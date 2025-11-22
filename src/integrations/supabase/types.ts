@@ -14,6 +14,621 @@ export type Database = {
   }
   public: {
     Tables: {
+      automation_logs: {
+        Row: {
+          automation_id: string
+          error_message: string | null
+          executed_at: string
+          id: string
+          status: string
+          task_id: string | null
+        }
+        Insert: {
+          automation_id: string
+          error_message?: string | null
+          executed_at?: string
+          id?: string
+          status: string
+          task_id?: string | null
+        }
+        Update: {
+          automation_id?: string
+          error_message?: string | null
+          executed_at?: string
+          id?: string
+          status?: string
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_logs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automations: {
+        Row: {
+          action_config: Json
+          action_type: Database["public"]["Enums"]["automation_action"]
+          created_at: string
+          enabled: boolean
+          id: string
+          scope_id: string | null
+          scope_type: Database["public"]["Enums"]["automation_scope"]
+          trigger: Database["public"]["Enums"]["automation_trigger"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          action_config?: Json
+          action_type: Database["public"]["Enums"]["automation_action"]
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          scope_id?: string | null
+          scope_type: Database["public"]["Enums"]["automation_scope"]
+          trigger: Database["public"]["Enums"]["automation_trigger"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          action_config?: Json
+          action_type?: Database["public"]["Enums"]["automation_action"]
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          scope_id?: string | null
+          scope_type?: Database["public"]["Enums"]["automation_scope"]
+          trigger?: Database["public"]["Enums"]["automation_trigger"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_channel_members: {
+        Row: {
+          channel_id: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["chat_channel_role"]
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["chat_channel_role"]
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["chat_channel_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_channel_members_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_channels: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          description: string | null
+          id: string
+          linked_folder_id: string | null
+          linked_list_id: string | null
+          linked_space_id: string | null
+          linked_task_id: string | null
+          name: string
+          type: Database["public"]["Enums"]["chat_channel_type"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          description?: string | null
+          id?: string
+          linked_folder_id?: string | null
+          linked_list_id?: string | null
+          linked_space_id?: string | null
+          linked_task_id?: string | null
+          name: string
+          type?: Database["public"]["Enums"]["chat_channel_type"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          description?: string | null
+          id?: string
+          linked_folder_id?: string | null
+          linked_list_id?: string | null
+          linked_space_id?: string | null
+          linked_task_id?: string | null
+          name?: string
+          type?: Database["public"]["Enums"]["chat_channel_type"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_channels_linked_folder_id_fkey"
+            columns: ["linked_folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_channels_linked_list_id_fkey"
+            columns: ["linked_list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_channels_linked_space_id_fkey"
+            columns: ["linked_space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_channels_linked_task_id_fkey"
+            columns: ["linked_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_channels_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          attachments: Json | null
+          channel_id: string
+          content: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          channel_id: string
+          content: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          channel_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboard_permissions: {
+        Row: {
+          created_at: string
+          dashboard_id: string
+          id: string
+          role: Database["public"]["Enums"]["permission_role"]
+          team_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dashboard_id: string
+          id?: string
+          role?: Database["public"]["Enums"]["permission_role"]
+          team_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dashboard_id?: string
+          id?: string
+          role?: Database["public"]["Enums"]["permission_role"]
+          team_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_permissions_dashboard_id_fkey"
+            columns: ["dashboard_id"]
+            isOneToOne: false
+            referencedRelation: "dashboards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_permissions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboards: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by_user_id: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by_user_id: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by_user_id?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboards_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      direct_message_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          user1_id: string
+          user2_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user1_id: string
+          user2_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user1_id?: string
+          user2_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_message_conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      direct_messages: {
+        Row: {
+          attachments: Json | null
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "direct_message_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_permissions: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          role: Database["public"]["Enums"]["permission_role"]
+          team_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          role?: Database["public"]["Enums"]["permission_role"]
+          team_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          role?: Database["public"]["Enums"]["permission_role"]
+          team_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_permissions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_permissions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by_user_id: string
+          id: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feed_post_comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "feed_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feed_post_reactions: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_post_reactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "feed_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feed_posts: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          linked_folder_id: string | null
+          linked_list_id: string | null
+          linked_space_id: string | null
+          linked_task_id: string | null
+          title: string | null
+          visibility: string
+          workspace_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          linked_folder_id?: string | null
+          linked_list_id?: string | null
+          linked_space_id?: string | null
+          linked_task_id?: string | null
+          title?: string | null
+          visibility?: string
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          linked_folder_id?: string | null
+          linked_list_id?: string | null
+          linked_space_id?: string | null
+          linked_task_id?: string | null
+          title?: string | null
+          visibility?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_posts_linked_folder_id_fkey"
+            columns: ["linked_folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_posts_linked_list_id_fkey"
+            columns: ["linked_list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_posts_linked_space_id_fkey"
+            columns: ["linked_space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_posts_linked_task_id_fkey"
+            columns: ["linked_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_posts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       folder_permissions: {
         Row: {
           created_at: string
@@ -448,6 +1063,70 @@ export type Database = {
           },
         ]
       }
+      team_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -534,10 +1213,23 @@ export type Database = {
       }
     }
     Enums: {
+      automation_action:
+        | "auto_assign_user"
+        | "auto_assign_team"
+        | "notify_channel"
+        | "set_status"
+      automation_scope: "workspace" | "space" | "folder" | "list"
+      automation_trigger:
+        | "on_task_created"
+        | "on_task_updated"
+        | "on_status_changed"
+      chat_channel_role: "owner" | "member"
+      chat_channel_type: "client" | "department" | "project" | "custom"
       list_view: "list" | "kanban" | "sprint"
       permission_role: "viewer" | "commenter" | "editor"
       status_scope: "workspace" | "space" | "folder" | "list"
       task_priority: "low" | "medium" | "high" | "urgent"
+      team_role: "leader" | "member"
       workspace_role: "owner" | "admin" | "member" | "limited_member" | "guest"
     }
     CompositeTypes: {
@@ -666,10 +1358,25 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      automation_action: [
+        "auto_assign_user",
+        "auto_assign_team",
+        "notify_channel",
+        "set_status",
+      ],
+      automation_scope: ["workspace", "space", "folder", "list"],
+      automation_trigger: [
+        "on_task_created",
+        "on_task_updated",
+        "on_status_changed",
+      ],
+      chat_channel_role: ["owner", "member"],
+      chat_channel_type: ["client", "department", "project", "custom"],
       list_view: ["list", "kanban", "sprint"],
       permission_role: ["viewer", "commenter", "editor"],
       status_scope: ["workspace", "space", "folder", "list"],
       task_priority: ["low", "medium", "high", "urgent"],
+      team_role: ["leader", "member"],
       workspace_role: ["owner", "admin", "member", "limited_member", "guest"],
     },
   },
