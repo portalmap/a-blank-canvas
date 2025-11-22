@@ -1127,6 +1127,53 @@ export type Database = {
           },
         ]
       }
+      user_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by_user_id: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          status: string
+          token: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by_user_id: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          status?: string
+          token?: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by_user_id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          status?: string
+          token?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_invitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -1191,6 +1238,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_old_invitations: { Args: never; Returns: undefined }
       get_user_id_by_email: { Args: { email: string }; Returns: string }
       get_user_workspace_role: {
         Args: { _user_id: string; _workspace_id: string }

@@ -17,6 +17,7 @@ import Automations from "./pages/Automations";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import AcceptInvite from "./pages/AcceptInvite";
 
 const queryClient = new QueryClient();
 
@@ -27,12 +28,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/accept-invite/:token" element={<AcceptInvite />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
                   <SidebarProvider>
                     <div className="flex min-h-screen w-full">
                       <AppSidebar />
