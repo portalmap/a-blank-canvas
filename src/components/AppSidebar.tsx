@@ -1,4 +1,4 @@
-import { Home, Folder, List, MessageSquare, Users, FileText, BarChart3, Settings, ChevronDown } from 'lucide-react';
+import { Home, Folder, MessageSquare, Users, FileText, BarChart3, Settings, Zap } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -10,11 +10,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
   SidebarHeader,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { CheckSquare } from 'lucide-react';
 
@@ -23,11 +21,12 @@ const mainNavItems = [
   { title: 'Spaces', url: '/spaces', icon: Folder },
 ];
 
-const futureModules = [
-  { title: 'Chat', icon: MessageSquare },
-  { title: 'Equipes', icon: Users },
-  { title: 'Documentos', icon: FileText },
-  { title: 'Painéis', icon: BarChart3 },
+const modulesNavItems = [
+  { title: 'Chat', url: '/chat', icon: MessageSquare },
+  { title: 'Equipes', url: '/teams', icon: Users },
+  { title: 'Documentos', url: '/documents', icon: FileText },
+  { title: 'Painéis', url: '/dashboards', icon: BarChart3 },
+  { title: 'Automações', url: '/automations', icon: Zap },
 ];
 
 export function AppSidebar() {
@@ -76,16 +75,20 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Módulos Futuros</SidebarGroupLabel>
+          <SidebarGroupLabel>Módulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {futureModules.map((item) => (
+              {modulesNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton disabled>
-                    <item.icon className="h-4 w-4 opacity-50" />
-                    {!isCollapsed && (
-                      <span className="opacity-50">{item.title}</span>
-                    )}
+                  <SidebarMenuButton asChild>
+                    <NavLink 
+                      to={item.url}
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!isCollapsed && <span>{item.title}</span>}
+                    </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -112,10 +115,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <div className="p-2 border-t border-sidebar-border">
-        <SidebarTrigger className="w-full" />
-      </div>
     </Sidebar>
   );
 }

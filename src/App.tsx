@@ -9,6 +9,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppSidebar } from "@/components/AppSidebar";
 import WorkspaceOverview from "./pages/WorkspaceOverview";
 import Spaces from "./pages/Spaces";
+import Chat from "./pages/Chat";
+import Teams from "./pages/Teams";
+import Documents from "./pages/Documents";
+import Dashboards from "./pages/Dashboards";
+import Automations from "./pages/Automations";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +39,11 @@ const App = () => (
                         <Routes>
                           <Route path="/" element={<WorkspaceOverview />} />
                           <Route path="/spaces" element={<Spaces />} />
+                          <Route path="/chat" element={<Chat />} />
+                          <Route path="/teams" element={<Teams />} />
+                          <Route path="/documents" element={<Documents />} />
+                          <Route path="/dashboards" element={<Dashboards />} />
+                          <Route path="/automations" element={<Automations />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </main>
