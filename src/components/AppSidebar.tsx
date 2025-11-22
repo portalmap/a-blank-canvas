@@ -46,7 +46,7 @@ export function AppSidebar() {
             <CheckSquare className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
           {!isCollapsed && (
-            <span className="font-semibold text-sidebar-foreground">TaskFlow</span>
+            <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
           )}
         </div>
       </SidebarHeader>
