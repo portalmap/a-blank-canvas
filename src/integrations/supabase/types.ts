@@ -1195,6 +1195,22 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: Database["public"]["Enums"]["workspace_role"]
       }
+      user_can_access_folder: {
+        Args: { _folder_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_can_access_list: {
+        Args: { _list_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_can_access_space: {
+        Args: { _space_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_can_access_task: {
+        Args: { _task_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_has_space_permission: {
         Args: { _space_id: string; _user_id: string }
         Returns: boolean
