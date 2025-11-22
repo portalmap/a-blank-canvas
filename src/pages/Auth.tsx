@@ -44,7 +44,7 @@ const Auth = () => {
               <CheckSquare className="h-10 w-10 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">TaskFlow</h1>
+          <h1 className="text-3xl font-bold tracking-tight">MAP Flow</h1>
           <p className="text-muted-foreground">Gerencie projetos com eficiência</p>
         </div>
 
