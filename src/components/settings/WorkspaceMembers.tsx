@@ -47,7 +47,7 @@ const roleBadgeVariants: Record<WorkspaceRole, "default" | "secondary" | "outlin
 export function WorkspaceMembers() {
   const { data: workspaces } = useWorkspaces();
   const { user: currentUser } = useAuth();
-  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberUserId, setNewMemberUserId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<WorkspaceRole>("member");
   const queryClient = useQueryClient();
 
@@ -73,21 +73,20 @@ export function WorkspaceMembers() {
   const addMember = useMutation({
     mutationFn: async () => {
       if (!currentWorkspace) throw new Error("Nenhum workspace encontrado");
-      if (!newMemberEmail.trim()) throw new Error("Email é obrigatório");
+      if (!newMemberUserId.trim()) throw new Error("ID do usuário é obrigatório");
 
-      // First, check if user exists in auth.users by email
-      const { data: userData, error: userError } = await supabase
-        .rpc('get_user_id_by_email', { email: newMemberEmail.trim() });
-
-      if (userError) throw new Error("Erro ao buscar usuário");
-      if (!userData) throw new Error("Usuário não encontrado");
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(newMemberUserId.trim())) {
+        throw new Error("ID do usuário inválido");
+      }
 
       // Add member to workspace
       const { error } = await supabase
         .from('workspace_members')
         .insert({
           workspace_id: currentWorkspace.id,
-          user_id: userData,
+          user_id: newMemberUserId.trim(),
           role: newMemberRole,
         });
 
@@ -95,12 +94,15 @@ export function WorkspaceMembers() {
         if (error.code === '23505') {
           throw new Error("Este usuário já é membro do workspace");
         }
+        if (error.code === '23503') {
+          throw new Error("Usuário não encontrado");
+        }
         throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspace-members'] });
-      setNewMemberEmail("");
+      setNewMemberUserId("");
       setNewMemberRole("member");
       toast.success('Membro adicionado com sucesso!');
     },
@@ -175,14 +177,18 @@ export function WorkspaceMembers() {
           <CardContent>
             <div className="flex gap-4">
               <div className="flex-1 space-y-2">
-                <Label htmlFor="member-email">Email do Usuário</Label>
+                <Label htmlFor="member-user-id">ID do Usuário</Label>
                 <Input 
-                  id="member-email"
-                  type="email"
-                  placeholder="email@exemplo.com"
-                  value={newMemberEmail}
-                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  id="member-user-id"
+                  type="text"
+                  placeholder="UUID do usuário (ex: 123e4567-e89b-12d3-a456-426614174000)"
+                  value={newMemberUserId}
+                  onChange={(e) => setNewMemberUserId(e.target.value)}
+                  className="font-mono text-sm"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Cole o ID do usuário que deseja adicionar ao workspace
+                </p>
               </div>
               <div className="w-48 space-y-2">
                 <Label htmlFor="member-role">Role</Label>
@@ -201,7 +207,7 @@ export function WorkspaceMembers() {
               <div className="flex items-end">
                 <Button 
                   onClick={() => addMember.mutate()}
-                  disabled={addMember.isPending || !newMemberEmail.trim()}
+                  disabled={addMember.isPending || !newMemberUserId.trim()}
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Adicionar
