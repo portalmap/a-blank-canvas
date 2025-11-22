@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { WorkspaceMembers } from "@/components/settings/WorkspaceMembers";
 import { UserProfile } from "@/components/settings/UserProfile";
 import { WorkspaceSettings } from "@/components/settings/WorkspaceSettings";
+import { UserInviteForm } from "@/components/settings/UserInviteForm";
+import { GuestPermissionsManager } from "@/components/settings/GuestPermissionsManager";
 
 export default function Settings() {
   return (
@@ -15,10 +17,12 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
+          <TabsTrigger value="invites">Convites</TabsTrigger>
+          <TabsTrigger value="guests">Convidados</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -31,6 +35,14 @@ export default function Settings() {
 
         <TabsContent value="members" className="mt-6">
           <WorkspaceMembers />
+        </TabsContent>
+
+        <TabsContent value="invites" className="mt-6">
+          <UserInviteForm />
+        </TabsContent>
+
+        <TabsContent value="guests" className="mt-6">
+          <GuestPermissionsManager />
         </TabsContent>
       </Tabs>
     </div>
