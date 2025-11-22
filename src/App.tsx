@@ -14,6 +14,7 @@ import Teams from "./pages/Teams";
 import Documents from "./pages/Documents";
 import Dashboards from "./pages/Dashboards";
 import Automations from "./pages/Automations";
+import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -44,6 +45,7 @@ const App = () => (
                           <Route path="/documents" element={<Documents />} />
                           <Route path="/dashboards" element={<Dashboards />} />
                           <Route path="/automations" element={<Automations />} />
+                          <Route path="/settings" element={<Settings />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </main>
