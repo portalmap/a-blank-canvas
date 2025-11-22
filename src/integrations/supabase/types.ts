@@ -1204,6 +1204,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -1274,6 +1295,14 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: Database["public"]["Enums"]["workspace_role"]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_global_owner: { Args: { _user_id: string }; Returns: boolean }
       user_can_access_folder: {
         Args: { _folder_id: string; _user_id: string }
         Returns: boolean
@@ -1312,6 +1341,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "global_owner" | "admin" | "user"
       automation_action:
         | "auto_assign_user"
         | "auto_assign_team"
@@ -1457,6 +1487,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["global_owner", "admin", "user"],
       automation_action: [
         "auto_assign_user",
         "auto_assign_team",
