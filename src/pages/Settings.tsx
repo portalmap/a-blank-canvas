@@ -5,6 +5,7 @@ import { UserProfile } from "@/components/settings/UserProfile";
 import { WorkspaceSettings } from "@/components/settings/WorkspaceSettings";
 import { UserInviteForm } from "@/components/settings/UserInviteForm";
 import { GuestPermissionsManager } from "@/components/settings/GuestPermissionsManager";
+import { UserManagement } from "@/components/settings/UserManagement";
 
 export default function Settings() {
   return (
@@ -17,9 +18,10 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[700px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
+          <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
           <TabsTrigger value="invites">Convites</TabsTrigger>
           <TabsTrigger value="guests">Convidados</TabsTrigger>
@@ -31,6 +33,10 @@ export default function Settings() {
 
         <TabsContent value="workspace" className="mt-6">
           <WorkspaceSettings />
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-6">
+          <UserManagement />
         </TabsContent>
 
         <TabsContent value="members" className="mt-6">
