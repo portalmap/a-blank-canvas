@@ -22,6 +22,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -56,6 +57,26 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        status: {
+          todo: "hsl(var(--status-todo))",
+          "todo-foreground": "hsl(var(--status-todo-foreground))",
+          progress: "hsl(var(--status-progress))",
+          "progress-foreground": "hsl(var(--status-progress-foreground))",
+          review: "hsl(var(--status-review))",
+          "review-foreground": "hsl(var(--status-review-foreground))",
+          done: "hsl(var(--status-done))",
+          "done-foreground": "hsl(var(--status-done-foreground))",
+        },
+        priority: {
+          low: "hsl(var(--priority-low))",
+          "low-foreground": "hsl(var(--priority-low-foreground))",
+          medium: "hsl(var(--priority-medium))",
+          "medium-foreground": "hsl(var(--priority-medium-foreground))",
+          high: "hsl(var(--priority-high))",
+          "high-foreground": "hsl(var(--priority-high-foreground))",
+          urgent: "hsl(var(--priority-urgent))",
+          "urgent-foreground": "hsl(var(--priority-urgent-foreground))",
         },
       },
       borderRadius: {
