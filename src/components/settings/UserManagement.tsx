@@ -78,18 +78,19 @@ export function UserManagement() {
   const { data: members, isLoading } = useQuery({
     queryKey: ["workspace-members-detailed", currentWorkspace?.workspace_id, isGlobalOwner],
     queryFn: async () => {
-      // Se for proprietário global, buscar TODOS os usuários
+      // Se for proprietário global, buscar TODOS os usuários diretamente do auth
       if (isGlobalOwner) {
-        // Buscar todos os membros de todos os workspaces
-        const { data: membersData, error: membersError } = await supabase
-          .from("workspace_members")
-          .select("*")
-          .order("created_at", { ascending: false });
+        // Buscar todos os usuários usando a função de banco de dados
+        const { data: allUsers, error: usersError } = await supabase.rpc(
+          "get_all_users_for_global_owner"
+        );
 
-        if (membersError) throw membersError;
+        if (usersError) throw usersError;
+        if (!allUsers) return [];
 
-        // Buscar perfis de todos os membros
-        const userIds = [...new Set(membersData.map(m => m.user_id))];
+        const userIds = allUsers.map((u: any) => u.user_id);
+
+        // Buscar perfis
         const { data: profilesData, error: profilesError } = await supabase
           .from("profiles")
           .select("*")
@@ -97,17 +98,11 @@ export function UserManagement() {
 
         if (profilesError) throw profilesError;
 
-        // Buscar emails via edge function
-        const { data: emailData, error: emailError } = await supabase.functions.invoke(
-          "get-user-emails",
-          {
-            body: { userIds }
-          }
-        );
-
-        if (emailError) {
-          console.error("Error fetching emails:", emailError);
-        }
+        // Buscar roles de workspace (se existirem)
+        const { data: workspaceMembersData } = await supabase
+          .from("workspace_members")
+          .select("*")
+          .in("user_id", userIds);
 
         // Buscar papéis globais
         const { data: rolesData } = await supabase
@@ -116,15 +111,19 @@ export function UserManagement() {
           .in("user_id", userIds);
         
         // Combinar dados
-        return membersData.map(member => {
-          const profile = profilesData?.find(p => p.id === member.user_id);
-          const emailInfo = emailData?.users?.find((u: any) => u.id === member.user_id);
-          const globalRole = rolesData?.find(r => r.user_id === member.user_id && r.role === "global_owner");
+        return allUsers.map((user: any) => {
+          const profile = profilesData?.find(p => p.id === user.user_id);
+          const workspaceMember = workspaceMembersData?.find(m => m.user_id === user.user_id);
+          const globalRole = rolesData?.find(r => r.user_id === user.user_id && r.role === "global_owner");
           
           return {
-            ...member,
+            id: workspaceMember?.id || user.user_id,
+            user_id: user.user_id,
+            role: workspaceMember?.role || "guest" as WorkspaceRole,
+            created_at: user.created_at,
+            workspace_id: workspaceMember?.workspace_id || null,
             profile: profile || { full_name: null, avatar_url: null, phone: null, bio: null },
-            email: emailInfo?.email || profile?.full_name || "Sem email",
+            email: user.email || profile?.full_name || "Sem email",
             isGlobalOwner: !!globalRole,
           };
         });
