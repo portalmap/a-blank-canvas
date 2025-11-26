@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Mail, Send, X, Copy, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Mail, Send, X, Copy, Clock, CheckCircle, XCircle, UserPlus } from "lucide-react";
 import { useWorkspaces } from "@/hooks/useWorkspaces";
+import { UserAddDialog } from "./UserAddDialog";
 
 type WorkspaceRole = "owner" | "admin" | "member" | "limited_member" | "guest";
 
@@ -55,6 +56,7 @@ export function UserInviteForm() {
   const { data: workspaces } = useWorkspaces();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("member");
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const queryClient = useQueryClient();
 
   const currentWorkspace = workspaces?.[0];
@@ -203,14 +205,26 @@ export function UserInviteForm() {
               </Select>
             </div>
 
-            <Button
-              onClick={() => createInvitation.mutate()}
-              disabled={createInvitation.isPending || !email.trim()}
-              className="w-full"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Enviar Convite
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => createInvitation.mutate()}
+                disabled={createInvitation.isPending || !email.trim()}
+                className="flex-1"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Enviar Convite
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAddDialog(true)}
+                disabled={!currentWorkspace}
+                className="flex-1"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Adicionar Manualmente
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -276,6 +290,12 @@ export function UserInviteForm() {
           </CardContent>
         </Card>
       )}
+
+      <UserAddDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        workspaceId={currentWorkspace?.id || ''}
+      />
     </div>
   );
 }
