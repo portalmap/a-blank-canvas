@@ -35,28 +35,35 @@ export function UserManagement() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<WorkspaceRole | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<WorkspaceRole | "all" | "global_owner" | "owner" | "workspace_owner">("all");
   const [sortBy, setSortBy] = useState<"name" | "date" | "role">("name");
   const [editUser, setEditUser] = useState<any | null>(null);
   const [detailsUser, setDetailsUser] = useState<any | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<any | null>(null);
 
-  // Verificar se é proprietário global
-  const { data: isGlobalOwner } = useQuery({
-    queryKey: ["is-global-owner", currentUser?.id],
+  // Verificar se é administrador do sistema (global_owner ou owner)
+  const { data: userRoles } = useQuery({
+    queryKey: ["user-system-roles", currentUser?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", currentUser?.id)
-        .eq("role", "global_owner")
-        .maybeSingle();
+        .in("role", ["global_owner", "owner"]);
 
       if (error) throw error;
-      return !!data;
+      
+      return {
+        isGlobalOwner: data?.some(r => r.role === "global_owner") || false,
+        isOwner: data?.some(r => r.role === "owner") || false,
+        isSystemAdmin: (data?.length || 0) > 0,
+      };
     },
     enabled: !!currentUser?.id,
   });
+
+  const isSystemAdmin = userRoles?.isSystemAdmin || false;
+  const isGlobalOwner = userRoles?.isGlobalOwner || false;
 
   // Buscar workspace atual do usuário
   const { data: currentWorkspace } = useQuery({
@@ -71,18 +78,18 @@ export function UserManagement() {
       if (error) throw error;
       return data;
     },
-    enabled: !!currentUser?.id && !isGlobalOwner,
+    enabled: !!currentUser?.id && !isSystemAdmin,
   });
 
-  // Buscar membros (todos se for global owner, ou do workspace específico)
+  // Buscar membros (todos se for system admin, ou do workspace específico)
   const { data: members, isLoading } = useQuery({
-    queryKey: ["workspace-members-detailed", currentWorkspace?.workspace_id, isGlobalOwner],
+    queryKey: ["workspace-members-detailed", currentWorkspace?.workspace_id, isSystemAdmin],
     queryFn: async () => {
-      // Se for proprietário global, buscar TODOS os usuários diretamente do auth
-      if (isGlobalOwner) {
-        // Buscar todos os usuários usando a função de banco de dados
+      // Se for administrador do sistema, buscar TODOS os usuários
+      if (isSystemAdmin) {
+        // Buscar todos os usuários usando a nova função
         const { data: allUsers, error: usersError } = await supabase.rpc(
-          "get_all_users_for_global_owner"
+          "get_all_users_for_system_admin"
         );
 
         if (usersError) throw usersError;
@@ -104,7 +111,7 @@ export function UserManagement() {
           .select("*")
           .in("user_id", userIds);
 
-        // Buscar papéis globais
+        // Buscar papéis globais (global_owner e owner)
         const { data: rolesData } = await supabase
           .from("user_roles")
           .select("*")
@@ -115,6 +122,7 @@ export function UserManagement() {
           const profile = profilesData?.find(p => p.id === user.user_id);
           const workspaceMember = workspaceMembersData?.find(m => m.user_id === user.user_id);
           const globalRole = rolesData?.find(r => r.user_id === user.user_id && r.role === "global_owner");
+          const ownerRole = rolesData?.find(r => r.user_id === user.user_id && r.role === "owner");
           
           return {
             id: workspaceMember?.id || user.user_id,
@@ -125,6 +133,7 @@ export function UserManagement() {
             profile: profile || { full_name: null, avatar_url: null, phone: null, bio: null },
             email: user.email || profile?.full_name || "Sem email",
             isGlobalOwner: !!globalRole,
+            isOwner: !!ownerRole,
           };
         });
       }
@@ -172,10 +181,11 @@ export function UserManagement() {
           profile: profile || { full_name: null, avatar_url: null, phone: null, bio: null },
           email: emailInfo?.email || profile?.full_name || "Sem email",
           isGlobalOwner: false,
+          isOwner: false,
         };
       });
     },
-    enabled: !!currentUser?.id && (isGlobalOwner || !!currentWorkspace?.workspace_id),
+    enabled: !!currentUser?.id && (isSystemAdmin || !!currentWorkspace?.workspace_id),
   });
 
   // Mutation para remover membro
@@ -205,7 +215,22 @@ export function UserManagement() {
       const matchesSearch =
         member.profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         member.email.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesRole = roleFilter === "all" || member.role === roleFilter;
+      
+      // Lógica de filtro por role
+      let matchesRole = true;
+      if (roleFilter === "global_owner") {
+        matchesRole = member.isGlobalOwner;
+      } else if (roleFilter === "owner") {
+        // Filtrar por proprietário técnico
+        matchesRole = member.isOwner && !member.isGlobalOwner;
+      } else if (roleFilter === "workspace_owner") {
+        // Filtrar por proprietário de workspace
+        matchesRole = member.role === "owner" && !member.isGlobalOwner && !member.isOwner;
+      } else if (roleFilter !== "all") {
+        // Para outros roles, verificar o workspace role
+        matchesRole = member.role === roleFilter;
+      }
+      
       return matchesSearch && matchesRole;
     });
 
@@ -227,12 +252,16 @@ export function UserManagement() {
     return filtered;
   }, [members, searchQuery, roleFilter, sortBy]);
 
-  const canEdit = isGlobalOwner || currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin";
-  const canDelete = (memberRole: WorkspaceRole, memberIsGlobalOwner?: boolean) => {
+  const canEdit = isSystemAdmin || currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin";
+  const canDelete = (memberRole: WorkspaceRole, memberIsGlobalOwner?: boolean, memberIsOwner?: boolean) => {
     // Proprietário global não pode ser deletado
     if (memberIsGlobalOwner) return false;
-    // Proprietário global pode deletar qualquer um (exceto outro global owner)
-    if (isGlobalOwner) return !memberIsGlobalOwner;
+    // Proprietário (técnico) também não pode ser deletado via workspace
+    if (memberIsOwner) return false;
+    // Proprietário global pode deletar qualquer um (exceto global_owner e owner)
+    if (isGlobalOwner) return !memberIsGlobalOwner && !memberIsOwner;
+    // Proprietário (técnico) pode deletar workspace members mas não outros system admins
+    if (userRoles?.isOwner) return !memberIsGlobalOwner && !memberIsOwner;
     if (currentWorkspace?.role === "owner") return memberRole !== "owner";
     if (currentWorkspace?.role === "admin") return memberRole !== "owner" && memberRole !== "admin";
     return false;
@@ -256,7 +285,7 @@ export function UserManagement() {
             <div>
               <CardTitle>Gestão de Usuários</CardTitle>
               <CardDescription>
-                {isGlobalOwner ? "Visualizando todos os usuários do sistema" : `${filteredMembers.length} usuário(s) encontrado(s)`}
+                {isSystemAdmin ? "Visualizando todos os usuários do sistema" : `${filteredMembers.length} usuário(s) encontrado(s)`}
               </CardDescription>
             </div>
             <Button>
@@ -285,11 +314,13 @@ export function UserManagement() {
                 <UserCard
                   key={member.id}
                   userId={member.user_id}
-                  fullName={`${member.profile.full_name || member.email}${member.isGlobalOwner ? " 👑" : ""}`}
+                  fullName={member.profile.full_name || member.email}
                   email={member.email}
                   avatarUrl={member.profile.avatar_url || undefined}
                   role={member.role}
                   createdAt={member.created_at}
+                  isGlobalOwner={member.isGlobalOwner}
+                  isOwner={member.isOwner}
                   onEdit={() =>
                     setEditUser({
                       id: member.user_id,
@@ -300,6 +331,8 @@ export function UserManagement() {
                       bio: member.profile.bio,
                       role: member.role,
                       workspaceMemberId: member.id,
+                      isGlobalOwner: member.isGlobalOwner,
+                      isOwner: member.isOwner,
                     })
                   }
                   onDelete={() => removeMemberMutation.mutate(member.id)}
@@ -316,7 +349,7 @@ export function UserManagement() {
                     })
                   }
                   canEdit={canEdit}
-                  canDelete={canDelete(member.role, member.isGlobalOwner)}
+                  canDelete={canDelete(member.role, member.isGlobalOwner, member.isOwner)}
                 />
               ))
             )}
