@@ -8,9 +8,10 @@ import { UserFilters } from "./UserFilters";
 import { UserEditDialog } from "./UserEditDialog";
 import { UserDetailsDrawer } from "./UserDetailsDrawer";
 import { UserPermissionsDialog } from "./UserPermissionsDialog";
+import { UserAddDialog } from "./UserAddDialog";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus, UserCog } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
@@ -40,6 +41,7 @@ export function UserManagement() {
   const [editUser, setEditUser] = useState<any | null>(null);
   const [detailsUser, setDetailsUser] = useState<any | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<any | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   // Verificar se é administrador do sistema (global_owner ou owner)
   const { data: userRoles } = useQuery({
@@ -288,10 +290,20 @@ export function UserManagement() {
                 {isSystemAdmin ? "Visualizando todos os usuários do sistema" : `${filteredMembers.length} usuário(s) encontrado(s)`}
               </CardDescription>
             </div>
-            <Button>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Convidar Usuário
-            </Button>
+            <div className="flex gap-2">
+              <Button>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Convidar Usuário
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setShowAddDialog(true)}
+                disabled={!currentWorkspace?.workspace_id}
+              >
+                <UserCog className="h-4 w-4 mr-2" />
+                Adicionar Manualmente
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -392,6 +404,12 @@ export function UserManagement() {
           }}
         />
       )}
+
+      <UserAddDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        workspaceId={currentWorkspace?.workspace_id || ''}
+      />
     </>
   );
 }
