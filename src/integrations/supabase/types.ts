@@ -1349,7 +1349,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "global_owner" | "admin" | "user"
+      app_role: "global_owner" | "admin" | "user" | "owner"
       automation_action:
         | "auto_assign_user"
         | "auto_assign_team"
@@ -1495,7 +1495,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["global_owner", "admin", "user"],
+      app_role: ["global_owner", "admin", "user", "owner"],
       automation_action: [
         "auto_assign_user",
         "auto_assign_team",
