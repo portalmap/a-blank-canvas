@@ -1289,8 +1289,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_user: {
+        Args: { _editor_id: string; _target_user_id: string }
+        Returns: boolean
+      }
       expire_old_invitations: { Args: never; Returns: undefined }
       get_all_users_for_global_owner: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          user_id: string
+        }[]
+      }
+      get_all_users_for_system_admin: {
         Args: never
         Returns: {
           created_at: string
@@ -1311,6 +1323,8 @@ export type Database = {
         Returns: boolean
       }
       is_global_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_system_admin: { Args: { _user_id: string }; Returns: boolean }
       user_can_access_folder: {
         Args: { _folder_id: string; _user_id: string }
         Returns: boolean

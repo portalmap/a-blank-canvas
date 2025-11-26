@@ -26,6 +26,8 @@ interface UserEditDialogProps {
     bio?: string;
     role: WorkspaceRole;
     workspaceMemberId: string;
+    isGlobalOwner?: boolean;
+    isOwner?: boolean;
   };
   currentUserRole: WorkspaceRole;
   workspaceId: string;
@@ -47,19 +49,60 @@ export function UserEditDialog({
   const [role, setRole] = useState<WorkspaceRole>(user.role);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isCurrentUserGlobalOwner, setIsCurrentUserGlobalOwner] = useState(false);
+  const [isCurrentUserOwner, setIsCurrentUserOwner] = useState(false);
   
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setCurrentUserId(data.user?.id || null);
-    });
+    const checkPermissions = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      setCurrentUserId(userData.user?.id || null);
+      
+      if (userData.user?.id) {
+        // Verificar se o usuário atual é system admin
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userData.user.id)
+          .in("role", ["global_owner", "owner"]);
+        
+        setIsCurrentUserGlobalOwner(roles?.some(r => r.role === "global_owner") || false);
+        setIsCurrentUserOwner(roles?.some(r => r.role === "owner") || false);
+      }
+    };
+    
+    checkPermissions();
   }, []);
 
   const isEditingSelf = user.id === currentUserId;
-  const canEditRole = currentUserRole === "owner" || currentUserRole === "admin";
+  const isCurrentUserSystemAdmin = isCurrentUserGlobalOwner || isCurrentUserOwner;
+  
+  // System admins (global_owner e owner) não podem ser editados por outros
+  const canEditThisUser = () => {
+    // Se estiver editando a si mesmo, pode editar perfil (mas não role de system admin)
+    if (isEditingSelf) return true;
+    
+    // Proprietário Global pode editar qualquer um
+    if (isCurrentUserGlobalOwner) return true;
+    
+    // Owner (técnico) pode editar qualquer um exceto Global Owner
+    if (isCurrentUserOwner && !user.isGlobalOwner) return true;
+    
+    // Workspace owners/admins podem editar membros normais (não system admins)
+    if (user.isGlobalOwner || user.isOwner) return false;
+    
+    return currentUserRole === "owner" || currentUserRole === "admin";
+  };
+  
+  const canEditRole = (currentUserRole === "owner" || currentUserRole === "admin") && !user.isGlobalOwner && !user.isOwner;
   const isOwner = user.role === "owner";
   const roleChangingToNonOwner = isOwner && role !== "owner";
 
   const handleSave = async () => {
+    if (!canEditThisUser()) {
+      toast.error("Você não tem permissão para editar este usuário");
+      return;
+    }
+    
     setLoading(true);
     try {
       // Atualizar perfil
@@ -75,7 +118,7 @@ export function UserEditDialog({
       if (profileError) throw profileError;
 
       // Atualizar role se necessário e permitido
-      if (canEditRole && role !== user.role) {
+      if (canEditRole && role !== user.role && !user.isGlobalOwner && !user.isOwner) {
         const { error: roleError } = await supabase
           .from("workspace_members")
           .update({ role })
@@ -105,6 +148,17 @@ export function UserEditDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {(user.isGlobalOwner || user.isOwner) && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {user.isGlobalOwner 
+                  ? "👑 Este usuário é Proprietário Global e possui controle total do sistema."
+                  : "🔧 Este usuário é Proprietário (Técnico) com acesso completo ao sistema."}
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="flex justify-center">
             <Avatar className="h-20 w-20">
               <AvatarImage src={user.avatarUrl} alt={fullName} />

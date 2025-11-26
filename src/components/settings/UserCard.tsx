@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Crown, Shield, User, MoreVertical, Edit, Trash2, Eye } from "lucide-react";
+import { Crown, Shield, User, MoreVertical, Edit, Trash2, Eye, Wrench } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,8 @@ interface UserCardProps {
   avatarUrl?: string;
   role: WorkspaceRole;
   createdAt: string;
+  isGlobalOwner?: boolean;
+  isOwner?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onViewDetails: () => void;
@@ -41,14 +43,32 @@ export function UserCard({
   avatarUrl,
   role,
   createdAt,
+  isGlobalOwner,
+  isOwner,
   onEdit,
   onDelete,
   onViewDetails,
   canEdit,
   canDelete,
 }: UserCardProps) {
-  const config = roleConfig[role];
-  const RoleIcon = config.icon;
+  // Determinar qual badge/ícone mostrar
+  let displayConfig = roleConfig[role];
+  let displayLabel = displayConfig.label;
+  let RoleIcon = displayConfig.icon;
+  let badgeVariant = displayConfig.variant;
+  
+  // Proprietário Global tem prioridade máxima
+  if (isGlobalOwner) {
+    displayLabel = "Proprietário Global";
+    RoleIcon = Crown;
+    badgeVariant = "default";
+  } 
+  // Proprietário (técnico) vem em seguida
+  else if (isOwner) {
+    displayLabel = "Proprietário";
+    RoleIcon = Wrench;
+    badgeVariant = "secondary";
+  }
   const initials = fullName
     ?.split(" ")
     .map((n) => n[0])
@@ -71,8 +91,8 @@ export function UserCard({
         <p className="text-sm text-muted-foreground truncate">{email}</p>
       </div>
 
-      <Badge variant={config.variant as any} className="whitespace-nowrap">
-        {config.label}
+      <Badge variant={badgeVariant as any} className="whitespace-nowrap">
+        {isGlobalOwner && "👑 "}{isOwner && !isGlobalOwner && "🔧 "}{displayLabel}
       </Badge>
 
       <div className="flex items-center gap-2">
