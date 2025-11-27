@@ -34,22 +34,20 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
 
-    // Initialize regular client for auth check
-    const authHeader = req.headers.get("Authorization")!;
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    // Extract JWT token from Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Não autorizado" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
-    // Verify the requesting user is authenticated
-    const { data: { user: requestingUser }, error: authError } = await supabaseClient.auth.getUser();
+    const token = authHeader.replace("Bearer ", "");
+
+    // Verify the requesting user is authenticated using admin client with token
+    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !requestingUser) {
       console.error("Authentication error:", authError);
       return new Response(
