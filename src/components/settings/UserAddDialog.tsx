@@ -105,9 +105,9 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Adicionar Usuário ao Workspace</DialogTitle>
+          <DialogTitle>Adicionar Usuário</DialogTitle>
           <DialogDescription>
-            Adicione um usuário existente diretamente ao workspace sem enviar convite por email.
+            Adicione um usuário ao sistema. Se não existir, será criado automaticamente e receberá um email para definir a senha.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
