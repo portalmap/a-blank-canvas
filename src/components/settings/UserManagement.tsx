@@ -67,20 +67,33 @@ export function UserManagement() {
   const isSystemAdmin = userRoles?.isSystemAdmin || false;
   const isGlobalOwner = userRoles?.isGlobalOwner || false;
 
-  // Buscar workspace atual do usuário
+  // Buscar workspace atual do usuário (ou primeiro workspace para system admins)
   const { data: currentWorkspace } = useQuery({
-    queryKey: ["current-workspace", currentUser?.id],
+    queryKey: ["current-workspace", currentUser?.id, isSystemAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("workspace_members")
-        .select("workspace_id, role")
-        .eq("user_id", currentUser?.id)
-        .single();
+      if (isSystemAdmin) {
+        // Para system admins, buscar o primeiro workspace disponível
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select("id")
+          .limit(1)
+          .single();
+        
+        if (error) throw error;
+        return { workspace_id: data.id, role: 'owner' as const };
+      } else {
+        // Para usuários normais, buscar seu workspace
+        const { data, error } = await supabase
+          .from("workspace_members")
+          .select("workspace_id, role")
+          .eq("user_id", currentUser?.id)
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) throw error;
+        return data;
+      }
     },
-    enabled: !!currentUser?.id && !isSystemAdmin,
+    enabled: !!currentUser?.id,
   });
 
   // Buscar membros (todos se for system admin, ou do workspace específico)

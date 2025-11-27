@@ -22,14 +22,25 @@ import {
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
-type WorkspaceRole = 'owner' | 'admin' | 'member' | 'limited_member' | 'guest';
+type RoleType = 'global_owner' | 'owner_technical' | 'workspace_owner' | 'admin' | 'member' | 'limited_member' | 'guest';
 
-const roleLabels: Record<WorkspaceRole, string> = {
-  owner: 'Proprietário',
+const roleLabels: Record<RoleType, string> = {
+  global_owner: 'Proprietário Global',
+  owner_technical: 'Proprietário (Técnico)',
+  workspace_owner: 'Proprietário Workspace',
   admin: 'Administrador',
   member: 'Membro',
   limited_member: 'Membro Limitado',
   guest: 'Convidado',
+};
+
+const isAppRole = (role: RoleType): role is 'global_owner' | 'owner_technical' => {
+  return role === 'global_owner' || role === 'owner_technical';
+};
+
+const getWorkspaceRole = (role: RoleType): 'owner' | 'admin' | 'member' | 'limited_member' | 'guest' => {
+  if (role === 'workspace_owner') return 'owner';
+  return role as 'admin' | 'member' | 'limited_member' | 'guest';
 };
 
 interface UserAddDialogProps {
@@ -40,13 +51,18 @@ interface UserAddDialogProps {
 
 export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialogProps) {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<WorkspaceRole>('member');
+  const [role, setRole] = useState<RoleType>('member');
   const queryClient = useQueryClient();
 
   const addUser = useMutation({
     mutationFn: async () => {
-      if (!email || !workspaceId) {
-        throw new Error('Email e workspace são obrigatórios');
+      if (!email) {
+        throw new Error('Email é obrigatório');
+      }
+
+      // For workspace roles, workspace is required
+      if (!isAppRole(role) && !workspaceId) {
+        throw new Error('Workspace é obrigatório para roles de workspace');
       }
 
       // Get user ID by email
@@ -63,20 +79,39 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
         throw new Error('Usuário não encontrado com este email');
       }
 
-      // Add user to workspace
-      const { error: insertError } = await supabase
-        .from('workspace_members')
-        .insert({
-          workspace_id: workspaceId,
-          user_id: userId,
-          role: role,
-        });
+      // If it's an app role (global_owner or owner), insert into user_roles
+      if (isAppRole(role)) {
+        const appRole = role === 'global_owner' ? 'global_owner' : 'owner';
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: userId,
+            role: appRole,
+          });
 
-      if (insertError) {
-        if (insertError.code === '23505') {
-          throw new Error('Usuário já é membro deste workspace');
+        if (insertError) {
+          if (insertError.code === '23505') {
+            throw new Error('Usuário já possui este role global');
+          }
+          throw insertError;
         }
-        throw insertError;
+      } else {
+        // Otherwise, insert into workspace_members
+        const workspaceRole = getWorkspaceRole(role);
+        const { error: insertError } = await supabase
+          .from('workspace_members')
+          .insert({
+            workspace_id: workspaceId,
+            user_id: userId,
+            role: workspaceRole,
+          });
+
+        if (insertError) {
+          if (insertError.code === '23505') {
+            throw new Error('Usuário já é membro deste workspace');
+          }
+          throw insertError;
+        }
       }
     },
     onSuccess: () => {
@@ -120,7 +155,7 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
             </div>
             <div className="grid gap-2">
               <Label htmlFor="role">Função</Label>
-              <Select value={role} onValueChange={(value) => setRole(value as WorkspaceRole)}>
+              <Select value={role} onValueChange={(value) => setRole(value as RoleType)}>
                 <SelectTrigger id="role">
                   <SelectValue />
                 </SelectTrigger>
