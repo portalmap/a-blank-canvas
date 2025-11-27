@@ -65,57 +65,27 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
         throw new Error('Workspace é obrigatório para roles de workspace');
       }
 
-      // Get user ID by email
-      const { data: userId, error: getUserError } = await supabase.rpc(
-        'get_user_id_by_email',
-        { email }
-      );
+      // Call edge function to add/create user
+      const { data, error } = await supabase.functions.invoke('add-user-with-invite', {
+        body: {
+          email,
+          role,
+          workspaceId,
+        },
+      });
 
-      if (getUserError) {
-        throw new Error('Erro ao buscar usuário: ' + getUserError.message);
+      if (error) {
+        throw new Error(error.message || 'Erro ao adicionar usuário');
       }
 
-      if (!userId) {
-        throw new Error('Usuário não encontrado com este email');
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
-      // If it's an app role (global_owner or owner), insert into user_roles
-      if (isAppRole(role)) {
-        const appRole = role === 'global_owner' ? 'global_owner' : 'owner';
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: userId,
-            role: appRole,
-          });
-
-        if (insertError) {
-          if (insertError.code === '23505') {
-            throw new Error('Usuário já possui este role global');
-          }
-          throw insertError;
-        }
-      } else {
-        // Otherwise, insert into workspace_members
-        const workspaceRole = getWorkspaceRole(role);
-        const { error: insertError } = await supabase
-          .from('workspace_members')
-          .insert({
-            workspace_id: workspaceId,
-            user_id: userId,
-            role: workspaceRole,
-          });
-
-        if (insertError) {
-          if (insertError.code === '23505') {
-            throw new Error('Usuário já é membro deste workspace');
-          }
-          throw insertError;
-        }
-      }
+      return data;
     },
-    onSuccess: () => {
-      toast.success('Usuário adicionado com sucesso!');
+    onSuccess: (data) => {
+      toast.success(data?.message || 'Usuário adicionado com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['workspace-members'] });
       setEmail('');
       setRole('member');

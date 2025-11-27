@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.get-user-emails]
 verify_jwt = true
+
+[functions.add-user-with-invite]
+verify_jwt = true
