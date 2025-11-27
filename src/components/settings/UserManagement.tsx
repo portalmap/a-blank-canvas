@@ -298,7 +298,6 @@ export function UserManagement() {
               <Button 
                 variant="outline"
                 onClick={() => setShowAddDialog(true)}
-                disabled={!currentWorkspace?.workspace_id}
               >
                 <UserCog className="h-4 w-4 mr-2" />
                 Adicionar Manualmente
