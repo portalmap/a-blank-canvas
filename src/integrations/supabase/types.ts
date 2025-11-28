@@ -1260,6 +1260,7 @@ export type Database = {
       workspaces: {
         Row: {
           created_at: string
+          created_by_user_id: string | null
           description: string | null
           id: string
           name: string
@@ -1268,6 +1269,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by_user_id?: string | null
           description?: string | null
           id?: string
           name: string
@@ -1276,6 +1278,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by_user_id?: string | null
           description?: string | null
           id?: string
           name?: string
