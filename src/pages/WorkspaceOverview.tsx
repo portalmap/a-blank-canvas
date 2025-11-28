@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useWorkspaces, useCreateWorkspace } from '@/hooks/useWorkspaces';
 import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Plus, Home, Pencil } from 'lucide-react';
 import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
 
 const WorkspaceOverview = () => {
+  const navigate = useNavigate();
   const { data: workspaces, isLoading } = useWorkspaces();
   const createWorkspace = useCreateWorkspace();
   const { data: canCreate } = useCanCreateWorkspace();
@@ -31,6 +33,11 @@ const WorkspaceOverview = () => {
     await createWorkspace.mutateAsync(newWorkspaceName);
     setNewWorkspaceName('');
     setDialogOpen(false);
+  };
+
+  const handleSelectWorkspace = (workspace: any) => {
+    setActiveWorkspace(workspace);
+    navigate('/spaces');
   };
 
   if (isLoading) {
@@ -112,7 +119,7 @@ const WorkspaceOverview = () => {
                 className={`hover:shadow-lg transition-all cursor-pointer h-full ${
                   activeWorkspace?.id === workspace.id ? 'ring-2 ring-primary' : ''
                 }`}
-                onClick={() => setActiveWorkspace(workspace)}
+                onClick={() => handleSelectWorkspace(workspace)}
               >
                 <CardHeader>
                   <div className="flex items-center justify-between">
