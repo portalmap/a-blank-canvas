@@ -13,6 +13,16 @@ import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
 import { Loader2, UserPlus, UserCog } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -42,6 +52,7 @@ export function UserManagement() {
   const [detailsUser, setDetailsUser] = useState<any | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<any | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [deleteConfirmMember, setDeleteConfirmMember] = useState<any | null>(null);
 
   // Verificar se é administrador do sistema (global_owner ou owner)
   const { data: userRoles } = useQuery({
@@ -208,18 +219,28 @@ export function UserManagement() {
   // Mutation para remover membro
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("workspace_members")
         .delete()
-        .eq("id", memberId);
+        .eq("id", memberId)
+        .select();
 
       if (error) throw error;
+      
+      // Verificar se realmente deletou algo
+      if (!data || data.length === 0) {
+        throw new Error("Não foi possível remover o membro. Verifique suas permissões.");
+      }
+      
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspace-members-detailed"] });
+      setDeleteConfirmMember(null);
       toast.success("Membro removido com sucesso!");
     },
     onError: (error: any) => {
+      setDeleteConfirmMember(null);
       toast.error(error.message || "Erro ao remover membro");
     },
   });
@@ -268,6 +289,16 @@ export function UserManagement() {
 
   const canEdit = isSystemAdmin || currentWorkspace?.role === "admin";
   const canDelete = (member: any) => {
+    // Debug temporário
+    console.log("canDelete check:", {
+      memberId: member.id,
+      hasWorkspaceMembership: member.hasWorkspaceMembership,
+      isGlobalOwner: member.isGlobalOwner,
+      isOwner: member.isOwner,
+      currentUserIsGlobalOwner: isGlobalOwner,
+      memberRole: member.role,
+    });
+    
     // Não pode deletar se não tem workspace membership
     if (!member.hasWorkspaceMembership) return false;
     
@@ -360,11 +391,7 @@ export function UserManagement() {
                       isOwner: member.isOwner,
                     })
                   }
-                  onDelete={() => {
-                    if (member.hasWorkspaceMembership) {
-                      removeMemberMutation.mutate(member.id);
-                    }
-                  }}
+                  onDelete={() => setDeleteConfirmMember(member)}
                   onViewDetails={() =>
                     setDetailsUser({
                       id: member.user_id,
@@ -427,6 +454,35 @@ export function UserManagement() {
         onOpenChange={setShowAddDialog}
         workspaceId={currentWorkspace?.workspace_id || ''}
       />
+
+      <AlertDialog 
+        open={!!deleteConfirmMember} 
+        onOpenChange={(open) => !open && setDeleteConfirmMember(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover <strong>{deleteConfirmMember?.profile?.full_name || deleteConfirmMember?.email}</strong> do workspace?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteConfirmMember?.hasWorkspaceMembership) {
+                  console.log("Deletando membro:", deleteConfirmMember.id);
+                  removeMemberMutation.mutate(deleteConfirmMember.id);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
