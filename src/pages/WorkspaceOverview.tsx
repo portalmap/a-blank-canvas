@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { useWorkspaces, useCreateWorkspace } from '@/hooks/useWorkspaces';
 import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Home, Pencil } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
 
 const WorkspaceOverview = () => {
   const { data: workspaces, isLoading } = useWorkspaces();
   const createWorkspace = useCreateWorkspace();
   const { data: canCreate } = useCanCreateWorkspace();
+  const { activeWorkspace, setActiveWorkspace } = useWorkspace();
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -107,14 +108,18 @@ const WorkspaceOverview = () => {
         ) : (
           workspaces?.map((workspace) => (
             <div key={workspace.id} className="relative group">
-              <Link to={`/workspace/${workspace.id}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <Home className="h-5 w-5 text-primary" />
-                        {workspace.name}
-                      </CardTitle>
+              <Card 
+                className={`hover:shadow-lg transition-all cursor-pointer h-full ${
+                  activeWorkspace?.id === workspace.id ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => setActiveWorkspace(workspace)}
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Home className="h-5 w-5 text-primary" />
+                      {workspace.name}
+                    </CardTitle>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -143,7 +148,6 @@ const WorkspaceOverview = () => {
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
             </div>
           ))
         )}
