@@ -1311,6 +1311,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_all_users_with_emails: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       get_user_id_by_email: { Args: { email: string }; Returns: string }
       get_user_workspace_role: {
         Args: { _user_id: string; _workspace_id: string }

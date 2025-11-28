@@ -10,8 +10,9 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { Trash2 } from "lucide-react";
+import { Trash2, UserPlus } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { AddExistingUserToWorkspaceDialog } from "./AddExistingUserToWorkspaceDialog";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -33,6 +34,7 @@ export function WorkspaceSettings() {
   const { data: workspaces, isLoading } = useWorkspaces();
   const { user } = useAuth();
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const currentWorkspace = workspaces?.find(w => w.id === selectedWorkspaceId);
@@ -121,10 +123,24 @@ export function WorkspaceSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Membros do Workspace</CardTitle>
-        <CardDescription>
-          Visualize e gerencie os membros com acesso a este workspace
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Membros do Workspace</CardTitle>
+            <CardDescription>
+              Visualize e gerencie os membros com acesso a este workspace
+            </CardDescription>
+          </div>
+          {canManageMembers && (
+            <Button
+              onClick={() => setIsAddUserDialogOpen(true)}
+              size="sm"
+              className="gap-2"
+            >
+              <UserPlus className="h-4 w-4" />
+              Adicionar Usuário
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
@@ -222,6 +238,12 @@ export function WorkspaceSettings() {
           </div>
         )}
       </CardContent>
+
+      <AddExistingUserToWorkspaceDialog
+        open={isAddUserDialogOpen}
+        onOpenChange={setIsAddUserDialogOpen}
+        currentWorkspaceId={selectedWorkspaceId}
+      />
     </Card>
   );
 }
