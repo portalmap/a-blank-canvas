@@ -36,7 +36,7 @@ export function UserManagement() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<WorkspaceRole | "all" | "global_owner" | "owner" | "workspace_owner">("all");
+  const [roleFilter, setRoleFilter] = useState<WorkspaceRole | "all" | "global_owner" | "owner">("all");
   const [sortBy, setSortBy] = useState<"name" | "date" | "role">("name");
   const [editUser, setEditUser] = useState<any | null>(null);
   const [detailsUser, setDetailsUser] = useState<any | null>(null);
@@ -80,7 +80,7 @@ export function UserManagement() {
           .single();
         
         if (error) throw error;
-        return { workspace_id: data.id, role: 'owner' as const };
+        return { workspace_id: data.id, role: 'admin' as const };
       } else {
         // Para usuários normais, buscar seu workspace
         const { data, error } = await supabase
@@ -238,9 +238,6 @@ export function UserManagement() {
       } else if (roleFilter === "owner") {
         // Filtrar por proprietário técnico
         matchesRole = member.isOwner && !member.isGlobalOwner;
-      } else if (roleFilter === "workspace_owner") {
-        // Filtrar por proprietário de workspace
-        matchesRole = member.role === "owner" && !member.isGlobalOwner && !member.isOwner;
       } else if (roleFilter !== "all") {
         // Para outros roles, verificar o workspace role
         matchesRole = member.role === roleFilter;
@@ -257,7 +254,7 @@ export function UserManagement() {
         case "date":
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case "role":
-          const roleOrder = ["owner", "admin", "member", "limited_member", "guest"];
+          const roleOrder = ["admin", "member", "limited_member", "guest"];
           return roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role);
         default:
           return 0;
@@ -267,7 +264,7 @@ export function UserManagement() {
     return filtered;
   }, [members, searchQuery, roleFilter, sortBy]);
 
-  const canEdit = isSystemAdmin || currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin";
+  const canEdit = isSystemAdmin || currentWorkspace?.role === "admin";
   const canDelete = (memberRole: WorkspaceRole, memberIsGlobalOwner?: boolean, memberIsOwner?: boolean) => {
     // Proprietário global não pode ser deletado
     if (memberIsGlobalOwner) return false;
@@ -277,8 +274,7 @@ export function UserManagement() {
     if (isGlobalOwner) return !memberIsGlobalOwner && !memberIsOwner;
     // Proprietário (técnico) pode deletar workspace members mas não outros system admins
     if (userRoles?.isOwner) return !memberIsGlobalOwner && !memberIsOwner;
-    if (currentWorkspace?.role === "owner") return memberRole !== "owner";
-    if (currentWorkspace?.role === "admin") return memberRole !== "owner" && memberRole !== "admin";
+    if (currentWorkspace?.role === "admin") return memberRole !== "admin";
     return false;
   };
 
@@ -386,7 +382,7 @@ export function UserManagement() {
           open={!!editUser}
           onOpenChange={(open) => !open && setEditUser(null)}
           user={editUser}
-          currentUserRole={currentWorkspace?.role || "guest"}
+          currentUserRole={((currentWorkspace?.role as any) === 'owner' ? 'admin' : currentWorkspace?.role) || "guest"}
           workspaceId={currentWorkspace?.workspace_id || ""}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["workspace-members-detailed"] });

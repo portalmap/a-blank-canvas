@@ -8,8 +8,8 @@ type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 interface UserFiltersProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  roleFilter: WorkspaceRole | "all" | "global_owner" | "owner" | "workspace_owner";
-  onRoleFilterChange: (value: WorkspaceRole | "all" | "global_owner" | "owner" | "workspace_owner") => void;
+  roleFilter: WorkspaceRole | "all" | "global_owner" | "owner";
+  onRoleFilterChange: (value: WorkspaceRole | "all" | "global_owner" | "owner") => void;
   sortBy: "name" | "date" | "role";
   onSortByChange: (value: "name" | "date" | "role") => void;
 }
@@ -42,7 +42,6 @@ export function UserFilters({
           <SelectItem value="all">Todos os roles</SelectItem>
           <SelectItem value="global_owner">👑 Proprietário Global</SelectItem>
           <SelectItem value="owner">🔧 Proprietário (Técnico)</SelectItem>
-          <SelectItem value="workspace_owner">Proprietário Workspace</SelectItem>
           <SelectItem value="admin">Administrador</SelectItem>
           <SelectItem value="member">Membro</SelectItem>
           <SelectItem value="limited_member">Membro Limitado</SelectItem>

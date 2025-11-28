@@ -28,7 +28,7 @@ export const useWorkspaces = () => {
                 .insert({
                   workspace_id: workspace.id,
                   user_id: user.id,
-                  role: 'owner'
+                  role: 'admin'
                 })
                 .select()
             )

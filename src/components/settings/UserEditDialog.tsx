@@ -90,12 +90,10 @@ export function UserEditDialog({
     // Workspace owners/admins podem editar membros normais (não system admins)
     if (user.isGlobalOwner || user.isOwner) return false;
     
-    return currentUserRole === "owner" || currentUserRole === "admin";
+    return currentUserRole === "admin";
   };
   
-  const canEditRole = (currentUserRole === "owner" || currentUserRole === "admin") && !user.isGlobalOwner && !user.isOwner;
-  const isOwner = user.role === "owner";
-  const roleChangingToNonOwner = isOwner && role !== "owner";
+  const canEditRole = currentUserRole === "admin" && !user.isGlobalOwner && !user.isOwner;
 
   const handleSave = async () => {
     if (!canEditThisUser()) {
@@ -209,7 +207,6 @@ export function UserEditDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="owner">Proprietário</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="member">Membro</SelectItem>
                   <SelectItem value="limited_member">Membro Limitado</SelectItem>
@@ -217,15 +214,6 @@ export function UserEditDialog({
                 </SelectContent>
               </Select>
             </div>
-          )}
-
-          {roleChangingToNonOwner && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Atenção: Você está prestes a remover privilégios de proprietário. Esta ação pode afetar o controle total do workspace.
-              </AlertDescription>
-            </Alert>
           )}
         </div>
 
