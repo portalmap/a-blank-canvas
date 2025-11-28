@@ -1,4 +1,4 @@
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -14,6 +14,7 @@ import {
   SidebarHeader,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { CheckSquare } from 'lucide-react';
 
 const mainNavItems = [
@@ -32,6 +33,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const { signOut } = useAuth();
+  const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
   
   const isActive = (path: string) => location.pathname === path;
   const isCollapsed = state === 'collapsed';
@@ -76,21 +78,41 @@ export function AppSidebar() {
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem>
+                {activeWorkspace ? (
+                  <div className="flex items-center justify-between px-2 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Home className="h-4 w-4 flex-shrink-0" />
+                      {!isCollapsed && (
+                        <span className="font-medium text-sm truncate">
+                          {activeWorkspace.name}
+                        </span>
+                      )}
+                    </div>
+                    {!isCollapsed && (
+                      <button
+                        onClick={clearActiveWorkspace}
+                        className="p-1 hover:bg-sidebar-accent rounded flex-shrink-0"
+                        title="Trocar Workspace"
+                      >
+                        <ArrowLeftRight className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
                   <SidebarMenuButton asChild>
                     <NavLink 
-                      to={item.url} 
+                      to="/" 
                       end
                       className="hover:bg-sidebar-accent"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                     >
-                      <item.icon className="h-4 w-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
+                      <Home className="h-4 w-4" />
+                      {!isCollapsed && <span>Workspace</span>}
                     </NavLink>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                )}
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
