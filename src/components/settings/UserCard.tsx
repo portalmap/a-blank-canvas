@@ -23,9 +23,11 @@ interface UserCardProps {
   isOwner?: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onDeleteFromSystem?: () => void;
   onViewDetails: () => void;
   canEdit: boolean;
   canDelete: boolean;
+  canDeleteFromSystem?: boolean;
 }
 
 const roleConfig: Record<WorkspaceRole, { label: string; icon: any; variant: any }> = {
@@ -46,9 +48,11 @@ export function UserCard({
   isOwner,
   onEdit,
   onDelete,
+  onDeleteFromSystem,
   onViewDetails,
   canEdit,
   canDelete,
+  canDeleteFromSystem,
 }: UserCardProps) {
   // Determinar qual badge/ícone mostrar
   let displayConfig = roleConfig[role];
@@ -115,7 +119,13 @@ export function UserCard({
             {canDelete && (
               <DropdownMenuItem onClick={onDelete} className="text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
-                Remover
+                Remover do Workspace
+              </DropdownMenuItem>
+            )}
+            {canDeleteFromSystem && onDeleteFromSystem && (
+              <DropdownMenuItem onClick={onDeleteFromSystem} className="text-destructive font-semibold">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir do Sistema
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

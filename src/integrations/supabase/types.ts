@@ -1294,6 +1294,10 @@ export type Database = {
         Args: { _editor_id: string; _target_user_id: string }
         Returns: boolean
       }
+      delete_user_completely: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       expire_old_invitations: { Args: never; Returns: undefined }
       get_all_users_for_global_owner: {
         Args: never
