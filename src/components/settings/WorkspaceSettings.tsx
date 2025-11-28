@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWorkspaces } from "@/hooks/useWorkspaces";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -11,12 +12,21 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export function WorkspaceSettings() {
   const { data: workspaces, isLoading } = useWorkspaces();
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const queryClient = useQueryClient();
 
-  const currentWorkspace = workspaces?.[0];
+  const currentWorkspace = workspaces?.find(w => w.id === selectedWorkspaceId);
 
+  // Selecionar o primeiro workspace quando carregar
+  useEffect(() => {
+    if (workspaces?.length && !selectedWorkspaceId) {
+      setSelectedWorkspaceId(workspaces[0].id);
+    }
+  }, [workspaces, selectedWorkspaceId]);
+
+  // Atualizar os campos quando o workspace selecionado mudar
   useEffect(() => {
     if (currentWorkspace) {
       setName(currentWorkspace.name);
@@ -72,6 +82,22 @@ export function WorkspaceSettings() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="workspace-select">Selecionar Workspace</Label>
+          <Select value={selectedWorkspaceId} onValueChange={setSelectedWorkspaceId}>
+            <SelectTrigger id="workspace-select">
+              <SelectValue placeholder="Selecione um workspace" />
+            </SelectTrigger>
+            <SelectContent>
+              {workspaces?.map((workspace) => (
+                <SelectItem key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="workspace-name">Nome do Workspace</Label>
           <Input 
