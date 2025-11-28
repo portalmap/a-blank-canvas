@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Home } from 'lucide-react';
+import { Plus, Home, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
 
 const WorkspaceOverview = () => {
   const { data: workspaces, isLoading } = useWorkspaces();
@@ -15,6 +16,12 @@ const WorkspaceOverview = () => {
   const { data: canCreate } = useCanCreateWorkspace();
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<{
+    id: string;
+    name: string;
+    description: string | null;
+  } | null>(null);
 
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,27 +106,54 @@ const WorkspaceOverview = () => {
           </Card>
         ) : (
           workspaces?.map((workspace) => (
-            <Link key={workspace.id} to={`/workspace/${workspace.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Home className="h-5 w-5 text-primary" />
-                    {workspace.name}
-                  </CardTitle>
-                  <CardDescription>
-                    {workspace.description || 'Sem descrição'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-sm text-muted-foreground">
-                    Criado em {new Date(workspace.created_at).toLocaleDateString('pt-BR')}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+            <div key={workspace.id} className="relative group">
+              <Link to={`/workspace/${workspace.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <Home className="h-5 w-5 text-primary" />
+                        {workspace.name}
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedWorkspace({
+                            id: workspace.id,
+                            name: workspace.name,
+                            description: workspace.description,
+                          });
+                          setEditDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <CardDescription>
+                      {workspace.description || 'Sem descrição'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-muted-foreground">
+                      Criado em {new Date(workspace.created_at).toLocaleDateString('pt-BR')}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
           ))
         )}
       </div>
+
+      <WorkspaceEditDialog
+        workspace={selectedWorkspace}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
     </div>
   );
 };
