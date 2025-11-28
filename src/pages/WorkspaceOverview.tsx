@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Folder } from 'lucide-react';
+import { Plus, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const WorkspaceOverview = () => {
@@ -82,7 +82,7 @@ const WorkspaceOverview = () => {
         {workspaces && workspaces.length === 0 ? (
           <Card className="col-span-full">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Folder className="h-16 w-16 text-muted-foreground mb-4" />
+              <Home className="h-16 w-16 text-muted-foreground mb-4" />
               <p className="text-lg font-medium mb-2">Nenhum workspace ainda</p>
               <p className="text-muted-foreground mb-4">
                 {canCreate 
@@ -103,7 +103,7 @@ const WorkspaceOverview = () => {
               <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Folder className="h-5 w-5 text-primary" />
+                    <Home className="h-5 w-5 text-primary" />
                     {workspace.name}
                   </CardTitle>
                   <CardDescription>
