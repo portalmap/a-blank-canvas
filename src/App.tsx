@@ -8,7 +8,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppSidebar } from "@/components/AppSidebar";
 import WorkspaceOverview from "./pages/WorkspaceOverview";
-import Spaces from "./pages/Spaces";
 import Chat from "./pages/Chat";
 import Teams from "./pages/Teams";
 import Documents from "./pages/Documents";
@@ -41,7 +40,6 @@ const App = () => (
                       <main className="flex-1 overflow-auto">
                         <Routes>
                           <Route path="/" element={<WorkspaceOverview />} />
-                          <Route path="/spaces" element={<Spaces />} />
                           <Route path="/chat" element={<Chat />} />
                           <Route path="/teams" element={<Teams />} />
                           <Route path="/documents" element={<Documents />} />
