@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useWorkspaces, useCreateWorkspace } from '@/hooks/useWorkspaces';
+import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Link } from 'react-router-dom';
 const WorkspaceOverview = () => {
   const { data: workspaces, isLoading } = useWorkspaces();
   const createWorkspace = useCreateWorkspace();
+  const { data: canCreate } = useCanCreateWorkspace();
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -41,37 +43,39 @@ const WorkspaceOverview = () => {
           </p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Workspace
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Workspace</DialogTitle>
-              <DialogDescription>
-                Crie um novo workspace para organizar seus projetos
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateWorkspace} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome do Workspace</Label>
-                <Input
-                  id="name"
-                  placeholder="Meu Projeto"
-                  value={newWorkspaceName}
-                  onChange={(e) => setNewWorkspaceName(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={createWorkspace.isPending}>
-                {createWorkspace.isPending ? 'Criando...' : 'Criar Workspace'}
+        {canCreate && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Workspace
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Criar Workspace</DialogTitle>
+                <DialogDescription>
+                  Crie um novo workspace para organizar seus projetos
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateWorkspace} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome do Workspace</Label>
+                  <Input
+                    id="name"
+                    placeholder="Meu Projeto"
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={createWorkspace.isPending}>
+                  {createWorkspace.isPending ? 'Criando...' : 'Criar Workspace'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -80,11 +84,17 @@ const WorkspaceOverview = () => {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Folder className="h-16 w-16 text-muted-foreground mb-4" />
               <p className="text-lg font-medium mb-2">Nenhum workspace ainda</p>
-              <p className="text-muted-foreground mb-4">Crie seu primeiro workspace para começar</p>
-              <Button onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Criar Workspace
-              </Button>
+              <p className="text-muted-foreground mb-4">
+                {canCreate 
+                  ? 'Crie seu primeiro workspace para começar'
+                  : 'Você ainda não foi adicionado a nenhum workspace'}
+              </p>
+              {canCreate && (
+                <Button onClick={() => setDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Criar Workspace
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (

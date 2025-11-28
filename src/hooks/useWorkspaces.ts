@@ -22,12 +22,9 @@ export const useCreateWorkspace = () => {
 
   return useMutation({
     mutationFn: async (name: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
       const { data, error } = await supabase
         .from('workspaces')
-        .insert({ name, owner_user_id: user.id })
+        .insert({ name })
         .select()
         .single();
 
