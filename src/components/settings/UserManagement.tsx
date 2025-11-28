@@ -216,7 +216,7 @@ export function UserManagement() {
     enabled: !!currentUser?.id && (isSystemAdmin || !!currentWorkspace?.workspace_id),
   });
 
-  // Mutation para remover membro
+  // Mutation para remover membro do workspace
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
       const { data, error } = await supabase
@@ -227,7 +227,6 @@ export function UserManagement() {
 
       if (error) throw error;
       
-      // Verificar se realmente deletou algo
       if (!data || data.length === 0) {
         throw new Error("Não foi possível remover o membro. Verifique suas permissões.");
       }
@@ -237,11 +236,31 @@ export function UserManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspace-members-detailed"] });
       setDeleteConfirmMember(null);
-      toast.success("Membro removido com sucesso!");
+      toast.success("Membro removido do workspace!");
     },
     onError: (error: any) => {
       setDeleteConfirmMember(null);
       toast.error(error.message || "Erro ao remover membro");
+    },
+  });
+
+  // Mutation para deletar usuário completamente do sistema
+  const deleteUserCompletelyMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.rpc('delete_user_completely', {
+        target_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspace-members-detailed"] });
+      setDeleteConfirmMember(null);
+      toast.success("Usuário excluído completamente do sistema!");
+    },
+    onError: (error: any) => {
+      setDeleteConfirmMember(null);
+      toast.error(error.message || "Erro ao excluir usuário");
     },
   });
 
@@ -288,30 +307,39 @@ export function UserManagement() {
   }, [members, searchQuery, roleFilter, sortBy]);
 
   const canEdit = isSystemAdmin || currentWorkspace?.role === "admin";
+  
   const canDelete = (member: any) => {
-    // Debug temporário
-    console.log("canDelete check:", {
-      memberId: member.id,
-      hasWorkspaceMembership: member.hasWorkspaceMembership,
-      isGlobalOwner: member.isGlobalOwner,
-      isOwner: member.isOwner,
-      currentUserIsGlobalOwner: isGlobalOwner,
-      memberRole: member.role,
-    });
-    
     // Não pode deletar se não tem workspace membership
     if (!member.hasWorkspaceMembership) return false;
     
-    // Proprietário global não pode ser deletado
-    if (member.isGlobalOwner) return false;
-    // Proprietário (técnico) também não pode ser deletado via workspace
-    if (member.isOwner) return false;
-    // Proprietário global pode deletar qualquer um (exceto global_owner e owner)
-    if (isGlobalOwner) return !member.isGlobalOwner && !member.isOwner;
-    // Proprietário (técnico) pode deletar workspace members mas não outros system admins
-    if (userRoles?.isOwner) return !member.isGlobalOwner && !member.isOwner;
-    if (currentWorkspace?.role === "admin") return member.role !== "admin";
+    // Global owner pode deletar qualquer um (exceto outros global owners)
+    if (isGlobalOwner) {
+      return !member.isGlobalOwner;
+    }
+    
+    // Admin do workspace pode deletar membros regulares
+    if (currentWorkspace?.role === "admin") {
+      // Não pode deletar global owner nem owner
+      if (member.isGlobalOwner || member.isOwner) return false;
+      // Não pode deletar a si mesmo
+      if (member.user_id === currentUser?.id) return false;
+      return true;
+    }
+    
     return false;
+  };
+
+  const canDeleteFromSystem = (member: any) => {
+    // Apenas global owners podem deletar usuários do sistema
+    if (!isGlobalOwner) return false;
+    
+    // Não pode deletar outro global owner
+    if (member.isGlobalOwner) return false;
+    
+    // Não pode deletar a si mesmo
+    if (member.user_id === currentUser?.id) return false;
+    
+    return true;
   };
 
   if (isLoading) {
@@ -392,6 +420,7 @@ export function UserManagement() {
                     })
                   }
                   onDelete={() => setDeleteConfirmMember(member)}
+                  onDeleteFromSystem={() => setDeleteConfirmMember({ ...member, deleteFromSystem: true })}
                   onViewDetails={() =>
                     setDetailsUser({
                       id: member.user_id,
@@ -406,6 +435,7 @@ export function UserManagement() {
                   }
                   canEdit={canEdit}
                   canDelete={canDelete(member)}
+                  canDeleteFromSystem={canDeleteFromSystem(member)}
                 />
               ))
             )}
@@ -461,24 +491,46 @@ export function UserManagement() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteConfirmMember?.deleteFromSystem ? "Excluir do Sistema" : "Remover do Workspace"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover <strong>{deleteConfirmMember?.profile?.full_name || deleteConfirmMember?.email}</strong> do workspace?
-              Esta ação não pode ser desfeita.
+              {deleteConfirmMember?.deleteFromSystem ? (
+                <>
+                  Tem certeza que deseja <strong className="text-destructive">excluir permanentemente</strong> o usuário{" "}
+                  <strong>{deleteConfirmMember?.profile?.full_name || deleteConfirmMember?.email}</strong> do sistema?
+                  <br /><br />
+                  Esta ação é <strong>IRREVERSÍVEL</strong> e removerá o usuário completamente, incluindo:
+                  <ul className="list-disc ml-6 mt-2">
+                    <li>Conta de autenticação</li>
+                    <li>Perfil e dados pessoais</li>
+                    <li>Membros de todos os workspaces</li>
+                  </ul>
+                  <br />
+                  O histórico e registros criados pelo usuário serão preservados.
+                </>
+              ) : (
+                <>
+                  Tem certeza que deseja remover <strong>{deleteConfirmMember?.profile?.full_name || deleteConfirmMember?.email}</strong> do workspace?
+                  <br /><br />
+                  Esta ação removerá o acesso do usuário a este workspace, mas a conta dele permanecerá no sistema.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (deleteConfirmMember?.hasWorkspaceMembership) {
-                  console.log("Deletando membro:", deleteConfirmMember.id);
+                if (deleteConfirmMember?.deleteFromSystem) {
+                  deleteUserCompletelyMutation.mutate(deleteConfirmMember.user_id);
+                } else if (deleteConfirmMember?.hasWorkspaceMembership) {
                   removeMemberMutation.mutate(deleteConfirmMember.id);
                 }
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Remover
+              {deleteConfirmMember?.deleteFromSystem ? "Excluir Permanentemente" : "Remover do Workspace"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
