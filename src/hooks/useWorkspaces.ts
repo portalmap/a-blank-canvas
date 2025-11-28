@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export const useWorkspaces = () => {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: ['workspaces'],
     queryFn: async () => {
@@ -12,6 +14,37 @@ export const useWorkspaces = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Adicionar usuário como membro de workspaces sem membros
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && data) {
+        const workspacesWithoutMembers = data.filter(w => w.workspace_members.length === 0);
+        
+        if (workspacesWithoutMembers.length > 0) {
+          await Promise.all(
+            workspacesWithoutMembers.map(workspace =>
+              supabase
+                .from('workspace_members')
+                .insert({
+                  workspace_id: workspace.id,
+                  user_id: user.id,
+                  role: 'owner'
+                })
+                .select()
+            )
+          );
+          
+          // Recarregar workspaces após adicionar membros
+          const { data: updatedData, error: updatedError } = await supabase
+            .from('workspaces')
+            .select('*, workspace_members(role)')
+            .order('created_at', { ascending: false });
+          
+          if (updatedError) throw updatedError;
+          return updatedData;
+        }
+      }
+
       return data;
     },
   });
@@ -56,7 +89,7 @@ export const useUpdateWorkspace = () => {
         .update({ name, description })
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
