@@ -1263,7 +1263,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
-          owner_user_id: string
+          owner_user_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1271,7 +1271,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
-          owner_user_id: string
+          owner_user_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1279,7 +1279,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
-          owner_user_id?: string
+          owner_user_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1289,6 +1289,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_create_workspace: { Args: { _user_id: string }; Returns: boolean }
       can_edit_user: {
         Args: { _editor_id: string; _target_user_id: string }
         Returns: boolean
