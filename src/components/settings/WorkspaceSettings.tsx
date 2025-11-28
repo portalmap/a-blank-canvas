@@ -46,17 +46,16 @@ export function WorkspaceSettings() {
     }
   }, [workspaces, selectedWorkspaceId]);
 
-  // Buscar membros do workspace selecionado
+  // Buscar membros do workspace selecionado com e-mails
   const { data: members, isLoading: loadingMembers } = useQuery({
     queryKey: ['workspace-members', selectedWorkspaceId],
     queryFn: async () => {
       if (!selectedWorkspaceId) return [];
       
       const { data, error } = await supabase
-        .from('workspace_members')
-        .select('*')
-        .eq('workspace_id', selectedWorkspaceId)
-        .order('created_at', { ascending: false });
+        .rpc('get_workspace_members_with_emails', {
+          workspace_uuid: selectedWorkspaceId
+        });
 
       if (error) throw error;
       return data;
@@ -164,7 +163,7 @@ export function WorkspaceSettings() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ID do Usuário</TableHead>
+                      <TableHead>E-mail</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Adicionado em</TableHead>
                       {canManageMembers && <TableHead className="text-right">Ações</TableHead>}
@@ -173,7 +172,7 @@ export function WorkspaceSettings() {
                   <TableBody>
                     {members.map((member) => (
                       <TableRow key={member.id}>
-                        <TableCell className="font-mono text-xs">{member.user_id}</TableCell>
+                        <TableCell>{member.email || 'E-mail não disponível'}</TableCell>
                         <TableCell>
                           {canManageMembers && member.role !== 'owner' ? (
                             <Select
