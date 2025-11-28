@@ -149,6 +149,7 @@ export function UserManagement() {
             email: user.email || profile?.full_name || "Sem email",
             isGlobalOwner: !!globalRole,
             isOwner: !!ownerRole,
+            hasWorkspaceMembership: !!workspaceMember,
           };
         });
       }
@@ -197,6 +198,7 @@ export function UserManagement() {
           email: emailInfo?.email || profile?.full_name || "Sem email",
           isGlobalOwner: false,
           isOwner: false,
+          hasWorkspaceMembership: true,
         };
       });
     },
@@ -265,16 +267,19 @@ export function UserManagement() {
   }, [members, searchQuery, roleFilter, sortBy]);
 
   const canEdit = isSystemAdmin || currentWorkspace?.role === "admin";
-  const canDelete = (memberRole: WorkspaceRole, memberIsGlobalOwner?: boolean, memberIsOwner?: boolean) => {
+  const canDelete = (member: any) => {
+    // Não pode deletar se não tem workspace membership
+    if (!member.hasWorkspaceMembership) return false;
+    
     // Proprietário global não pode ser deletado
-    if (memberIsGlobalOwner) return false;
+    if (member.isGlobalOwner) return false;
     // Proprietário (técnico) também não pode ser deletado via workspace
-    if (memberIsOwner) return false;
+    if (member.isOwner) return false;
     // Proprietário global pode deletar qualquer um (exceto global_owner e owner)
-    if (isGlobalOwner) return !memberIsGlobalOwner && !memberIsOwner;
+    if (isGlobalOwner) return !member.isGlobalOwner && !member.isOwner;
     // Proprietário (técnico) pode deletar workspace members mas não outros system admins
-    if (userRoles?.isOwner) return !memberIsGlobalOwner && !memberIsOwner;
-    if (currentWorkspace?.role === "admin") return memberRole !== "admin";
+    if (userRoles?.isOwner) return !member.isGlobalOwner && !member.isOwner;
+    if (currentWorkspace?.role === "admin") return member.role !== "admin";
     return false;
   };
 
@@ -355,7 +360,11 @@ export function UserManagement() {
                       isOwner: member.isOwner,
                     })
                   }
-                  onDelete={() => removeMemberMutation.mutate(member.id)}
+                  onDelete={() => {
+                    if (member.hasWorkspaceMembership) {
+                      removeMemberMutation.mutate(member.id);
+                    }
+                  }}
                   onViewDetails={() =>
                     setDetailsUser({
                       id: member.user_id,
@@ -369,7 +378,7 @@ export function UserManagement() {
                     })
                   }
                   canEdit={canEdit}
-                  canDelete={canDelete(member.role, member.isGlobalOwner, member.isOwner)}
+                  canDelete={canDelete(member)}
                 />
               ))
             )}
