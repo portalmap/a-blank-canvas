@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -36,25 +35,19 @@ import {
 } from "@/components/ui/popover";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
 interface AddExistingUserToWorkspaceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentWorkspaceId?: string;
+  currentWorkspaceId: string;
 }
 
 interface UserOption {
   user_id: string;
   email: string;
   full_name: string | null;
-}
-
-interface WorkspaceOption {
-  id: string;
-  name: string;
 }
 
 const roleLabels: Record<WorkspaceRole, string> = {
@@ -71,9 +64,6 @@ export function AddExistingUserToWorkspaceDialog({
 }: AddExistingUserToWorkspaceDialogProps) {
   const queryClient = useQueryClient();
   const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>(
-    currentWorkspaceId ? [currentWorkspaceId] : []
-  );
   const [selectedRole, setSelectedRole] = useState<WorkspaceRole>("member");
   const [userSearchOpen, setUserSearchOpen] = useState(false);
 
@@ -87,56 +77,47 @@ export function AddExistingUserToWorkspaceDialog({
     },
   });
 
-  // Fetch all workspaces
-  const { data: workspaces = [], isLoading: isLoadingWorkspaces } = useQuery({
-    queryKey: ["workspaces"],
+  // Check if selected user is already a member of current workspace
+  const { data: isAlreadyMember = false } = useQuery({
+    queryKey: ["is-workspace-member", currentWorkspaceId, selectedUserId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("workspaces")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data as WorkspaceOption[];
-    },
-  });
-
-  // Fetch existing memberships for selected user
-  const { data: existingMemberships = [] } = useQuery({
-    queryKey: ["user-memberships", selectedUserId],
-    queryFn: async () => {
-      if (!selectedUserId) return [];
+      if (!selectedUserId) return false;
       const { data, error } = await supabase
         .from("workspace_members")
-        .select("workspace_id")
-        .eq("user_id", selectedUserId);
+        .select("id")
+        .eq("workspace_id", currentWorkspaceId)
+        .eq("user_id", selectedUserId)
+        .maybeSingle();
       if (error) throw error;
-      return data.map((m) => m.workspace_id);
+      return !!data;
     },
     enabled: !!selectedUserId,
   });
 
   const addUserMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedUserId || selectedWorkspaces.length === 0) {
-        throw new Error("Selecione um usuário e pelo menos um workspace");
+      if (!selectedUserId) {
+        throw new Error("Selecione um usuário");
       }
 
-      const insertData = selectedWorkspaces.map((workspaceId) => ({
-        workspace_id: workspaceId,
-        user_id: selectedUserId,
-        role: selectedRole,
-      }));
+      if (isAlreadyMember) {
+        throw new Error("Este usuário já é membro do workspace");
+      }
 
       const { error } = await supabase
         .from("workspace_members")
-        .insert(insertData);
+        .insert({
+          workspace_id: currentWorkspaceId,
+          user_id: selectedUserId,
+          role: selectedRole,
+        });
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       queryClient.invalidateQueries({ queryKey: ["workspace-members"] });
-      toast.success("Usuário adicionado com sucesso aos workspaces!");
+      toast.success("Usuário adicionado com sucesso ao workspace!");
       handleClose();
     },
     onError: (error: Error) => {
@@ -147,22 +128,11 @@ export function AddExistingUserToWorkspaceDialog({
 
   const handleClose = () => {
     setSelectedUserId("");
-    setSelectedWorkspaces(currentWorkspaceId ? [currentWorkspaceId] : []);
     setSelectedRole("member");
     onOpenChange(false);
   };
 
-  const handleWorkspaceToggle = (workspaceId: string) => {
-    setSelectedWorkspaces((prev) =>
-      prev.includes(workspaceId)
-        ? prev.filter((id) => id !== workspaceId)
-        : [...prev, workspaceId]
-    );
-  };
-
   const selectedUser = users.find((u) => u.user_id === selectedUserId);
-
-  const isLoading = isLoadingUsers || isLoadingWorkspaces;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,63 +140,11 @@ export function AddExistingUserToWorkspaceDialog({
         <DialogHeader>
           <DialogTitle>Adicionar Usuário ao Workspace</DialogTitle>
           <DialogDescription>
-            Vincule um usuário existente a um ou mais workspaces
+            Vincule um usuário existente ao workspace atual
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Workspace Selection */}
-          <div className="space-y-2">
-            <Label>Selecionar Workspaces</Label>
-            <ScrollArea className="h-[150px] rounded-md border p-4">
-              {isLoadingWorkspaces ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              ) : workspaces.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum workspace disponível
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {workspaces.map((workspace) => {
-                    const isAlreadyMember = existingMemberships.includes(
-                      workspace.id
-                    );
-                    const isSelected = selectedWorkspaces.includes(workspace.id);
-
-                    return (
-                      <div
-                        key={workspace.id}
-                        className="flex items-center space-x-2"
-                      >
-                        <Checkbox
-                          id={workspace.id}
-                          checked={isSelected}
-                          onCheckedChange={() =>
-                            !isAlreadyMember && handleWorkspaceToggle(workspace.id)
-                          }
-                          disabled={isAlreadyMember}
-                        />
-                        <label
-                          htmlFor={workspace.id}
-                          className={cn(
-                            "flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-                            isAlreadyMember && "text-muted-foreground"
-                          )}
-                        >
-                          {workspace.name}
-                          {workspace.id === currentWorkspaceId && " (atual)"}
-                          {isAlreadyMember && " - Já é membro"}
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
-
           {/* User Selection */}
           <div className="space-y-2">
             <Label>Selecionar Usuário</Label>
@@ -325,9 +243,9 @@ export function AddExistingUserToWorkspaceDialog({
             onClick={() => addUserMutation.mutate()}
             disabled={
               !selectedUserId ||
-              selectedWorkspaces.length === 0 ||
+              isAlreadyMember ||
               addUserMutation.isPending ||
-              isLoading
+              isLoadingUsers
             }
           >
             {addUserMutation.isPending ? (
