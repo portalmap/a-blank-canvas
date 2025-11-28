@@ -1,4 +1,4 @@
-import { Home, Folder, MessageSquare, Users, FileText, BarChart3, Settings, Zap } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -18,7 +18,6 @@ import { CheckSquare } from 'lucide-react';
 
 const mainNavItems = [
   { title: 'Workspace', url: '/', icon: Home },
-  { title: 'Spaces', url: '/spaces', icon: Folder },
 ];
 
 const modulesNavItems = [
