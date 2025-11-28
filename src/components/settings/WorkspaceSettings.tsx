@@ -16,7 +16,6 @@ import type { Database } from "@/integrations/supabase/types";
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
 const roleLabels: Record<WorkspaceRole, string> = {
-  owner: "Proprietário",
   admin: "Administrador",
   member: "Membro",
   limited_member: "Membro Limitado",
@@ -24,7 +23,6 @@ const roleLabels: Record<WorkspaceRole, string> = {
 };
 
 const roleBadgeVariants: Record<WorkspaceRole, "default" | "secondary" | "destructive" | "outline"> = {
-  owner: "default",
   admin: "secondary",
   member: "outline",
   limited_member: "outline",
@@ -65,7 +63,7 @@ export function WorkspaceSettings() {
 
   // Buscar role do usuário atual no workspace
   const currentUserMember = members?.find(m => m.user_id === user?.id);
-  const canManageMembers = currentUserMember?.role === 'owner' || currentUserMember?.role === 'admin';
+  const canManageMembers = currentUserMember?.role === 'admin';
 
   const removeMember = useMutation({
     mutationFn: async (memberId: string) => {
@@ -174,7 +172,7 @@ export function WorkspaceSettings() {
                       <TableRow key={member.id}>
                         <TableCell>{member.email || 'E-mail não disponível'}</TableCell>
                         <TableCell>
-                          {canManageMembers && member.role !== 'owner' ? (
+                          {canManageMembers ? (
                             <Select
                               value={member.role}
                               onValueChange={(newRole) => 
@@ -203,16 +201,14 @@ export function WorkspaceSettings() {
                         </TableCell>
                         {canManageMembers && (
                           <TableCell className="text-right">
-                            {member.role !== 'owner' && (
-                              <Button
+                            <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeMember.mutate(member.id)}
                                 disabled={removeMember.isPending}
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           </TableCell>
                         )}
                       </TableRow>

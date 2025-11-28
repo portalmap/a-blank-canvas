@@ -88,7 +88,7 @@ export function WorkspaceMembers() {
     mutationFn: async ({ memberId, role }: { memberId: string; role: WorkspaceRole }) => {
       const { error } = await supabase
         .from('workspace_members')
-        .update({ role })
+        .update({ role: role as any })
         .eq('id', memberId);
 
       if (error) {
@@ -121,7 +121,7 @@ export function WorkspaceMembers() {
   }
 
   const currentUserMember = members?.find(m => m.user_id === currentUser?.id);
-  const isAdmin = currentUserMember?.role === 'owner' || currentUserMember?.role === 'admin';
+  const isAdmin = currentUserMember?.role === 'admin';
 
   return (
     <Card>
@@ -149,7 +149,6 @@ export function WorkspaceMembers() {
             <TableBody>
               {members.map((member) => {
                 const isCurrentUser = member.user_id === currentUser?.id;
-                const isOwner = member.role === 'owner';
                 
                 return (
                   <TableRow key={member.id}>
@@ -160,8 +159,8 @@ export function WorkspaceMembers() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isAdmin && !isOwner && !isCurrentUser ? (
-                        <Select 
+                      {isAdmin && !isCurrentUser ? (
+                        <Select
                           value={member.role} 
                           onValueChange={(value) => 
                             updateMemberRole.mutate({ 
@@ -181,14 +180,9 @@ export function WorkspaceMembers() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <Badge variant={roleBadgeVariants[member.role]}>
-                            {roleLabels[member.role]}
-                          </Badge>
-                          {isOwner && (
-                            <ShieldAlert className="h-4 w-4 text-destructive" aria-label="Protegido - não pode ser removido ou alterado" />
-                          )}
-                        </div>
+                        <Badge variant={roleBadgeVariants[member.role]}>
+                          {roleLabels[member.role]}
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>
@@ -196,7 +190,7 @@ export function WorkspaceMembers() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell className="text-right">
-                        {!isOwner && !isCurrentUser && (
+                        {!isCurrentUser && (
                           <Button
                             variant="ghost"
                             size="sm"

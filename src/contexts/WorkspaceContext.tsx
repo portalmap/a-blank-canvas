@@ -7,7 +7,6 @@ interface Workspace {
   description: string | null;
   created_at: string;
   updated_at: string;
-  owner_user_id: string | null;
 }
 
 interface WorkspaceContextType {

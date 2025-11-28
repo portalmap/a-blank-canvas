@@ -29,7 +29,6 @@ interface UserCardProps {
 }
 
 const roleConfig: Record<WorkspaceRole, { label: string; icon: any; variant: any }> = {
-  owner: { label: "Proprietário", icon: Crown, variant: "default" },
   admin: { label: "Administrador", icon: Shield, variant: "secondary" },
   member: { label: "Membro", icon: User, variant: "outline" },
   limited_member: { label: "Membro Limitado", icon: User, variant: "outline" },

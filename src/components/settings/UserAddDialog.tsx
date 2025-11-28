@@ -22,12 +22,11 @@ import {
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
-type RoleType = 'global_owner' | 'owner_technical' | 'workspace_owner' | 'admin' | 'member' | 'limited_member' | 'guest';
+type RoleType = 'global_owner' | 'owner_technical' | 'admin' | 'member' | 'limited_member' | 'guest';
 
 const roleLabels: Record<RoleType, string> = {
   global_owner: 'Proprietário Global',
   owner_technical: 'Proprietário (Técnico)',
-  workspace_owner: 'Proprietário Workspace',
   admin: 'Administrador',
   member: 'Membro',
   limited_member: 'Membro Limitado',
@@ -38,8 +37,7 @@ const isAppRole = (role: RoleType): role is 'global_owner' | 'owner_technical' =
   return role === 'global_owner' || role === 'owner_technical';
 };
 
-const getWorkspaceRole = (role: RoleType): 'owner' | 'admin' | 'member' | 'limited_member' | 'guest' => {
-  if (role === 'workspace_owner') return 'owner';
+const getWorkspaceRole = (role: RoleType): 'admin' | 'member' | 'limited_member' | 'guest' => {
   return role as 'admin' | 'member' | 'limited_member' | 'guest';
 };
 
