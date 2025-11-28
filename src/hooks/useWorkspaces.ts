@@ -92,15 +92,16 @@ export const useUpdateWorkspace = () => {
         .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error('Workspace não encontrado ou sem permissões');
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       toast.success('Workspace atualizado com sucesso!');
     },
-    onError: (error) => {
-      toast.error('Erro ao atualizar workspace');
-      console.error(error);
+    onError: (error: Error) => {
+      console.error('Erro ao atualizar workspace:', error);
+      toast.error(`Erro ao atualizar workspace: ${error.message}`);
     },
   });
 };

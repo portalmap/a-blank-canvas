@@ -32,13 +32,18 @@ export const WorkspaceEditDialog = ({ workspace, open, onOpenChange }: Workspace
     e.preventDefault();
     if (!workspace || !name.trim()) return;
 
-    await updateWorkspace.mutateAsync({
-      id: workspace.id,
-      name: name.trim(),
-      description: description.trim() || null,
-    });
-    
-    onOpenChange(false);
+    try {
+      await updateWorkspace.mutateAsync({
+        id: workspace.id,
+        name: name.trim(),
+        description: description.trim() || null,
+      });
+      
+      onOpenChange(false);
+    } catch (error) {
+      // O erro já é tratado no hook, não precisa fazer nada aqui
+      console.error('Erro ao salvar workspace:', error);
+    }
   };
 
   return (
