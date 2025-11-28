@@ -11,17 +11,18 @@ interface Task {
   assignee_id: string | null;
   start_date: string | null;
   due_date: string | null;
-  space_id: string | null;
-  folder_id: string | null;
-  list_id: string | null;
+  list_id: string;
+  status?: {
+    name: string;
+    color: string | null;
+  };
 }
 
 interface TaskListViewProps {
   tasks: Task[];
-  statuses: Record<string, { name: string; color: string }>;
 }
 
-export const TaskListView = ({ tasks, statuses }: TaskListViewProps) => {
+export const TaskListView = ({ tasks }: TaskListViewProps) => {
   const isOverdue = (dueDate: string | null) => {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date();
@@ -52,7 +53,7 @@ export const TaskListView = ({ tasks, statuses }: TaskListViewProps) => {
               <TableRow key={task.id} className="cursor-pointer hover:bg-muted/50">
                 <TableCell className="font-medium">{task.title}</TableCell>
                 <TableCell>
-                  <StatusBadge status={statuses[task.status_id]?.name || 'Sem status'} />
+                  <StatusBadge status={task.status?.name || 'Sem status'} />
                 </TableCell>
                 <TableCell>
                   <PriorityBadge priority={task.priority} />

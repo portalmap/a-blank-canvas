@@ -742,7 +742,7 @@ export type Database = {
           folder_id: string | null
           id: string
           name: string
-          space_id: string | null
+          space_id: string
           updated_at: string
           workspace_id: string
         }
@@ -753,7 +753,7 @@ export type Database = {
           folder_id?: string | null
           id?: string
           name: string
-          space_id?: string | null
+          space_id: string
           updated_at?: string
           workspace_id: string
         }
@@ -764,7 +764,7 @@ export type Database = {
           folder_id?: string | null
           id?: string
           name?: string
-          space_id?: string | null
+          space_id?: string
           updated_at?: string
           workspace_id?: string
         }
@@ -1008,11 +1008,9 @@ export type Database = {
           created_by_user_id: string
           description: string | null
           due_date: string | null
-          folder_id: string | null
           id: string
-          list_id: string | null
+          list_id: string
           priority: Database["public"]["Enums"]["task_priority"]
-          space_id: string | null
           start_date: string | null
           status_id: string
           title: string
@@ -1026,11 +1024,9 @@ export type Database = {
           created_by_user_id: string
           description?: string | null
           due_date?: string | null
-          folder_id?: string | null
           id?: string
-          list_id?: string | null
+          list_id: string
           priority?: Database["public"]["Enums"]["task_priority"]
-          space_id?: string | null
           start_date?: string | null
           status_id: string
           title: string
@@ -1044,11 +1040,9 @@ export type Database = {
           created_by_user_id?: string
           description?: string | null
           due_date?: string | null
-          folder_id?: string | null
           id?: string
-          list_id?: string | null
+          list_id?: string
           priority?: Database["public"]["Enums"]["task_priority"]
-          space_id?: string | null
           start_date?: string | null
           status_id?: string
           title?: string
@@ -1057,10 +1051,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tasks_folder_id_fkey"
-            columns: ["folder_id"]
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
             isOneToOne: false
-            referencedRelation: "folders"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1068,13 +1062,6 @@ export type Database = {
             columns: ["list_id"]
             isOneToOne: false
             referencedRelation: "lists"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_space_id_fkey"
-            columns: ["space_id"]
-            isOneToOne: false
-            referencedRelation: "spaces"
             referencedColumns: ["id"]
           },
           {
