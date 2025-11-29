@@ -1,12 +1,31 @@
 import { useState } from "react";
-import { ChevronRight, Circle } from "lucide-react";
-import { useFolders } from "@/hooks/useFolders";
-import { useLists } from "@/hooks/useLists";
+import { ChevronRight, Circle, Plus, Folder, List } from "lucide-react";
+import { useFolders, useCreateFolder } from "@/hooks/useFolders";
+import { useLists, useCreateList } from "@/hooks/useLists";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { FolderTreeItem } from "./FolderTreeItem";
 import { ListTreeItem } from "./ListTreeItem";
 import { NavLink } from "@/components/NavLink";
@@ -22,46 +41,197 @@ interface SpaceTreeItemProps {
 
 export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { activeWorkspace } = useWorkspace();
   const { data: folders } = useFolders(space.id);
   const { data: allLists } = useLists({ spaceId: space.id });
+  
+  const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
+  const [isListDialogOpen, setIsListDialogOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderDescription, setNewFolderDescription] = useState('');
+  const [newListName, setNewListName] = useState('');
+  const [newListDescription, setNewListDescription] = useState('');
+
+  const createFolder = useCreateFolder();
+  const createList = useCreateList();
   
   // Filter lists that don't belong to any folder (direct lists)
   const directLists = allLists?.filter(list => !list.folder_id);
 
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    
+    await createFolder.mutateAsync({
+      spaceId: space.id,
+      name: newFolderName,
+      description: newFolderDescription,
+    });
+
+    setNewFolderName('');
+    setNewFolderDescription('');
+    setIsFolderDialogOpen(false);
+  };
+
+  const handleCreateList = async () => {
+    if (!activeWorkspace || !newListName.trim()) return;
+    
+    await createList.mutateAsync({
+      workspaceId: activeWorkspace.id,
+      spaceId: space.id,
+      name: newListName,
+      description: newListDescription,
+    });
+
+    setNewListName('');
+    setNewListDescription('');
+    setIsListDialogOpen(false);
+  };
+
   if (isCollapsed) return null;
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="flex items-center w-full">
-        <CollapsibleTrigger className="p-1.5 hover:bg-sidebar-accent rounded-md">
-          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-        </CollapsibleTrigger>
+    <>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <div className="flex items-center w-full group">
+          <CollapsibleTrigger className="p-1.5 hover:bg-sidebar-accent rounded-md">
+            <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+          </CollapsibleTrigger>
+          
+          <NavLink
+            to={`/space/${space.id}`}
+            className="flex items-center gap-2 flex-1 px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm"
+            activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+          >
+            <Circle 
+              className="h-3 w-3 flex-shrink-0" 
+              style={{ color: space.color || 'hsl(var(--sidebar-foreground))' }}
+              fill={space.color || 'currentColor'}
+            />
+            <span className="truncate">{space.name}</span>
+          </NavLink>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsFolderDialogOpen(true)}>
+                <Folder className="mr-2 h-4 w-4" />
+                Nova Pasta
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsListDialogOpen(true)}>
+                <List className="mr-2 h-4 w-4" />
+                Nova Lista
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         
-        <NavLink
-          to={`/space/${space.id}`}
-          className="flex items-center gap-2 flex-1 px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm"
-          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-        >
-          <Circle 
-            className="h-3 w-3 flex-shrink-0" 
-            style={{ color: space.color || 'hsl(var(--sidebar-foreground))' }}
-            fill={space.color || 'currentColor'}
-          />
-          <span className="truncate">{space.name}</span>
-        </NavLink>
-      </div>
-      
-      <CollapsibleContent className="ml-4">
-        {/* Folders with their lists */}
-        {folders?.map(folder => (
-          <FolderTreeItem key={folder.id} folder={folder} />
-        ))}
-        
-        {/* Direct lists (without folder) */}
-        {directLists?.map(list => (
-          <ListTreeItem key={list.id} list={list} />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
+        <CollapsibleContent className="ml-4">
+          {/* Folders with their lists */}
+          {folders?.map(folder => (
+            <FolderTreeItem key={folder.id} folder={folder} />
+          ))}
+          
+          {/* Direct lists (without folder) */}
+          {directLists?.map(list => (
+            <ListTreeItem key={list.id} list={list} />
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Dialog for creating folder */}
+      <Dialog open={isFolderDialogOpen} onOpenChange={setIsFolderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Nova Pasta</DialogTitle>
+            <DialogDescription>
+              Adicione uma nova pasta neste space
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="folder-name">Nome</Label>
+              <Input
+                id="folder-name"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Ex: Onboarding, Infraestrutura"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="folder-description">Descrição (opcional)</Label>
+              <Textarea
+                id="folder-description"
+                value={newFolderDescription}
+                onChange={(e) => setNewFolderDescription(e.target.value)}
+                placeholder="Descreva o propósito desta pasta"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsFolderDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCreateFolder} 
+              disabled={!newFolderName.trim() || createFolder.isPending}
+            >
+              Criar Pasta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for creating list */}
+      <Dialog open={isListDialogOpen} onOpenChange={setIsListDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Nova Lista</DialogTitle>
+            <DialogDescription>
+              Adicione uma nova lista neste space
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="list-name">Nome</Label>
+              <Input
+                id="list-name"
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                placeholder="Ex: Sprint 1, Backlog"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="list-description">Descrição (opcional)</Label>
+              <Textarea
+                id="list-description"
+                value={newListDescription}
+                onChange={(e) => setNewListDescription(e.target.value)}
+                placeholder="Descreva o propósito desta lista"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsListDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCreateList} 
+              disabled={!newListName.trim() || createList.isPending}
+            >
+              Criar Lista
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

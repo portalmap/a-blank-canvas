@@ -21,6 +21,25 @@ export const useFolders = (spaceId?: string) => {
   });
 };
 
+export const useFolder = (folderId?: string) => {
+  return useQuery({
+    queryKey: ['folder', folderId],
+    queryFn: async () => {
+      if (!folderId) return null;
+      
+      const { data, error } = await supabase
+        .from('folders')
+        .select('*')
+        .eq('id', folderId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!folderId,
+  });
+};
+
 export const useCreateFolder = () => {
   const queryClient = useQueryClient();
 
