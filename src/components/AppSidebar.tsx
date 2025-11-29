@@ -15,7 +15,9 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useSpaces } from '@/hooks/useSpaces';
 import { CheckSquare } from 'lucide-react';
+import { SpaceTreeItem } from '@/components/workspace/SpaceTreeItem';
 
 const mainNavItems = [
   { title: 'Workspace', url: '/', icon: Home },
@@ -34,6 +36,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { signOut } = useAuth();
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
+  const { data: spaces } = useSpaces(activeWorkspace?.id);
   
   const isActive = (path: string) => location.pathname === path;
   const isCollapsed = state === 'collapsed';
@@ -77,29 +80,42 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                {activeWorkspace ? (
-                  <div className="flex items-center justify-between px-2 py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Home className="h-4 w-4 flex-shrink-0" />
-                      {!isCollapsed && (
-                        <span className="font-medium text-sm truncate">
-                          {activeWorkspace.name}
-                        </span>
-                      )}
-                    </div>
+            {activeWorkspace ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between px-2 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Home className="h-4 w-4 flex-shrink-0" />
                     {!isCollapsed && (
-                      <button
-                        onClick={clearActiveWorkspace}
-                        className="p-1 hover:bg-sidebar-accent rounded flex-shrink-0"
-                        title="Trocar Workspace"
-                      >
-                        <ArrowLeftRight className="h-4 w-4" />
-                      </button>
+                      <span className="font-medium text-sm truncate">
+                        {activeWorkspace.name}
+                      </span>
                     )}
                   </div>
-                ) : (
+                  {!isCollapsed && (
+                    <button
+                      onClick={clearActiveWorkspace}
+                      className="p-1 hover:bg-sidebar-accent rounded flex-shrink-0"
+                      title="Trocar Workspace"
+                    >
+                      <ArrowLeftRight className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Spaces hierarchy */}
+                <div className="space-y-0.5">
+                  {spaces?.map(space => (
+                    <SpaceTreeItem 
+                      key={space.id} 
+                      space={space}
+                      isCollapsed={isCollapsed}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <SidebarMenu>
+                <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink 
                       to="/" 
@@ -111,9 +127,9 @@ export function AppSidebar() {
                       {!isCollapsed && <span>Workspace</span>}
                     </NavLink>
                   </SidebarMenuButton>
-                )}
-              </SidebarMenuItem>
-            </SidebarMenu>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
 
