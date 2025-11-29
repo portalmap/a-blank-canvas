@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useSpaces } from '@/hooks/useSpaces';
+import { useSpace } from '@/hooks/useSpaces';
 import { useFolder } from '@/hooks/useFolders';
 import { useLists, useCreateList } from '@/hooks/useLists';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { Loader2, Plus, List, FolderOpen } from 'lucide-react';
+import { Loader2, Plus, List, FolderOpen, ChevronRight } from 'lucide-react';
 
 const FolderDetailView = () => {
   const { folderId } = useParams<{ folderId: string }>();
@@ -19,20 +19,19 @@ const FolderDetailView = () => {
   const navigate = useNavigate();
 
   const { data: currentFolder, isLoading: folderLoading } = useFolder(folderId);
-  const { data: lists, isLoading } = useLists({ folderId });
+  const { data: lists, isLoading: listsLoading } = useLists({ folderId });
+  const { data: currentSpace, isLoading: spaceLoading } = useSpace(currentFolder?.space_id);
   const createList = useCreateList();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
-  const { data: spaces } = useSpaces(activeWorkspace?.id);
-  const currentSpace = spaces?.find(s => s.id === currentFolder?.space_id);
 
   const handleCreateList = async () => {
-    if (!activeWorkspace || !currentFolder || !newListName.trim()) return;
+    if (!currentSpace || !currentFolder || !newListName.trim()) return;
 
     await createList.mutateAsync({
-      workspaceId: activeWorkspace.id,
+      workspaceId: currentSpace.workspace_id,
       spaceId: currentFolder.space_id,
       folderId: currentFolder.id,
       name: newListName,
@@ -44,7 +43,7 @@ const FolderDetailView = () => {
     setIsDialogOpen(false);
   };
 
-  if (!activeWorkspace || folderLoading || !currentFolder || !currentSpace) {
+  if (!activeWorkspace || folderLoading || listsLoading || spaceLoading || !currentFolder || !currentSpace) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -90,7 +89,7 @@ const FolderDetailView = () => {
         </Button>
       </div>
 
-      {isLoading ? (
+      {listsLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -135,7 +134,13 @@ const FolderDetailView = () => {
           <DialogHeader>
             <DialogTitle>Criar Nova Lista</DialogTitle>
             <DialogDescription>
-              Adicione uma nova lista nesta pasta
+              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                <span>{activeWorkspace?.name}</span>
+                <ChevronRight className="h-3 w-3" />
+                <span>{currentSpace?.name}</span>
+                <ChevronRight className="h-3 w-3" />
+                <span className="font-medium">{currentFolder?.name}</span>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
