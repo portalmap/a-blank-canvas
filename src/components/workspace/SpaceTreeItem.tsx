@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/collapsible";
 import { FolderTreeItem } from "./FolderTreeItem";
 import { ListTreeItem } from "./ListTreeItem";
+import { NavLink } from "@/components/NavLink";
 
 interface SpaceTreeItemProps {
   space: {
@@ -31,15 +32,24 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm">
-        <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-        <Circle 
-          className="h-3 w-3 flex-shrink-0" 
-          style={{ color: space.color || 'hsl(var(--sidebar-foreground))' }}
-          fill={space.color || 'currentColor'}
-        />
-        <span className="truncate">{space.name}</span>
-      </CollapsibleTrigger>
+      <div className="flex items-center w-full">
+        <CollapsibleTrigger className="p-1.5 hover:bg-sidebar-accent rounded-md">
+          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+        </CollapsibleTrigger>
+        
+        <NavLink
+          to={`/space/${space.id}`}
+          className="flex items-center gap-2 flex-1 px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm"
+          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+        >
+          <Circle 
+            className="h-3 w-3 flex-shrink-0" 
+            style={{ color: space.color || 'hsl(var(--sidebar-foreground))' }}
+            fill={space.color || 'currentColor'}
+          />
+          <span className="truncate">{space.name}</span>
+        </NavLink>
+      </div>
       
       <CollapsibleContent className="ml-4">
         {/* Folders with their lists */}
