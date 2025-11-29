@@ -21,6 +21,25 @@ export const useSpaces = (workspaceId?: string) => {
   });
 };
 
+export const useSpace = (spaceId?: string) => {
+  return useQuery({
+    queryKey: ['space', spaceId],
+    queryFn: async () => {
+      if (!spaceId) return null;
+      
+      const { data, error } = await supabase
+        .from('spaces')
+        .select('*')
+        .eq('id', spaceId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!spaceId,
+  });
+};
+
 export const useCreateSpace = () => {
   const queryClient = useQueryClient();
 

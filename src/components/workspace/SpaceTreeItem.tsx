@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronRight, Circle, Plus, Folder, List } from "lucide-react";
 import { useFolders, useCreateFolder } from "@/hooks/useFolders";
 import { useLists, useCreateList } from "@/hooks/useLists";
+import { useSpace } from "@/hooks/useSpaces";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Collapsible,
@@ -42,6 +43,7 @@ interface SpaceTreeItemProps {
 export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { activeWorkspace } = useWorkspace();
+  const { data: currentSpace } = useSpace(space.id);
   const { data: folders } = useFolders(space.id);
   const { data: allLists } = useLists({ spaceId: space.id });
   
@@ -73,10 +75,10 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   };
 
   const handleCreateList = async () => {
-    if (!activeWorkspace || !newListName.trim()) return;
+    if (!currentSpace || !newListName.trim()) return;
     
     await createList.mutateAsync({
-      workspaceId: activeWorkspace.id,
+      workspaceId: currentSpace.workspace_id,
       spaceId: space.id,
       name: newListName,
       description: newListDescription,
@@ -196,7 +198,11 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
           <DialogHeader>
             <DialogTitle>Criar Nova Lista</DialogTitle>
             <DialogDescription>
-              Adicione uma nova lista neste space
+              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                <span>{activeWorkspace?.name}</span>
+                <ChevronRight className="h-3 w-3" />
+                <span className="font-medium">{space.name}</span>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

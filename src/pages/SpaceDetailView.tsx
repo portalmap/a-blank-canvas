@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useSpaces } from '@/hooks/useSpaces';
+import { useSpace } from '@/hooks/useSpaces';
 import { useFolders, useCreateFolder } from '@/hooks/useFolders';
 import { useLists, useCreateList } from '@/hooks/useLists';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ const SpaceDetailView = () => {
   const { activeWorkspace } = useWorkspace();
   const navigate = useNavigate();
 
-  const { data: spaces } = useSpaces(activeWorkspace?.id);
+  const { data: currentSpace, isLoading: spaceLoading } = useSpace(spaceId);
   const { data: folders, isLoading: foldersLoading } = useFolders(spaceId);
   const { data: lists, isLoading: listsLoading } = useLists({ spaceId });
   
@@ -32,8 +32,6 @@ const SpaceDetailView = () => {
   const [newFolderDescription, setNewFolderDescription] = useState('');
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
-
-  const currentSpace = spaces?.find(s => s.id === spaceId);
 
   const handleCreateFolder = async () => {
     if (!spaceId || !newFolderName.trim()) return;
@@ -50,10 +48,10 @@ const SpaceDetailView = () => {
   };
 
   const handleCreateList = async () => {
-    if (!activeWorkspace || !spaceId || !newListName.trim()) return;
+    if (!currentSpace || !spaceId || !newListName.trim()) return;
 
     await createList.mutateAsync({
-      workspaceId: activeWorkspace.id,
+      workspaceId: currentSpace.workspace_id,
       spaceId,
       name: newListName,
       description: newListDescription,
@@ -264,7 +262,11 @@ const SpaceDetailView = () => {
           <DialogHeader>
             <DialogTitle>Criar Nova Lista</DialogTitle>
             <DialogDescription>
-              Crie uma lista diretamente neste space
+              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                <span>{activeWorkspace?.name}</span>
+                <ChevronRight className="h-3 w-3" />
+                <span className="font-medium">{currentSpace?.name}</span>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
