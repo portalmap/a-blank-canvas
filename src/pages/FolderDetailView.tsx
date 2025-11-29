@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
-import { useFolders } from '@/hooks/useFolders';
+import { useFolder } from '@/hooks/useFolders';
 import { useLists, useCreateList } from '@/hooks/useLists';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,15 +18,13 @@ const FolderDetailView = () => {
   const { activeWorkspace } = useWorkspace();
   const navigate = useNavigate();
 
-  const { data: folders } = useFolders();
+  const { data: currentFolder, isLoading: folderLoading } = useFolder(folderId);
   const { data: lists, isLoading } = useLists({ folderId });
   const createList = useCreateList();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
-
-  const currentFolder = folders?.find(f => f.id === folderId);
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const currentSpace = spaces?.find(s => s.id === currentFolder?.space_id);
 
@@ -46,7 +44,7 @@ const FolderDetailView = () => {
     setIsDialogOpen(false);
   };
 
-  if (!activeWorkspace || !currentFolder || !currentSpace) {
+  if (!activeWorkspace || folderLoading || !currentFolder || !currentSpace) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
