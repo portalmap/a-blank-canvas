@@ -7,6 +7,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ListTreeItem } from "./ListTreeItem";
+import { NavLink } from "@/components/NavLink";
 
 interface FolderTreeItemProps {
   folder: {
@@ -21,11 +22,20 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm">
-        <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-        <Folder className="h-4 w-4 flex-shrink-0" />
-        <span className="truncate">{folder.name}</span>
-      </CollapsibleTrigger>
+      <div className="flex items-center w-full">
+        <CollapsibleTrigger className="p-1.5 hover:bg-sidebar-accent rounded-md">
+          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+        </CollapsibleTrigger>
+        
+        <NavLink
+          to={`/folder/${folder.id}`}
+          className="flex items-center gap-2 flex-1 px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm"
+          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+        >
+          <Folder className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate">{folder.name}</span>
+        </NavLink>
+      </div>
       
       <CollapsibleContent className="ml-4">
         {lists?.map(list => (
