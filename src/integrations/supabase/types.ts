@@ -1352,6 +1352,10 @@ export type Database = {
         Args: { _task_id: string; _user_id: string }
         Returns: boolean
       }
+      user_can_create_in_space: {
+        Args: { _space_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_has_space_permission: {
         Args: { _space_id: string; _user_id: string }
         Returns: boolean

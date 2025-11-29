@@ -28,18 +28,7 @@ const FolderDetailView = () => {
   const [newListDescription, setNewListDescription] = useState('');
 
   const handleCreateList = async () => {
-    console.log('=== DEBUG CREATE LIST ===');
-    console.log('currentSpace:', currentSpace);
-    console.log('currentFolder:', currentFolder);
-    console.log('workspace_id:', currentSpace?.workspace_id);
-    console.log('space_id:', currentFolder?.space_id);
-    console.log('folder_id:', currentFolder?.id);
-    console.log('========================');
-    
-    if (!currentSpace || !currentFolder || !newListName.trim()) {
-      console.error('Missing data:', { currentSpace, currentFolder, newListName });
-      return;
-    }
+    if (!currentSpace || !currentFolder || !newListName.trim()) return;
 
     await createList.mutateAsync({
       workspaceId: currentSpace.workspace_id,
