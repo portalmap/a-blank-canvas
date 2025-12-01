@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ChevronRight, Circle, Plus, Folder, List } from "lucide-react";
+import { ChevronRight, Circle, Plus, Folder, List, Trash2 } from "lucide-react";
 import { useFolders, useCreateFolder } from "@/hooks/useFolders";
 import { useLists, useCreateList } from "@/hooks/useLists";
-import { useSpace } from "@/hooks/useSpaces";
+import { useSpace, useDeleteSpace } from "@/hooks/useSpaces";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Collapsible,
@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -23,6 +24,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,6 +60,7 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderDescription, setNewFolderDescription] = useState('');
   const [newListName, setNewListName] = useState('');
@@ -56,6 +68,7 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
 
   const createFolder = useCreateFolder();
   const createList = useCreateList();
+  const deleteSpace = useDeleteSpace();
   
   // Filter lists that don't belong to any folder (direct lists)
   const directLists = allLists?.filter(list => !list.folder_id);
@@ -131,6 +144,14 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
               <DropdownMenuItem onClick={() => setIsListDialogOpen(true)}>
                 <List className="mr-2 h-4 w-4" />
                 Nova Lista
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir Space
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -238,6 +259,27 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog for deleting space */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Space?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todas as pastas e listas dentro deste space serão excluídas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteSpace.mutate(space.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

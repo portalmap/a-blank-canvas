@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ChevronRight, Folder, Plus, List } from "lucide-react";
-import { useLists, useCreateList } from "@/hooks/useLists";
+import { ChevronRight, Folder, Plus, List, Trash2 } from "lucide-react";
+import { useLists, useCreateList, useDeleteList } from "@/hooks/useLists";
+import { useDeleteFolder } from "@/hooks/useFolders";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Collapsible,
@@ -11,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -21,6 +23,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,10 +54,12 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
   const { data: lists } = useLists({ folderId: folder.id });
   
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
 
   const createList = useCreateList();
+  const deleteFolder = useDeleteFolder();
 
   const handleCreateList = async () => {
     if (!activeWorkspace || !newListName.trim()) return;
@@ -95,6 +109,14 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
               <DropdownMenuItem onClick={() => setIsListDialogOpen(true)}>
                 <List className="mr-2 h-4 w-4" />
                 Nova Lista
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir Pasta
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -149,6 +171,27 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog for deleting folder */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Pasta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todas as listas dentro desta pasta serão excluídas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteFolder.mutate(folder.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

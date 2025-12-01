@@ -27,6 +27,8 @@ type SidebarContext = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  sidebarWidth: number;
+  setSidebarWidth: (width: number) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContext | null>(null);
@@ -50,6 +52,18 @@ const SidebarProvider = React.forwardRef<
 >(({ defaultOpen = true, open: openProp, onOpenChange: setOpenProp, className, style, children, ...props }, ref) => {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+
+  // Custom width state
+  const [sidebarWidth, setSidebarWidthState] = React.useState(() => {
+    const saved = localStorage.getItem('sidebar-width');
+    return saved ? parseInt(saved, 10) : 256;
+  });
+
+  const setSidebarWidth = React.useCallback((width: number) => {
+    const clamped = Math.max(200, Math.min(400, width));
+    setSidebarWidthState(clamped);
+    localStorage.setItem('sidebar-width', String(clamped));
+  }, []);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -101,8 +115,10 @@ const SidebarProvider = React.forwardRef<
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      sidebarWidth,
+      setSidebarWidth,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, sidebarWidth, setSidebarWidth],
   );
 
   return (
