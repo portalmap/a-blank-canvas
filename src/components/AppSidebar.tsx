@@ -32,7 +32,7 @@ const modulesNavItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, sidebarWidth, setSidebarWidth } = useSidebar();
   const location = useLocation();
   const { signOut } = useAuth();
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
@@ -41,8 +41,35 @@ export function AppSidebar() {
   const isActive = (path: string) => location.pathname === path;
   const isCollapsed = state === 'collapsed';
 
+  // Resize handler
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startX;
+      setSidebarWidth(startWidth + delta);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
   return (
-    <Sidebar className={isCollapsed ? 'w-14' : 'w-64'}>
+    <Sidebar 
+      className={isCollapsed ? 'w-14' : ''} 
+      style={!isCollapsed ? { width: `${sidebarWidth}px` } : undefined}
+    >
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-2">
           <div className="bg-sidebar-primary rounded-lg p-2">
@@ -158,6 +185,14 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      {/* Resize handle */}
+      {!isCollapsed && (
+        <div
+          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors z-50"
+          onMouseDown={handleResizeStart}
+        />
+      )}
     </Sidebar>
   );
 }
