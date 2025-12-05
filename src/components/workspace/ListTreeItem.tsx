@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { List, Plus, Trash2 } from "lucide-react";
+import { List, Plus, MoreHorizontal, Trash2, Pencil, Link, Move, Copy, Archive } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useStatuses } from "@/hooks/useStatuses";
 import { useCreateTask } from "@/hooks/useTasks";
-import { useDeleteList } from "@/hooks/useLists";
+import { useDeleteList, useUpdateList } from "@/hooks/useLists";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,11 +51,14 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
   const { data: statuses } = useStatuses(list.workspace_id);
   const createTask = useCreateTask();
   const deleteList = useDeleteList();
+  const updateList = useUpdateList();
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newName, setNewName] = useState('');
 
   const handleCreateTask = async () => {
     if (!activeWorkspace || !newTaskTitle.trim() || !statuses || statuses.length === 0) return;
@@ -73,6 +77,17 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
     setNewTaskDescription('');
     setIsTaskDialogOpen(false);
     navigate(`/list/${list.id}`);
+  };
+
+  const handleRename = async () => {
+    if (!newName.trim() || newName === list.name) return;
+    
+    await updateList.mutateAsync({
+      id: list.id,
+      name: newName,
+    });
+    
+    setIsRenameDialogOpen(false);
   };
 
   return (
@@ -95,13 +110,37 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
               className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
             >
-              <Plus className="h-3 w-3" />
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setIsTaskDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Tarefa
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => {
+              setNewName(list.name);
+              setIsRenameDialogOpen(true);
+            }}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Renomear
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+              <Link className="mr-2 h-4 w-4" />
+              Copiar Link
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+              <Move className="mr-2 h-4 w-4" />
+              Mover
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+              <Copy className="mr-2 h-4 w-4" />
+              Duplicar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+              <Archive className="mr-2 h-4 w-4" />
+              Arquivar
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
@@ -153,6 +192,40 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
               disabled={!newTaskTitle.trim() || createTask.isPending}
             >
               Criar Tarefa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for renaming list */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Lista</DialogTitle>
+            <DialogDescription>
+              Digite o novo nome para a lista
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-list">Nome</Label>
+              <Input
+                id="rename-list"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nome da lista"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleRename} 
+              disabled={!newName.trim() || newName === list.name || updateList.isPending}
+            >
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>

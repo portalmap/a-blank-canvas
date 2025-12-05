@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ChevronRight, Folder, Plus, List, Trash2 } from "lucide-react";
-import { useLists, useCreateList, useDeleteList } from "@/hooks/useLists";
-import { useDeleteFolder } from "@/hooks/useFolders";
+import { ChevronRight, Folder, MoreHorizontal, List, Trash2, Pencil, Link, Move, Copy, Archive, ListPlus } from "lucide-react";
+import { useLists, useCreateList } from "@/hooks/useLists";
+import { useDeleteFolder, useUpdateFolder } from "@/hooks/useFolders";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { toast } from "sonner";
 import {
   Collapsible,
   CollapsibleContent,
@@ -55,11 +56,14 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
   
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
+  const [newName, setNewName] = useState('');
 
   const createList = useCreateList();
   const deleteFolder = useDeleteFolder();
+  const updateFolder = useUpdateFolder();
 
   const handleCreateList = async () => {
     if (!activeWorkspace || !newListName.trim()) return;
@@ -75,6 +79,17 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
     setNewListName('');
     setNewListDescription('');
     setIsListDialogOpen(false);
+  };
+
+  const handleRename = async () => {
+    if (!newName.trim() || newName === folder.name) return;
+    
+    await updateFolder.mutateAsync({
+      id: folder.id,
+      name: newName,
+    });
+    
+    setIsRenameDialogOpen(false);
   };
 
   return (
@@ -102,13 +117,37 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Plus className="h-3 w-3" />
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setIsListDialogOpen(true)}>
-                <List className="mr-2 h-4 w-4" />
+                <ListPlus className="mr-2 h-4 w-4" />
                 Nova Lista
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {
+                setNewName(folder.name);
+                setIsRenameDialogOpen(true);
+              }}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Renomear
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Link className="mr-2 h-4 w-4" />
+                Copiar Link
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Move className="mr-2 h-4 w-4" />
+                Mover
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Copy className="mr-2 h-4 w-4" />
+                Duplicar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Archive className="mr-2 h-4 w-4" />
+                Arquivar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
@@ -167,6 +206,40 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
               disabled={!newListName.trim() || createList.isPending}
             >
               Criar Lista
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for renaming folder */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Pasta</DialogTitle>
+            <DialogDescription>
+              Digite o novo nome para a pasta
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-folder">Nome</Label>
+              <Input
+                id="rename-folder"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nome da pasta"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleRename} 
+              disabled={!newName.trim() || newName === folder.name || updateFolder.isPending}
+            >
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>

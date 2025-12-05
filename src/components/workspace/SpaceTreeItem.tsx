@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ChevronRight, Circle, Plus, Folder, List, Trash2 } from "lucide-react";
+import { ChevronRight, Circle, MoreHorizontal, Folder, List, Trash2, Pencil, Link, Move, Copy, Archive, FolderPlus, ListPlus } from "lucide-react";
 import { useFolders, useCreateFolder } from "@/hooks/useFolders";
 import { useLists, useCreateList } from "@/hooks/useLists";
-import { useSpace, useDeleteSpace } from "@/hooks/useSpaces";
+import { useSpace, useDeleteSpace, useUpdateSpace } from "@/hooks/useSpaces";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { toast } from "sonner";
 import {
   Collapsible,
   CollapsibleContent,
@@ -61,14 +62,17 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderDescription, setNewFolderDescription] = useState('');
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
+  const [newName, setNewName] = useState('');
 
   const createFolder = useCreateFolder();
   const createList = useCreateList();
   const deleteSpace = useDeleteSpace();
+  const updateSpace = useUpdateSpace();
   
   // Filter lists that don't belong to any folder (direct lists)
   const directLists = allLists?.filter(list => !list.folder_id);
@@ -102,6 +106,17 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
     setIsListDialogOpen(false);
   };
 
+  const handleRename = async () => {
+    if (!newName.trim() || newName === space.name) return;
+    
+    await updateSpace.mutateAsync({
+      id: space.id,
+      name: newName,
+    });
+    
+    setIsRenameDialogOpen(false);
+  };
+
   if (isCollapsed) return null;
 
   return (
@@ -133,17 +148,41 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Plus className="h-3 w-3" />
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setIsFolderDialogOpen(true)}>
-                <Folder className="mr-2 h-4 w-4" />
+                <FolderPlus className="mr-2 h-4 w-4" />
                 Nova Pasta
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsListDialogOpen(true)}>
-                <List className="mr-2 h-4 w-4" />
+                <ListPlus className="mr-2 h-4 w-4" />
                 Nova Lista
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {
+                setNewName(space.name);
+                setIsRenameDialogOpen(true);
+              }}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Renomear
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Link className="mr-2 h-4 w-4" />
+                Copiar Link
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Move className="mr-2 h-4 w-4" />
+                Mover
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Copy className="mr-2 h-4 w-4" />
+                Duplicar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+                <Archive className="mr-2 h-4 w-4" />
+                Arquivar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
@@ -255,6 +294,40 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
               disabled={!newListName.trim() || createList.isPending}
             >
               Criar Lista
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for renaming space */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Space</DialogTitle>
+            <DialogDescription>
+              Digite o novo nome para o space
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-space">Nome</Label>
+              <Input
+                id="rename-space"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nome do space"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleRename} 
+              disabled={!newName.trim() || newName === space.name || updateSpace.isPending}
+            >
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
