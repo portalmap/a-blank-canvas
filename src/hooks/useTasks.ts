@@ -10,7 +10,23 @@ export const useTasks = (listId?: string) => {
       
       const { data, error } = await supabase
         .from('tasks')
-        .select('*, assignee:profiles(full_name, avatar_url), status:statuses(name, color)')
+        .select(`
+          id,
+          title,
+          description,
+          status_id,
+          priority,
+          assignee_id,
+          start_date,
+          due_date,
+          list_id,
+          workspace_id,
+          parent_id,
+          completed_at,
+          created_at,
+          assignee:profiles(full_name, avatar_url),
+          status:statuses(name, color)
+        `)
         .eq('list_id', listId)
         .order('created_at', { ascending: false });
 
