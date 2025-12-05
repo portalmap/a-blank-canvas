@@ -968,6 +968,184 @@ export type Database = {
           },
         ]
       }
+      task_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          task_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          task_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          task_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_checklist_items: {
+        Row: {
+          assignee_id: string | null
+          checklist_id: string
+          content: string
+          created_at: string | null
+          due_date: string | null
+          id: string
+          is_completed: boolean | null
+          order_index: number | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          checklist_id: string
+          content: string
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          is_completed?: boolean | null
+          order_index?: number | null
+        }
+        Update: {
+          assignee_id?: string | null
+          checklist_id?: string
+          content?: string
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          is_completed?: boolean | null
+          order_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_checklist_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "task_checklists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_checklists: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_index: number | null
+          task_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_index?: number | null
+          task_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_index?: number | null
+          task_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_checklists_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string | null
+          id: string
+          task_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          task_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          task_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_followers: {
+        Row: {
+          created_at: string | null
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_followers_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_permissions: {
         Row: {
           created_at: string
@@ -1002,49 +1180,67 @@ export type Database = {
       }
       tasks: {
         Row: {
+          archived_at: string | null
           assignee_id: string | null
           completed_at: string | null
+          cover_image_url: string | null
           created_at: string
           created_by_user_id: string
           description: string | null
           due_date: string | null
+          estimated_time: number | null
           id: string
+          is_milestone: boolean | null
           list_id: string
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           start_date: string | null
           status_id: string
+          time_spent: number | null
           title: string
           updated_at: string
           workspace_id: string
         }
         Insert: {
+          archived_at?: string | null
           assignee_id?: string | null
           completed_at?: string | null
+          cover_image_url?: string | null
           created_at?: string
           created_by_user_id: string
           description?: string | null
           due_date?: string | null
+          estimated_time?: number | null
           id?: string
+          is_milestone?: boolean | null
           list_id: string
+          parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           start_date?: string | null
           status_id: string
+          time_spent?: number | null
           title: string
           updated_at?: string
           workspace_id: string
         }
         Update: {
+          archived_at?: string | null
           assignee_id?: string | null
           completed_at?: string | null
+          cover_image_url?: string | null
           created_at?: string
           created_by_user_id?: string
           description?: string | null
           due_date?: string | null
+          estimated_time?: number | null
           id?: string
+          is_milestone?: boolean | null
           list_id?: string
+          parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           start_date?: string | null
           status_id?: string
+          time_spent?: number | null
           title?: string
           updated_at?: string
           workspace_id?: string
@@ -1062,6 +1258,13 @@ export type Database = {
             columns: ["list_id"]
             isOneToOne: false
             referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
