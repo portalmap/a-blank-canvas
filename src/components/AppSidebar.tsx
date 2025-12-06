@@ -66,10 +66,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar 
-      className={isCollapsed ? 'w-14' : ''} 
-      style={!isCollapsed ? { width: `${sidebarWidth}px` } : undefined}
-    >
+    <Sidebar className={isCollapsed ? 'w-14' : ''}>
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-2">
           <div className="bg-sidebar-primary rounded-lg p-2">
