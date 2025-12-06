@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { Loader2, Plus } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Plus, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskListView } from '@/components/views/TaskListView';
 import { TaskKanbanView } from '@/components/views/TaskKanbanView';
@@ -109,11 +110,21 @@ const ListDetailView = () => {
             <p className="text-muted-foreground mt-1">{currentList.description}</p>
           )}
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
+        <Button onClick={() => setIsDialogOpen(true)} disabled={!defaultStatus}>
           <Plus className="mr-2 h-4 w-4" />
           Nova Tarefa
         </Button>
       </div>
+
+      {!defaultStatus && statuses !== undefined && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Status não configurados</AlertTitle>
+          <AlertDescription>
+            Este workspace não possui status configurados. Contate um administrador para criar os status padrão.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue={viewMode} className="w-full">
         <TabsList>
