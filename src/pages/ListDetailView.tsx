@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useFolders } from '@/hooks/useFolders';
-import { useLists } from '@/hooks/useLists';
+import { useList } from '@/hooks/useLists';
 import { useTasks, useCreateTask } from '@/hooks/useTasks';
 import { useStatuses, useDefaultStatus } from '@/hooks/useStatuses';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ const ListDetailView = () => {
   const { activeWorkspace } = useWorkspace();
   const navigate = useNavigate();
 
-  const { data: lists } = useLists({});
+  const { data: currentList, isLoading: listLoading } = useList(listId);
   const { data: tasks, isLoading: tasksLoading } = useTasks(listId);
   const { data: statuses } = useStatuses(activeWorkspace?.id);
   const { data: defaultStatus } = useDefaultStatus(activeWorkspace?.id);
@@ -36,7 +36,7 @@ const ListDetailView = () => {
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
 
-  const currentList = lists?.find(l => l.id === listId);
+  
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: folders } = useFolders(currentList?.space_id);
   
@@ -61,7 +61,7 @@ const ListDetailView = () => {
     setIsDialogOpen(false);
   };
 
-  if (!activeWorkspace || !currentList || !currentSpace) {
+  if (!activeWorkspace || listLoading || !currentList || !currentSpace) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

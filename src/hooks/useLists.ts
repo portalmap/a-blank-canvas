@@ -28,6 +28,25 @@ export const useLists = ({ spaceId, folderId }: UseListsOptions = {}) => {
   });
 };
 
+export const useList = (listId?: string) => {
+  return useQuery({
+    queryKey: ['list', listId],
+    queryFn: async () => {
+      if (!listId) return null;
+      
+      const { data, error } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('id', listId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!listId,
+  });
+};
+
 export const useCreateList = () => {
   const queryClient = useQueryClient();
 
