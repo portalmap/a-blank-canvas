@@ -2,11 +2,30 @@ import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronDown, ChevronRight, GitBranch } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal, FolderInput, Archive, Trash2 } from 'lucide-react';
 import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
+import { TaskMoveDialog } from '@/components/tasks/TaskMoveDialog';
 import { useSubtasks } from '@/hooks/useSubtasks';
+import { useDeleteTask, useArchiveTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 
 interface Task {
@@ -34,6 +53,8 @@ interface Task {
 
 interface TaskListViewProps {
   tasks: Task[];
+  workspaceId: string;
+  listId: string;
 }
 
 const SubtaskCount = ({ parentId }: { parentId: string }) => {
@@ -51,9 +72,14 @@ const SubtaskCount = ({ parentId }: { parentId: string }) => {
   );
 };
 
-export const TaskListView = ({ tasks }: TaskListViewProps) => {
+export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [moveTaskId, setMoveTaskId] = useState<string | null>(null);
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+
+  const deleteTask = useDeleteTask();
+  const archiveTask = useArchiveTask();
 
   const isOverdue = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
@@ -71,6 +97,13 @@ export const TaskListView = ({ tasks }: TaskListViewProps) => {
       }
       return newSet;
     });
+  };
+
+  const handleDelete = () => {
+    if (deleteTaskId) {
+      deleteTask.mutate(deleteTaskId);
+      setDeleteTaskId(null);
+    }
   };
 
   // Filtrar apenas tarefas principais (sem parent_id)
@@ -131,6 +164,32 @@ export const TaskListView = ({ tasks }: TaskListViewProps) => {
               <span className="text-muted-foreground">Não</span>
             )}
           </TableCell>
+          <TableCell onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setMoveTaskId(task.id)}>
+                  <FolderInput className="h-4 w-4 mr-2" />
+                  Mover
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => archiveTask.mutate(task.id)}>
+                  <Archive className="h-4 w-4 mr-2" />
+                  Arquivar
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setDeleteTaskId(task.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
         </TableRow>
         {isExpanded && subtasks.map(subtask => renderTaskRow(subtask, true))}
       </>
@@ -149,12 +208,13 @@ export const TaskListView = ({ tasks }: TaskListViewProps) => {
               <TableHead>Início</TableHead>
               <TableHead>Entrega</TableHead>
               <TableHead>Atrasada</TableHead>
+              <TableHead className="w-12">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {mainTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   Nenhuma tarefa encontrada
                 </TableCell>
               </TableRow>
@@ -170,6 +230,31 @@ export const TaskListView = ({ tasks }: TaskListViewProps) => {
         open={!!selectedTask}
         onOpenChange={(open) => !open && setSelectedTask(null)}
       />
+
+      <TaskMoveDialog
+        taskId={moveTaskId}
+        open={!!moveTaskId}
+        onOpenChange={(open) => !open && setMoveTaskId(null)}
+        workspaceId={workspaceId}
+        currentListId={listId}
+      />
+
+      <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A tarefa será permanentemente excluída.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

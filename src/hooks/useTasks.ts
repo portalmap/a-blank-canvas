@@ -28,12 +28,65 @@ export const useTasks = (listId?: string) => {
           status:statuses(name, color)
         `)
         .eq('list_id', listId)
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data;
     },
     enabled: !!listId,
+  });
+};
+
+export const useMoveTask = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, listId, workspaceId }: { id: string; listId: string; workspaceId: string }) => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ list_id: listId, workspace_id: workspaceId })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Tarefa movida com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao mover tarefa');
+      console.error(error);
+    },
+  });
+};
+
+export const useArchiveTask = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
+      toast.success('Tarefa arquivada com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao arquivar tarefa');
+      console.error(error);
+    },
   });
 };
 
