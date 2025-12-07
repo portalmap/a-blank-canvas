@@ -139,7 +139,7 @@ const ListDetailView = () => {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <TaskListView tasks={tasks || []} />
+            <TaskListView tasks={tasks || []} workspaceId={activeWorkspace.id} listId={listId!} />
           )}
         </TabsContent>
 
