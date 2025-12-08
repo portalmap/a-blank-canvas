@@ -15,6 +15,7 @@ const Dashboards = () => {
   const { data: dashboards = [], isLoading } = useDashboards();
   const [filter, setFilter] = useState<'all' | 'mine' | 'shared' | 'private'>('all');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Filter dashboards based on selected filter
   const filteredDashboards = dashboards.filter((dashboard) => {
@@ -49,6 +50,8 @@ const Dashboards = () => {
         onFilterChange={setFilter}
         onDashboardClick={handleDashboardClick}
         currentUserId={user?.id}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       {/* Main Content */}
