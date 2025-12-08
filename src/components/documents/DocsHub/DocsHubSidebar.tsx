@@ -49,7 +49,7 @@ export const DocsHubSidebar = ({
           variant="ghost"
           size="icon"
           onClick={onToggleCollapse}
-          className="h-8 w-8"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
         >
           {isCollapsed ? (
             <PanelLeft className="h-4 w-4" />
