@@ -28,6 +28,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Json } from '@/integrations/supabase/types';
+import { ShareDocumentDialog } from '@/components/documents/ShareDocumentDialog';
 
 const EMOJI_OPTIONS = ['📄', '📝', '📋', '📌', '📎', '📂', '🗂️', '📑', '📒', '📓', '💡', '🎯', '🚀', '⭐', '🔖'];
 
@@ -42,6 +43,7 @@ const DocumentView = () => {
   const [emoji, setEmoji] = useState('📄');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const { data: document, isLoading } = useQuery({
     queryKey: ['document', id],
@@ -50,12 +52,9 @@ const DocumentView = () => {
       
       const { data, error } = await supabase
         .from('documents')
-        .select(`
-          *,
-          creator:profiles!documents_created_by_user_id_fkey(full_name, avatar_url)
-        `)
+        .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -90,7 +89,7 @@ const DocumentView = () => {
   }, [document]);
 
   const updateDocument = useMutation({
-    mutationFn: async (data: { title?: string; emoji?: string; content?: Json; is_protected?: boolean; is_wiki?: boolean }) => {
+    mutationFn: async (data: { title?: string; emoji?: string; content?: Json; is_protected?: boolean; is_wiki?: boolean; visibility?: string }) => {
       if (!id) throw new Error('Document ID missing');
       
       const { error } = await supabase
@@ -196,6 +195,8 @@ const DocumentView = () => {
     setHasChanges(true);
   };
 
+  const isOwner = document?.created_by_user_id === user?.id;
+
   if (isLoading) {
     return (
       <div className="flex-1 p-6">
@@ -256,7 +257,7 @@ const DocumentView = () => {
             <Star className={`h-4 w-4 ${isFavorited ? 'fill-yellow-500 text-yellow-500' : ''}`} />
           </Button>
 
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" onClick={() => setShareDialogOpen(true)}>
             <Share2 className="h-4 w-4" />
           </Button>
 
@@ -269,12 +270,14 @@ const DocumentView = () => {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() => updateDocument.mutate({ is_wiki: !document.is_wiki })}
+                disabled={!isOwner}
               >
                 <BookOpen className="h-4 w-4 mr-2" />
                 {document.is_wiki ? 'Remover como Wiki' : 'Marcar como Wiki'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => updateDocument.mutate({ is_protected: !document.is_protected })}
+                disabled={!isOwner}
               >
                 {document.is_protected ? (
                   <>
@@ -289,13 +292,14 @@ const DocumentView = () => {
                 )}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => archiveDocument.mutate()}>
+              <DropdownMenuItem onClick={() => archiveDocument.mutate()} disabled={!isOwner}>
                 <Archive className="h-4 w-4 mr-2" />
                 {document.is_archived ? 'Restaurar' : 'Arquivar'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => deleteDocument.mutate()}
                 className="text-destructive"
+                disabled={!isOwner}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Excluir
@@ -353,6 +357,17 @@ const DocumentView = () => {
           />
         </div>
       </div>
+
+      {/* Share Dialog */}
+      <ShareDocumentDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        documentId={id || ''}
+        documentTitle={document.title}
+        visibility={document.visibility || 'private'}
+        publicLinkId={document.public_link_id || ''}
+        onVisibilityChange={(visibility) => updateDocument.mutate({ visibility })}
+      />
     </div>
   );
 };

@@ -471,6 +471,44 @@ export type Database = {
           },
         ]
       }
+      document_folders: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          parent_folder_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          parent_folder_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          parent_folder_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_folders_parent_folder_id_fkey"
+            columns: ["parent_folder_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_pages: {
         Row: {
           content: Json
@@ -609,21 +647,24 @@ export type Database = {
           created_at: string
           id: string
           name: string
-          workspace_id: string
+          user_id: string | null
+          workspace_id: string | null
         }
         Insert: {
           color?: string | null
           created_at?: string
           id?: string
           name: string
-          workspace_id: string
+          user_id?: string | null
+          workspace_id?: string | null
         }
         Update: {
           color?: string | null
           created_at?: string
           id?: string
           name?: string
-          workspace_id?: string
+          user_id?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -642,6 +683,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           emoji: string | null
+          folder_id: string | null
           id: string
           is_archived: boolean | null
           is_favorite: boolean | null
@@ -649,9 +691,11 @@ export type Database = {
           is_wiki: boolean | null
           parent_document_id: string | null
           position: number | null
+          public_link_id: string | null
           title: string
           updated_at: string
-          workspace_id: string
+          visibility: string | null
+          workspace_id: string | null
         }
         Insert: {
           content?: Json
@@ -659,6 +703,7 @@ export type Database = {
           created_at?: string
           created_by_user_id: string
           emoji?: string | null
+          folder_id?: string | null
           id?: string
           is_archived?: boolean | null
           is_favorite?: boolean | null
@@ -666,9 +711,11 @@ export type Database = {
           is_wiki?: boolean | null
           parent_document_id?: string | null
           position?: number | null
+          public_link_id?: string | null
           title: string
           updated_at?: string
-          workspace_id: string
+          visibility?: string | null
+          workspace_id?: string | null
         }
         Update: {
           content?: Json
@@ -676,6 +723,7 @@ export type Database = {
           created_at?: string
           created_by_user_id?: string
           emoji?: string | null
+          folder_id?: string | null
           id?: string
           is_archived?: boolean | null
           is_favorite?: boolean | null
@@ -683,11 +731,20 @@ export type Database = {
           is_wiki?: boolean | null
           parent_document_id?: string | null
           position?: number | null
+          public_link_id?: string | null
           title?: string
           updated_at?: string
-          workspace_id?: string
+          visibility?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "documents_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "documents_parent_document_id_fkey"
             columns: ["parent_document_id"]
