@@ -70,26 +70,37 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-sidebar-primary rounded-lg p-2">
-              <CheckSquare className="h-5 w-5 text-sidebar-primary-foreground" />
-            </div>
-            {!isCollapsed && (
-              <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={isCollapsed ? toggleSidebar : undefined}
+                className={`flex items-center gap-2 ${isCollapsed ? 'cursor-pointer hover:opacity-80' : ''}`}
+              >
+                <div className="bg-sidebar-primary rounded-lg p-2">
+                  <CheckSquare className="h-5 w-5 text-sidebar-primary-foreground" />
+                </div>
+                {!isCollapsed && (
+                  <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
+                )}
+              </button>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                Expandir menu
+              </TooltipContent>
             )}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
-          >
-            {isCollapsed ? (
-              <PanelLeft className="h-4 w-4" />
-            ) : (
+          </Tooltip>
+          
+          {!isCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
+            >
               <PanelLeftClose className="h-4 w-4" />
-            )}
-          </Button>
+            </Button>
+          )}
         </div>
       </SidebarHeader>
 
