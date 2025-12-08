@@ -16,7 +16,6 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
@@ -29,6 +28,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Json } from '@/integrations/supabase/types';
 import { ShareDocumentDialog } from '@/components/documents/ShareDocumentDialog';
+import { RichTextEditor } from '@/components/documents/editor';
 
 const EMOJI_OPTIONS = ['📄', '📝', '📋', '📌', '📎', '📂', '🗂️', '📑', '📒', '📓', '💡', '🎯', '🚀', '⭐', '🔖'];
 
@@ -83,8 +83,17 @@ const DocumentView = () => {
     if (document) {
       setTitle(document.title);
       setEmoji(document.emoji || '📄');
-      const contentObj = document.content as { text?: string } | null;
-      setContent(contentObj?.text || '');
+      const contentObj = document.content as { text?: string; type?: string } | null;
+      // Support both legacy text format and new TipTap JSON format
+      if (contentObj?.type === 'doc') {
+        setContent(JSON.stringify(contentObj));
+      } else if (contentObj?.text !== undefined) {
+        setContent(JSON.stringify({ text: contentObj.text }));
+      } else if (typeof document.content === 'string') {
+        setContent(document.content);
+      } else {
+        setContent('');
+      }
     }
   }, [document]);
 
@@ -172,10 +181,23 @@ const DocumentView = () => {
   });
 
   const handleSave = () => {
+    // Parse content to check if it's TipTap format
+    let contentToSave: Json;
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.type === 'doc') {
+        contentToSave = parsed as Json;
+      } else {
+        contentToSave = { text: content } as Json;
+      }
+    } catch {
+      contentToSave = { text: content } as Json;
+    }
+    
     updateDocument.mutate({
       title,
       emoji,
-      content: { text: content } as Json,
+      content: contentToSave,
     });
   };
 
@@ -348,12 +370,11 @@ const DocumentView = () => {
           </div>
 
           {/* Content Editor */}
-          <Textarea
-            value={content}
-            onChange={(e) => handleContentChange(e.target.value)}
-            placeholder="Comece a escrever..."
-            className="min-h-[500px] border-none shadow-none focus-visible:ring-0 resize-none text-lg leading-relaxed"
+          <RichTextEditor
+            content={content}
+            onChange={handleContentChange}
             disabled={document.is_protected}
+            placeholder="Comece a escrever ou digite / para comandos..."
           />
         </div>
       </div>
