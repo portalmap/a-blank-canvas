@@ -11,6 +11,8 @@ import BubbleMenu from '@tiptap/extension-bubble-menu';
 import { useEffect, useRef } from 'react';
 import { EditorToolbar } from './EditorToolbar';
 import { SlashCommandMenu } from './SlashCommandMenu';
+import { AddBlockButton } from './AddBlockButton';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import './editor-styles.css';
 
 interface RichTextEditorProps {
@@ -88,11 +90,14 @@ export const RichTextEditor = ({
   }
 
   return (
-    <div className="rich-text-editor">
-      <EditorToolbar editor={editor} />
-      <SlashCommandMenu editor={editor} />
-      <EditorContent editor={editor} className="prose prose-lg dark:prose-invert max-w-none" />
-    </div>
+    <TooltipProvider>
+      <div className="rich-text-editor">
+        <EditorToolbar editor={editor} />
+        <SlashCommandMenu editor={editor} />
+        <EditorContent editor={editor} className="prose prose-lg dark:prose-invert max-w-none" />
+        {!disabled && <AddBlockButton editor={editor} />}
+      </div>
+    </TooltipProvider>
   );
 };
 

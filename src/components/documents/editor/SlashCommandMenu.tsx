@@ -1,4 +1,4 @@
-import { Editor, Extension } from '@tiptap/react';
+import { Editor } from '@tiptap/react';
 import { 
   Heading1, 
   Heading2, 
@@ -10,8 +10,6 @@ import {
   Quote, 
   Code, 
   Minus,
-  Highlighter,
-  Type
 } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 
@@ -106,6 +104,7 @@ export const SlashCommandMenu = ({ editor }: SlashCommandMenuProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
+  const slashPosRef = useRef<number | null>(null);
 
   const filteredCommands = COMMANDS.filter((cmd) =>
     cmd.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -119,23 +118,21 @@ export const SlashCommandMenu = ({ editor }: SlashCommandMenuProps) => {
   }, {} as Record<string, CommandItem[]>);
 
   const executeCommand = useCallback((command: CommandItem) => {
-    // Delete the slash and query
     const { from } = editor.state.selection;
-    const textBefore = editor.state.doc.textBetween(
-      Math.max(0, from - query.length - 1),
-      from,
-      ''
-    );
-    const slashIndex = textBefore.lastIndexOf('/');
-    if (slashIndex !== -1) {
-      const deleteFrom = from - (textBefore.length - slashIndex);
-      editor.chain().focus().deleteRange({ from: deleteFrom, to: from }).run();
+    
+    // Delete from the slash position to current cursor
+    if (slashPosRef.current !== null) {
+      editor.chain()
+        .focus()
+        .deleteRange({ from: slashPosRef.current, to: from })
+        .run();
     }
     
     command.command(editor);
     setIsOpen(false);
     setQuery('');
-  }, [editor, query]);
+    slashPosRef.current = null;
+  }, [editor]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -159,6 +156,7 @@ export const SlashCommandMenu = ({ editor }: SlashCommandMenuProps) => {
       } else if (event.key === 'Escape') {
         setIsOpen(false);
         setQuery('');
+        slashPosRef.current = null;
       }
     };
 
@@ -168,29 +166,37 @@ export const SlashCommandMenu = ({ editor }: SlashCommandMenuProps) => {
 
   useEffect(() => {
     const handleUpdate = () => {
-      const { from, empty } = editor.state.selection;
+      const { from, empty, $from } = editor.state.selection;
       
       if (!empty) {
         setIsOpen(false);
         return;
       }
 
-      const textBefore = editor.state.doc.textBetween(
-        Math.max(0, from - 20),
-        from,
-        ''
-      );
-
-      const slashIndex = textBefore.lastIndexOf('/');
+      // Use $from.parent to get current block's text content
+      const currentNode = $from.parent;
+      const textContent = currentNode.textContent;
+      const cursorOffset = $from.parentOffset;
+      
+      // Text before cursor within the current block
+      const textBeforeCursor = textContent.slice(0, cursorOffset);
+      
+      // Find "/" in text before cursor
+      const slashIndex = textBeforeCursor.lastIndexOf('/');
       
       if (slashIndex !== -1) {
-        const charBeforeSlash = textBefore[slashIndex - 1];
-        if (!charBeforeSlash || charBeforeSlash === ' ' || charBeforeSlash === '\n') {
-          const searchQuery = textBefore.slice(slashIndex + 1);
+        // Check if "/" is at start of block OR after a space
+        const charBeforeSlash = textBeforeCursor[slashIndex - 1];
+        if (slashIndex === 0 || charBeforeSlash === ' ') {
+          const searchQuery = textBeforeCursor.slice(slashIndex + 1);
           setQuery(searchQuery);
           setSelectedIndex(0);
           
-          // Get cursor position
+          // Calculate absolute position of "/" in the document
+          const blockStart = $from.start();
+          slashPosRef.current = blockStart + slashIndex;
+          
+          // Get cursor position for menu placement
           const coords = editor.view.coordsAtPos(from);
           setPosition({
             top: coords.bottom + 8,
@@ -203,6 +209,7 @@ export const SlashCommandMenu = ({ editor }: SlashCommandMenuProps) => {
       
       setIsOpen(false);
       setQuery('');
+      slashPosRef.current = null;
     };
 
     editor.on('update', handleUpdate);
