@@ -16,6 +16,7 @@ import ListDetailView from "./pages/ListDetailView";
 import Chat from "./pages/Chat";
 import Teams from "./pages/Teams";
 import Documents from "./pages/Documents";
+import DocumentView from "./pages/DocumentView";
 import Dashboards from "./pages/Dashboards";
 import Automations from "./pages/Automations";
 import Settings from "./pages/Settings";
@@ -53,6 +54,7 @@ const App = () => (
                           <Route path="/chat" element={<Chat />} />
                           <Route path="/teams" element={<Teams />} />
                           <Route path="/documents" element={<Documents />} />
+                          <Route path="/documents/:id" element={<DocumentView />} />
                           <Route path="/dashboards" element={<Dashboards />} />
                           <Route path="/automations" element={<Automations />} />
                           <Route path="/settings" element={<Settings />} />
