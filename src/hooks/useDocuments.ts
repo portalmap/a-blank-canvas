@@ -1,13 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
 
 export interface Document {
   id: string;
-  workspace_id: string;
+  workspace_id: string | null;
   title: string;
   emoji: string | null;
   cover_url: string | null;
@@ -21,6 +20,9 @@ export interface Document {
   created_by_user_id: string;
   created_at: string;
   updated_at: string;
+  visibility?: string;
+  public_link_id?: string;
+  folder_id?: string | null;
   tags?: DocumentTag[];
   creator?: {
     full_name: string | null;
@@ -35,35 +37,49 @@ export interface DocumentTag {
   color: string;
 }
 
+export interface DocumentFolder {
+  id: string;
+  name: string;
+  user_id: string;
+  parent_folder_id: string | null;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type DocumentFilter = 'all' | 'created' | 'shared' | 'private' | 'archived' | 'favorites' | 'wikis';
 
 interface UseDocumentsOptions {
   filter?: DocumentFilter;
   search?: string;
   tagIds?: string[];
+  folderId?: string | null;
 }
 
 export const useDocuments = (options: UseDocumentsOptions = {}) => {
-  const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { filter = 'all', search, tagIds } = options;
+  const { filter = 'all', search, tagIds, folderId } = options;
 
   const documentsQuery = useQuery({
-    queryKey: ['documents', activeWorkspace?.id, filter, search, tagIds],
+    queryKey: ['documents', user?.id, filter, search, tagIds, folderId],
     queryFn: async () => {
-      if (!activeWorkspace?.id) return [];
+      if (!user?.id) return [];
 
       let query = supabase
         .from('documents')
         .select('*')
-        .eq('workspace_id', activeWorkspace.id)
         .order('updated_at', { ascending: false });
+
+      // Filter by folder if specified
+      if (folderId) {
+        query = query.eq('folder_id', folderId);
+      }
 
       // Apply filters
       switch (filter) {
         case 'created':
-          if (user?.id) query = query.eq('created_by_user_id', user.id);
+          query = query.eq('created_by_user_id', user.id).eq('is_archived', false);
           break;
         case 'archived':
           query = query.eq('is_archived', true);
@@ -102,7 +118,7 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
           .from('document_favorites')
           .select('document_id')
           .in('document_id', docIds)
-          .eq('user_id', user?.id || '');
+          .eq('user_id', user.id);
 
         const favoriteDocIds = new Set(favorites?.map(f => f.document_id) || []);
 
@@ -133,22 +149,23 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
 
       return (data || []).map(d => ({ ...d, creator: null, tags: [], isFavorited: false })) as Document[];
     },
-    enabled: !!activeWorkspace?.id,
+    enabled: !!user?.id,
   });
 
   const createDocument = useMutation({
-    mutationFn: async (data: { title: string; emoji?: string; is_wiki?: boolean }) => {
-      if (!activeWorkspace?.id || !user?.id) throw new Error('Missing workspace or user');
+    mutationFn: async (data: { title: string; emoji?: string; is_wiki?: boolean; folder_id?: string }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
 
       const { data: doc, error } = await supabase
         .from('documents')
         .insert({
-          workspace_id: activeWorkspace.id,
           title: data.title,
           emoji: data.emoji,
           is_wiki: data.is_wiki || false,
           created_by_user_id: user.id,
           content: {},
+          folder_id: data.folder_id || null,
+          visibility: 'private',
         })
         .select()
         .single();
@@ -166,7 +183,7 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
   });
 
   const updateDocument = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; title?: string; emoji?: string; content?: Json; is_wiki?: boolean; is_protected?: boolean; is_archived?: boolean }) => {
+    mutationFn: async ({ id, ...data }: { id: string; title?: string; emoji?: string; content?: Json; is_wiki?: boolean; is_protected?: boolean; is_archived?: boolean; visibility?: string; folder_id?: string | null }) => {
       const { error } = await supabase
         .from('documents')
         .update(data)
@@ -251,34 +268,34 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
 };
 
 export const useDocumentTags = () => {
-  const { activeWorkspace } = useWorkspace();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const tagsQuery = useQuery({
-    queryKey: ['document-tags', activeWorkspace?.id],
+    queryKey: ['document-tags', user?.id],
     queryFn: async () => {
-      if (!activeWorkspace?.id) return [];
+      if (!user?.id) return [];
 
       const { data, error } = await supabase
         .from('document_tags')
         .select('*')
-        .eq('workspace_id', activeWorkspace.id)
+        .eq('user_id', user.id)
         .order('name');
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!activeWorkspace?.id,
+    enabled: !!user?.id,
   });
 
   const createTag = useMutation({
     mutationFn: async (data: { name: string; color: string }) => {
-      if (!activeWorkspace?.id) throw new Error('Missing workspace');
+      if (!user?.id) throw new Error('Usuário não autenticado');
 
       const { data: tag, error } = await supabase
         .from('document_tags')
         .insert({
-          workspace_id: activeWorkspace.id,
+          user_id: user.id,
           name: data.name,
           color: data.color,
         })
@@ -298,5 +315,88 @@ export const useDocumentTags = () => {
     tags: tagsQuery.data || [],
     isLoading: tagsQuery.isLoading,
     createTag,
+  };
+};
+
+export const useDocumentFolders = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const foldersQuery = useQuery({
+    queryKey: ['document-folders', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data, error } = await supabase
+        .from('document_folders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (error) throw error;
+      return data as DocumentFolder[] || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const createFolder = useMutation({
+    mutationFn: async (data: { name: string; color?: string; parent_folder_id?: string }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+
+      const { data: folder, error } = await supabase
+        .from('document_folders')
+        .insert({
+          user_id: user.id,
+          name: data.name,
+          color: data.color || '#6366f1',
+          parent_folder_id: data.parent_folder_id || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return folder;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-folders'] });
+      toast.success('Pasta criada!');
+    },
+  });
+
+  const updateFolder = useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; name?: string; color?: string }) => {
+      const { error } = await supabase
+        .from('document_folders')
+        .update(data)
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-folders'] });
+    },
+  });
+
+  const deleteFolder = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('document_folders')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-folders'] });
+      toast.success('Pasta excluída!');
+    },
+  });
+
+  return {
+    folders: foldersQuery.data || [],
+    isLoading: foldersQuery.isLoading,
+    createFolder,
+    updateFolder,
+    deleteFolder,
   };
 };
