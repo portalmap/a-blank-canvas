@@ -4,6 +4,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpace } from '@/hooks/useSpaces';
 import { useFolder } from '@/hooks/useFolders';
 import { useLists, useCreateList } from '@/hooks/useLists';
+import { useTaskStats } from '@/hooks/useTaskStats';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Loader2, Plus, List, FolderOpen, ChevronRight } from 'lucide-react';
+import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 
 const FolderDetailView = () => {
   const { folderId } = useParams<{ folderId: string }>();
@@ -21,6 +23,7 @@ const FolderDetailView = () => {
   const { data: currentFolder, isLoading: folderLoading } = useFolder(folderId);
   const { data: lists, isLoading: listsLoading } = useLists({ folderId });
   const { data: currentSpace, isLoading: spaceLoading } = useSpace(currentFolder?.space_id);
+  const { data: taskStats, isLoading: statsLoading } = useTaskStats({ type: 'folder', id: folderId });
   const createList = useCreateList();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -88,6 +91,8 @@ const FolderDetailView = () => {
           Nova Lista
         </Button>
       </div>
+
+      <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
 
       {listsLoading ? (
         <div className="flex justify-center py-8">
