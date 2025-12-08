@@ -28,6 +28,7 @@ const Documents = () => {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<Document | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const { 
     documents, 
@@ -96,6 +97,8 @@ const Documents = () => {
         onFilterChange={setFilter}
         recentDocs={stats.recent}
         onOpenDoc={handleOpenDoc}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
       {/* Main Content */}
