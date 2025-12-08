@@ -18,6 +18,7 @@ import Teams from "./pages/Teams";
 import Documents from "./pages/Documents";
 import DocumentView from "./pages/DocumentView";
 import Dashboards from "./pages/Dashboards";
+import DashboardView from "./pages/DashboardView";
 import Automations from "./pages/Automations";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
@@ -56,6 +57,7 @@ const App = () => (
                           <Route path="/documents" element={<Documents />} />
                           <Route path="/documents/:id" element={<DocumentView />} />
                           <Route path="/dashboards" element={<Dashboards />} />
+                          <Route path="/dashboards/:id" element={<DashboardView />} />
                           <Route path="/automations" element={<Automations />} />
                           <Route path="/settings" element={<Settings />} />
                           <Route path="*" element={<NotFound />} />
