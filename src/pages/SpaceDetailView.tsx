@@ -4,6 +4,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpace } from '@/hooks/useSpaces';
 import { useFolders, useCreateFolder } from '@/hooks/useFolders';
 import { useLists, useCreateList } from '@/hooks/useLists';
+import { useTaskStats } from '@/hooks/useTaskStats';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Loader2, Plus, FolderOpen, List, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 
 const SpaceDetailView = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -22,6 +24,7 @@ const SpaceDetailView = () => {
   const { data: currentSpace, isLoading: spaceLoading } = useSpace(spaceId);
   const { data: folders, isLoading: foldersLoading } = useFolders(spaceId);
   const { data: lists, isLoading: listsLoading } = useLists({ spaceId });
+  const { data: taskStats, isLoading: statsLoading } = useTaskStats({ type: 'space', id: spaceId });
   
   const createFolder = useCreateFolder();
   const createList = useCreateList();
@@ -100,6 +103,8 @@ const SpaceDetailView = () => {
           )}
         </div>
       </div>
+
+      <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
 
       <Tabs defaultValue="folders" className="w-full">
         <TabsList>
