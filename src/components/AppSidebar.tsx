@@ -1,4 +1,4 @@
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -16,8 +16,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
-import { CheckSquare } from 'lucide-react';
 import { SpaceTreeItem } from '@/components/workspace/SpaceTreeItem';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const mainNavItems = [
   { title: 'Workspace', url: '/', icon: Home },
@@ -32,7 +33,7 @@ const modulesNavItems = [
 ];
 
 export function AppSidebar() {
-  const { state, sidebarWidth, setSidebarWidth } = useSidebar();
+  const { state, sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();
   const location = useLocation();
   const { signOut } = useAuth();
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
@@ -68,13 +69,27 @@ export function AppSidebar() {
   return (
     <Sidebar className={isCollapsed ? 'w-14' : ''}>
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-2">
-          <div className="bg-sidebar-primary rounded-lg p-2">
-            <CheckSquare className="h-5 w-5 text-sidebar-primary-foreground" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-sidebar-primary rounded-lg p-2">
+              <CheckSquare className="h-5 w-5 text-sidebar-primary-foreground" />
+            </div>
+            {!isCollapsed && (
+              <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
+            )}
           </div>
-          {!isCollapsed && (
-            <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
+          >
+            {isCollapsed ? (
+              <PanelLeft className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </SidebarHeader>
 
@@ -85,16 +100,25 @@ export function AppSidebar() {
             <SidebarMenu>
               {modulesNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url}
-                      className="hover:bg-sidebar-accent"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
+                  <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton asChild>
+                        <NavLink 
+                          to={item.url}
+                          className="hover:bg-sidebar-accent"
+                          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {!isCollapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    {isCollapsed && (
+                      <TooltipContent side="right">
+                        {item.title}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -161,22 +185,40 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink 
-                    to="/settings"
-                    className="hover:bg-sidebar-accent"
-                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-                  >
-                    <Settings className="h-4 w-4" />
-                    {!isCollapsed && <span>Configurações</span>}
-                  </NavLink>
-                </SidebarMenuButton>
+                <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton asChild>
+                      <NavLink 
+                        to="/settings"
+                        className="hover:bg-sidebar-accent"
+                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      >
+                        <Settings className="h-4 w-4" />
+                        {!isCollapsed && <span>Configurações</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right">
+                      Configurações
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={signOut}>
-                  <span className="h-4 w-4">🚪</span>
-                  {!isCollapsed && <span>Sair</span>}
-                </SidebarMenuButton>
+                <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton onClick={signOut}>
+                      <span className="h-4 w-4">🚪</span>
+                      {!isCollapsed && <span>Sair</span>}
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right">
+                      Sair
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
