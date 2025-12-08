@@ -28,6 +28,25 @@ export const useLists = ({ spaceId, folderId }: UseListsOptions = {}) => {
   });
 };
 
+export const useListsForWorkspace = (workspaceId?: string) => {
+  return useQuery({
+    queryKey: ['lists', 'workspace', workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return [];
+      
+      const { data, error } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId,
+  });
+};
+
 export const useList = (listId?: string) => {
   return useQuery({
     queryKey: ['list', listId],

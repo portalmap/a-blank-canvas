@@ -1,10 +1,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserProfile } from "@/components/settings/UserProfile";
 import { WorkspaceSettings } from "@/components/settings/WorkspaceSettings";
 import { UserInviteForm } from "@/components/settings/UserInviteForm";
 import { GuestPermissionsManager } from "@/components/settings/GuestPermissionsManager";
 import { UserManagement } from "@/components/settings/UserManagement";
+import { StatusSettings } from "@/components/settings/StatusSettings";
 
 export default function Settings() {
   return (
@@ -17,9 +17,10 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[720px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
+          <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="invites">Convites</TabsTrigger>
           <TabsTrigger value="guests">Convidados</TabsTrigger>
@@ -31,6 +32,10 @@ export default function Settings() {
 
         <TabsContent value="workspace" className="mt-6">
           <WorkspaceSettings />
+        </TabsContent>
+
+        <TabsContent value="status" className="mt-6">
+          <StatusSettings />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
