@@ -671,6 +671,8 @@ export type Database = {
           id: string
           name: string
           space_id: string
+          status_source: string | null
+          status_template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -679,6 +681,8 @@ export type Database = {
           id?: string
           name: string
           space_id: string
+          status_source?: string | null
+          status_template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -687,6 +691,8 @@ export type Database = {
           id?: string
           name?: string
           space_id?: string
+          status_source?: string | null
+          status_template_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -695,6 +701,13 @@ export type Database = {
             columns: ["space_id"]
             isOneToOne: false
             referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folders_status_template_id_fkey"
+            columns: ["status_template_id"]
+            isOneToOne: false
+            referencedRelation: "status_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -743,6 +756,8 @@ export type Database = {
           id: string
           name: string
           space_id: string
+          status_source: string | null
+          status_template_id: string | null
           updated_at: string
           workspace_id: string
         }
@@ -754,6 +769,8 @@ export type Database = {
           id?: string
           name: string
           space_id: string
+          status_source?: string | null
+          status_template_id?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -765,6 +782,8 @@ export type Database = {
           id?: string
           name?: string
           space_id?: string
+          status_source?: string | null
+          status_template_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -781,6 +800,13 @@ export type Database = {
             columns: ["space_id"]
             isOneToOne: false
             referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lists_status_template_id_fkey"
+            columns: ["status_template_id"]
+            isOneToOne: false
+            referencedRelation: "status_templates"
             referencedColumns: ["id"]
           },
           {
@@ -864,6 +890,8 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          status_source: string | null
+          status_template_id: string | null
           updated_at: string
           workspace_id: string
         }
@@ -873,6 +901,8 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          status_source?: string | null
+          status_template_id?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -882,12 +912,97 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          status_source?: string | null
+          status_template_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "spaces_status_template_id_fkey"
+            columns: ["status_template_id"]
+            isOneToOne: false
+            referencedRelation: "status_templates"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "spaces_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      status_template_items: {
+        Row: {
+          category: string | null
+          color: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          order_index: number | null
+          template_id: string
+        }
+        Insert: {
+          category?: string | null
+          color?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          order_index?: number | null
+          template_id: string
+        }
+        Update: {
+          category?: string | null
+          color?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          order_index?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "status_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "status_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      status_templates: {
+        Row: {
+          created_at: string | null
+          created_by_user_id: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by_user_id: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by_user_id?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "status_templates_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -900,36 +1015,49 @@ export type Database = {
           color: string | null
           created_at: string
           id: string
+          inherit_from_parent: boolean | null
           is_default: boolean
           name: string
           order_index: number
           scope_id: string | null
           scope_type: Database["public"]["Enums"]["status_scope"]
+          template_id: string | null
           workspace_id: string
         }
         Insert: {
           color?: string | null
           created_at?: string
           id?: string
+          inherit_from_parent?: boolean | null
           is_default?: boolean
           name: string
           order_index?: number
           scope_id?: string | null
           scope_type?: Database["public"]["Enums"]["status_scope"]
+          template_id?: string | null
           workspace_id: string
         }
         Update: {
           color?: string | null
           created_at?: string
           id?: string
+          inherit_from_parent?: boolean | null
           is_default?: boolean
           name?: string
           order_index?: number
           scope_id?: string | null
           scope_type?: Database["public"]["Enums"]["status_scope"]
+          template_id?: string | null
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "statuses_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "status_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "statuses_workspace_id_fkey"
             columns: ["workspace_id"]
