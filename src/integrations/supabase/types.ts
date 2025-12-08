@@ -1938,9 +1938,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_document_creator: {
+        Args: { _document_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_global_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_system_admin: { Args: { _user_id: string }; Returns: boolean }
+      user_can_access_document: {
+        Args: { _document_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_can_access_folder: {
         Args: { _folder_id: string; _user_id: string }
         Returns: boolean
