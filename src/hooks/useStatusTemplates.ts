@@ -263,38 +263,177 @@ export const useApplyStatusTemplate = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      templateId, 
-      applyToWorkspace,
+    mutationFn: async ({
+      templateId,
+      workspaceId,
       spaceIds,
       folderIds,
       listIds,
-    }: { 
+      synchronized = true,
+    }: {
       templateId: string;
-      applyToWorkspace?: boolean;
-      spaceIds?: string[];
-      folderIds?: string[];
-      listIds?: string[];
+      workspaceId?: string;
+      spaceIds: string[];
+      folderIds: string[];
+      listIds: string[];
+      synchronized?: boolean;
     }) => {
-      if (spaceIds?.length) {
-        await supabase
-          .from('spaces')
-          .update({ status_source: 'template', status_template_id: templateId })
-          .in('id', spaceIds);
+      // Get the template with its items
+      const { data: template, error: templateError } = await supabase
+        .from('status_templates')
+        .select('*, status_template_items(*)')
+        .eq('id', templateId)
+        .single();
+
+      if (templateError) throw templateError;
+
+      // Apply to spaces
+      for (const spaceId of spaceIds) {
+        if (synchronized) {
+          // Link to template (synchronized mode)
+          await supabase
+            .from('spaces')
+            .update({ 
+              status_template_id: templateId,
+              status_source: 'template'
+            })
+            .eq('id', spaceId);
+        } else {
+          // Create independent copy
+          await supabase
+            .from('spaces')
+            .update({ 
+              status_template_id: null,
+              status_source: 'custom'
+            })
+            .eq('id', spaceId);
+
+          // Copy status items as statuses
+          if (template.status_template_items) {
+            const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
+              workspace_id: template.workspace_id,
+              scope_type: 'space' as const,
+              scope_id: spaceId,
+              name: item.name,
+              color: item.color,
+              order_index: index,
+              is_default: item.is_default,
+            }));
+
+            await supabase.from('statuses').insert(statusesToInsert);
+          }
+        }
       }
 
-      if (folderIds?.length) {
-        await supabase
-          .from('folders')
-          .update({ status_source: 'template', status_template_id: templateId })
-          .in('id', folderIds);
+      // Apply to folders
+      for (const folderId of folderIds) {
+        if (synchronized) {
+          await supabase
+            .from('folders')
+            .update({ 
+              status_template_id: templateId,
+              status_source: 'template'
+            })
+            .eq('id', folderId);
+        } else {
+          // Get the folder's space to find workspace_id
+          const { data: folder } = await supabase
+            .from('folders')
+            .select('space_id, spaces(workspace_id)')
+            .eq('id', folderId)
+            .single();
+
+          await supabase
+            .from('folders')
+            .update({ 
+              status_template_id: null,
+              status_source: 'custom'
+            })
+            .eq('id', folderId);
+
+          if (template.status_template_items && folder) {
+            const workspaceIdFromFolder = (folder.spaces as any)?.workspace_id;
+            if (workspaceIdFromFolder) {
+              const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
+                workspace_id: workspaceIdFromFolder,
+                scope_type: 'folder' as const,
+                scope_id: folderId,
+                name: item.name,
+                color: item.color,
+                order_index: index,
+                is_default: item.is_default,
+              }));
+
+              await supabase.from('statuses').insert(statusesToInsert);
+            }
+          }
+        }
       }
 
-      if (listIds?.length) {
-        await supabase
+      // Apply to lists
+      for (const listId of listIds) {
+        const { data: list } = await supabase
           .from('lists')
-          .update({ status_source: 'template', status_template_id: templateId })
-          .in('id', listIds);
+          .select('workspace_id')
+          .eq('id', listId)
+          .single();
+
+        if (synchronized) {
+          await supabase
+            .from('lists')
+            .update({ 
+              status_template_id: templateId,
+              status_source: 'template'
+            })
+            .eq('id', listId);
+        } else {
+          await supabase
+            .from('lists')
+            .update({ 
+              status_template_id: null,
+              status_source: 'custom'
+            })
+            .eq('id', listId);
+
+          if (template.status_template_items && list) {
+            const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
+              workspace_id: list.workspace_id,
+              scope_type: 'list' as const,
+              scope_id: listId,
+              name: item.name,
+              color: item.color,
+              order_index: index,
+              is_default: item.is_default,
+            }));
+
+            await supabase.from('statuses').insert(statusesToInsert);
+          }
+        }
+      }
+
+      // Apply to workspace if specified
+      if (workspaceId) {
+        // First delete existing workspace statuses
+        await supabase
+          .from('statuses')
+          .delete()
+          .eq('workspace_id', workspaceId)
+          .eq('scope_type', 'workspace');
+
+        if (template.status_template_items) {
+          const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
+            workspace_id: workspaceId,
+            scope_type: 'workspace' as const,
+            scope_id: null,
+            name: item.name,
+            color: item.color,
+            order_index: index,
+            is_default: item.is_default,
+            template_id: synchronized ? templateId : null,
+          }));
+
+          await supabase.from('statuses').insert(statusesToInsert);
+        }
       }
 
       return { templateId };
@@ -303,6 +442,7 @@ export const useApplyStatusTemplate = () => {
       queryClient.invalidateQueries({ queryKey: ['spaces'] });
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       queryClient.invalidateQueries({ queryKey: ['lists'] });
+      queryClient.invalidateQueries({ queryKey: ['statuses'] });
       toast.success('Modelo aplicado com sucesso!');
     },
     onError: (error) => {
