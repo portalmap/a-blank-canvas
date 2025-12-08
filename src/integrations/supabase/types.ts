@@ -407,6 +407,124 @@ export type Database = {
           },
         ]
       }
+      document_contributors: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          last_contributed_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          last_contributed_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          last_contributed_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_contributors_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_favorites: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_favorites_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_pages: {
+        Row: {
+          content: Json
+          created_at: string
+          document_id: string
+          emoji: string | null
+          id: string
+          is_protected: boolean | null
+          parent_page_id: string | null
+          position: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          document_id: string
+          emoji?: string | null
+          id?: string
+          is_protected?: boolean | null
+          parent_page_id?: string | null
+          position?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          document_id?: string
+          emoji?: string | null
+          id?: string
+          is_protected?: boolean | null
+          parent_page_id?: string | null
+          position?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_pages_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_pages_parent_page_id_fkey"
+            columns: ["parent_page_id"]
+            isOneToOne: false
+            referencedRelation: "document_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_permissions: {
         Row: {
           created_at: string
@@ -449,35 +567,134 @@ export type Database = {
           },
         ]
       }
+      document_tag_relations: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_tag_relations_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_tag_relations_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "document_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_tags: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_tags_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           content: Json
+          cover_url: string | null
           created_at: string
           created_by_user_id: string
+          emoji: string | null
           id: string
+          is_archived: boolean | null
+          is_favorite: boolean | null
+          is_protected: boolean | null
+          is_wiki: boolean | null
+          parent_document_id: string | null
+          position: number | null
           title: string
           updated_at: string
           workspace_id: string
         }
         Insert: {
           content?: Json
+          cover_url?: string | null
           created_at?: string
           created_by_user_id: string
+          emoji?: string | null
           id?: string
+          is_archived?: boolean | null
+          is_favorite?: boolean | null
+          is_protected?: boolean | null
+          is_wiki?: boolean | null
+          parent_document_id?: string | null
+          position?: number | null
           title: string
           updated_at?: string
           workspace_id: string
         }
         Update: {
           content?: Json
+          cover_url?: string | null
           created_at?: string
           created_by_user_id?: string
+          emoji?: string | null
           id?: string
+          is_archived?: boolean | null
+          is_favorite?: boolean | null
+          is_protected?: boolean | null
+          is_wiki?: boolean | null
+          parent_document_id?: string | null
+          position?: number | null
           title?: string
           updated_at?: string
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "documents_parent_document_id_fkey"
+            columns: ["parent_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "documents_workspace_id_fkey"
             columns: ["workspace_id"]
