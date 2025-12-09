@@ -8,12 +8,11 @@ import { Color } from '@tiptap/extension-color';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import BubbleMenu from '@tiptap/extension-bubble-menu';
-import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import AutoJoiner from 'tiptap-extension-auto-joiner';
 import { useEffect, useRef } from 'react';
 import { EditorToolbar } from './EditorToolbar';
 import { SlashCommandMenu } from './SlashCommandMenu';
-import { AddBlockButton } from './AddBlockButton';
+import { BlockHandle } from './BlockHandle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import './editor-styles.css';
 
@@ -60,10 +59,6 @@ export const RichTextEditor = ({
       BubbleMenu.configure({
         element: bubbleMenuRef.current!,
       }),
-      GlobalDragHandle.configure({
-        dragHandleWidth: 20,
-        scrollTreshold: 100,
-      }),
       AutoJoiner.configure({
         elementsToJoin: ['bulletList', 'orderedList'],
       }),
@@ -103,8 +98,10 @@ export const RichTextEditor = ({
       <div className="rich-text-editor">
         <EditorToolbar editor={editor} />
         <SlashCommandMenu editor={editor} />
-        <EditorContent editor={editor} className="prose prose-lg dark:prose-invert max-w-none" />
-        {!disabled && <AddBlockButton editor={editor} />}
+        <div className="editor-content-wrapper">
+          {!disabled && <BlockHandle editor={editor} />}
+          <EditorContent editor={editor} className="prose prose-lg dark:prose-invert max-w-none" />
+        </div>
       </div>
     </TooltipProvider>
   );
