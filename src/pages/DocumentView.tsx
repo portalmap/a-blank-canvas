@@ -333,7 +333,7 @@ const DocumentView = () => {
 
       {/* Document Content */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto py-8 px-6 pl-12">
+        <div className="max-w-4xl mx-auto py-8 px-6">
           {/* Emoji + Title */}
           <div className="flex items-start gap-4 mb-8">
             <div className="relative">
