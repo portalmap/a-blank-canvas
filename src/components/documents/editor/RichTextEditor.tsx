@@ -8,6 +8,8 @@ import { Color } from '@tiptap/extension-color';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import BubbleMenu from '@tiptap/extension-bubble-menu';
+import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
+import AutoJoiner from 'tiptap-extension-auto-joiner';
 import { useEffect, useRef } from 'react';
 import { EditorToolbar } from './EditorToolbar';
 import { SlashCommandMenu } from './SlashCommandMenu';
@@ -57,6 +59,13 @@ export const RichTextEditor = ({
       }),
       BubbleMenu.configure({
         element: bubbleMenuRef.current!,
+      }),
+      GlobalDragHandle.configure({
+        dragHandleWidth: 20,
+        scrollTreshold: 100,
+      }),
+      AutoJoiner.configure({
+        elementsToJoin: ['bulletList', 'orderedList'],
       }),
     ],
     content: parseContent(content),
