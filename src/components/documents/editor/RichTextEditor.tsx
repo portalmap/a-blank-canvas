@@ -14,6 +14,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { BlockHandle } from './BlockHandle';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { CollapsibleHeading } from './extensions';
 import './editor-styles.css';
 
 interface RichTextEditorProps {
@@ -34,9 +35,10 @@ export const RichTextEditor = ({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3, 4],
-        },
+        heading: false,
+      }),
+      CollapsibleHeading.configure({
+        levels: [1, 2, 3, 4],
       }),
       Placeholder.configure({
         placeholder,
