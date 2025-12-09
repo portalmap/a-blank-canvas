@@ -82,7 +82,7 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
       if (coords) {
         setPosition({
           top: coords.top - editorRect.top,
-          left: -48,
+          left: -32,
           visible: true,
           nodePos: blockPos,
         });
