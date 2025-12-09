@@ -1,6 +1,7 @@
 import { Editor } from '@tiptap/react';
-import { Plus, GripVertical } from 'lucide-react';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface BlockHandleProps {
   editor: Editor;
@@ -21,13 +22,10 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
     nodePos: 0,
   });
   const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
   const isHoveringHandle = useRef(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isDragging.current) return;
-    
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -44,7 +42,6 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
       e.clientY < editorRect.top - 10 ||
       e.clientY > editorRect.bottom + 10
     ) {
-      // Don't hide immediately if hovering over the handle
       if (!isHoveringHandle.current) {
         setPosition(prev => ({ ...prev, visible: false }));
       }
@@ -68,19 +65,27 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
     const $pos = editor.state.doc.resolve(pos.pos);
     const depth = $pos.depth;
     
-    // Get the top-level block position
-    let blockPos = pos.pos;
-    if (depth > 0) {
-      blockPos = $pos.before(1);
+    if (depth === 0) {
+      setPosition(prev => ({ ...prev, visible: false }));
+      return;
     }
 
-    // Get coordinates of the block start
+    // Get the top-level block position
+    const blockPos = $pos.before(1);
+    const node = editor.state.doc.nodeAt(blockPos);
+    
+    if (!node) {
+      setPosition(prev => ({ ...prev, visible: false }));
+      return;
+    }
+
+    // Get coordinates for this block
     const coords = editor.view.coordsAtPos(blockPos);
     
     if (coords) {
       setPosition({
         top: coords.top - editorRect.top,
-        left: -44,
+        left: -28,
         visible: true,
         nodePos: blockPos,
       });
@@ -88,8 +93,7 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
   }, [editor]);
 
   const handleMouseLeave = useCallback(() => {
-    if (!isDragging.current && !isHoveringHandle.current) {
-      // Small delay to allow mouse to reach the handle
+    if (!isHoveringHandle.current) {
       hideTimeoutRef.current = setTimeout(() => {
         if (!isHoveringHandle.current) {
           setPosition(prev => ({ ...prev, visible: false }));
@@ -108,7 +112,6 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
 
   const handleHandleMouseLeave = useCallback(() => {
     isHoveringHandle.current = false;
-    // Hide after a short delay
     hideTimeoutRef.current = setTimeout(() => {
       if (!isHoveringHandle.current) {
         setPosition(prev => ({ ...prev, visible: false }));
@@ -117,7 +120,6 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
   }, []);
 
   useEffect(() => {
-    // Use the editor-content-wrapper which contains both the handle and editor
     const editorWrapper = editor.view.dom.closest('.editor-content-wrapper');
     if (!editorWrapper) return;
 
@@ -133,52 +135,34 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
     };
   }, [editor, handleMouseMove, handleMouseLeave]);
 
-  const handleAddBlock = () => {
-    // Insert a new paragraph after the current block and focus it
-    const { nodePos } = position;
-    const node = editor.state.doc.nodeAt(nodePos);
-    
-    if (node) {
-      const endPos = nodePos + node.nodeSize;
-      editor.chain()
-        .focus()
-        .insertContentAt(endPos, { type: 'paragraph' })
-        .setTextSelection(endPos + 1)
-        .run();
+  const handleAddBlock = useCallback(() => {
+    if (position.nodePos === undefined) return;
+
+    try {
+      const node = editor.state.doc.nodeAt(position.nodePos);
+      if (!node) return;
+
+      const endOfBlock = position.nodePos + node.nodeSize;
       
-      // Trigger slash menu
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(endOfBlock, { type: 'paragraph' })
+        .setTextSelection(endOfBlock + 1)
+        .run();
+
+      // Trigger slash command
       setTimeout(() => {
-        editor.chain().focus().insertContent('/').run();
+        editor.commands.insertContent('/');
       }, 10);
+    } catch (error) {
+      console.error('Error adding block:', error);
     }
-  };
+  }, [editor, position.nodePos]);
 
-  const handleDragStart = (e: React.MouseEvent) => {
-    isDragging.current = true;
-    
-    const { nodePos } = position;
-    
-    // Select the node for dragging
-    editor.chain()
-      .focus()
-      .setNodeSelection(nodePos)
-      .run();
-    
-    // Add dragging class to editor
-    editor.view.dom.classList.add('dragging');
-  };
-
-  const handleDragEnd = () => {
-    isDragging.current = false;
-    editor.view.dom.classList.remove('dragging');
-  };
-
-  useEffect(() => {
-    document.addEventListener('mouseup', handleDragEnd);
-    return () => document.removeEventListener('mouseup', handleDragEnd);
-  }, []);
-
-  if (!position.visible) return null;
+  if (!position.visible) {
+    return null;
+  }
 
   return (
     <div
@@ -191,23 +175,20 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
       onMouseEnter={handleHandleMouseEnter}
       onMouseLeave={handleHandleMouseLeave}
     >
-      <button
-        type="button"
-        className="block-handle-btn block-add-btn"
-        onClick={handleAddBlock}
-        title="Adicionar bloco"
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className="block-handle-btn block-drag-btn"
-        onMouseDown={handleDragStart}
-        title="Arrastar para mover"
-        draggable
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="block-handle-btn block-add-btn"
+            onClick={handleAddBlock}
+          >
+            <Plus size={16} />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p>Adicionar bloco</p>
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 };
