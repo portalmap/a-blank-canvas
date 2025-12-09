@@ -1,7 +1,8 @@
 import { Editor } from '@tiptap/react';
-import { Plus } from 'lucide-react';
+import { GripVertical, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { NodeSelection } from '@tiptap/pm/state';
 
 interface BlockHandleProps {
   editor: Editor;
@@ -24,9 +25,9 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isHoveringHandle = useRef(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dragImageRef = useRef<HTMLDivElement | null>(null);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
@@ -35,7 +36,6 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
     const editorElement = editor.view.dom;
     const editorRect = editorElement.getBoundingClientRect();
     
-    // Check if mouse is within editor bounds (with generous padding for the handle area)
     if (
       e.clientX < editorRect.left - 80 ||
       e.clientX > editorRect.right + 20 ||
@@ -48,7 +48,6 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
       return;
     }
 
-    // Get position in the document using the editor area
     const pos = editor.view.posAtCoords({ 
       left: Math.max(e.clientX, editorRect.left + 10), 
       top: e.clientY 
@@ -61,34 +60,35 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
       return;
     }
 
-    // Find the block node at this position
-    const $pos = editor.state.doc.resolve(pos.pos);
-    const depth = $pos.depth;
-    
-    if (depth === 0) {
-      setPosition(prev => ({ ...prev, visible: false }));
-      return;
-    }
+    try {
+      const $pos = editor.state.doc.resolve(pos.pos);
+      const depth = $pos.depth;
+      
+      if (depth === 0) {
+        setPosition(prev => ({ ...prev, visible: false }));
+        return;
+      }
 
-    // Get the top-level block position
-    const blockPos = $pos.before(1);
-    const node = editor.state.doc.nodeAt(blockPos);
-    
-    if (!node) {
-      setPosition(prev => ({ ...prev, visible: false }));
-      return;
-    }
+      const blockPos = $pos.before(1);
+      const node = editor.state.doc.nodeAt(blockPos);
+      
+      if (!node) {
+        setPosition(prev => ({ ...prev, visible: false }));
+        return;
+      }
 
-    // Get coordinates for this block
-    const coords = editor.view.coordsAtPos(blockPos);
-    
-    if (coords) {
-      setPosition({
-        top: coords.top - editorRect.top,
-        left: -28,
-        visible: true,
-        nodePos: blockPos,
-      });
+      const coords = editor.view.coordsAtPos(blockPos);
+      
+      if (coords) {
+        setPosition({
+          top: coords.top - editorRect.top,
+          left: -48,
+          visible: true,
+          nodePos: blockPos,
+        });
+      }
+    } catch {
+      setPosition(prev => ({ ...prev, visible: false }));
     }
   }, [editor]);
 
@@ -135,6 +135,21 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
     };
   }, [editor, handleMouseMove, handleMouseLeave]);
 
+  // Create drag image element
+  useEffect(() => {
+    const dragImage = document.createElement('div');
+    dragImage.style.cssText = 'position: absolute; top: -1000px; left: -1000px; background: hsl(var(--muted)); padding: 8px 12px; border-radius: 4px; font-size: 14px; color: hsl(var(--foreground));';
+    dragImage.textContent = 'Movendo bloco...';
+    document.body.appendChild(dragImage);
+    dragImageRef.current = dragImage;
+    
+    return () => {
+      if (dragImageRef.current) {
+        document.body.removeChild(dragImageRef.current);
+      }
+    };
+  }, []);
+
   const handleAddBlock = useCallback(() => {
     if (position.nodePos === undefined) return;
 
@@ -151,7 +166,6 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
         .setTextSelection(endOfBlock + 1)
         .run();
 
-      // Trigger slash command
       setTimeout(() => {
         editor.commands.insertContent('/');
       }, 10);
@@ -159,6 +173,37 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
       console.error('Error adding block:', error);
     }
   }, [editor, position.nodePos]);
+
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    if (position.nodePos === undefined) return;
+
+    try {
+      const node = editor.state.doc.nodeAt(position.nodePos);
+      if (!node) return;
+
+      // Select the node
+      const selection = NodeSelection.create(editor.state.doc, position.nodePos);
+      editor.view.dispatch(editor.state.tr.setSelection(selection));
+
+      // Set drag data
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+      
+      // Set custom drag image
+      if (dragImageRef.current) {
+        e.dataTransfer.setDragImage(dragImageRef.current, 0, 0);
+      }
+
+      // Add dragging class
+      editor.view.dom.classList.add('dragging');
+    } catch (error) {
+      console.error('Error starting drag:', error);
+    }
+  }, [editor, position.nodePos]);
+
+  const handleDragEnd = useCallback(() => {
+    editor.view.dom.classList.remove('dragging');
+  }, [editor]);
 
   if (!position.visible) {
     return null;
@@ -179,10 +224,27 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
         <TooltipTrigger asChild>
           <button
             type="button"
+            className="block-handle-btn block-drag-btn"
+            draggable
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <GripVertical size={14} />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p>Arrastar para mover</p>
+        </TooltipContent>
+      </Tooltip>
+      
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
             className="block-handle-btn block-add-btn"
             onClick={handleAddBlock}
           >
-            <Plus size={16} />
+            <Plus size={14} />
           </button>
         </TooltipTrigger>
         <TooltipContent side="top">
