@@ -22,29 +22,45 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const isHoveringHandle = useRef(false);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging.current) return;
     
+    // Clear any pending hide timeout
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    
     const editorElement = editor.view.dom;
     const editorRect = editorElement.getBoundingClientRect();
     
-    // Check if mouse is within editor bounds (with some padding for the handle area)
+    // Check if mouse is within editor bounds (with generous padding for the handle area)
     if (
-      e.clientX < editorRect.left - 60 ||
-      e.clientX > editorRect.right ||
-      e.clientY < editorRect.top ||
-      e.clientY > editorRect.bottom
+      e.clientX < editorRect.left - 80 ||
+      e.clientX > editorRect.right + 20 ||
+      e.clientY < editorRect.top - 10 ||
+      e.clientY > editorRect.bottom + 10
     ) {
-      setPosition(prev => ({ ...prev, visible: false }));
+      // Don't hide immediately if hovering over the handle
+      if (!isHoveringHandle.current) {
+        setPosition(prev => ({ ...prev, visible: false }));
+      }
       return;
     }
 
-    // Get position in the document
-    const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+    // Get position in the document using the editor area
+    const pos = editor.view.posAtCoords({ 
+      left: Math.max(e.clientX, editorRect.left + 10), 
+      top: e.clientY 
+    });
     
     if (!pos) {
-      setPosition(prev => ({ ...prev, visible: false }));
+      if (!isHoveringHandle.current) {
+        setPosition(prev => ({ ...prev, visible: false }));
+      }
       return;
     }
 
@@ -64,7 +80,7 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
     if (coords) {
       setPosition({
         top: coords.top - editorRect.top,
-        left: -44, // Position to the left of the editor
+        left: -44,
         visible: true,
         nodePos: blockPos,
       });
@@ -72,21 +88,48 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
   }, [editor]);
 
   const handleMouseLeave = useCallback(() => {
-    if (!isDragging.current) {
-      setPosition(prev => ({ ...prev, visible: false }));
+    if (!isDragging.current && !isHoveringHandle.current) {
+      // Small delay to allow mouse to reach the handle
+      hideTimeoutRef.current = setTimeout(() => {
+        if (!isHoveringHandle.current) {
+          setPosition(prev => ({ ...prev, visible: false }));
+        }
+      }, 150);
     }
   }, []);
 
-  useEffect(() => {
-    const editorContainer = editor.view.dom.parentElement;
-    if (!editorContainer) return;
+  const handleHandleMouseEnter = useCallback(() => {
+    isHoveringHandle.current = true;
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  }, []);
 
-    editorContainer.addEventListener('mousemove', handleMouseMove);
-    editorContainer.addEventListener('mouseleave', handleMouseLeave);
+  const handleHandleMouseLeave = useCallback(() => {
+    isHoveringHandle.current = false;
+    // Hide after a short delay
+    hideTimeoutRef.current = setTimeout(() => {
+      if (!isHoveringHandle.current) {
+        setPosition(prev => ({ ...prev, visible: false }));
+      }
+    }, 100);
+  }, []);
+
+  useEffect(() => {
+    // Use the editor-content-wrapper which contains both the handle and editor
+    const editorWrapper = editor.view.dom.closest('.editor-content-wrapper');
+    if (!editorWrapper) return;
+
+    editorWrapper.addEventListener('mousemove', handleMouseMove);
+    editorWrapper.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
-      editorContainer.removeEventListener('mousemove', handleMouseMove);
-      editorContainer.removeEventListener('mouseleave', handleMouseLeave);
+      editorWrapper.removeEventListener('mousemove', handleMouseMove);
+      editorWrapper.removeEventListener('mouseleave', handleMouseLeave);
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
     };
   }, [editor, handleMouseMove, handleMouseLeave]);
 
@@ -145,6 +188,8 @@ export const BlockHandle = ({ editor }: BlockHandleProps) => {
         top: position.top,
         left: position.left,
       }}
+      onMouseEnter={handleHandleMouseEnter}
+      onMouseLeave={handleHandleMouseLeave}
     >
       <button
         type="button"
