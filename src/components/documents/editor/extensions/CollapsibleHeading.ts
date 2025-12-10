@@ -50,13 +50,17 @@ export const CollapsibleHeading = Heading.extend({
         
         if (typeof getPos === 'function') {
           const pos = getPos();
-          const newCollapsed = !node.attrs.collapsed;
+          // Get the current node from the document at click time
+          const currentNode = editor.state.doc.nodeAt(pos);
+          if (!currentNode) return;
+          
+          const newCollapsed = !currentNode.attrs.collapsed;
           
           editor.chain()
             .focus()
             .command(({ tr }) => {
               tr.setNodeMarkup(pos, undefined, {
-                ...node.attrs,
+                ...currentNode.attrs,
                 collapsed: newCollapsed,
               });
               // Signal the plugin to rebuild decorations
