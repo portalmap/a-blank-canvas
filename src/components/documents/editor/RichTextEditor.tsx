@@ -9,10 +9,11 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import BubbleMenu from '@tiptap/extension-bubble-menu';
 import AutoJoiner from 'tiptap-extension-auto-joiner';
+import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import { useEffect, useRef } from 'react';
 import { EditorToolbar } from './EditorToolbar';
 import { SlashCommandMenu } from './SlashCommandMenu';
-import { BlockHandle } from './BlockHandle';
+import { AddBlockButton } from './AddBlockButton';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { CollapsibleHeading } from './extensions';
 import './editor-styles.css';
@@ -64,6 +65,10 @@ export const RichTextEditor = ({
       AutoJoiner.configure({
         elementsToJoin: ['bulletList', 'orderedList'],
       }),
+      GlobalDragHandle.configure({
+        dragHandleWidth: 24,
+        scrollTreshold: 100,
+      }),
     ],
     content: parseContent(content),
     editable: !disabled,
@@ -101,7 +106,7 @@ export const RichTextEditor = ({
         <EditorToolbar editor={editor} />
         <SlashCommandMenu editor={editor} />
         <div className="editor-content-wrapper">
-          {!disabled && <BlockHandle editor={editor} />}
+          {!disabled && <AddBlockButton editor={editor} />}
           <EditorContent editor={editor} className="prose prose-lg dark:prose-invert max-w-none" />
         </div>
       </div>
