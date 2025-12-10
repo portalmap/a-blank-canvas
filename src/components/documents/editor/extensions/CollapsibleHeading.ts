@@ -1,5 +1,5 @@
 import { Heading } from '@tiptap/extension-heading';
-import { mergeAttributes } from '@tiptap/core';
+import { CollapsiblePlugin, collapsiblePluginKey } from './CollapsiblePlugin';
 
 export const CollapsibleHeading = Heading.extend({
   addAttributes() {
@@ -13,6 +13,10 @@ export const CollapsibleHeading = Heading.extend({
         }),
       },
     };
+  },
+
+  addProseMirrorPlugins() {
+    return [CollapsiblePlugin];
   },
 
   addNodeView() {
@@ -55,6 +59,8 @@ export const CollapsibleHeading = Heading.extend({
                 ...node.attrs,
                 collapsed: newCollapsed,
               });
+              // Signal the plugin to rebuild decorations
+              tr.setMeta(collapsiblePluginKey, true);
               return true;
             })
             .run();
@@ -73,6 +79,7 @@ export const CollapsibleHeading = Heading.extend({
           
           const newCollapsed = updatedNode.attrs.collapsed;
           heading.dataset.collapsed = String(newCollapsed);
+          heading.dataset.level = String(updatedNode.attrs.level);
           toggle.innerHTML = newCollapsed 
             ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>'
             : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>';

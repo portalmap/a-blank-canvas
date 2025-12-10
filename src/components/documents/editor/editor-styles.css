@@ -158,28 +158,9 @@
   margin-top: 0.125rem;
 }
 
-/* Hide content after collapsed heading */
-.collapsible-heading[data-collapsed="true"] ~ p,
-.collapsible-heading[data-collapsed="true"] ~ ul,
-.collapsible-heading[data-collapsed="true"] ~ ol,
-.collapsible-heading[data-collapsed="true"] ~ blockquote,
-.collapsible-heading[data-collapsed="true"] ~ pre,
-.collapsible-heading[data-collapsed="true"] ~ hr {
+/* Collapsed content via JS plugin */
+.collapsed-content {
   display: none !important;
-}
-
-/* Stop hiding at next heading */
-.collapsible-heading[data-collapsed="true"] ~ .collapsible-heading {
-  display: flex !important;
-}
-
-.collapsible-heading[data-collapsed="true"] ~ .collapsible-heading ~ p,
-.collapsible-heading[data-collapsed="true"] ~ .collapsible-heading ~ ul,
-.collapsible-heading[data-collapsed="true"] ~ .collapsible-heading ~ ol,
-.collapsible-heading[data-collapsed="true"] ~ .collapsible-heading ~ blockquote,
-.collapsible-heading[data-collapsed="true"] ~ .collapsible-heading ~ pre,
-.collapsible-heading[data-collapsed="true"] ~ .collapsible-heading ~ hr {
-  display: block !important;
 }
 
 /* Lists */
