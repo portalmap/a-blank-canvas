@@ -22,7 +22,7 @@ interface CommandItem {
   title: string;
   description: string;
   icon: React.ReactNode;
-  command: (editor: Editor) => void;
+  command: (chain: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>;
   category: string;
 }
 
@@ -31,77 +31,77 @@ const COMMANDS: CommandItem[] = [
     title: 'Cabeçalho 1',
     description: 'Título grande',
     icon: <Heading1 className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+    command: (chain) => chain.toggleHeading({ level: 1 }),
     category: 'TEXTO',
   },
   {
     title: 'Cabeçalho 2',
     description: 'Título médio',
     icon: <Heading2 className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+    command: (chain) => chain.toggleHeading({ level: 2 }),
     category: 'TEXTO',
   },
   {
     title: 'Cabeçalho 3',
     description: 'Título pequeno',
     icon: <Heading3 className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+    command: (chain) => chain.toggleHeading({ level: 3 }),
     category: 'TEXTO',
   },
   {
     title: 'Cabeçalho 4',
     description: 'Título menor',
     icon: <Heading4 className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleHeading({ level: 4 }).run(),
+    command: (chain) => chain.toggleHeading({ level: 4 }),
     category: 'TEXTO',
   },
   {
     title: 'Lista com marcadores',
     description: 'Lista simples',
     icon: <List className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleBulletList().run(),
+    command: (chain) => chain.toggleBulletList(),
     category: 'LISTAS',
   },
   {
     title: 'Lista numerada',
     description: 'Lista ordenada',
     icon: <ListOrdered className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleOrderedList().run(),
+    command: (chain) => chain.toggleOrderedList(),
     category: 'LISTAS',
   },
   {
     title: 'Checklist',
     description: 'Lista de tarefas',
     icon: <CheckSquare className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleTaskList().run(),
+    command: (chain) => chain.toggleTaskList(),
     category: 'LISTAS',
   },
   {
     title: 'Citação',
     description: 'Bloco de citação',
     icon: <Quote className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleBlockquote().run(),
+    command: (chain) => chain.toggleBlockquote(),
     category: 'BLOCOS',
   },
   {
     title: 'Código',
     description: 'Bloco de código',
     icon: <Code className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().toggleCodeBlock().run(),
+    command: (chain) => chain.toggleCodeBlock(),
     category: 'BLOCOS',
   },
   {
     title: 'Divisor',
     description: 'Linha horizontal',
     icon: <Minus className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().setHorizontalRule().run(),
+    command: (chain) => chain.setHorizontalRule(),
     category: 'BLOCOS',
   },
   {
     title: 'Tabela',
     description: 'Inserir tabela 3x2',
     icon: <Table2 className="h-4 w-4" />,
-    command: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run(),
+    command: (chain) => chain.insertTable({ rows: 3, cols: 2, withHeaderRow: true }),
     category: 'BLOCOS',
   },
 ];
@@ -128,15 +128,16 @@ export const SlashCommandMenu = ({ editor }: SlashCommandMenuProps) => {
   const executeCommand = useCallback((command: CommandItem) => {
     const { from } = editor.state.selection;
     
-    // Delete from the slash position to current cursor
+    // Create chain and delete slash command text first
+    let chain = editor.chain().focus();
+    
     if (slashPosRef.current !== null) {
-      editor.chain()
-        .focus()
-        .deleteRange({ from: slashPosRef.current, to: from })
-        .run();
+      chain = chain.deleteRange({ from: slashPosRef.current, to: from });
     }
     
-    command.command(editor);
+    // Execute the command in the same transaction and run
+    command.command(chain).run();
+    
     setIsOpen(false);
     setQuery('');
     slashPosRef.current = null;
