@@ -10,6 +10,7 @@ import {
   Quote, 
   Code, 
   Minus,
+  Table2,
 } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 
@@ -94,6 +95,13 @@ const COMMANDS: CommandItem[] = [
     description: 'Linha horizontal',
     icon: <Minus className="h-4 w-4" />,
     command: (editor) => editor.chain().focus().setHorizontalRule().run(),
+    category: 'BLOCOS',
+  },
+  {
+    title: 'Tabela',
+    description: 'Inserir tabela 3x2',
+    icon: <Table2 className="h-4 w-4" />,
+    command: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run(),
     category: 'BLOCOS',
   },
 ];
