@@ -175,7 +175,7 @@ export function AddExistingUserToWorkspaceDialog({
               <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                 <Command>
                   <CommandInput placeholder="Buscar usuário..." />
-                  <CommandList>
+                  <CommandList className="max-h-[200px] overflow-y-auto">
                     <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
                     <CommandGroup>
                       {users.map((user) => (
