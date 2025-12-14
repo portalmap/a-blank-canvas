@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { useWorkspaces } from '@/hooks/useWorkspaces';
 
 type RoleType = 'global_owner' | 'owner_technical' | 'admin' | 'member' | 'limited_member' | 'guest';
 
@@ -50,7 +51,27 @@ interface UserAddDialogProps {
 export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialogProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<RoleType>('member');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>(workspaceId || '');
   const queryClient = useQueryClient();
+  const { data: workspaces, isLoading: isLoadingWorkspaces } = useWorkspaces();
+
+  // Reset selected workspace when dialog opens or workspaceId prop changes
+  useEffect(() => {
+    if (open && workspaceId) {
+      setSelectedWorkspaceId(workspaceId);
+    }
+  }, [open, workspaceId]);
+
+  // Clear workspace when switching to owner role
+  useEffect(() => {
+    if (isAppRole(role)) {
+      setSelectedWorkspaceId('');
+    } else if (!selectedWorkspaceId && workspaceId) {
+      setSelectedWorkspaceId(workspaceId);
+    }
+  }, [role, workspaceId]);
+
+  const requiresWorkspace = !isAppRole(role);
 
   const addUser = useMutation({
     mutationFn: async () => {
@@ -59,8 +80,8 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
       }
 
       // For workspace roles, workspace is required
-      if (!isAppRole(role) && !workspaceId) {
-        throw new Error('Workspace é obrigatório para roles de workspace');
+      if (requiresWorkspace && !selectedWorkspaceId) {
+        throw new Error('Workspace é obrigatório para esta função');
       }
 
       // Call edge function to add/create user
@@ -68,7 +89,7 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
         body: {
           email,
           role,
-          workspaceId,
+          workspaceId: requiresWorkspace ? selectedWorkspaceId : undefined,
         },
       });
 
@@ -87,6 +108,7 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
       queryClient.invalidateQueries({ queryKey: ['workspace-members'] });
       setEmail('');
       setRole('member');
+      setSelectedWorkspaceId(workspaceId || '');
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -96,6 +118,10 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (requiresWorkspace && !selectedWorkspaceId) {
+      toast.error('Selecione um workspace');
+      return;
+    }
     addUser.mutate();
   };
 
@@ -136,6 +162,27 @@ export function UserAddDialog({ open, onOpenChange, workspaceId }: UserAddDialog
                 </SelectContent>
               </Select>
             </div>
+            {requiresWorkspace && (
+              <div className="grid gap-2">
+                <Label htmlFor="workspace">Workspace *</Label>
+                <Select 
+                  value={selectedWorkspaceId} 
+                  onValueChange={setSelectedWorkspaceId}
+                  disabled={isLoadingWorkspaces}
+                >
+                  <SelectTrigger id="workspace">
+                    <SelectValue placeholder="Selecione o workspace" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaces?.map((ws) => (
+                      <SelectItem key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
