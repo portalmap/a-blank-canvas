@@ -57,7 +57,6 @@ export const CollapsibleHeading = Heading.extend({
           const newCollapsed = !currentNode.attrs.collapsed;
           
           editor.chain()
-            .focus()
             .command(({ tr }) => {
               tr.setNodeMarkup(pos, undefined, {
                 ...currentNode.attrs,
