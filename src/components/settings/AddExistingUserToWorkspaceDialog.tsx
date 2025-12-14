@@ -148,7 +148,7 @@ export function AddExistingUserToWorkspaceDialog({
           {/* User Selection */}
           <div className="space-y-2">
             <Label>Selecionar Usuário</Label>
-            <Popover open={userSearchOpen} onOpenChange={setUserSearchOpen}>
+            <Popover open={userSearchOpen} onOpenChange={setUserSearchOpen} modal={false}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -172,10 +172,16 @@ export function AddExistingUserToWorkspaceDialog({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+              <PopoverContent 
+                className="w-[--radix-popover-trigger-width] p-0"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
                 <Command>
                   <CommandInput placeholder="Buscar usuário..." />
-                  <CommandList className="max-h-[200px] overflow-y-auto">
+                  <CommandList 
+                    className="max-h-[200px] overflow-y-auto"
+                    onWheel={(e) => e.stopPropagation()}
+                  >
                     <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
                     <CommandGroup>
                       {users.map((user) => (
