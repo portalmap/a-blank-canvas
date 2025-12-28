@@ -7,6 +7,7 @@ import { Plus, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { useSubtasks, useCreateSubtask } from '@/hooks/useSubtasks';
 import { useDefaultStatus } from '@/hooks/useStatuses';
 import { useUpdateTask } from '@/hooks/useTasks';
+import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { cn } from '@/lib/utils';
 
 interface Task {
@@ -37,6 +38,7 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
   const { data: defaultStatus } = useDefaultStatus(parentTask.workspace_id);
   const createSubtask = useCreateSubtask();
   const updateTask = useUpdateTask();
+  const createActivity = useCreateTaskActivity();
 
   const handleCreateSubtask = async () => {
     if (!newSubtaskTitle.trim() || !defaultStatus) return;
@@ -54,11 +56,29 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
   };
 
   const handleToggleComplete = async (subtask: any) => {
-    const newCompletedAt = subtask.completed_at ? null : new Date().toISOString();
-    await updateTask.mutateAsync({
-      id: subtask.id,
-      completedAt: newCompletedAt,
-    });
+    const isCompleting = !subtask.completed_at;
+    const newCompletedAt = isCompleting ? new Date().toISOString() : null;
+    const subtaskTitle = subtask.title;
+    const subtaskId = subtask.id;
+    
+    try {
+      await updateTask.mutateAsync({
+        id: subtaskId,
+        completedAt: newCompletedAt,
+      });
+      
+      // Registrar atividade na tarefa pai
+      await createActivity.mutateAsync({
+        taskId: parentTask.id,
+        activityType: isCompleting ? 'subtask.completed' : 'subtask.uncompleted',
+        metadata: {
+          subtask_id: subtaskId,
+          subtask_title: subtaskTitle,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar subtarefa:', error);
+    }
   };
 
   const completedCount = subtasks?.filter(s => s.completed_at).length || 0;
