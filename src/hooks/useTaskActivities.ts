@@ -143,6 +143,10 @@ export const getActivityLabel = (activity: TaskActivity): string => {
       return `marcou "${activity.metadata?.item_name || ''}" como concluído`;
     case 'checklist.item.uncompleted':
       return `desmarcou "${activity.metadata?.item_name || ''}"`;
+    case 'subtask.completed':
+      return `marcou a subtarefa "${activity.metadata?.subtask_title || ''}" como concluída`;
+    case 'subtask.uncompleted':
+      return `desmarcou a subtarefa "${activity.metadata?.subtask_title || ''}"`;
     default:
       return type;
   }

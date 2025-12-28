@@ -201,6 +201,7 @@ export const useUpdateTask = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
       queryClient.invalidateQueries({ queryKey: ['subtasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task', data.id] });
       toast.success('Tarefa atualizada com sucesso!');
     },
     onError: (error: Error) => {
