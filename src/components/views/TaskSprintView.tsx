@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PriorityBadge } from '@/components/ui/badge-variant';
 import { Badge } from '@/components/ui/badge';
-import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -53,7 +53,7 @@ const SubtaskProgress = ({ parentId }: { parentId: string }) => {
 };
 
 export const TaskSprintView = ({ tasks }: TaskSprintViewProps) => {
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const navigate = useNavigate();
 
   // Filtrar apenas tarefas principais (sem parent_id)
   const mainTasks = tasks.filter(t => !t.parent_id);
@@ -154,7 +154,7 @@ export const TaskSprintView = ({ tasks }: TaskSprintViewProps) => {
                           left: position.left,
                           width: position.width,
                         }}
-                        onClick={() => setSelectedTask(task)}
+                        onClick={() => navigate(`/task/${task.id}`)}
                       >
                         <div className="flex items-center justify-between h-full">
                           <div className="flex-1 min-w-0">
@@ -179,12 +179,6 @@ export const TaskSprintView = ({ tasks }: TaskSprintViewProps) => {
           </div>
         )}
       </div>
-
-      <TaskDetailDrawer
-        task={selectedTask}
-        open={!!selectedTask}
-        onOpenChange={(open) => !open && setSelectedTask(null)}
-      />
     </>
   );
 };

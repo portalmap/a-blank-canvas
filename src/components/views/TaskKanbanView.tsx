@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +6,6 @@ import { PriorityBadge } from '@/components/ui/badge-variant';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, GitBranch } from 'lucide-react';
-import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
@@ -62,7 +61,7 @@ const SubtaskBadge = ({ parentId }: { parentId: string }) => {
 };
 
 export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const navigate = useNavigate();
   const { mutate: updateTask } = useUpdateTask();
 
   const sortedStatuses = [...statuses].sort((a, b) => a.order_index - b.order_index);
@@ -139,7 +138,7 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  onClick={() => !snapshot.isDragging && setSelectedTask(task)}
+                                  onClick={() => !snapshot.isDragging && navigate(`/task/${task.id}`)}
                                 >
                                   <Card
                                     className={cn(
@@ -193,11 +192,6 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
         </div>
       </DragDropContext>
 
-      <TaskDetailDrawer
-        task={selectedTask}
-        open={!!selectedTask}
-        onOpenChange={(open) => !open && setSelectedTask(null)}
-      />
     </>
   );
 };
