@@ -24,6 +24,7 @@ import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AcceptInvite from "./pages/AcceptInvite";
+import TaskView from "./pages/TaskView";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
                           <Route path="/space/:spaceId" element={<SpaceDetailView />} />
                           <Route path="/folder/:folderId" element={<FolderDetailView />} />
                           <Route path="/list/:listId" element={<ListDetailView />} />
+                          <Route path="/task/:taskId" element={<TaskView />} />
                           <Route path="/chat" element={<Chat />} />
                           <Route path="/teams" element={<Teams />} />
                           <Route path="/documents" element={<Documents />} />

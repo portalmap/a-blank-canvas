@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +23,6 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal, FolderInput, Archive, Trash2 } from 'lucide-react';
-import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
 import { TaskMoveDialog } from '@/components/tasks/TaskMoveDialog';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { useDeleteTask, useArchiveTask } from '@/hooks/useTasks';
@@ -73,7 +73,7 @@ const SubtaskCount = ({ parentId }: { parentId: string }) => {
 };
 
 export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) => {
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const navigate = useNavigate();
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [moveTaskId, setMoveTaskId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
@@ -122,7 +122,7 @@ export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) 
             "cursor-pointer hover:bg-muted/50",
             isSubtask && "bg-muted/20"
           )}
-          onClick={() => setSelectedTask(task)}
+          onClick={() => navigate(`/task/${task.id}`)}
         >
           <TableCell className={cn("font-medium", isSubtask && "pl-10")}>
             <div className="flex items-center">
@@ -224,12 +224,6 @@ export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) 
           </TableBody>
         </Table>
       </div>
-
-      <TaskDetailDrawer
-        task={selectedTask}
-        open={!!selectedTask}
-        onOpenChange={(open) => !open && setSelectedTask(null)}
-      />
 
       <TaskMoveDialog
         taskId={moveTaskId}
