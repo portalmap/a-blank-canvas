@@ -8,3 +8,12 @@ verify_jwt = true
 
 [functions.add-user-with-invite]
 verify_jwt = true
+
+[functions.webhooks-inbound]
+verify_jwt = false
+
+[functions.webhooks-dispatcher]
+verify_jwt = true
+
+[functions.webhook-enqueue]
+verify_jwt = true

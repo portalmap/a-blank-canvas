@@ -5,6 +5,7 @@ import { UserInviteForm } from "@/components/settings/UserInviteForm";
 import { GuestPermissionsManager } from "@/components/settings/GuestPermissionsManager";
 import { UserManagement } from "@/components/settings/UserManagement";
 import { StatusSettings } from "@/components/settings/StatusSettings";
+import { WebhooksSettings } from "@/components/settings/webhooks/WebhooksSettings";
 
 export default function Settings() {
   return (
@@ -17,13 +18,14 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 lg:w-[720px]">
+        <TabsList className="grid w-full grid-cols-7 lg:w-[840px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="invites">Convites</TabsTrigger>
           <TabsTrigger value="guests">Convidados</TabsTrigger>
+          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -48,6 +50,10 @@ export default function Settings() {
 
         <TabsContent value="guests" className="mt-6">
           <GuestPermissionsManager />
+        </TabsContent>
+
+        <TabsContent value="webhooks" className="mt-6">
+          <WebhooksSettings />
         </TabsContent>
       </Tabs>
     </div>

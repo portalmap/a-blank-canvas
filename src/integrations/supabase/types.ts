@@ -1817,6 +1817,147 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_deliveries: {
+        Row: {
+          attempt_count: number | null
+          created_at: string | null
+          delivered_at: string | null
+          endpoint_id: string
+          event_type: string
+          id: string
+          last_error: string | null
+          last_status_code: number | null
+          next_attempt_at: string | null
+          payload: Json
+          status: string
+        }
+        Insert: {
+          attempt_count?: number | null
+          created_at?: string | null
+          delivered_at?: string | null
+          endpoint_id: string
+          event_type: string
+          id?: string
+          last_error?: string | null
+          last_status_code?: number | null
+          next_attempt_at?: string | null
+          payload: Json
+          status?: string
+        }
+        Update: {
+          attempt_count?: number | null
+          created_at?: string | null
+          delivered_at?: string | null
+          endpoint_id?: string
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          last_status_code?: number | null
+          next_attempt_at?: string | null
+          payload?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_endpoints: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          description: string | null
+          events: string[]
+          id: string
+          is_active: boolean | null
+          secret: string
+          updated_at: string | null
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          events: string[]
+          id?: string
+          is_active?: boolean | null
+          secret?: string
+          updated_at?: string | null
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          events?: string[]
+          id?: string
+          is_active?: boolean | null
+          secret?: string
+          updated_at?: string | null
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_endpoints_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_inbox: {
+        Row: {
+          error: string | null
+          headers: Json | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string | null
+          source: string
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          error?: string | null
+          headers?: Json | null
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          received_at?: string | null
+          source: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          error?: string | null
+          headers?: Json | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string | null
+          source?: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_inbox_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
