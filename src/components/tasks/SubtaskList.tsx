@@ -54,10 +54,10 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
   };
 
   const handleToggleComplete = async (subtask: any) => {
+    const newCompletedAt = subtask.completed_at ? null : new Date().toISOString();
     await updateTask.mutateAsync({
       id: subtask.id,
-      // Toggle completed status - if already completed, remove it; otherwise set it
-      statusId: subtask.completed_at ? defaultStatus?.id : undefined,
+      completedAt: newCompletedAt,
     });
   };
 
