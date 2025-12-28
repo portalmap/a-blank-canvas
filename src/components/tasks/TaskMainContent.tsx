@@ -51,32 +51,28 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
   const createActivity = useCreateTaskActivity();
   const { data: statuses } = useStatuses(task.workspace_id);
 
-  const logActivity = async (
-    activityType: string,
-    fieldName: string,
-    oldValue: string | null,
-    newValue: string | null
-  ) => {
-    try {
-      await createActivity.mutateAsync({
-        taskId: task.id,
-        activityType,
-        fieldName,
-        oldValue,
-        newValue,
-      });
-    } catch (error) {
-      console.error('Erro ao registrar atividade:', error);
-    }
-  };
-
   const handleSaveTitle = async () => {
     if (!editTitle.trim() || editTitle === task.title) {
       setIsEditingTitle(false);
       return;
     }
-    await updateTask.mutateAsync({ id: task.id, title: editTitle });
-    await logActivity('title.changed', 'title', task.title, editTitle);
+    
+    const taskId = task.id;
+    const oldTitle = task.title;
+    const newTitle = editTitle;
+    
+    try {
+      await updateTask.mutateAsync({ id: taskId, title: newTitle });
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'title.changed',
+        fieldName: 'title',
+        oldValue: oldTitle,
+        newValue: newTitle,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar título ou registrar atividade:', error);
+    }
     setIsEditingTitle(false);
   };
 
@@ -85,33 +81,101 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
       setIsEditingDescription(false);
       return;
     }
-    await updateTask.mutateAsync({ id: task.id, description: editDescription || null });
-    await logActivity('description.changed', 'description', task.description || null, editDescription || null);
+    
+    const taskId = task.id;
+    const oldDescription = task.description || null;
+    const newDescription = editDescription || null;
+    
+    try {
+      await updateTask.mutateAsync({ id: taskId, description: newDescription });
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'description.changed',
+        fieldName: 'description',
+        oldValue: oldDescription,
+        newValue: newDescription,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar descrição ou registrar atividade:', error);
+    }
     setIsEditingDescription(false);
   };
 
   const handleStatusChange = async (statusId: string) => {
+    const taskId = task.id;
     const oldStatus = statuses?.find(s => s.id === task.status_id);
     const newStatus = statuses?.find(s => s.id === statusId);
-    await updateTask.mutateAsync({ id: task.id, statusId });
-    await logActivity('status.changed', 'status_id', oldStatus?.name || null, newStatus?.name || null);
+    const oldStatusName = oldStatus?.name || null;
+    const newStatusName = newStatus?.name || null;
+    
+    try {
+      await updateTask.mutateAsync({ id: taskId, statusId });
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'status.changed',
+        fieldName: 'status_id',
+        oldValue: oldStatusName,
+        newValue: newStatusName,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar status ou registrar atividade:', error);
+    }
   };
 
   const handlePriorityChange = async (priority: 'low' | 'medium' | 'high' | 'urgent') => {
-    await updateTask.mutateAsync({ id: task.id, priority });
-    await logActivity('priority.changed', 'priority', task.priority, priority);
+    const taskId = task.id;
+    const oldPriority = task.priority;
+    
+    try {
+      await updateTask.mutateAsync({ id: taskId, priority });
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'priority.changed',
+        fieldName: 'priority',
+        oldValue: oldPriority,
+        newValue: priority,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar prioridade ou registrar atividade:', error);
+    }
   };
 
   const handleStartDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const taskId = task.id;
+    const oldDate = task.start_date || null;
     const newDate = e.target.value || null;
-    await updateTask.mutateAsync({ id: task.id, startDate: newDate });
-    await logActivity('start_date.changed', 'start_date', task.start_date || null, newDate);
+    
+    try {
+      await updateTask.mutateAsync({ id: taskId, startDate: newDate });
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'start_date.changed',
+        fieldName: 'start_date',
+        oldValue: oldDate,
+        newValue: newDate,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar data de início ou registrar atividade:', error);
+    }
   };
 
   const handleDueDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const taskId = task.id;
+    const oldDate = task.due_date || null;
     const newDate = e.target.value || null;
-    await updateTask.mutateAsync({ id: task.id, dueDate: newDate });
-    await logActivity('due_date.changed', 'due_date', task.due_date || null, newDate);
+    
+    try {
+      await updateTask.mutateAsync({ id: taskId, dueDate: newDate });
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'due_date.changed',
+        fieldName: 'due_date',
+        oldValue: oldDate,
+        newValue: newDate,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar data de entrega ou registrar atividade:', error);
+    }
   };
 
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !task.completed_at;
