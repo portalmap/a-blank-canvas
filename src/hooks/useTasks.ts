@@ -161,7 +161,8 @@ export const useUpdateTask = () => {
       priority,
       assigneeId,
       dueDate,
-      startDate
+      startDate,
+      completedAt
     }: { 
       id: string; 
       title?: string; 
@@ -171,6 +172,7 @@ export const useUpdateTask = () => {
       assigneeId?: string | null;
       dueDate?: string | null;
       startDate?: string | null;
+      completedAt?: string | null;
     }) => {
       const updateData: any = {};
       if (title !== undefined) updateData.title = title;
@@ -180,20 +182,25 @@ export const useUpdateTask = () => {
       if (assigneeId !== undefined) updateData.assignee_id = assigneeId;
       if (dueDate !== undefined) updateData.due_date = dueDate;
       if (startDate !== undefined) updateData.start_date = startDate;
+      if (completedAt !== undefined) updateData.completed_at = completedAt;
+
+      if (Object.keys(updateData).length === 0) {
+        throw new Error('Nenhum campo para atualizar');
+      }
 
       const { data, error } = await supabase
         .from('tasks')
         .update(updateData)
         .eq('id', id)
         .select()
-        .maybeSingle();
+        .single();
 
       if (error) throw error;
-      if (!data) throw new Error('Tarefa não encontrada');
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['subtasks'] });
       toast.success('Tarefa atualizada com sucesso!');
     },
     onError: (error: Error) => {
