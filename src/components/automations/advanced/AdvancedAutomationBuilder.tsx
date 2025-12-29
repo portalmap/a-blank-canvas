@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowRight, Zap, Target, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useCreateAutomation } from '@/hooks/useAutomations';
+import { useCreateAutomation, useUpdateAutomation, type Automation } from '@/hooks/useAutomations';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TriggerSelector } from './TriggerSelector';
 import { ActionSelector } from './ActionSelector';
@@ -20,27 +20,47 @@ interface AdvancedAutomationBuilderProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: string;
+  automation?: Automation; // Para modo edição
 }
 
 type BuilderStep = 'trigger' | 'action';
+type ScopeType = 'workspace' | 'space' | 'folder' | 'list';
 
 export const AdvancedAutomationBuilder = ({ 
   open, 
   onOpenChange, 
-  workspaceId 
+  workspaceId,
+  automation
 }: AdvancedAutomationBuilderProps) => {
   const { activeWorkspace } = useWorkspace();
   const createAutomation = useCreateAutomation();
+  const updateAutomation = useUpdateAutomation();
+
+  const isEditMode = !!automation;
 
   const [name, setName] = useState('');
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [actionConfig, setActionConfig] = useState<Record<string, any>>({});
-  type ScopeType = 'workspace' | 'space' | 'folder' | 'list';
   const [scope, setScope] = useState<{ scopeType: ScopeType; scopeId?: string }>({ 
     scopeType: 'workspace' 
   });
   const [activeStep, setActiveStep] = useState<BuilderStep>('trigger');
+
+  // Preencher campos quando estiver em modo edição
+  useEffect(() => {
+    if (automation && open) {
+      setName(automation.description || '');
+      setSelectedTrigger(automation.trigger);
+      setSelectedAction(automation.action_type);
+      setActionConfig(automation.action_config || {});
+      setScope({ 
+        scopeType: automation.scope_type, 
+        scopeId: automation.scope_id || undefined 
+      });
+      setActiveStep('trigger');
+    }
+  }, [automation, open]);
 
   const resetForm = () => {
     setName('');
@@ -52,7 +72,9 @@ export const AdvancedAutomationBuilder = ({
   };
 
   const handleClose = () => {
-    resetForm();
+    if (!isEditMode) {
+      resetForm();
+    }
     onOpenChange(false);
   };
 
@@ -78,21 +100,35 @@ export const AdvancedAutomationBuilder = ({
     const description = name || `Quando ${trigger?.label} → ${action?.label}`;
 
     try {
-      await createAutomation.mutateAsync({
-        workspaceId,
-        description,
-        trigger: selectedTrigger as any,
-        actionType: selectedAction as any,
-        actionConfig,
-        scopeType: scope.scopeType,
-        scopeId: scope.scopeId,
-      });
+      if (isEditMode && automation) {
+        await updateAutomation.mutateAsync({
+          id: automation.id,
+          description,
+          trigger: selectedTrigger as any,
+          action_type: selectedAction as any,
+          action_config: actionConfig,
+          scope_type: scope.scopeType,
+          scope_id: scope.scopeId || null,
+        });
+      } else {
+        await createAutomation.mutateAsync({
+          workspaceId,
+          description,
+          trigger: selectedTrigger as any,
+          actionType: selectedAction as any,
+          actionConfig,
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+        });
+      }
 
       handleClose();
     } catch (error) {
-      console.error('Erro ao criar automação:', error);
+      console.error('Erro ao salvar automação:', error);
     }
   };
+
+  const isPending = createAutomation.isPending || updateAutomation.isPending;
 
   const selectedTriggerData = selectedTrigger ? getTriggerById(selectedTrigger) : null;
   const selectedTriggerCategory = selectedTrigger ? getCategoryByTriggerId(selectedTrigger) : null;
@@ -108,7 +144,9 @@ export const AdvancedAutomationBuilder = ({
                 <Zap className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <DialogTitle className="text-lg">Nova Automação</DialogTitle>
+                <DialogTitle className="text-lg">
+                  {isEditMode ? 'Editar Automação' : 'Nova Automação'}
+                </DialogTitle>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   Localizado em: {activeWorkspace?.name || 'Workspace'}
                 </p>
@@ -263,9 +301,12 @@ export const AdvancedAutomationBuilder = ({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!selectedTrigger || !selectedAction || createAutomation.isPending}
+            disabled={!selectedTrigger || !selectedAction || isPending}
           >
-            {createAutomation.isPending ? 'Criando...' : 'Criar Automação'}
+            {isPending 
+              ? (isEditMode ? 'Salvando...' : 'Criando...') 
+              : (isEditMode ? 'Salvar Alterações' : 'Criar Automação')
+            }
           </Button>
         </div>
       </DialogContent>

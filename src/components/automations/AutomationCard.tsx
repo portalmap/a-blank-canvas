@@ -1,11 +1,13 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Folder, List, LayoutGrid, Building2, ArrowRight, Zap } from 'lucide-react';
+import { Trash2, Folder, List, LayoutGrid, Building2, ArrowRight, Zap, Pencil } from 'lucide-react';
 import { useToggleAutomation, useDeleteAutomation, type Automation, type AutomationScope } from '@/hooks/useAutomations';
 import { getTriggerById } from './advanced/triggerCategories';
 import { getActionById } from './advanced/actionCategories';
+import { AdvancedAutomationBuilder } from './advanced/AdvancedAutomationBuilder';
 
 interface AutomationCardProps {
   automation: Automation;
@@ -30,6 +32,7 @@ const getScopeLabel = (scope: AutomationScope) => {
 };
 
 export function AutomationCard({ automation }: AutomationCardProps) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const toggleAutomation = useToggleAutomation();
   const deleteAutomation = useDeleteAutomation();
 
@@ -94,8 +97,16 @@ export function AutomationCard({ automation }: AutomationCardProps) {
             </div>
           </div>
 
-          {/* Right: Toggle and Delete */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Right: Edit, Toggle and Delete */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => setEditDialogOpen(true)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             <Switch
               checked={automation.enabled}
               onCheckedChange={handleToggle}
@@ -113,6 +124,14 @@ export function AutomationCard({ automation }: AutomationCardProps) {
           </div>
         </div>
       </CardContent>
+
+      {/* Edit Dialog */}
+      <AdvancedAutomationBuilder
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        workspaceId={automation.workspace_id}
+        automation={automation}
+      />
     </Card>
   );
 }
