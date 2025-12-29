@@ -69,6 +69,7 @@ export const useTaskStats = ({ type, id }: UseTaskStatsOptions) => {
           priority,
           archived_at,
           status_id,
+          parent_id,
           statuses (
             id,
             name,
@@ -76,7 +77,8 @@ export const useTaskStats = ({ type, id }: UseTaskStatsOptions) => {
           )
         `)
         .in('list_id', listIds)
-        .is('archived_at', null);
+        .is('archived_at', null)
+        .is('parent_id', null);
 
       if (tasksError) throw tasksError;
 
