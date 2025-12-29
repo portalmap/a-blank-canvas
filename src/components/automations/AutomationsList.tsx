@@ -1,14 +1,16 @@
 import { AutomationCard } from './AutomationCard';
 import { useAutomations } from '@/hooks/useAutomations';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Zap } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export function AutomationsList() {
-  const { activeWorkspace } = useWorkspace();
-  const { data: automations, isLoading } = useAutomations(activeWorkspace?.id);
+interface AutomationsListProps {
+  workspaceId: string;
+}
+
+export function AutomationsList({ workspaceId }: AutomationsListProps) {
+  const { data: automations, isLoading } = useAutomations(workspaceId);
 
   // Fetch all profiles for displaying user names
   const { data: profiles = [] } = useQuery({

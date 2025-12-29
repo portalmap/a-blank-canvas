@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { applyAutomationsToTask } from './useApplyAutomations';
 
 export const useTasks = (listId?: string) => {
   return useQuery({
@@ -136,10 +137,29 @@ export const useCreateTask = () => {
         .single();
 
       if (error) throw error;
+
+      // Aplicar automações (responsáveis e seguidores automáticos)
+      try {
+        const result = await applyAutomationsToTask({
+          id: data.id,
+          workspace_id: data.workspace_id,
+          list_id: data.list_id,
+        });
+        
+        if (result.assigneesAdded > 0 || result.followersAdded > 0) {
+          console.log(`Automações aplicadas: ${result.assigneesAdded} responsáveis, ${result.followersAdded} seguidores`);
+        }
+      } catch (automationError) {
+        console.error('Erro ao aplicar automações:', automationError);
+        // Não falhar a criação da tarefa por causa de erro nas automações
+      }
+
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['task-assignees', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['task-followers', data.id] });
       toast.success('Tarefa criada com sucesso!');
     },
     onError: (error) => {
