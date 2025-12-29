@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Plus, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
 
 const SpacesView = () => {
   const { activeWorkspace } = useWorkspace();
@@ -100,9 +101,17 @@ const SpacesView = () => {
                 )}
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground mb-3">
                   Criado em {new Date(space.created_at).toLocaleDateString('pt-BR')}
                 </p>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <QuickAutomationButtons 
+                    workspaceId={activeWorkspace.id}
+                    scopeType="space"
+                    scopeId={space.id}
+                    scopeName={space.name}
+                  />
+                </div>
               </CardContent>
             </Card>
           ))}
