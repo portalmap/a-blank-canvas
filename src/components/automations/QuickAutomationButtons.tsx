@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 
 interface QuickAutomationButtonsProps {
   workspaceId: string;
-  scopeType: 'space' | 'folder' | 'list';
+  scopeType: 'workspace' | 'space' | 'folder' | 'list';
   scopeId: string;
   scopeName: string;
 }

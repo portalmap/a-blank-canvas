@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Plus, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
 
 const SpacesView = () => {
   const { activeWorkspace } = useWorkspace();
@@ -59,10 +60,18 @@ const SpacesView = () => {
             Organize seu trabalho em spaces
           </p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Space
-        </Button>
+        <div className="flex items-center gap-2">
+          <QuickAutomationButtons
+            workspaceId={activeWorkspace.id}
+            scopeType="workspace"
+            scopeId={activeWorkspace.id}
+            scopeName={activeWorkspace.name}
+          />
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Space
+          </Button>
+        </div>
       </div>
 
       {spaces && spaces.length === 0 ? (
