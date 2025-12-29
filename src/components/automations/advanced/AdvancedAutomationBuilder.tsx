@@ -1,0 +1,274 @@
+import { useState } from 'react';
+import { ArrowRight, Zap, Target, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useCreateAutomation } from '@/hooks/useAutomations';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { TriggerSelector } from './TriggerSelector';
+import { ActionSelector } from './ActionSelector';
+import { ActionConfigForm } from './ActionConfigForm';
+import { getTriggerById, getCategoryByTriggerId } from './triggerCategories';
+import { getActionById } from './actionCategories';
+import { ScopeSelector } from '../ScopeSelector';
+import { toast } from 'sonner';
+
+interface AdvancedAutomationBuilderProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  workspaceId: string;
+}
+
+type BuilderStep = 'trigger' | 'action';
+
+export const AdvancedAutomationBuilder = ({ 
+  open, 
+  onOpenChange, 
+  workspaceId 
+}: AdvancedAutomationBuilderProps) => {
+  const { activeWorkspace } = useWorkspace();
+  const createAutomation = useCreateAutomation();
+
+  const [name, setName] = useState('');
+  const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [actionConfig, setActionConfig] = useState<Record<string, any>>({});
+  type ScopeType = 'workspace' | 'space' | 'folder' | 'list';
+  const [scope, setScope] = useState<{ scopeType: ScopeType; scopeId?: string }>({ 
+    scopeType: 'workspace' 
+  });
+  const [activeStep, setActiveStep] = useState<BuilderStep>('trigger');
+
+  const resetForm = () => {
+    setName('');
+    setSelectedTrigger(null);
+    setSelectedAction(null);
+    setActionConfig({});
+    setScope({ scopeType: 'workspace' });
+    setActiveStep('trigger');
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onOpenChange(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedTrigger || !selectedAction) {
+      toast.error('Selecione um gatilho e uma ação');
+      return;
+    }
+
+    const trigger = getTriggerById(selectedTrigger);
+    const action = getActionById(selectedAction);
+
+    // Validate required config fields
+    if (action?.configFields) {
+      for (const field of action.configFields) {
+        if (field.required && !actionConfig[field.name]) {
+          toast.error(`Preencha o campo: ${field.label}`);
+          return;
+        }
+      }
+    }
+
+    const description = name || `Quando ${trigger?.label} → ${action?.label}`;
+
+    try {
+      await createAutomation.mutateAsync({
+        workspaceId,
+        description,
+        trigger: selectedTrigger as any,
+        actionType: selectedAction as any,
+        actionConfig,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      });
+
+      handleClose();
+    } catch (error) {
+      console.error('Erro ao criar automação:', error);
+    }
+  };
+
+  const selectedTriggerData = selectedTrigger ? getTriggerById(selectedTrigger) : null;
+  const selectedTriggerCategory = selectedTrigger ? getCategoryByTriggerId(selectedTrigger) : null;
+  const selectedActionData = selectedAction ? getActionById(selectedAction) : null;
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-4 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Zap className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">Nova Automação</DialogTitle>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Localizado em: {activeWorkspace?.name || 'Workspace'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto py-4 space-y-6">
+          {/* Name Input */}
+          <div className="space-y-2">
+            <Label>Nome da automação (opcional)</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Dê um nome a essa regra de automação..."
+            />
+          </div>
+
+          {/* Scope Selector */}
+          <div className="space-y-2">
+            <Label>Escopo</Label>
+            <ScopeSelector
+              workspaceId={workspaceId}
+              value={scope}
+              onChange={setScope}
+            />
+          </div>
+
+          {/* Trigger → Action Flow */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-4 items-start">
+            {/* Trigger Card */}
+            <Card 
+              className={`p-4 cursor-pointer transition-all ${
+                activeStep === 'trigger' ? 'ring-2 ring-primary' : ''
+              }`}
+              onClick={() => setActiveStep('trigger')}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="h-4 w-4 text-primary" />
+                <span className="font-medium text-sm">Gatilho</span>
+                {selectedTriggerCategory && (
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {selectedTriggerCategory.name}
+                  </Badge>
+                )}
+              </div>
+
+              {selectedTriggerData ? (
+                <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
+                  <selectedTriggerData.icon className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">{selectedTriggerData.label}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 ml-auto"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTrigger(null);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Clique para selecionar um gatilho
+                </p>
+              )}
+
+              {activeStep === 'trigger' && (
+                <div className="mt-4 border-t pt-4">
+                  <TriggerSelector
+                    selectedTrigger={selectedTrigger}
+                    onSelectTrigger={(id) => {
+                      setSelectedTrigger(id);
+                      setActiveStep('action');
+                    }}
+                  />
+                </div>
+              )}
+            </Card>
+
+            {/* Arrow */}
+            <div className="hidden md:flex items-center justify-center h-full pt-12">
+              <div className="p-2 rounded-full bg-muted">
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            {/* Action Card */}
+            <Card 
+              className={`p-4 cursor-pointer transition-all ${
+                activeStep === 'action' ? 'ring-2 ring-primary' : ''
+              }`}
+              onClick={() => setActiveStep('action')}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="h-4 w-4 text-primary" />
+                <span className="font-medium text-sm">Ação</span>
+              </div>
+
+              {selectedActionData ? (
+                <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
+                  <selectedActionData.icon className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">{selectedActionData.label}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 ml-auto"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAction(null);
+                      setActionConfig({});
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Clique para selecionar uma ação
+                </p>
+              )}
+
+              {activeStep === 'action' && (
+                <div className="mt-4 border-t pt-4">
+                  <ActionSelector
+                    selectedAction={selectedAction}
+                    onSelectAction={setSelectedAction}
+                  />
+                </div>
+              )}
+
+              {/* Action Config Form */}
+              {selectedAction && (
+                <ActionConfigForm
+                  actionId={selectedAction}
+                  workspaceId={workspaceId}
+                  config={actionConfig}
+                  onConfigChange={setActionConfig}
+                />
+              )}
+            </Card>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={handleClose}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={!selectedTrigger || !selectedAction || createAutomation.isPending}
+          >
+            {createAutomation.isPending ? 'Criando...' : 'Criar Automação'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};

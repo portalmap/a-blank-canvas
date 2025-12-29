@@ -2192,11 +2192,47 @@ export type Database = {
         | "notify_channel"
         | "set_status"
         | "auto_add_follower"
+        | "set_priority"
+        | "add_assignee"
+        | "remove_assignee"
+        | "add_follower"
+        | "add_tag"
+        | "remove_tag"
+        | "set_due_date"
+        | "set_start_date"
+        | "send_notification"
+        | "create_subtask"
+        | "move_task"
+        | "archive_task"
+        | "send_webhook"
       automation_scope: "workspace" | "space" | "folder" | "list"
       automation_trigger:
         | "on_task_created"
         | "on_task_updated"
         | "on_status_changed"
+        | "on_custom_field_changed"
+        | "on_schedule"
+        | "on_comment_added"
+        | "on_all_checklists_resolved"
+        | "on_all_subtasks_resolved"
+        | "on_task_added_here"
+        | "on_task_moved_here"
+        | "on_due_date_changed"
+        | "on_start_date_changed"
+        | "on_date_before_after"
+        | "on_start_date_arrives"
+        | "on_due_date_arrives"
+        | "on_custom_date_arrives"
+        | "on_time_tracked"
+        | "on_assignee_added"
+        | "on_assignee_removed"
+        | "on_name_changed"
+        | "on_priority_changed"
+        | "on_tag_added"
+        | "on_tag_removed"
+        | "on_task_type_changed"
+        | "on_task_linked"
+        | "on_task_unblocked"
       chat_channel_role: "owner" | "member"
       chat_channel_type: "client" | "department" | "project" | "custom"
       list_view: "list" | "kanban" | "sprint"
@@ -2339,12 +2375,48 @@ export const Constants = {
         "notify_channel",
         "set_status",
         "auto_add_follower",
+        "set_priority",
+        "add_assignee",
+        "remove_assignee",
+        "add_follower",
+        "add_tag",
+        "remove_tag",
+        "set_due_date",
+        "set_start_date",
+        "send_notification",
+        "create_subtask",
+        "move_task",
+        "archive_task",
+        "send_webhook",
       ],
       automation_scope: ["workspace", "space", "folder", "list"],
       automation_trigger: [
         "on_task_created",
         "on_task_updated",
         "on_status_changed",
+        "on_custom_field_changed",
+        "on_schedule",
+        "on_comment_added",
+        "on_all_checklists_resolved",
+        "on_all_subtasks_resolved",
+        "on_task_added_here",
+        "on_task_moved_here",
+        "on_due_date_changed",
+        "on_start_date_changed",
+        "on_date_before_after",
+        "on_start_date_arrives",
+        "on_due_date_arrives",
+        "on_custom_date_arrives",
+        "on_time_tracked",
+        "on_assignee_added",
+        "on_assignee_removed",
+        "on_name_changed",
+        "on_priority_changed",
+        "on_tag_added",
+        "on_tag_removed",
+        "on_task_type_changed",
+        "on_task_linked",
+        "on_task_unblocked",
       ],
       chat_channel_role: ["owner", "member"],
       chat_channel_type: ["client", "department", "project", "custom"],
