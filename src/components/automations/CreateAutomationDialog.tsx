@@ -16,13 +16,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Eye } from 'lucide-react';
 import { ScopeSelector } from './ScopeSelector';
 import { useCreateAutomation, type AutomationAction, type AutomationScope } from '@/hooks/useAutomations';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
 interface CreateAutomationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  workspaceId: string;
 }
 
 interface WorkspaceMember {
@@ -35,29 +35,28 @@ interface WorkspaceMember {
   };
 }
 
-export function CreateAutomationDialog({ open, onOpenChange }: CreateAutomationDialogProps) {
-  const { activeWorkspace } = useWorkspace();
+export function CreateAutomationDialog({ open, onOpenChange, workspaceId }: CreateAutomationDialogProps) {
   const createAutomation = useCreateAutomation();
 
   const [description, setDescription] = useState('');
   const [actionType, setActionType] = useState<AutomationAction>('auto_assign_user');
   const [scope, setScope] = useState<{ scopeType: AutomationScope; scopeId?: string }>({
     scopeType: 'workspace',
-    scopeId: activeWorkspace?.id,
+    scopeId: workspaceId,
   });
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
   // Fetch workspace members with profiles
   const { data: members = [] } = useQuery({
-    queryKey: ['workspace-members-with-profiles', activeWorkspace?.id],
+    queryKey: ['workspace-members-with-profiles', workspaceId],
     queryFn: async (): Promise<WorkspaceMember[]> => {
-      if (!activeWorkspace?.id) return [];
+      if (!workspaceId) return [];
       
       // First get workspace members
       const { data: memberData, error: memberError } = await supabase
         .from('workspace_members')
         .select('user_id, role')
-        .eq('workspace_id', activeWorkspace.id);
+        .eq('workspace_id', workspaceId);
 
       if (memberError) throw memberError;
       if (!memberData || memberData.length === 0) return [];
@@ -78,14 +77,14 @@ export function CreateAutomationDialog({ open, onOpenChange }: CreateAutomationD
         profile: profileData?.find(p => p.id === member.user_id),
       }));
     },
-    enabled: !!activeWorkspace?.id,
+    enabled: !!workspaceId,
   });
 
   const handleSubmit = () => {
-    if (!activeWorkspace?.id || !selectedUserId) return;
+    if (!workspaceId || !selectedUserId) return;
 
     createAutomation.mutate({
-      workspaceId: activeWorkspace.id,
+      workspaceId,
       description: description.trim() || undefined,
       trigger: 'on_task_created',
       actionType,
@@ -103,7 +102,7 @@ export function CreateAutomationDialog({ open, onOpenChange }: CreateAutomationD
   const resetForm = () => {
     setDescription('');
     setActionType('auto_assign_user');
-    setScope({ scopeType: 'workspace', scopeId: activeWorkspace?.id });
+    setScope({ scopeType: 'workspace', scopeId: workspaceId });
     setSelectedUserId('');
   };
 
@@ -177,13 +176,11 @@ export function CreateAutomationDialog({ open, onOpenChange }: CreateAutomationD
           </div>
 
           {/* Scope Selector */}
-          {activeWorkspace?.id && (
-            <ScopeSelector
-              workspaceId={activeWorkspace.id}
-              value={scope}
-              onChange={setScope}
-            />
-          )}
+          <ScopeSelector
+            workspaceId={workspaceId}
+            value={scope}
+            onChange={setScope}
+          />
 
           {/* User Selector */}
           <div>
