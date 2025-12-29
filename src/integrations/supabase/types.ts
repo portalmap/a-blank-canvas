@@ -61,6 +61,7 @@ export type Database = {
           action_config: Json
           action_type: Database["public"]["Enums"]["automation_action"]
           created_at: string
+          description: string | null
           enabled: boolean
           id: string
           scope_id: string | null
@@ -73,6 +74,7 @@ export type Database = {
           action_config?: Json
           action_type: Database["public"]["Enums"]["automation_action"]
           created_at?: string
+          description?: string | null
           enabled?: boolean
           id?: string
           scope_id?: string | null
@@ -85,6 +87,7 @@ export type Database = {
           action_config?: Json
           action_type?: Database["public"]["Enums"]["automation_action"]
           created_at?: string
+          description?: string | null
           enabled?: boolean
           id?: string
           scope_id?: string | null
@@ -1567,18 +1570,24 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          source_id: string | null
+          source_type: string | null
           task_id: string
           user_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
+          source_id?: string | null
+          source_type?: string | null
           task_id: string
           user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
+          source_id?: string | null
+          source_type?: string | null
           task_id?: string
           user_id?: string
         }
@@ -2182,6 +2191,7 @@ export type Database = {
         | "auto_assign_team"
         | "notify_channel"
         | "set_status"
+        | "auto_add_follower"
       automation_scope: "workspace" | "space" | "folder" | "list"
       automation_trigger:
         | "on_task_created"
@@ -2328,6 +2338,7 @@ export const Constants = {
         "auto_assign_team",
         "notify_channel",
         "set_status",
+        "auto_add_follower",
       ],
       automation_scope: ["workspace", "space", "folder", "list"],
       automation_trigger: [
