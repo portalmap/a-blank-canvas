@@ -105,19 +105,22 @@ export const useCreateAutomation = () => {
   });
 };
 
+interface UpdateAutomationParams {
+  id: string;
+  description?: string;
+  trigger?: AutomationTrigger;
+  action_type?: AutomationActionType;
+  action_config?: Record<string, any>;
+  scope_type?: AutomationScopeType;
+  scope_id?: string | null;
+  enabled?: boolean;
+}
+
 export const useUpdateAutomation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      id, 
-      ...updates 
-    }: { 
-      id: string; 
-      description?: string;
-      enabled?: boolean;
-      action_config?: Record<string, any>;
-    }) => {
+    mutationFn: async ({ id, ...updates }: UpdateAutomationParams) => {
       const { data, error } = await supabase
         .from('automations')
         .update(updates)
