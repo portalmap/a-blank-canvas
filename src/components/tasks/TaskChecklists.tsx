@@ -12,6 +12,7 @@ import {
   useUpdateChecklistItem,
   useDeleteChecklistItem 
 } from '@/hooks/useTaskChecklists';
+import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { cn } from '@/lib/utils';
 
 interface TaskChecklistsProps {
@@ -31,6 +32,50 @@ export const TaskChecklists = ({ taskId }: TaskChecklistsProps) => {
   const createItem = useCreateChecklistItem();
   const updateItem = useUpdateChecklistItem();
   const deleteItem = useDeleteChecklistItem();
+  const createActivity = useCreateTaskActivity();
+
+  const handleToggleItem = async (item: any, checklistTitle: string) => {
+    const isCompleting = !item.is_completed;
+    
+    try {
+      await updateItem.mutateAsync({
+        id: item.id,
+        isCompleted: isCompleting,
+        taskId,
+      });
+      
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: isCompleting ? 'checklist.item.completed' : 'checklist.item.uncompleted',
+        metadata: {
+          item_name: item.content,
+          checklist_title: checklistTitle,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar item do checklist:', error);
+    }
+  };
+
+  const handleDeleteChecklist = async (checklist: any) => {
+    const checklistTitle = checklist.title;
+    const itemsCount = checklist.items?.length || 0;
+    
+    try {
+      await deleteChecklist.mutateAsync({ id: checklist.id, taskId });
+      
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'checklist.deleted',
+        metadata: {
+          checklist_title: checklistTitle,
+          items_count: itemsCount,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao excluir checklist:', error);
+    }
+  };
 
   const handleCreateChecklist = async () => {
     if (!newChecklistTitle.trim()) return;
@@ -164,7 +209,7 @@ export const TaskChecklists = ({ taskId }: TaskChecklistsProps) => {
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                    onClick={() => deleteChecklist.mutate({ id: checklist.id, taskId })}
+                    onClick={() => handleDeleteChecklist(checklist)}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -181,15 +226,9 @@ export const TaskChecklists = ({ taskId }: TaskChecklistsProps) => {
                         key={item.id} 
                         className="flex items-center gap-2 group"
                       >
-                        <Checkbox
+                      <Checkbox
                           checked={item.is_completed}
-                          onCheckedChange={(checked) => {
-                            updateItem.mutate({
-                              id: item.id,
-                              isCompleted: checked === true,
-                              taskId,
-                            });
-                          }}
+                          onCheckedChange={() => handleToggleItem(item, checklist.title)}
                         />
                         <span className={cn(
                           "flex-1 text-sm",
