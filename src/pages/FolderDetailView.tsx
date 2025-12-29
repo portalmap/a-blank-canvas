@@ -15,6 +15,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Loader2, Plus, List, FolderOpen, ChevronRight } from 'lucide-react';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import DateRangeFilter from '@/components/filters/DateRangeFilter';
+import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
 
 const FolderDetailView = () => {
   const { folderId } = useParams<{ folderId: string }>();
@@ -102,10 +103,18 @@ const FolderDetailView = () => {
             <p className="text-muted-foreground mt-1">{currentFolder.description}</p>
           )}
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Lista
-        </Button>
+        <div className="flex items-center gap-4">
+          <QuickAutomationButtons
+            workspaceId={activeWorkspace.id}
+            scopeType="folder"
+            scopeId={folderId!}
+            scopeName={currentFolder.name}
+          />
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Lista
+          </Button>
+        </div>
       </div>
 
       <TaskStatsDashboard 

@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskListView } from '@/components/views/TaskListView';
 import { TaskKanbanView } from '@/components/views/TaskKanbanView';
 import { TaskSprintView } from '@/components/views/TaskSprintView';
+import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
 
 const ListDetailView = () => {
   const { listId } = useParams<{ listId: string }>();
@@ -110,10 +111,18 @@ const ListDetailView = () => {
             <p className="text-muted-foreground mt-1">{currentList.description}</p>
           )}
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} disabled={!defaultStatus}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Tarefa
-        </Button>
+        <div className="flex items-center gap-4">
+          <QuickAutomationButtons
+            workspaceId={activeWorkspace.id}
+            scopeType="list"
+            scopeId={listId!}
+            scopeName={currentList.name}
+          />
+          <Button onClick={() => setIsDialogOpen(true)} disabled={!defaultStatus}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Tarefa
+          </Button>
+        </div>
       </div>
 
       {!defaultStatus && statuses !== undefined && (
