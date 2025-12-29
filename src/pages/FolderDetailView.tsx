@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpace } from '@/hooks/useSpaces';
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Loader2, Plus, List, FolderOpen, ChevronRight } from 'lucide-react';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
+import DateRangeFilter from '@/components/filters/DateRangeFilter';
 
 const FolderDetailView = () => {
   const { folderId } = useParams<{ folderId: string }>();
@@ -23,7 +24,22 @@ const FolderDetailView = () => {
   const { data: currentFolder, isLoading: folderLoading } = useFolder(folderId);
   const { data: lists, isLoading: listsLoading } = useLists({ folderId });
   const { data: currentSpace, isLoading: spaceLoading } = useSpace(currentFolder?.space_id);
-  const { data: taskStats, isLoading: statsLoading } = useTaskStats({ type: 'folder', id: folderId });
+  
+  const [dateRange, setDateRange] = useState<{ startDate: Date | undefined; endDate: Date | undefined }>({
+    startDate: undefined,
+    endDate: undefined,
+  });
+
+  const handleDateRangeChange = useCallback((range: { startDate: Date | undefined; endDate: Date | undefined }) => {
+    setDateRange(range);
+  }, []);
+
+  const { data: taskStats, isLoading: statsLoading } = useTaskStats({ 
+    type: 'folder', 
+    id: folderId,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+  });
   const createList = useCreateList();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -92,7 +108,11 @@ const FolderDetailView = () => {
         </Button>
       </div>
 
-      <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
+      <TaskStatsDashboard 
+        stats={taskStats} 
+        isLoading={statsLoading}
+        filterComponent={<DateRangeFilter onDateRangeChange={handleDateRangeChange} />}
+      />
 
       {listsLoading ? (
         <div className="flex justify-center py-8">

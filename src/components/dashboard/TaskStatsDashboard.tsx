@@ -17,6 +17,7 @@ interface TaskStats {
 interface TaskStatsDashboardProps {
   stats: TaskStats | undefined;
   isLoading: boolean;
+  filterComponent?: React.ReactNode;
 }
 
 const StatCard = ({ 
@@ -57,15 +58,18 @@ const StatCard = ({
   );
 };
 
-const TaskStatsDashboard = ({ stats, isLoading }: TaskStatsDashboardProps) => {
+const TaskStatsDashboard = ({ stats, isLoading, filterComponent }: TaskStatsDashboardProps) => {
   if (isLoading) {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Visão Geral
-          </CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Visão Geral
+            </CardTitle>
+            {filterComponent}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -83,10 +87,13 @@ const TaskStatsDashboard = ({ stats, isLoading }: TaskStatsDashboardProps) => {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Visão Geral
-          </CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Visão Geral
+            </CardTitle>
+            {filterComponent}
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm text-center py-4">
@@ -100,10 +107,13 @@ const TaskStatsDashboard = ({ stats, isLoading }: TaskStatsDashboardProps) => {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          Visão Geral
-        </CardTitle>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Visão Geral
+          </CardTitle>
+          {filterComponent}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Stats Cards */}
