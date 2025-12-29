@@ -25,23 +25,30 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
   const createAutomation = useCreateAutomation();
 
   const { data: members } = useQuery({
-    queryKey: ['workspace-members', workspaceId],
+    queryKey: ['workspace-members-with-profiles', workspaceId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Buscar membros do workspace
+      const { data: workspaceMembers, error: membersError } = await supabase
         .from('workspace_members')
-        .select(`
-          user_id,
-          role,
-          profiles:user_id (
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('user_id, role')
         .eq('workspace_id', workspaceId);
 
-      if (error) throw error;
-      return data;
+      if (membersError) throw membersError;
+
+      // Buscar profiles dos membros
+      const userIds = workspaceMembers.map(m => m.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combinar os dados
+      return workspaceMembers.map(member => ({
+        ...member,
+        profile: profiles?.find(p => p.id === member.user_id) || null
+      }));
     },
     enabled: !!workspaceId,
   });
@@ -59,7 +66,7 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
     }
 
     const selectedMember = members?.find(m => m.user_id === selectedUserId);
-    const userName = (selectedMember?.profiles as any)?.full_name || 'Usuário';
+    const userName = selectedMember?.profile?.full_name || 'Usuário';
 
     await createAutomation.mutateAsync({
       workspaceId,
@@ -126,22 +133,19 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
                   <SelectValue placeholder="Escolha um membro..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {members?.map((member) => {
-                    const profile = member.profiles as any;
-                    return (
-                      <SelectItem key={member.user_id} value={member.user_id}>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={profile?.avatar_url} />
-                            <AvatarFallback className="text-xs">
-                              {profile?.full_name?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span>{profile?.full_name || 'Usuário'}</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                  {members?.map((member) => (
+                    <SelectItem key={member.user_id} value={member.user_id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={member.profile?.avatar_url} />
+                          <AvatarFallback className="text-xs">
+                            {member.profile?.full_name?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{member.profile?.full_name || 'Usuário'}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
