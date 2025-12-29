@@ -2,14 +2,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trash2, User, Eye, Folder, List, LayoutGrid, Building2 } from 'lucide-react';
+import { Trash2, Folder, List, LayoutGrid, Building2, ArrowRight, Zap } from 'lucide-react';
 import { useToggleAutomation, useDeleteAutomation, type Automation, type AutomationScope } from '@/hooks/useAutomations';
+import { getTriggerById } from './advanced/triggerCategories';
+import { getActionById } from './advanced/actionCategories';
 
 interface AutomationCardProps {
   automation: Automation;
-  userName?: string;
-  userAvatar?: string;
 }
 
 const getScopeIcon = (scope: AutomationScope) => {
@@ -30,23 +29,7 @@ const getScopeLabel = (scope: AutomationScope) => {
   }
 };
 
-const getActionIcon = (actionType: string) => {
-  switch (actionType) {
-    case 'auto_assign_user': return <User className="h-5 w-5 text-primary" />;
-    case 'auto_add_follower': return <Eye className="h-5 w-5 text-blue-500" />;
-    default: return <User className="h-5 w-5" />;
-  }
-};
-
-const getActionLabel = (actionType: string) => {
-  switch (actionType) {
-    case 'auto_assign_user': return 'Atribuir Responsável';
-    case 'auto_add_follower': return 'Adicionar Seguidor';
-    default: return actionType;
-  }
-};
-
-export function AutomationCard({ automation, userName, userAvatar }: AutomationCardProps) {
+export function AutomationCard({ automation }: AutomationCardProps) {
   const toggleAutomation = useToggleAutomation();
   const deleteAutomation = useDeleteAutomation();
 
@@ -60,7 +43,24 @@ export function AutomationCard({ automation, userName, userAvatar }: AutomationC
     }
   };
 
+  const trigger = getTriggerById(automation.trigger);
+  const action = getActionById(automation.action_type);
   const actionConfig = automation.action_config as Record<string, any> | null;
+
+  // Get a summary of the action config
+  const getConfigSummary = () => {
+    if (!actionConfig) return null;
+    const summaryParts: string[] = [];
+    
+    if (actionConfig.title) summaryParts.push(`"${actionConfig.title}"`);
+    if (actionConfig.status_id) summaryParts.push('Status definido');
+    if (actionConfig.priority) summaryParts.push(`Prioridade: ${actionConfig.priority}`);
+    if (actionConfig.message) summaryParts.push(`Msg: "${actionConfig.message.substring(0, 30)}..."`);
+    
+    return summaryParts.length > 0 ? summaryParts.join(' • ') : null;
+  };
+
+  const configSummary = getConfigSummary();
 
   return (
     <Card className={`transition-opacity ${!automation.enabled ? 'opacity-60' : ''}`}>
@@ -69,38 +69,30 @@ export function AutomationCard({ automation, userName, userAvatar }: AutomationC
           {/* Left: Icon and Info */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="flex-shrink-0 p-2 rounded-lg bg-muted">
-              {getActionIcon(automation.action_type)}
+              <Zap className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="font-medium text-sm truncate">
-                  {automation.description || getActionLabel(automation.action_type)}
+                  {automation.description || 'Automação'}
                 </h4>
                 <Badge variant="outline" className="gap-1 text-xs">
                   {getScopeIcon(automation.scope_type)}
                   {getScopeLabel(automation.scope_type)}
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getActionLabel(automation.action_type)} quando tarefa for criada
-              </p>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                <span className="font-medium text-foreground/80">{trigger?.label || automation.trigger}</span>
+                <ArrowRight className="h-3 w-3" />
+                <span className="font-medium text-foreground/80">{action?.label || automation.action_type}</span>
+              </div>
+              {configSummary && (
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {configSummary}
+                </p>
+              )}
             </div>
           </div>
-
-          {/* Center: Assigned User */}
-          {actionConfig?.user_id && (
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Avatar className="h-7 w-7">
-                <AvatarImage src={userAvatar} />
-                <AvatarFallback className="text-xs">
-                  {userName?.charAt(0)?.toUpperCase() || '?'}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                {userName || 'Usuário'}
-              </span>
-            </div>
-          )}
 
           {/* Right: Toggle and Delete */}
           <div className="flex items-center gap-2 flex-shrink-0">
