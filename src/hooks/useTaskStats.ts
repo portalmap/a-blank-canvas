@@ -14,11 +14,13 @@ interface TaskStats {
 interface UseTaskStatsOptions {
   type: 'space' | 'folder';
   id?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
-export const useTaskStats = ({ type, id }: UseTaskStatsOptions) => {
+export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptions) => {
   return useQuery({
-    queryKey: ['taskStats', type, id],
+    queryKey: ['taskStats', type, id, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async (): Promise<TaskStats> => {
       if (!id) {
         return {
@@ -60,7 +62,7 @@ export const useTaskStats = ({ type, id }: UseTaskStatsOptions) => {
       const listIds = lists.map(l => l.id);
 
       // Get all tasks for these lists with status info
-      const { data: tasks, error: tasksError } = await supabase
+      let tasksQuery = supabase
         .from('tasks')
         .select(`
           id,
@@ -70,6 +72,7 @@ export const useTaskStats = ({ type, id }: UseTaskStatsOptions) => {
           archived_at,
           status_id,
           parent_id,
+          created_at,
           statuses (
             id,
             name,
@@ -79,6 +82,16 @@ export const useTaskStats = ({ type, id }: UseTaskStatsOptions) => {
         .in('list_id', listIds)
         .is('archived_at', null)
         .is('parent_id', null);
+
+      // Apply date filters if provided
+      if (startDate) {
+        tasksQuery = tasksQuery.gte('created_at', startDate.toISOString());
+      }
+      if (endDate) {
+        tasksQuery = tasksQuery.lte('created_at', endDate.toISOString());
+      }
+
+      const { data: tasks, error: tasksError } = await tasksQuery;
 
       if (tasksError) throw tasksError;
 
