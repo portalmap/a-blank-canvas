@@ -1,0 +1,168 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useCreateAutomation } from '@/hooks/useAutomations';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { User, Eye, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface QuickAutomationButtonsProps {
+  workspaceId: string;
+  scopeType: 'space' | 'folder' | 'list';
+  scopeId: string;
+  scopeName: string;
+}
+
+const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: QuickAutomationButtonsProps) => {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [actionType, setActionType] = useState<'auto_assign_user' | 'auto_add_follower'>('auto_assign_user');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+
+  const createAutomation = useCreateAutomation();
+
+  const { data: members } = useQuery({
+    queryKey: ['workspace-members', workspaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workspace_members')
+        .select(`
+          user_id,
+          role,
+          profiles:user_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq('workspace_id', workspaceId);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId,
+  });
+
+  const handleOpenDialog = (type: 'auto_assign_user' | 'auto_add_follower') => {
+    setActionType(type);
+    setSelectedUserId('');
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedUserId) {
+      toast.error('Selecione um usuário');
+      return;
+    }
+
+    const selectedMember = members?.find(m => m.user_id === selectedUserId);
+    const userName = (selectedMember?.profiles as any)?.full_name || 'Usuário';
+
+    await createAutomation.mutateAsync({
+      workspaceId,
+      trigger: 'on_task_created',
+      actionType,
+      actionConfig: { user_id: selectedUserId },
+      scopeType,
+      scopeId,
+      description: `${actionType === 'auto_assign_user' ? 'Atribuir' : 'Adicionar como seguidor'} ${userName} em ${scopeName}`,
+    });
+
+    setDialogOpen(false);
+    setSelectedUserId('');
+  };
+
+  const getDialogTitle = () => {
+    return actionType === 'auto_assign_user' 
+      ? 'Atribuição Automática' 
+      : 'Seguir Automaticamente';
+  };
+
+  const getDialogDescription = () => {
+    const scopeLabel = scopeType === 'space' ? 'Space' : scopeType === 'folder' ? 'Pasta' : 'Lista';
+    const action = actionType === 'auto_assign_user' 
+      ? 'terão este usuário como responsável' 
+      : 'terão este usuário como seguidor';
+    
+    return `Todas as tarefas criadas nesta ${scopeLabel} "${scopeName}" ${action}.`;
+  };
+
+  return (
+    <>
+      <div className="flex gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => handleOpenDialog('auto_assign_user')}
+        >
+          <User className="mr-2 h-4 w-4" />
+          Atribuição Automática
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => handleOpenDialog('auto_add_follower')}
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          Seguir Automaticamente
+        </Button>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{getDialogTitle()}</DialogTitle>
+            <DialogDescription>{getDialogDescription()}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Selecione o usuário</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha um membro..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {members?.map((member) => {
+                    const profile = member.profiles as any;
+                    return (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={profile?.avatar_url} />
+                            <AvatarFallback className="text-xs">
+                              {profile?.full_name?.charAt(0) || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{profile?.full_name || 'Usuário'}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={!selectedUserId || createAutomation.isPending}
+            >
+              {createAutomation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Criar Automação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+export default QuickAutomationButtons;
