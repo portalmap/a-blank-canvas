@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Zap, UserPlus, Eye } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { AutomationsList } from '@/components/automations/AutomationsList';
-import { CreateAutomationDialog } from '@/components/automations/CreateAutomationDialog';
+import { AdvancedAutomationBuilder } from '@/components/automations/advanced/AdvancedAutomationBuilder';
 
 const Automations = () => {
   const { activeWorkspace } = useWorkspace();
@@ -77,7 +77,7 @@ const Automations = () => {
       <AutomationsList workspaceId={activeWorkspace.id} />
 
       {/* Create Dialog */}
-      <CreateAutomationDialog
+      <AdvancedAutomationBuilder
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         workspaceId={activeWorkspace.id}
