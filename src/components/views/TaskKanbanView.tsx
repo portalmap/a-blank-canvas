@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import { Calendar, GitBranch } from 'lucide-react';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { useUpdateTask } from '@/hooks/useTasks';
+import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { cn } from '@/lib/utils';
 
 interface Task {
@@ -63,6 +64,7 @@ const SubtaskBadge = ({ parentId }: { parentId: string }) => {
 export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
   const navigate = useNavigate();
   const { mutate: updateTask } = useUpdateTask();
+  const createActivity = useCreateTaskActivity();
 
   const sortedStatuses = [...statuses].sort((a, b) => a.order_index - b.order_index);
 
@@ -89,9 +91,21 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
 
     // Se mudou de coluna (status diferente)
     if (destination.droppableId !== source.droppableId) {
+      const oldStatus = statuses.find(s => s.id === source.droppableId);
+      const newStatus = statuses.find(s => s.id === destination.droppableId);
+
       updateTask({
         id: draggableId,
         statusId: destination.droppableId
+      });
+
+      // Registrar atividade de mudança de status
+      createActivity.mutate({
+        taskId: draggableId,
+        activityType: 'status.changed',
+        fieldName: 'status_id',
+        oldValue: oldStatus?.name || null,
+        newValue: newStatus?.name || null,
       });
     }
   };
