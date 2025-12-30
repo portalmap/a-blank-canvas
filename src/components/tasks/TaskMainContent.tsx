@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
-import { Calendar, User, Clock, Flag, Check, X } from 'lucide-react';
+import { Calendar, Clock, Flag, Check, X } from 'lucide-react';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatuses } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
+import { TaskAttachmentsList } from './TaskAttachmentsList';
+import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { cn } from '@/lib/utils';
 
 interface Task {
@@ -290,32 +292,8 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         </div>
       </div>
 
-      {/* Responsável */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <User className="h-4 w-4" /> Responsável
-        </label>
-        <div className="flex items-center gap-2 p-2 border rounded-md">
-          {task.assignee ? (
-            <>
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                {task.assignee.avatar_url ? (
-                  <img 
-                    src={task.assignee.avatar_url} 
-                    alt={task.assignee.full_name || ''} 
-                    className="w-8 h-8 rounded-full"
-                  />
-                ) : (
-                  <User className="h-4 w-4 text-primary" />
-                )}
-              </div>
-              <span>{task.assignee.full_name || 'Sem nome'}</span>
-            </>
-          ) : (
-            <span className="text-muted-foreground">Não atribuído</span>
-          )}
-        </div>
-      </div>
+      {/* Responsáveis */}
+      <TaskAssigneesManager taskId={task.id} workspaceId={task.workspace_id} />
 
       <Separator />
 
@@ -370,6 +348,11 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
       {/* Checklists */}
       <TaskChecklists taskId={task.id} />
+
+      <Separator />
+
+      {/* Anexos */}
+      <TaskAttachmentsList taskId={task.id} />
     </div>
   );
 };
