@@ -1217,6 +1217,169 @@ export type Database = {
           },
         ]
       }
+      space_template_folders: {
+        Row: {
+          description: string | null
+          id: string
+          name: string
+          order_index: number | null
+          template_id: string
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+          template_id: string
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_template_folders_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "space_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      space_template_lists: {
+        Row: {
+          default_view: string | null
+          description: string | null
+          folder_ref_id: string | null
+          id: string
+          name: string
+          order_index: number | null
+          template_id: string
+        }
+        Insert: {
+          default_view?: string | null
+          description?: string | null
+          folder_ref_id?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+          template_id: string
+        }
+        Update: {
+          default_view?: string | null
+          description?: string | null
+          folder_ref_id?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_template_lists_folder_ref_id_fkey"
+            columns: ["folder_ref_id"]
+            isOneToOne: false
+            referencedRelation: "space_template_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_template_lists_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "space_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      space_template_tasks: {
+        Row: {
+          description: string | null
+          id: string
+          list_ref_id: string
+          order_index: number | null
+          priority: string | null
+          template_id: string
+          title: string
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          list_ref_id: string
+          order_index?: number | null
+          priority?: string | null
+          template_id: string
+          title: string
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          list_ref_id?: string
+          order_index?: number | null
+          priority?: string | null
+          template_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_template_tasks_list_ref_id_fkey"
+            columns: ["list_ref_id"]
+            isOneToOne: false
+            referencedRelation: "space_template_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_template_tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "space_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      space_templates: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          created_by_user_id: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          created_by_user_id: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          created_by_user_id?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spaces: {
         Row: {
           color: string | null

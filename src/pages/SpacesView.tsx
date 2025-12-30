@@ -1,39 +1,19 @@
 import { useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useSpaces, useCreateSpace } from '@/hooks/useSpaces';
+import { useSpaces } from '@/hooks/useSpaces';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Plus, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
+import { CreateSpaceDialog } from '@/components/spaces/CreateSpaceDialog';
 
 const SpacesView = () => {
   const { activeWorkspace } = useWorkspace();
   const { data: spaces, isLoading } = useSpaces(activeWorkspace?.id);
-  const createSpace = useCreateSpace();
   const navigate = useNavigate();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newSpaceName, setNewSpaceName] = useState('');
-  const [newSpaceDescription, setNewSpaceDescription] = useState('');
-
-  const handleCreateSpace = async () => {
-    if (!activeWorkspace || !newSpaceName.trim()) return;
-
-    await createSpace.mutateAsync({
-      workspaceId: activeWorkspace.id,
-      name: newSpaceName,
-      description: newSpaceDescription,
-    });
-
-    setNewSpaceName('');
-    setNewSpaceDescription('');
-    setIsDialogOpen(false);
-  };
 
   if (!activeWorkspace) {
     return (
@@ -118,48 +98,11 @@ const SpacesView = () => {
         </div>
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Criar Novo Space</DialogTitle>
-            <DialogDescription>
-              Adicione um novo space para organizar suas pastas e listas
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome</Label>
-              <Input
-                id="name"
-                value={newSpaceName}
-                onChange={(e) => setNewSpaceName(e.target.value)}
-                placeholder="Ex: Projetos, Marketing, Vendas"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição (opcional)</Label>
-              <Textarea
-                id="description"
-                value={newSpaceDescription}
-                onChange={(e) => setNewSpaceDescription(e.target.value)}
-                placeholder="Descreva o propósito deste space"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleCreateSpace} 
-              disabled={!newSpaceName.trim() || createSpace.isPending}
-            >
-              {createSpace.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Criar Space
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateSpaceDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        workspaceId={activeWorkspace.id}
+      />
     </div>
   );
 };
