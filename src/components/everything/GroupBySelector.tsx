@@ -26,28 +26,27 @@ export function GroupBySelector({ value, onChange }: GroupBySelectorProps) {
   const selected = groupByOptions.find(o => o.value === value);
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">Agrupar por:</span>
-      <Select value={value} onValueChange={(v) => onChange(v as GroupByOption)}>
-        <SelectTrigger className="w-[180px] h-8">
-          <SelectValue>
+    <Select value={value} onValueChange={(v) => onChange(v as GroupByOption)}>
+      <SelectTrigger className="h-8 w-auto min-w-[180px] gap-2 border-dashed bg-background hover:bg-accent/50 transition-colors">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium">Grupo:</span>
+          {selected?.icon && <selected.icon className="h-3.5 w-3.5 text-primary" />}
+          <span className="text-sm font-medium">{selected?.label}</span>
+        </div>
+      </SelectTrigger>
+      <SelectContent className="bg-popover">
+        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Agrupar por
+        </div>
+        {groupByOptions.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
             <div className="flex items-center gap-2">
-              {selected?.icon && <selected.icon className="h-4 w-4" />}
-              <span>{selected?.label}</span>
+              {option.icon && <option.icon className="h-4 w-4" />}
+              <span>{option.label}</span>
             </div>
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {groupByOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              <div className="flex items-center gap-2">
-                {option.icon && <option.icon className="h-4 w-4" />}
-                <span>{option.label}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
