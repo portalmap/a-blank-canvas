@@ -101,7 +101,7 @@ export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) 
 
   const handleDelete = () => {
     if (deleteTaskId) {
-      deleteTask.mutate(deleteTaskId);
+      deleteTask.mutate({ id: deleteTaskId });
       setDeleteTaskId(null);
     }
   };

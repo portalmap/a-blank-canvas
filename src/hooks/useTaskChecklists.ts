@@ -41,6 +41,9 @@ export const useCreateTaskChecklist = () => {
 
   return useMutation({
     mutationFn: async ({ taskId, title }: { taskId: string; title: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase
         .from('task_checklists')
         .insert({ task_id: taskId, title })
@@ -48,10 +51,23 @@ export const useCreateTaskChecklist = () => {
         .single();
 
       if (error) throw error;
+
+      // Registrar atividade
+      await supabase.from('task_activities').insert({
+        task_id: taskId,
+        user_id: user.id,
+        activity_type: 'checklist.created',
+        metadata: {
+          checklist_id: data.id,
+          checklist_title: title,
+        },
+      });
+
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['task-checklists', data.task_id] });
+      queryClient.invalidateQueries({ queryKey: ['task-activities', data.task_id] });
       toast.success('Checklist criada!');
     },
     onError: (error) => {
@@ -90,6 +106,9 @@ export const useCreateChecklistItem = () => {
 
   return useMutation({
     mutationFn: async ({ checklistId, content, taskId }: { checklistId: string; content: string; taskId: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase
         .from('task_checklist_items')
         .insert({ checklist_id: checklistId, content })
@@ -97,10 +116,24 @@ export const useCreateChecklistItem = () => {
         .single();
 
       if (error) throw error;
+
+      // Registrar atividade
+      await supabase.from('task_activities').insert({
+        task_id: taskId,
+        user_id: user.id,
+        activity_type: 'checklist.item.created',
+        metadata: {
+          item_id: data.id,
+          item_content: content,
+          checklist_id: checklistId,
+        },
+      });
+
       return { ...data, taskId };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['task-checklists', data.taskId] });
+      queryClient.invalidateQueries({ queryKey: ['task-activities', data.taskId] });
     },
     onError: (error) => {
       toast.error('Erro ao adicionar item');

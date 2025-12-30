@@ -70,11 +70,25 @@ export const useCreateSubtask = () => {
         .single();
 
       if (error) throw error;
+
+      // Registrar atividade na tarefa pai
+      await supabase.from('task_activities').insert({
+        task_id: parentId,
+        user_id: user.id,
+        activity_type: 'subtask.created',
+        metadata: {
+          subtask_id: data.id,
+          subtask_title: title,
+          created_by: 'user',
+        },
+      });
+
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', data.parent_id] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-activities', data.parent_id] });
       toast.success('Subtarefa criada com sucesso!');
     },
     onError: (error) => {

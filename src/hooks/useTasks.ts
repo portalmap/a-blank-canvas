@@ -43,7 +43,16 @@ export const useMoveTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, listId, workspaceId }: { id: string; listId: string; workspaceId: string }) => {
+    mutationFn: async ({ id, listId, workspaceId, oldListName, newListName }: { 
+      id: string; 
+      listId: string; 
+      workspaceId: string;
+      oldListName?: string;
+      newListName?: string;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase
         .from('tasks')
         .update({ list_id: listId, workspace_id: workspaceId })
@@ -52,10 +61,26 @@ export const useMoveTask = () => {
         .single();
 
       if (error) throw error;
+
+      // Registrar atividade
+      await supabase.from('task_activities').insert({
+        task_id: id,
+        user_id: user.id,
+        activity_type: 'task.moved',
+        old_value: oldListName || null,
+        new_value: newListName || null,
+        metadata: { 
+          new_list_id: listId,
+          new_workspace_id: workspaceId,
+          created_by: 'user',
+        },
+      });
+
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-activities', data.id] });
       toast.success('Tarefa movida com sucesso!');
     },
     onError: (error) => {
@@ -70,6 +95,9 @@ export const useArchiveTask = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase
         .from('tasks')
         .update({ archived_at: new Date().toISOString() })
@@ -78,10 +106,20 @@ export const useArchiveTask = () => {
         .single();
 
       if (error) throw error;
+
+      // Registrar atividade
+      await supabase.from('task_activities').insert({
+        task_id: id,
+        user_id: user.id,
+        activity_type: 'task.archived',
+        metadata: { created_by: 'user' },
+      });
+
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['task-activities', data.id] });
       toast.success('Tarefa arquivada com sucesso!');
     },
     onError: (error) => {
@@ -235,16 +273,45 @@ export const useDeleteTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, taskTitle }: { id: string; taskTitle?: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Buscar a tarefa para obter o parent_id (se for subtarefa)
+      const { data: task } = await supabase
+        .from('tasks')
+        .select('parent_id, title')
+        .eq('id', id)
+        .single();
+
       const { error } = await supabase
         .from('tasks')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+
+      // Se for uma subtarefa, registrar atividade na tarefa pai
+      if (task?.parent_id) {
+        await supabase.from('task_activities').insert({
+          task_id: task.parent_id,
+          user_id: user.id,
+          activity_type: 'subtask.deleted',
+          metadata: {
+            subtask_title: task.title || taskTitle || 'Subtarefa',
+            created_by: 'user',
+          },
+        });
+      }
+
+      return { parentId: task?.parent_id };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      if (data?.parentId) {
+        queryClient.invalidateQueries({ queryKey: ['subtasks', data.parentId] });
+        queryClient.invalidateQueries({ queryKey: ['task-activities', data.parentId] });
+      }
       toast.success('Tarefa excluída com sucesso!');
     },
     onError: (error) => {

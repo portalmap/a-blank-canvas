@@ -100,58 +100,81 @@ export const useCreateTaskActivity = () => {
 // Helpers para traduzir tipos de atividade
 export const getActivityLabel = (activity: TaskActivity): string => {
   const type = activity.activity_type;
+  const isAutomation = activity.metadata?.created_by === 'automation';
+  const automationName = activity.metadata?.automation_name;
+  
+  // Prefixo para automações
+  const prefix = isAutomation && automationName ? `[${automationName}] ` : '';
   
   switch (type) {
     case 'task.created':
-      return 'criou esta tarefa';
+      return `${prefix}criou esta tarefa`;
     case 'status.changed':
-      return `alterou o status de "${activity.old_value || 'Sem status'}" para "${activity.new_value}"`;
+      return `${prefix}alterou o status de "${activity.old_value || 'Sem status'}" para "${activity.new_value}"`;
     case 'priority.changed':
-      return `alterou a prioridade de "${getPriorityLabel(activity.old_value)}" para "${getPriorityLabel(activity.new_value)}"`;
+      return `${prefix}alterou a prioridade de "${getPriorityLabel(activity.old_value)}" para "${getPriorityLabel(activity.new_value)}"`;
     case 'assignee.changed':
       if (!activity.old_value && activity.new_value) {
-        return `atribuiu a tarefa para "${activity.new_value}"`;
+        return `${prefix}atribuiu a tarefa para "${activity.new_value}"`;
       } else if (activity.old_value && !activity.new_value) {
-        return `removeu a atribuição de "${activity.old_value}"`;
+        return `${prefix}removeu a atribuição de "${activity.old_value}"`;
       }
-      return `alterou o responsável de "${activity.old_value}" para "${activity.new_value}"`;
+      return `${prefix}alterou o responsável de "${activity.old_value}" para "${activity.new_value}"`;
+    case 'assignee.added':
+      return `${prefix}adicionou "${activity.new_value}" como responsável`;
     case 'due_date.changed':
       if (!activity.old_value && activity.new_value) {
-        return `definiu a data de entrega para ${formatDate(activity.new_value)}`;
+        return `${prefix}definiu a data de entrega para ${formatDate(activity.new_value)}`;
       } else if (activity.old_value && !activity.new_value) {
-        return 'removeu a data de entrega';
+        return `${prefix}removeu a data de entrega`;
       }
-      return `alterou a data de entrega de ${formatDate(activity.old_value)} para ${formatDate(activity.new_value)}`;
+      return `${prefix}alterou a data de entrega de ${formatDate(activity.old_value)} para ${formatDate(activity.new_value)}`;
     case 'start_date.changed':
       if (!activity.old_value && activity.new_value) {
-        return `definiu a data de início para ${formatDate(activity.new_value)}`;
+        return `${prefix}definiu a data de início para ${formatDate(activity.new_value)}`;
       } else if (activity.old_value && !activity.new_value) {
-        return 'removeu a data de início';
+        return `${prefix}removeu a data de início`;
       }
-      return `alterou a data de início de ${formatDate(activity.old_value)} para ${formatDate(activity.new_value)}`;
+      return `${prefix}alterou a data de início de ${formatDate(activity.old_value)} para ${formatDate(activity.new_value)}`;
     case 'title.changed':
-      return `alterou o título de "${activity.old_value}" para "${activity.new_value}"`;
+      return `${prefix}alterou o título de "${activity.old_value}" para "${activity.new_value}"`;
     case 'description.changed':
-      return activity.new_value ? 'atualizou a descrição' : 'removeu a descrição';
+      return activity.new_value ? `${prefix}atualizou a descrição` : `${prefix}removeu a descrição`;
     case 'comment.created':
-      return 'adicionou um comentário';
+      return `${prefix}adicionou um comentário`;
     case 'subtask.created':
-      return `criou a subtarefa "${activity.metadata?.subtask_title || ''}"`;
+      return `${prefix}criou a subtarefa "${activity.metadata?.subtask_title || ''}"`;
+    case 'subtask.deleted':
+      return `${prefix}excluiu a subtarefa "${activity.metadata?.subtask_title || ''}"`;
     case 'checklist.created':
-      return `criou o checklist "${activity.metadata?.checklist_title || ''}"`;
+      return `${prefix}criou o checklist "${activity.metadata?.checklist_title || ''}"`;
+    case 'checklist.item.created':
+      return `${prefix}adicionou item "${activity.metadata?.item_content || ''}" ao checklist`;
     case 'checklist.item.completed':
-      return `marcou "${activity.metadata?.item_name || ''}" como concluído`;
+      return `${prefix}marcou "${activity.metadata?.item_name || ''}" como concluído`;
     case 'checklist.item.uncompleted':
-      return `desmarcou "${activity.metadata?.item_name || ''}"`;
+      return `${prefix}desmarcou "${activity.metadata?.item_name || ''}"`;
     case 'subtask.completed':
-      return `marcou a subtarefa "${activity.metadata?.subtask_title || ''}" como concluída`;
+      return `${prefix}marcou a subtarefa "${activity.metadata?.subtask_title || ''}" como concluída`;
     case 'subtask.uncompleted':
-      return `desmarcou a subtarefa "${activity.metadata?.subtask_title || ''}"`;
+      return `${prefix}desmarcou a subtarefa "${activity.metadata?.subtask_title || ''}"`;
     case 'checklist.deleted':
-      return `excluiu o checklist "${activity.metadata?.checklist_title || ''}" (${activity.metadata?.items_count || 0} itens)`;
+      return `${prefix}excluiu o checklist "${activity.metadata?.checklist_title || ''}" (${activity.metadata?.items_count || 0} itens)`;
+    case 'task.archived':
+      return `${prefix}arquivou a tarefa`;
+    case 'task.moved':
+      if (activity.old_value && activity.new_value) {
+        return `${prefix}moveu a tarefa de "${activity.old_value}" para "${activity.new_value}"`;
+      }
+      return `${prefix}moveu a tarefa para outra lista`;
     default:
       return type;
   }
+};
+
+// Verificar se atividade foi criada por automação
+export const isAutomationActivity = (activity: TaskActivity): boolean => {
+  return activity.metadata?.created_by === 'automation';
 };
 
 const getPriorityLabel = (priority: string | null): string => {
