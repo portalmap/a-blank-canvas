@@ -25,6 +25,9 @@ import { GroupBySelector, GroupByOption } from '@/components/everything/GroupByS
 import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
 import { AssigneeFilterPanel } from '@/components/everything/AssigneeFilterPanel';
 import { Badge } from '@/components/ui/badge';
+import { ColumnSelector } from '@/components/tasks/ColumnSelector';
+import { BulkActionsBar } from '@/components/tasks/BulkActionsBar';
+import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId } from '@/hooks/useColumnPreferences';
 
 const ListDetailView = () => {
   const { listId } = useParams<{ listId: string }>();
@@ -53,6 +56,20 @@ const ListDetailView = () => {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [showAssigneePanel, setShowAssigneePanel] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+
+  // Column preferences
+  const { data: columnPrefs } = useColumnPreferences(listId || null, 'list');
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(DEFAULT_COLUMN_ORDER);
+
+  // Update local state when preferences load
+  useMemo(() => {
+    if (columnPrefs) {
+      setVisibleColumns(columnPrefs.visible_columns);
+      setColumnOrder(columnPrefs.column_order);
+    }
+  }, [columnPrefs]);
   
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: folders } = useFolders(currentList?.space_id);
@@ -302,6 +319,14 @@ const ListDetailView = () => {
                 onChange={setFilters}
                 availableStatuses={availableStatuses}
               />
+              <ColumnSelector
+                listId={listId || null}
+                scope="list"
+                visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                onColumnsChange={setVisibleColumns}
+                onOrderChange={setColumnOrder}
+              />
               <Button
                 variant="outline"
                 size="sm"
@@ -331,6 +356,8 @@ const ListDetailView = () => {
                 listId={listId!}
                 groupBy={groupBy}
                 tasksWithAssignees={filteredTasks}
+                selectedTaskIds={selectedTaskIds}
+                onSelectionChange={setSelectedTaskIds}
               />
             )}
           </TabsContent>
@@ -425,6 +452,14 @@ const ListDetailView = () => {
           onClose={() => setShowAssigneePanel(false)}
         />
       )}
+
+      <BulkActionsBar
+        selectedTaskIds={selectedTaskIds}
+        workspaceId={activeWorkspace.id}
+        listId={listId}
+        defaultStatusId={defaultStatus?.id}
+        onClearSelection={() => setSelectedTaskIds([])}
+      />
     </div>
   );
 };

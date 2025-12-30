@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,8 @@ type TaskWithAssignees = AllTask & {
 interface EverythingTableViewProps {
   tasks: TaskWithAssignees[];
   groupBy: GroupByOption;
+  selectedTaskIds?: string[];
+  onSelectionChange?: (taskIds: string[]) => void;
 }
 
 const priorityConfig = {
@@ -139,9 +142,27 @@ function groupTasksByPriority(tasks: TaskWithAssignees[]) {
   });
 }
 
-export function EverythingTableView({ tasks, groupBy }: EverythingTableViewProps) {
+export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSelectionChange }: EverythingTableViewProps) {
   const navigate = useNavigate();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const handleSelectTask = (taskId: string, checked: boolean) => {
+    if (!onSelectionChange) return;
+    if (checked) {
+      onSelectionChange([...selectedTaskIds, taskId]);
+    } else {
+      onSelectionChange(selectedTaskIds.filter(id => id !== taskId));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (!onSelectionChange) return;
+    if (checked) {
+      onSelectionChange(tasks.map(t => t.id));
+    } else {
+      onSelectionChange([]);
+    }
+  };
 
   const groupedTasks = (() => {
     switch (groupBy) {
@@ -187,26 +208,37 @@ export function EverythingTableView({ tasks, groupBy }: EverythingTableViewProps
     return isPast(dueDate);
   };
 
-  const renderTaskRow = (task: TaskWithAssignees) => (
-    <TableRow
-      key={task.id}
-      className="hover:bg-muted/50 cursor-pointer"
-      onClick={() => navigate(`/task/${task.id}`)}
-    >
-      <TableCell className="max-w-md">
-        <div className="flex flex-col gap-1">
-          <span className="font-medium truncate">{task.title}</span>
-          {task.list && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span>
-                {task.list.space?.name}
-                {task.list.folder && ` > ${task.list.folder.name}`}
-                {` > ${task.list.name}`}
-              </span>
-            </div>
-          )}
-        </div>
+  const renderTaskRow = (task: TaskWithAssignees) => {
+    const isSelected = selectedTaskIds.includes(task.id);
+    
+    return (
+      <TableRow
+        key={task.id}
+        className={cn("hover:bg-muted/50 cursor-pointer", isSelected && "bg-primary/5")}
+        onClick={() => navigate(`/task/${task.id}`)}
+      >
+        {onSelectionChange && (
+          <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(checked) => handleSelectTask(task.id, checked as boolean)}
+            />
+          </TableCell>
+        )}
+        <TableCell className="max-w-md">
+          <div className="flex flex-col gap-1">
+            <span className="font-medium truncate">{task.title}</span>
+            {task.list && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span>
+                  {task.list.space?.name}
+                  {task.list.folder && ` > ${task.list.folder.name}`}
+                  {` > ${task.list.name}`}
+                </span>
+              </div>
+            )}
+          </div>
       </TableCell>
       <TableCell>
         {task.status && (
@@ -288,13 +320,22 @@ export function EverythingTableView({ tasks, groupBy }: EverythingTableViewProps
         </DropdownMenu>
       </TableCell>
     </TableRow>
-  );
+    );
+  };
 
   if (groupBy === 'none') {
     return (
       <Table>
         <TableHeader>
           <TableRow>
+            {onSelectionChange && (
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={tasks.length > 0 && selectedTaskIds.length === tasks.length}
+                  onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                />
+              </TableHead>
+            )}
             <TableHead className="w-[40%]">Tarefa</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Responsável</TableHead>

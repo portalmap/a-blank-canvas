@@ -302,6 +302,7 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
     const isExpanded = expandedTasks.has(task.id);
     const subtasks = tasks.filter(t => t.parent_id === task.id);
     const hasSubtasks = subtasks.length > 0;
+    const isSelected = selectedTaskIds.includes(task.id);
 
     return (
       <>
@@ -309,10 +310,19 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
           key={task.id} 
           className={cn(
             "cursor-pointer hover:bg-muted/50",
-            isSubtask && "bg-muted/20"
+            isSubtask && "bg-muted/20",
+            isSelected && "bg-primary/5"
           )}
           onClick={() => navigate(`/task/${task.id}`)}
         >
+          {onSelectionChange && (
+            <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={(checked) => handleSelectTask(task.id, checked as boolean)}
+              />
+            </TableCell>
+          )}
           <TableCell className={cn("font-medium", isSubtask && "pl-10")}>
             <div className="flex items-center">
               {!isSubtask && hasSubtasks && (
@@ -413,6 +423,7 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
       <Table>
         <TableHeader>
           <TableRow>
+            {onSelectionChange && <TableHead className="w-10"></TableHead>}
             <TableHead>Tarefa</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Prioridade</TableHead>
@@ -550,6 +561,14 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
         <Table>
           <TableHeader>
             <TableRow>
+              {onSelectionChange && (
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={mainTasks.length > 0 && selectedTaskIds.length === mainTasks.length}
+                    onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                  />
+                </TableHead>
+              )}
               <TableHead>Tarefa</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Prioridade</TableHead>
@@ -562,7 +581,7 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
           <TableBody>
             {mainTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={onSelectionChange ? 8 : 7} className="text-center text-muted-foreground py-8">
                   Nenhuma tarefa encontrada
                 </TableCell>
               </TableRow>
