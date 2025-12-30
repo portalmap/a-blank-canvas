@@ -12,7 +12,8 @@ import { GroupBySelector, GroupByOption } from '@/components/everything/GroupByS
 import { AssigneeFilterPanel } from '@/components/everything/AssigneeFilterPanel';
 import { ColumnSelector } from '@/components/tasks/ColumnSelector';
 import { BulkActionsBar } from '@/components/tasks/BulkActionsBar';
-import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId } from '@/hooks/useColumnPreferences';
+import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId, SortConfig } from '@/hooks/useColumnPreferences';
+import { useTaskSorting } from '@/hooks/useTaskSorting';
 
 export default function EverythingView() {
   const { activeWorkspace } = useWorkspace();
@@ -31,6 +32,7 @@ export default function EverythingView() {
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [showAssigneePanel, setShowAssigneePanel] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   // Column preferences
   const { data: columnPrefs } = useColumnPreferences(null, 'everything');
@@ -107,6 +109,20 @@ export default function EverythingView() {
       return true;
     });
   }, [tasks, searchQuery, filters, selectedAssignees, includeUnassigned]);
+
+  // Apply sorting
+  const sortedTasks = useTaskSorting(filteredTasks, sortConfig);
+
+  const handleSortChange = (column: ColumnId) => {
+    setSortConfig((prev) => {
+      if (prev?.column === column) {
+        return prev.direction === 'asc'
+          ? { column, direction: 'desc' }
+          : null;
+      }
+      return { column, direction: 'asc' };
+    });
+  };
 
   const toggleAssignee = (assigneeId: string) => {
     setSelectedAssignees((prev) =>
@@ -205,10 +221,12 @@ export default function EverythingView() {
             </div>
           ) : (
             <EverythingTableView 
-              tasks={filteredTasks} 
+              tasks={sortedTasks} 
               groupBy={groupBy}
               selectedTaskIds={selectedTaskIds}
               onSelectionChange={setSelectedTaskIds}
+              sortConfig={sortConfig}
+              onSortChange={handleSortChange}
             />
           )}
         </div>

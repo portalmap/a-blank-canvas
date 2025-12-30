@@ -27,7 +27,8 @@ import { AssigneeFilterPanel } from '@/components/everything/AssigneeFilterPanel
 import { Badge } from '@/components/ui/badge';
 import { ColumnSelector } from '@/components/tasks/ColumnSelector';
 import { BulkActionsBar } from '@/components/tasks/BulkActionsBar';
-import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId } from '@/hooks/useColumnPreferences';
+import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId, SortConfig } from '@/hooks/useColumnPreferences';
+import { useTaskSorting } from '@/hooks/useTaskSorting';
 
 const ListDetailView = () => {
   const { listId } = useParams<{ listId: string }>();
@@ -57,6 +58,7 @@ const ListDetailView = () => {
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [showAssigneePanel, setShowAssigneePanel] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   // Column preferences
   const { data: columnPrefs } = useColumnPreferences(listId || null, 'list');
@@ -180,6 +182,20 @@ const ListDetailView = () => {
 
   const activeAssigneeFilterCount = selectedAssignees.length + (includeUnassigned ? 1 : 0);
 
+  // Apply sorting
+  const sortedTasks = useTaskSorting(filteredTasks, sortConfig);
+
+  const handleSortChange = (column: ColumnId) => {
+    setSortConfig((prev) => {
+      if (prev?.column === column) {
+        return prev.direction === 'asc'
+          ? { column, direction: 'desc' }
+          : null;
+      }
+      return { column, direction: 'asc' };
+    });
+  };
+
   const handleCreateTask = async () => {
     if (!activeWorkspace || !listId || !newTaskTitle.trim() || !defaultStatus) return;
 
@@ -208,8 +224,8 @@ const ListDetailView = () => {
 
   const viewMode = (currentList.default_view || 'list') as 'list' | 'kanban' | 'sprint';
 
-  // Convert filtered tasks to the format expected by views
-  const tasksForViews = filteredTasks.map((task) => ({
+  // Convert sorted tasks to the format expected by views
+  const tasksForViews = sortedTasks.map((task) => ({
     id: task.id,
     title: task.title,
     description: task.description,
@@ -355,9 +371,11 @@ const ListDetailView = () => {
                 workspaceId={activeWorkspace.id} 
                 listId={listId!}
                 groupBy={groupBy}
-                tasksWithAssignees={filteredTasks}
+                tasksWithAssignees={sortedTasks}
                 selectedTaskIds={selectedTaskIds}
                 onSelectionChange={setSelectedTaskIds}
+                sortConfig={sortConfig}
+                onSortChange={handleSortChange}
               />
             )}
           </TabsContent>

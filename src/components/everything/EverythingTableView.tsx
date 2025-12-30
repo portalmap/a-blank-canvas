@@ -29,6 +29,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { AllTask } from '@/hooks/useAllTasks';
 import type { GroupByOption } from './GroupBySelector';
+import type { SortConfig, ColumnId } from '@/hooks/useColumnPreferences';
+import { SortableTableHead } from '@/components/tasks/SortableTableHead';
 
 type TaskWithAssignees = AllTask & { 
   assignees: Array<{ id: string; full_name: string | null; avatar_url: string | null }> 
@@ -39,6 +41,8 @@ interface EverythingTableViewProps {
   groupBy: GroupByOption;
   selectedTaskIds?: string[];
   onSelectionChange?: (taskIds: string[]) => void;
+  sortConfig?: SortConfig | null;
+  onSortChange?: (column: ColumnId) => void;
 }
 
 const priorityConfig = {
@@ -142,7 +146,7 @@ function groupTasksByPriority(tasks: TaskWithAssignees[]) {
   });
 }
 
-export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSelectionChange }: EverythingTableViewProps) {
+export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSelectionChange, sortConfig = null, onSortChange }: EverythingTableViewProps) {
   const navigate = useNavigate();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -336,11 +340,23 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
                 />
               </TableHead>
             )}
-            <TableHead className="w-[40%]">Tarefa</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Responsável</TableHead>
-            <TableHead>Vencimento</TableHead>
-            <TableHead>Prioridade</TableHead>
+            {onSortChange ? (
+              <>
+                <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig} onSort={onSortChange} className="w-[40%]" />
+                <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig} onSort={onSortChange} />
+                <SortableTableHead columnId="assignee" label="Responsável" sortConfig={sortConfig} onSort={onSortChange} />
+                <SortableTableHead columnId="due_date" label="Vencimento" sortConfig={sortConfig} onSort={onSortChange} />
+                <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig} onSort={onSortChange} />
+              </>
+            ) : (
+              <>
+                <TableHead className="w-[40%]">Tarefa</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Responsável</TableHead>
+                <TableHead>Vencimento</TableHead>
+                <TableHead>Prioridade</TableHead>
+              </>
+            )}
             <TableHead className="w-10"></TableHead>
           </TableRow>
         </TableHeader>

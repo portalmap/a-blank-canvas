@@ -15,11 +15,19 @@ export type ColumnId =
   | "subtasks"
   | "actions";
 
+export type SortDirection = 'asc' | 'desc';
+
+export interface SortConfig {
+  column: ColumnId;
+  direction: SortDirection;
+}
+
 export interface ColumnDefinition {
   id: ColumnId;
   label: string;
   canHide: boolean;
   defaultVisible: boolean;
+  sortable?: boolean;
 }
 
 export const AVAILABLE_COLUMNS: ColumnDefinition[] = [
