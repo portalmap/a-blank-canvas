@@ -10,7 +10,11 @@ import {
   Plus, 
   GripVertical, 
   Trash2, 
-  Check 
+  Check,
+  Ban,
+  Circle,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   useStatusTemplate, 
@@ -25,7 +29,7 @@ interface StatusTemplateEditorProps {
   onClose: () => void;
 }
 
-type StatusCategory = 'not_started' | 'active' | 'done';
+type StatusCategory = 'not_started' | 'active' | 'in_progress' | 'done';
 
 interface StatusItemForm {
   id?: string;
@@ -41,11 +45,14 @@ const PRESET_COLORS = [
   '#a78bfa', '#f472b6',
 ];
 
-const CATEGORY_LABELS: Record<StatusCategory, string> = {
-  not_started: 'Não Iniciado',
-  active: 'Em Andamento',
-  done: 'Concluído',
+const CATEGORY_CONFIG: Record<StatusCategory, { label: string; icon: React.ElementType; color: string }> = {
+  not_started: { label: 'Inativa', icon: Ban, color: 'text-muted-foreground' },
+  active: { label: 'Ativa', icon: Circle, color: 'text-blue-500' },
+  in_progress: { label: 'Executando', icon: Loader2, color: 'text-yellow-500' },
+  done: { label: 'Finalizada', icon: CheckCircle2, color: 'text-green-500' },
 };
+
+const CATEGORY_ORDER: StatusCategory[] = ['not_started', 'active', 'in_progress', 'done'];
 
 export function StatusTemplateEditor({ workspaceId, templateId, onClose }: StatusTemplateEditorProps) {
   const [name, setName] = useState('');
@@ -75,7 +82,8 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
       // Default items for new template
       setItems([
         { name: 'A Fazer', color: '#94a3b8', is_default: true, category: 'not_started' },
-        { name: 'Em Progresso', color: '#3b82f6', is_default: false, category: 'active' },
+        { name: 'Aberto', color: '#60a5fa', is_default: false, category: 'active' },
+        { name: 'Em Progresso', color: '#fbbf24', is_default: false, category: 'in_progress' },
         { name: 'Concluído', color: '#22c55e', is_default: false, category: 'done' },
       ]);
     }
@@ -174,78 +182,86 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
         </CardContent>
       </Card>
 
-      {(['not_started', 'active', 'done'] as StatusCategory[]).map((category) => (
-        <Card key={category}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{CATEGORY_LABELS[category]}</CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => addItem(category)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Adicionar
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {getItemsByCategory(category).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Nenhum status nesta categoria
-              </p>
-            ) : (
-              getItemsByCategory(category).map((item) => (
-                <div
-                  key={item.originalIndex}
-                  className="flex items-center gap-3 p-2 rounded-lg border bg-background"
-                >
-                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                  
-                  <div className="flex gap-1">
-                    {PRESET_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        className={`w-5 h-5 rounded-full transition-transform ${
-                          item.color === color ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''
-                        }`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => updateItem(item.originalIndex, { color })}
-                      />
-                    ))}
-                  </div>
-
-                  <Input
-                    value={item.name}
-                    onChange={(e) => updateItem(item.originalIndex, { name: e.target.value })}
-                    placeholder="Nome do status"
-                    className="flex-1"
-                  />
-
-                  <Button
-                    variant={item.is_default ? 'default' : 'outline'}
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => updateItem(item.originalIndex, { is_default: !item.is_default })}
-                  >
-                    {item.is_default && <Check className="h-3 w-3 mr-1" />}
-                    Padrão
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeItem(item.originalIndex)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+      {CATEGORY_ORDER.map((category) => {
+        const config = CATEGORY_CONFIG[category];
+        const Icon = config.icon;
+        
+        return (
+          <Card key={category}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon className={`h-4 w-4 ${config.color}`} />
+                  <CardTitle className="text-base">{config.label}</CardTitle>
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      ))}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => addItem(category)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {getItemsByCategory(category).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum status nesta categoria
+                </p>
+              ) : (
+                getItemsByCategory(category).map((item) => (
+                  <div
+                    key={item.originalIndex}
+                    className="flex items-center gap-3 p-2 rounded-lg border bg-background"
+                  >
+                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                    
+                    <div className="flex gap-1">
+                      {PRESET_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          className={`w-5 h-5 rounded-full transition-transform ${
+                            item.color === color ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''
+                          }`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => updateItem(item.originalIndex, { color })}
+                        />
+                      ))}
+                    </div>
+
+                    <Input
+                      value={item.name}
+                      onChange={(e) => updateItem(item.originalIndex, { name: e.target.value })}
+                      placeholder="Nome do status"
+                      className="flex-1"
+                    />
+
+                    <Button
+                      variant={item.is_default ? 'default' : 'outline'}
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => updateItem(item.originalIndex, { is_default: !item.is_default })}
+                    >
+                      {item.is_default && <Check className="h-3 w-3 mr-1" />}
+                      Padrão
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeItem(item.originalIndex)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onClose}>
