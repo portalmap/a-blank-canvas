@@ -131,9 +131,9 @@ interface CreateSpaceTemplateInput {
   name: string;
   description?: string;
   color?: string;
-  folders?: Omit<SpaceTemplateFolder, 'id' | 'template_id'>[];
-  lists?: (Omit<SpaceTemplateList, 'id' | 'template_id'> & { folderRefIndex?: number })[];
-  tasks?: (Omit<SpaceTemplateTask, 'id' | 'template_id' | 'list_ref_id'> & { listRefIndex: number })[];
+  folders?: { name: string; description: string | null; order_index: number }[];
+  lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number }[];
+  tasks?: { listRefIndex: number; title: string; description: string | null; priority: string; order_index: number }[];
 }
 
 export const useCreateSpaceTemplate = () => {
@@ -318,7 +318,7 @@ export const useUpdateSpaceTemplate = () => {
             .insert(
               tasks.map((t) => ({
                 template_id: id,
-                list_ref_id: 'listRefIndex' in t ? listIdMap[t.listRefIndex] : t.list_ref_id,
+                list_ref_id: listIdMap[t.listRefIndex],
                 title: t.title,
                 description: t.description,
                 priority: t.priority,
