@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useFolders } from '@/hooks/useFolders';
 import { useList } from '@/hooks/useLists';
-import { useTasks, useCreateTask } from '@/hooks/useTasks';
+import { useTasksWithAssignees, TaskWithAssignees } from '@/hooks/useTasksWithAssignees';
+import { useCreateTask } from '@/hooks/useTasks';
 import { useStatuses, useDefaultStatus } from '@/hooks/useStatuses';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,12 +15,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Plus, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, AlertCircle, Search, User } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskListView } from '@/components/views/TaskListView';
 import { TaskKanbanView } from '@/components/views/TaskKanbanView';
 import { TaskSprintView } from '@/components/views/TaskSprintView';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
+import { GroupBySelector, GroupByOption } from '@/components/everything/GroupBySelector';
+import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
+import { AssigneeFilterPanel } from '@/components/everything/AssigneeFilterPanel';
+import { Badge } from '@/components/ui/badge';
 
 const ListDetailView = () => {
   const { listId } = useParams<{ listId: string }>();
@@ -27,7 +32,7 @@ const ListDetailView = () => {
   const navigate = useNavigate();
 
   const { data: currentList, isLoading: listLoading } = useList(listId);
-  const { data: tasks, isLoading: tasksLoading } = useTasks(listId);
+  const { data: tasksWithAssignees, isLoading: tasksLoading } = useTasksWithAssignees(listId);
   const { data: statuses } = useStatuses(activeWorkspace?.id);
   const { data: defaultStatus } = useDefaultStatus(activeWorkspace?.id);
   const createTask = useCreateTask();
@@ -37,12 +42,126 @@ const ListDetailView = () => {
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
 
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [groupBy, setGroupBy] = useState<GroupByOption>('none');
+  const [filters, setFilters] = useState<FilterState>({
+    statuses: [],
+    priorities: [],
+    showCompleted: true,
+  });
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [includeUnassigned, setIncludeUnassigned] = useState(false);
+  const [showAssigneePanel, setShowAssigneePanel] = useState(false);
   
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: folders } = useFolders(currentList?.space_id);
   
   const currentSpace = spaces?.find(s => s.id === currentList?.space_id);
   const currentFolder = folders?.find(f => f.id === currentList?.folder_id);
+
+  // Calculate assignee statistics
+  const assigneeStats = useMemo(() => {
+    if (!tasksWithAssignees) return { assignees: [], unassignedCount: 0 };
+
+    const assigneeMap = new Map<string, { id: string; full_name: string | null; avatar_url: string | null; taskCount: number }>();
+    let unassignedCount = 0;
+
+    tasksWithAssignees.forEach((task) => {
+      if (task.assignees.length === 0) {
+        unassignedCount++;
+      } else {
+        task.assignees.forEach((assignee) => {
+          const existing = assigneeMap.get(assignee.id);
+          if (existing) {
+            existing.taskCount++;
+          } else {
+            assigneeMap.set(assignee.id, {
+              id: assignee.id,
+              full_name: assignee.full_name,
+              avatar_url: assignee.avatar_url,
+              taskCount: 1,
+            });
+          }
+        });
+      }
+    });
+
+    return {
+      assignees: Array.from(assigneeMap.values()),
+      unassignedCount,
+    };
+  }, [tasksWithAssignees]);
+
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    if (!tasksWithAssignees) return [];
+
+    return tasksWithAssignees.filter((task) => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesTitle = task.title.toLowerCase().includes(query);
+        const matchesDescription = task.description?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesDescription) return false;
+      }
+
+      // Status filter
+      if (filters.statuses.length > 0 && !filters.statuses.includes(task.status_id)) {
+        return false;
+      }
+
+      // Priority filter
+      if (filters.priorities.length > 0 && !filters.priorities.includes(task.priority)) {
+        return false;
+      }
+
+      // Completed filter
+      if (!filters.showCompleted && task.completed_at) {
+        return false;
+      }
+
+      // Assignee filter
+      if (selectedAssignees.length > 0 || includeUnassigned) {
+        const hasSelectedAssignee = task.assignees.some((a) => selectedAssignees.includes(a.id));
+        const isUnassigned = task.assignees.length === 0;
+
+        if (includeUnassigned && selectedAssignees.length > 0) {
+          if (!hasSelectedAssignee && !isUnassigned) return false;
+        } else if (includeUnassigned) {
+          if (!isUnassigned) return false;
+        } else if (selectedAssignees.length > 0) {
+          if (!hasSelectedAssignee) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [tasksWithAssignees, searchQuery, filters, selectedAssignees, includeUnassigned]);
+
+  // Available statuses for filter
+  const availableStatuses = useMemo(() => {
+    if (!statuses) return [];
+    return statuses.map((s) => ({
+      id: s.id,
+      name: s.name,
+      color: s.color,
+    }));
+  }, [statuses]);
+
+  const handleToggleAssignee = (assigneeId: string) => {
+    setSelectedAssignees((prev) =>
+      prev.includes(assigneeId)
+        ? prev.filter((id) => id !== assigneeId)
+        : [...prev, assigneeId]
+    );
+  };
+
+  const handleToggleUnassigned = () => {
+    setIncludeUnassigned((prev) => !prev);
+  };
+
+  const activeAssigneeFilterCount = selectedAssignees.length + (includeUnassigned ? 1 : 0);
 
   const handleCreateTask = async () => {
     if (!activeWorkspace || !listId || !newTaskTitle.trim() || !defaultStatus) return;
@@ -72,163 +191,240 @@ const ListDetailView = () => {
 
   const viewMode = (currentList.default_view || 'list') as 'list' | 'kanban' | 'sprint';
 
+  // Convert filtered tasks to the format expected by views
+  const tasksForViews = filteredTasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    priority: task.priority,
+    due_date: task.due_date,
+    start_date: task.start_date,
+    completed_at: task.completed_at,
+    created_at: task.created_at,
+    updated_at: task.updated_at,
+    list_id: task.list_id,
+    workspace_id: task.workspace_id,
+    parent_id: task.parent_id,
+    status_id: task.status_id,
+    status: task.status,
+    assignee_id: task.assignees[0]?.id || null,
+    assignee: task.assignees[0] || null,
+  }));
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink onClick={() => navigate('/')}>
-              {activeWorkspace.name}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink onClick={() => navigate(`/space/${currentSpace.id}`)}>
-              {currentSpace.name}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          {currentFolder && (
-            <>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink onClick={() => navigate(`/folder/${currentFolder.id}`)}>
-                  {currentFolder.name}
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-            </>
-          )}
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{currentList.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="flex h-full">
+      <div className="flex-1 container mx-auto p-6 space-y-6 overflow-auto">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink onClick={() => navigate('/')}>
+                {activeWorkspace.name}
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink onClick={() => navigate(`/space/${currentSpace.id}`)}>
+                {currentSpace.name}
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            {currentFolder && (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink onClick={() => navigate(`/folder/${currentFolder.id}`)}>
+                    {currentFolder.name}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+              </>
+            )}
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{currentList.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">{currentList.name}</h1>
-          {currentList.description && (
-            <p className="text-muted-foreground mt-1">{currentList.description}</p>
-          )}
+        <div className="flex justify-between items-start gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold">{currentList.name}</h1>
+            {currentList.description && (
+              <p className="text-muted-foreground mt-1">{currentList.description}</p>
+            )}
+          </div>
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Pesquisar tarefas..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <QuickAutomationButtons
-            workspaceId={activeWorkspace.id}
-            scopeType="list"
-            scopeId={listId!}
-            scopeName={currentList.name}
-          />
-          <Button onClick={() => setIsDialogOpen(true)} disabled={!defaultStatus}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Tarefa
-          </Button>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <QuickAutomationButtons
+              workspaceId={activeWorkspace.id}
+              scopeType="list"
+              scopeId={listId!}
+              scopeName={currentList.name}
+            />
+            <Button onClick={() => setIsDialogOpen(true)} disabled={!defaultStatus}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Tarefa
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {!defaultStatus && statuses !== undefined && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Status não configurados</AlertTitle>
-          <AlertDescription>
-            Este workspace não possui status configurados. Contate um administrador para criar os status padrão.
-          </AlertDescription>
-        </Alert>
-      )}
+        {!defaultStatus && statuses !== undefined && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Status não configurados</AlertTitle>
+            <AlertDescription>
+              Este workspace não possui status configurados. Contate um administrador para criar os status padrão.
+            </AlertDescription>
+          </Alert>
+        )}
 
-      <Tabs defaultValue={viewMode} className="w-full">
-        <TabsList>
-          <TabsTrigger value="list">Lista</TabsTrigger>
-          <TabsTrigger value="kanban">Kanban</TabsTrigger>
-          <TabsTrigger value="sprint">Sprint</TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue={viewMode} className="w-full">
+          <div className="flex items-center justify-between mb-4">
+            <TabsList>
+              <TabsTrigger value="list">Lista</TabsTrigger>
+              <TabsTrigger value="kanban">Kanban</TabsTrigger>
+              <TabsTrigger value="sprint">Sprint</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="list">
-          {tasksLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <TaskListView tasks={tasks || []} workspaceId={activeWorkspace.id} listId={listId!} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="kanban">
-          {tasksLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <TaskKanbanView tasks={tasks || []} statuses={statuses || []} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="sprint">
-          {tasksLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <TaskSprintView tasks={tasks || []} />
-          )}
-        </TabsContent>
-      </Tabs>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Criar Nova Tarefa</DialogTitle>
-            <DialogDescription>
-              Adicione uma nova tarefa nesta lista
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Título</Label>
-              <Input
-                id="title"
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                placeholder="Ex: Revisar documentação, Implementar feature X"
+            <div className="flex items-center gap-2">
+              <GroupBySelector value={groupBy} onChange={setGroupBy} />
+              <EverythingFilters
+                filters={filters}
+                onChange={setFilters}
+                availableStatuses={availableStatuses}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição (opcional)</Label>
-              <Textarea
-                id="description"
-                value={newTaskDescription}
-                onChange={(e) => setNewTaskDescription(e.target.value)}
-                placeholder="Descreva os detalhes da tarefa"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="priority">Prioridade</Label>
-              <Select value={newTaskPriority} onValueChange={(value: any) => setNewTaskPriority(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Baixa</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="urgent">Urgente</SelectItem>
-                </SelectContent>
-              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 border-dashed"
+                onClick={() => setShowAssigneePanel(!showAssigneePanel)}
+              >
+                <User className="h-3.5 w-3.5" />
+                <span>Responsável</span>
+                {activeAssigneeFilterCount > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                    {activeAssigneeFilterCount}
+                  </Badge>
+                )}
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleCreateTask} 
-              disabled={!newTaskTitle.trim() || createTask.isPending || !defaultStatus}
-            >
-              {createTask.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Criar Tarefa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+          <TabsContent value="list">
+            {tasksLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <TaskListView 
+                tasks={tasksForViews} 
+                workspaceId={activeWorkspace.id} 
+                listId={listId!}
+                groupBy={groupBy}
+                tasksWithAssignees={filteredTasks}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="kanban">
+            {tasksLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <TaskKanbanView tasks={tasksForViews} statuses={statuses || []} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="sprint">
+            {tasksLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <TaskSprintView tasks={tasksForViews} />
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Criar Nova Tarefa</DialogTitle>
+              <DialogDescription>
+                Adicione uma nova tarefa nesta lista
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Título</Label>
+                <Input
+                  id="title"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="Ex: Revisar documentação, Implementar feature X"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Descrição (opcional)</Label>
+                <Textarea
+                  id="description"
+                  value={newTaskDescription}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
+                  placeholder="Descreva os detalhes da tarefa"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="priority">Prioridade</Label>
+                <Select value={newTaskPriority} onValueChange={(value: any) => setNewTaskPriority(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Baixa</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleCreateTask} 
+                disabled={!newTaskTitle.trim() || createTask.isPending || !defaultStatus}
+              >
+                {createTask.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Criar Tarefa
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {showAssigneePanel && (
+        <AssigneeFilterPanel
+          assignees={assigneeStats.assignees}
+          selectedAssignees={selectedAssignees}
+          unassignedCount={assigneeStats.unassignedCount}
+          includeUnassigned={includeUnassigned}
+          onToggleAssignee={handleToggleAssignee}
+          onToggleUnassigned={handleToggleUnassigned}
+          onClose={() => setShowAssigneePanel(false)}
+        />
+      )}
     </div>
   );
 };
