@@ -1716,6 +1716,74 @@ export type Database = {
           },
         ]
       }
+      task_tag_relations: {
+        Row: {
+          created_at: string | null
+          id: string
+          tag_id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          tag_id: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          tag_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_tag_relations_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "task_tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_tag_relations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_tags: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_tags_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           archived_at: string | null
@@ -1881,6 +1949,47 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_column_preferences: {
+        Row: {
+          column_order: string[] | null
+          created_at: string | null
+          id: string
+          list_id: string | null
+          scope: string
+          updated_at: string | null
+          user_id: string
+          visible_columns: string[] | null
+        }
+        Insert: {
+          column_order?: string[] | null
+          created_at?: string | null
+          id?: string
+          list_id?: string | null
+          scope?: string
+          updated_at?: string | null
+          user_id: string
+          visible_columns?: string[] | null
+        }
+        Update: {
+          column_order?: string[] | null
+          created_at?: string | null
+          id?: string
+          list_id?: string | null
+          scope?: string
+          updated_at?: string | null
+          user_id?: string
+          visible_columns?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_column_preferences_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
             referencedColumns: ["id"]
           },
         ]
