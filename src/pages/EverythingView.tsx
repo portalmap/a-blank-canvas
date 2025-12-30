@@ -2,19 +2,23 @@ import { useState, useMemo } from 'react';
 import { Search, User, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAllTasksWithAssignees } from '@/hooks/useAllTasks';
-import { useStatuses } from '@/hooks/useStatuses';
+import { useStatuses, useDefaultStatus } from '@/hooks/useStatuses';
 import { EverythingTableView } from '@/components/everything/EverythingTableView';
 import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
 import { GroupBySelector, GroupByOption } from '@/components/everything/GroupBySelector';
 import { AssigneeFilterPanel } from '@/components/everything/AssigneeFilterPanel';
+import { ColumnSelector } from '@/components/tasks/ColumnSelector';
+import { BulkActionsBar } from '@/components/tasks/BulkActionsBar';
+import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId } from '@/hooks/useColumnPreferences';
 
 export default function EverythingView() {
   const { activeWorkspace } = useWorkspace();
   const { data: tasks = [], isLoading } = useAllTasksWithAssignees(activeWorkspace?.id);
   const { data: statuses = [] } = useStatuses(activeWorkspace?.id);
+  const { data: defaultStatus } = useDefaultStatus(activeWorkspace?.id);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [groupBy, setGroupBy] = useState<GroupByOption>('due_date');
@@ -26,6 +30,19 @@ export default function EverythingView() {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [showAssigneePanel, setShowAssigneePanel] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+
+  // Column preferences
+  const { data: columnPrefs } = useColumnPreferences(null, 'everything');
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(DEFAULT_COLUMN_ORDER);
+
+  useMemo(() => {
+    if (columnPrefs) {
+      setVisibleColumns(columnPrefs.visible_columns);
+      setColumnOrder(columnPrefs.column_order);
+    }
+  }, [columnPrefs]);
 
   // Calculate assignee statistics
   const assigneeStats = useMemo(() => {
@@ -154,6 +171,14 @@ export default function EverythingView() {
                 onChange={setFilters}
                 availableStatuses={availableStatuses}
               />
+              <ColumnSelector
+                listId={null}
+                scope="everything"
+                visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                onColumnsChange={setVisibleColumns}
+                onOrderChange={setColumnOrder}
+              />
               <Button
                 variant={showAssigneePanel ? 'secondary' : 'outline'}
                 size="sm"
@@ -179,7 +204,12 @@ export default function EverythingView() {
               <p className="text-muted-foreground">Carregando tarefas...</p>
             </div>
           ) : (
-            <EverythingTableView tasks={filteredTasks} groupBy={groupBy} />
+            <EverythingTableView 
+              tasks={filteredTasks} 
+              groupBy={groupBy}
+              selectedTaskIds={selectedTaskIds}
+              onSelectionChange={setSelectedTaskIds}
+            />
           )}
         </div>
       </div>
@@ -196,6 +226,13 @@ export default function EverythingView() {
           onClose={() => setShowAssigneePanel(false)}
         />
       )}
+
+      <BulkActionsBar
+        selectedTaskIds={selectedTaskIds}
+        workspaceId={activeWorkspace?.id || ''}
+        defaultStatusId={defaultStatus?.id}
+        onClearSelection={() => setSelectedTaskIds([])}
+      />
     </div>
   );
 }
