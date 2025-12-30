@@ -35,7 +35,7 @@ export function SortableTableHead({
             <ArrowDown className="h-4 w-4 text-primary" />
           )
         ) : (
-          <ArrowUpDown className="h-4 w-4 text-muted-foreground/50" />
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
         )}
       </div>
     </TableHead>

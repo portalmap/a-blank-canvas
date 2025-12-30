@@ -404,6 +404,22 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {onSelectionChange && (
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={tasksInGroup.length > 0 && tasksInGroup.every(t => selectedTaskIds.includes(t.id))}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              const newIds = [...selectedTaskIds, ...tasksInGroup.map(t => t.id).filter(id => !selectedTaskIds.includes(id))];
+                              onSelectionChange(newIds);
+                            } else {
+                              const groupIds = tasksInGroup.map(t => t.id);
+                              onSelectionChange(selectedTaskIds.filter(id => !groupIds.includes(id)));
+                            }
+                          }}
+                        />
+                      </TableHead>
+                    )}
                     {onSortChange ? (
                       <>
                         <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig || null} onSort={onSortChange} className="w-[40%]" />
