@@ -99,6 +99,17 @@ export const useCreateTaskActivity = () => {
 
 // Helpers para traduzir tipos de atividade
 export const getActivityLabel = (activity: TaskActivity): string => {
+  // Handle assignee activities
+  if (activity.activity_type === 'assignee.added') {
+    return `adicionou ${activity.new_value || 'um responsável'}`;
+  }
+  if (activity.activity_type === 'assignee.removed') {
+    return `removeu ${activity.old_value || 'um responsável'}`;
+  }
+  if (activity.activity_type === 'attachment.removed') {
+    return `removeu o anexo "${activity.old_value || 'arquivo'}"`;
+  }
+
   const type = activity.activity_type;
   const isAutomation = activity.metadata?.created_by === 'automation';
   const automationName = activity.metadata?.automation_name;
