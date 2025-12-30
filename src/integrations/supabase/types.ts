@@ -1095,6 +1095,63 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          link: string | null
+          message: string | null
+          reference_id: string | null
+          reference_type: string | null
+          title: string
+          type: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
+          type: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1533,30 +1590,53 @@ export type Database = {
       }
       task_comments: {
         Row: {
+          assignee_id: string | null
           author_id: string
           content: string
           created_at: string | null
           id: string
+          resolved_at: string | null
+          resolved_by: string | null
           task_id: string
           updated_at: string | null
         }
         Insert: {
+          assignee_id?: string | null
           author_id: string
           content: string
           created_at?: string | null
           id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           task_id: string
           updated_at?: string | null
         }
         Update: {
+          assignee_id?: string | null
           author_id?: string
           content?: string
           created_at?: string | null
           id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           task_id?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "task_comments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_comments_task_id_fkey"
             columns: ["task_id"]

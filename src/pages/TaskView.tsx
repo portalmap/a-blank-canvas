@@ -192,7 +192,11 @@ const TaskView = () => {
         {/* Activity Panel */}
         {showActivityPanel && (
           <div className="hidden lg:flex w-[35%] border-l bg-muted/30">
-            <TaskActivityPanel taskId={task.id} />
+            <TaskActivityPanel 
+              taskId={task.id} 
+              workspaceId={task.workspace_id}
+              taskTitle={task.title}
+            />
           </div>
         )}
       </div>
