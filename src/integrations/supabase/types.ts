@@ -1348,7 +1348,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string | null
-          workspace_id: string
+          workspace_id: string | null
         }
         Insert: {
           color?: string | null
@@ -1358,7 +1358,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string | null
-          workspace_id: string
+          workspace_id?: string | null
         }
         Update: {
           color?: string | null
@@ -1368,7 +1368,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
-          workspace_id?: string
+          workspace_id?: string | null
         }
         Relationships: [
           {

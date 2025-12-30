@@ -32,7 +32,7 @@ export interface SpaceTemplateTask {
 
 export interface SpaceTemplate {
   id: string;
-  workspace_id: string;
+  workspace_id: string | null;
   created_by_user_id: string;
   name: string;
   description: string | null;
@@ -44,22 +44,19 @@ export interface SpaceTemplate {
   tasks?: SpaceTemplateTask[];
 }
 
-export const useSpaceTemplates = (workspaceId?: string) => {
+// Buscar TODOS os templates (globais)
+export const useSpaceTemplates = () => {
   return useQuery({
-    queryKey: ['space-templates', workspaceId],
+    queryKey: ['space-templates'],
     queryFn: async () => {
-      if (!workspaceId) return [];
-
       const { data, error } = await supabase
         .from('space_templates')
         .select('*')
-        .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as SpaceTemplate[];
     },
-    enabled: !!workspaceId,
   });
 };
 
@@ -89,16 +86,14 @@ export const useSpaceTemplate = (templateId?: string) => {
   });
 };
 
-export const useSpaceTemplatesWithStructure = (workspaceId?: string) => {
+// Buscar TODOS os templates com contagens (globais)
+export const useSpaceTemplatesWithStructure = () => {
   return useQuery({
-    queryKey: ['space-templates-structure', workspaceId],
+    queryKey: ['space-templates-structure'],
     queryFn: async () => {
-      if (!workspaceId) return [];
-
       const { data: templates, error } = await supabase
         .from('space_templates')
         .select('*')
-        .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -122,12 +117,10 @@ export const useSpaceTemplatesWithStructure = (workspaceId?: string) => {
 
       return templatesWithCounts;
     },
-    enabled: !!workspaceId,
   });
 };
 
 interface CreateSpaceTemplateInput {
-  workspaceId: string;
   name: string;
   description?: string;
   color?: string;
@@ -141,7 +134,6 @@ export const useCreateSpaceTemplate = () => {
 
   return useMutation({
     mutationFn: async ({
-      workspaceId,
       name,
       description,
       color,
@@ -152,11 +144,10 @@ export const useCreateSpaceTemplate = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      // Create template
+      // Create template (global - sem workspace_id)
       const { data: template, error: templateError } = await supabase
         .from('space_templates')
         .insert({
-          workspace_id: workspaceId,
           created_by_user_id: user.id,
           name,
           description,
@@ -224,9 +215,9 @@ export const useCreateSpaceTemplate = () => {
 
       return template;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['space-templates', variables.workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['space-templates-structure', variables.workspaceId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['space-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['space-templates-structure'] });
       toast.success('Template criado com sucesso!');
     },
     onError: (error) => {
@@ -333,8 +324,8 @@ export const useUpdateSpaceTemplate = () => {
       return template;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['space-templates', data.workspace_id] });
-      queryClient.invalidateQueries({ queryKey: ['space-templates-structure', data.workspace_id] });
+      queryClient.invalidateQueries({ queryKey: ['space-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['space-templates-structure'] });
       queryClient.invalidateQueries({ queryKey: ['space-template', data.id] });
       toast.success('Template atualizado com sucesso!');
     },
@@ -350,22 +341,12 @@ export const useDeleteSpaceTemplate = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data: template, error: fetchError } = await supabase
-        .from('space_templates')
-        .select('workspace_id')
-        .eq('id', id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
       const { error } = await supabase.from('space_templates').delete().eq('id', id);
       if (error) throw error;
-
-      return template.workspace_id;
     },
-    onSuccess: (workspaceId) => {
-      queryClient.invalidateQueries({ queryKey: ['space-templates', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['space-templates-structure', workspaceId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['space-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['space-templates-structure'] });
       toast.success('Template excluído com sucesso!');
     },
     onError: (error) => {
@@ -395,11 +376,10 @@ export const useDuplicateSpaceTemplate = () => {
 
       const original = templateResult.data;
 
-      // Create new template
+      // Create new template (global - sem workspace_id)
       const { data: newTemplate, error: newTemplateError } = await supabase
         .from('space_templates')
         .insert({
-          workspace_id: original.workspace_id,
           created_by_user_id: user.id,
           name: `${original.name} (cópia)`,
           description: original.description,
@@ -478,9 +458,9 @@ export const useDuplicateSpaceTemplate = () => {
 
       return newTemplate;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['space-templates', data.workspace_id] });
-      queryClient.invalidateQueries({ queryKey: ['space-templates-structure', data.workspace_id] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['space-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['space-templates-structure'] });
       toast.success('Template duplicado com sucesso!');
     },
     onError: (error) => {

@@ -60,12 +60,11 @@ interface TaskItem {
 }
 
 interface SpaceTemplateEditorProps {
-  workspaceId: string;
   templateId?: string;
   onClose: () => void;
 }
 
-export const SpaceTemplateEditor = ({ workspaceId, templateId, onClose }: SpaceTemplateEditorProps) => {
+export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditorProps) => {
   const { data: template, isLoading } = useSpaceTemplate(templateId);
   const createTemplate = useCreateSpaceTemplate();
   const updateTemplate = useUpdateSpaceTemplate();
@@ -156,7 +155,6 @@ export const SpaceTemplateEditor = ({ workspaceId, templateId, onClose }: SpaceT
 
   const removeFolder = (tempId: string) => {
     setFolders(folders.filter(f => f.tempId !== tempId));
-    // Remove lists and their tasks
     const listsToRemove = lists.filter(l => l.folderTempId === tempId).map(l => l.tempId);
     setLists(lists.filter(l => l.folderTempId !== tempId));
     setTasks(tasks.filter(t => !listsToRemove.includes(t.listTempId)));
@@ -226,7 +224,6 @@ export const SpaceTemplateEditor = ({ workspaceId, templateId, onClose }: SpaceT
       });
     } else {
       await createTemplate.mutateAsync({
-        workspaceId,
         name,
         description: description || undefined,
         color,
