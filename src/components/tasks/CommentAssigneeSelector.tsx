@@ -109,7 +109,7 @@ export const CommentAssigneeSelector = ({
           Membros do Workspace ({members.length})
         </div>
 
-        <ScrollArea className="max-h-[240px]">
+        <ScrollArea className="h-[200px]">
           {isLoading ? (
             <div className="p-2 space-y-2">
               {[1, 2, 3].map((i) => (

@@ -9,8 +9,12 @@ import { useCreateTaskComment } from '@/hooks/useTaskComments';
 import { useCreateNotification } from '@/hooks/useNotifications';
 import { TaskActivityItem } from './TaskActivityItem';
 import { CommentAssigneeSelector } from './CommentAssigneeSelector';
+import { CommentAttachmentButton } from './CommentAttachmentButton';
+import { AttachmentPreview } from './AttachmentPreview';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useUploadAttachment } from '@/hooks/useTaskAttachments';
+import { toast } from 'sonner';
 
 interface TaskActivityPanelProps {
   taskId: string;
@@ -21,6 +25,7 @@ interface TaskActivityPanelProps {
 export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivityPanelProps) => {
   const [newComment, setNewComment] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<WorkspaceMember | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<{ file: File; preview?: string }[]>([]);
   
   const { activeWorkspace } = useWorkspace();
   const effectiveWorkspaceId = workspaceId || activeWorkspace?.id;
@@ -29,55 +34,103 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
   const createComment = useCreateTaskComment();
   const createActivity = useCreateTaskActivity();
   const createNotification = useCreateNotification();
+  const uploadAttachment = useUploadAttachment();
+
+  const handleFilesSelected = (files: File[]) => {
+    const newFiles = files.map(file => {
+      const isImage = file.type.startsWith('image/');
+      return {
+        file,
+        preview: isImage ? URL.createObjectURL(file) : undefined,
+      };
+    });
+    setPendingFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setPendingFiles(prev => {
+      const file = prev[index];
+      if (file.preview) {
+        URL.revokeObjectURL(file.preview);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
+  };
 
   const handleSubmitComment = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() && pendingFiles.length === 0) return;
     
     try {
-      // Criar comentário com atribuição opcional
-      const comment = await createComment.mutateAsync({
-        taskId,
-        content: newComment.trim(),
-        assigneeId: selectedAssignee?.user_id,
-      });
-      
-      // Registrar atividade apropriada
-      if (selectedAssignee) {
+      // Upload arquivos primeiro
+      for (const { file } of pendingFiles) {
+        await uploadAttachment.mutateAsync({ taskId, file });
+        
+        // Registrar atividade para cada anexo
         await createActivity.mutateAsync({
           taskId,
-          activityType: 'assignment.created',
+          activityType: 'attachment.added',
           metadata: { 
-            content: newComment.trim(),
-            assignee_id: selectedAssignee.user_id,
-            assignee_name: selectedAssignee.profile?.full_name || 'Usuário',
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
           },
         });
+      }
 
-        // Criar notificação para o usuário atribuído
-        if (effectiveWorkspaceId) {
-          await createNotification.mutateAsync({
-            userId: selectedAssignee.user_id,
-            workspaceId: effectiveWorkspaceId,
-            type: 'comment_assignment',
-            title: 'Nova atribuição',
-            message: `Você foi atribuído em um comentário${taskTitle ? ` na tarefa "${taskTitle}"` : ''}`,
-            link: `/tasks/${taskId}`,
-            referenceType: 'comment',
-            referenceId: comment.id,
+      // Se tiver comentário, criar
+      if (newComment.trim()) {
+        const comment = await createComment.mutateAsync({
+          taskId,
+          content: newComment.trim(),
+          assigneeId: selectedAssignee?.user_id,
+        });
+        
+        // Registrar atividade apropriada
+        if (selectedAssignee) {
+          await createActivity.mutateAsync({
+            taskId,
+            activityType: 'assignment.created',
+            metadata: { 
+              content: newComment.trim(),
+              assignee_id: selectedAssignee.user_id,
+              assignee_name: selectedAssignee.profile?.full_name || 'Usuário',
+            },
+          });
+
+          // Criar notificação para o usuário atribuído
+          if (effectiveWorkspaceId) {
+            await createNotification.mutateAsync({
+              userId: selectedAssignee.user_id,
+              workspaceId: effectiveWorkspaceId,
+              type: 'comment_assignment',
+              title: 'Nova atribuição',
+              message: `Você foi atribuído em um comentário${taskTitle ? ` na tarefa "${taskTitle}"` : ''}`,
+              link: `/tasks/${taskId}`,
+              referenceType: 'comment',
+              referenceId: comment.id,
+            });
+          }
+        } else {
+          await createActivity.mutateAsync({
+            taskId,
+            activityType: 'comment.created',
+            metadata: { content: newComment.trim() },
           });
         }
-      } else {
-        await createActivity.mutateAsync({
-          taskId,
-          activityType: 'comment.created',
-          metadata: { content: newComment.trim() },
-        });
       }
       
+      // Limpar estado
       setNewComment('');
       setSelectedAssignee(null);
+      pendingFiles.forEach(f => f.preview && URL.revokeObjectURL(f.preview));
+      setPendingFiles([]);
+      
+      if (pendingFiles.length > 0) {
+        toast.success(`${pendingFiles.length} anexo(s) enviado(s) com sucesso`);
+      }
     } catch (error) {
       console.error('Erro ao criar comentário:', error);
+      toast.error('Erro ao enviar. Tente novamente.');
     }
   };
 
@@ -149,6 +202,20 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
           </div>
         )}
 
+        {/* Pending Files Preview */}
+        {pendingFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 p-2 bg-muted/50 rounded-md">
+            {pendingFiles.map((item, index) => (
+              <AttachmentPreview
+                key={index}
+                attachment={item}
+                onRemove={() => handleRemoveFile(index)}
+                compact
+              />
+            ))}
+          </div>
+        )}
+
         <Textarea
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
@@ -157,30 +224,36 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
           className="min-h-[80px] resize-none"
         />
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <CommentAssigneeSelector
               workspaceId={effectiveWorkspaceId}
               selectedAssignee={selectedAssignee}
               onSelect={setSelectedAssignee}
             />
-            <span className="text-xs text-muted-foreground">
-              Ctrl+Enter para enviar
-            </span>
+            <CommentAttachmentButton
+              onFilesSelected={handleFilesSelected}
+              disabled={uploadAttachment.isPending}
+            />
           </div>
-          <Button 
-            size="sm" 
-            onClick={handleSubmitComment}
-            disabled={!newComment.trim() || createComment.isPending}
-          >
-            {createComment.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-1" />
-                {selectedAssignee ? 'Atribuir' : 'Comentar'}
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Ctrl+Enter
+            </span>
+            <Button 
+              size="sm" 
+              onClick={handleSubmitComment}
+              disabled={(!newComment.trim() && pendingFiles.length === 0) || createComment.isPending || uploadAttachment.isPending}
+            >
+              {(createComment.isPending || uploadAttachment.isPending) ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-1" />
+                  {selectedAssignee ? 'Atribuir' : pendingFiles.length > 0 ? 'Enviar' : 'Comentar'}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
