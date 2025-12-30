@@ -404,11 +404,23 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40%]">Tarefa</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Responsável</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Prioridade</TableHead>
+                    {onSortChange ? (
+                      <>
+                        <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig || null} onSort={onSortChange} className="w-[40%]" />
+                        <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig || null} onSort={onSortChange} />
+                        <SortableTableHead columnId="assignee" label="Responsável" sortConfig={sortConfig || null} onSort={onSortChange} />
+                        <SortableTableHead columnId="due_date" label="Vencimento" sortConfig={sortConfig || null} onSort={onSortChange} />
+                        <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig || null} onSort={onSortChange} />
+                      </>
+                    ) : (
+                      <>
+                        <TableHead className="w-[40%]">Tarefa</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Responsável</TableHead>
+                        <TableHead>Vencimento</TableHead>
+                        <TableHead>Prioridade</TableHead>
+                      </>
+                    )}
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>

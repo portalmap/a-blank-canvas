@@ -585,11 +585,23 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
                   />
                 </TableHead>
               )}
-              <TableHead>Tarefa</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Prioridade</TableHead>
-              <TableHead>Início</TableHead>
-              <TableHead>Entrega</TableHead>
+              {onSortChange ? (
+                <>
+                  <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig || null} onSort={onSortChange} />
+                  <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig || null} onSort={onSortChange} />
+                  <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig || null} onSort={onSortChange} />
+                  <SortableTableHead columnId="start_date" label="Início" sortConfig={sortConfig || null} onSort={onSortChange} />
+                  <SortableTableHead columnId="due_date" label="Entrega" sortConfig={sortConfig || null} onSort={onSortChange} />
+                </>
+              ) : (
+                <>
+                  <TableHead>Tarefa</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead>Início</TableHead>
+                  <TableHead>Entrega</TableHead>
+                </>
+              )}
               <TableHead>Atrasada</TableHead>
               <TableHead className="w-12">Ações</TableHead>
             </TableRow>
