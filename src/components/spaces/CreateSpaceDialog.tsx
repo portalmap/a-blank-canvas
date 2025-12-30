@@ -31,7 +31,8 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
   const [spaceDescription, setSpaceDescription] = useState('');
   const [spaceColor, setSpaceColor] = useState('#6366f1');
 
-  const { data: templates } = useSpaceTemplatesWithStructure(workspaceId);
+  // Busca TODOS os templates globais
+  const { data: templates } = useSpaceTemplatesWithStructure();
   const createSpace = useCreateSpace();
   const applyTemplate = useApplySpaceTemplate();
 
@@ -72,6 +73,7 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
     if (!spaceName.trim()) return;
 
     if (selectedTemplateId) {
+      // Aplica o template no workspace atual
       await applyTemplate.mutateAsync({
         templateId: selectedTemplateId,
         workspaceId,

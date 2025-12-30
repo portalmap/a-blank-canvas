@@ -24,13 +24,12 @@ import { Plus, MoreHorizontal, Pencil, Copy, Trash2, FolderTree, Loader2 } from 
 import { useState } from 'react';
 
 interface SpaceTemplateListProps {
-  workspaceId: string;
   onEdit: (templateId: string) => void;
   onCreate: () => void;
 }
 
-export const SpaceTemplateList = ({ workspaceId, onEdit, onCreate }: SpaceTemplateListProps) => {
-  const { data: templates, isLoading } = useSpaceTemplatesWithStructure(workspaceId);
+export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) => {
+  const { data: templates, isLoading } = useSpaceTemplatesWithStructure();
   const deleteTemplate = useDeleteSpaceTemplate();
   const duplicateTemplate = useDuplicateSpaceTemplate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
