@@ -51,25 +51,13 @@ export const useAddTaskAssignee = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      taskId, 
-      userId, 
-      sourceType = 'manual',
-      sourceId 
-    }: { 
-      taskId: string; 
-      userId: string;
-      sourceType?: string;
-      sourceId?: string;
-    }) => {
+    mutationFn: async ({ taskId, userId }: { taskId: string; userId: string }) => {
       const { data, error } = await supabase
         .from('task_assignees')
         .insert({
           task_id: taskId,
           user_id: userId,
-          source_type: sourceType,
-          source_id: sourceId,
-        } as any)
+        })
         .select()
         .single();
 
