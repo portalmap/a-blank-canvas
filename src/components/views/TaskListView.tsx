@@ -26,6 +26,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format, isToday, isTomorrow, isPast, isThisWeek, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal, FolderInput, Archive, Trash2, User } from 'lucide-react';
@@ -65,6 +66,8 @@ interface TaskListViewProps {
   listId: string;
   groupBy?: GroupByOption;
   tasksWithAssignees?: TaskWithAssignees[];
+  selectedTaskIds?: string[];
+  onSelectionChange?: (taskIds: string[]) => void;
 }
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
@@ -227,7 +230,7 @@ const getInitials = (name: string | null) => {
     .slice(0, 2);
 };
 
-export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tasksWithAssignees }: TaskListViewProps) => {
+export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tasksWithAssignees, selectedTaskIds = [], onSelectionChange }: TaskListViewProps) => {
   const navigate = useNavigate();
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [moveTaskId, setMoveTaskId] = useState<string | null>(null);
@@ -236,6 +239,24 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
 
   const deleteTask = useDeleteTask();
   const archiveTask = useArchiveTask();
+
+  const handleSelectTask = (taskId: string, checked: boolean) => {
+    if (!onSelectionChange) return;
+    if (checked) {
+      onSelectionChange([...selectedTaskIds, taskId]);
+    } else {
+      onSelectionChange(selectedTaskIds.filter(id => id !== taskId));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (!onSelectionChange) return;
+    if (checked) {
+      onSelectionChange(tasks.filter(t => !t.parent_id).map(t => t.id));
+    } else {
+      onSelectionChange([]);
+    }
+  };
 
   const isOverdue = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
