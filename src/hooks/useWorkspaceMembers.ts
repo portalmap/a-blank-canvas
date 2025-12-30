@@ -20,24 +20,29 @@ export const useWorkspaceMembers = (workspaceId?: string) => {
     queryFn: async () => {
       if (!workspaceId) return [];
 
-      const { data, error } = await supabase
+      // Buscar membros do workspace
+      const { data: members, error: membersError } = await supabase
         .from('workspace_members')
-        .select(`
-          id,
-          user_id,
-          workspace_id,
-          role,
-          created_at,
-          profile:profiles!workspace_members_user_id_fkey (
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('id, user_id, workspace_id, role, created_at')
         .eq('workspace_id', workspaceId);
 
-      if (error) throw error;
-      return (data || []) as unknown as WorkspaceMember[];
+      if (membersError) throw membersError;
+      if (!members || members.length === 0) return [];
+
+      // Buscar profiles dos membros
+      const userIds = members.map(m => m.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combinar os dados
+      return members.map(member => ({
+        ...member,
+        profile: profiles?.find(p => p.id === member.user_id) || null,
+      })) as WorkspaceMember[];
     },
     enabled: !!workspaceId,
   });
