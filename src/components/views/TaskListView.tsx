@@ -20,13 +20,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { format } from 'date-fns';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { format, isToday, isTomorrow, isPast, isThisWeek, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal, FolderInput, Archive, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal, FolderInput, Archive, Trash2, User } from 'lucide-react';
 import { TaskMoveDialog } from '@/components/tasks/TaskMoveDialog';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { useDeleteTask, useArchiveTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
+import { GroupByOption } from '@/components/everything/GroupBySelector';
+import { TaskWithAssignees } from '@/hooks/useTasksWithAssignees';
 
 interface Task {
   id: string;
@@ -55,7 +63,16 @@ interface TaskListViewProps {
   tasks: Task[];
   workspaceId: string;
   listId: string;
+  groupBy?: GroupByOption;
+  tasksWithAssignees?: TaskWithAssignees[];
 }
+
+const priorityConfig: Record<string, { label: string; color: string }> = {
+  urgent: { label: 'Urgente', color: 'bg-red-500' },
+  high: { label: 'Alta', color: 'bg-orange-500' },
+  medium: { label: 'Média', color: 'bg-yellow-500' },
+  low: { label: 'Baixa', color: 'bg-blue-500' },
+};
 
 const SubtaskCount = ({ parentId }: { parentId: string }) => {
   const { data: subtasks } = useSubtasks(parentId);
@@ -72,11 +89,150 @@ const SubtaskCount = ({ parentId }: { parentId: string }) => {
   );
 };
 
-export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) => {
+// Group tasks by due date
+function groupTasksByDueDate(tasks: TaskWithAssignees[]) {
+  const groups: Record<string, TaskWithAssignees[]> = {
+    overdue: [],
+    today: [],
+    tomorrow: [],
+    thisWeek: [],
+    later: [],
+    noDueDate: [],
+  };
+
+  const today = startOfDay(new Date());
+
+  tasks.forEach((task) => {
+    if (!task.due_date) {
+      groups.noDueDate.push(task);
+    } else {
+      const dueDate = new Date(task.due_date);
+      if (isPast(dueDate) && !isToday(dueDate) && !task.completed_at) {
+        groups.overdue.push(task);
+      } else if (isToday(dueDate)) {
+        groups.today.push(task);
+      } else if (isTomorrow(dueDate)) {
+        groups.tomorrow.push(task);
+      } else if (isThisWeek(dueDate, { weekStartsOn: 1 }) || dueDate <= addDays(today, 7)) {
+        groups.thisWeek.push(task);
+      } else {
+        groups.later.push(task);
+      }
+    }
+  });
+
+  return [
+    { key: 'overdue', label: 'Atrasadas', tasks: groups.overdue },
+    { key: 'today', label: 'Hoje', tasks: groups.today },
+    { key: 'tomorrow', label: 'Amanhã', tasks: groups.tomorrow },
+    { key: 'thisWeek', label: 'Esta Semana', tasks: groups.thisWeek },
+    { key: 'later', label: 'Mais Tarde', tasks: groups.later },
+    { key: 'noDueDate', label: 'Sem Data', tasks: groups.noDueDate },
+  ].filter((g) => g.tasks.length > 0);
+}
+
+// Group tasks by status
+function groupTasksByStatus(tasks: TaskWithAssignees[]) {
+  const groups = new Map<string, { label: string; color: string | null; tasks: TaskWithAssignees[] }>();
+
+  tasks.forEach((task) => {
+    const statusId = task.status?.id || 'no-status';
+    const statusName = task.status?.name || 'Sem Status';
+    const statusColor = task.status?.color || null;
+
+    if (!groups.has(statusId)) {
+      groups.set(statusId, { label: statusName, color: statusColor, tasks: [] });
+    }
+    groups.get(statusId)!.tasks.push(task);
+  });
+
+  return Array.from(groups.entries()).map(([key, value]) => ({
+    key,
+    label: value.label,
+    color: value.color,
+    tasks: value.tasks,
+  }));
+}
+
+// Group tasks by assignee
+function groupTasksByAssignee(tasks: TaskWithAssignees[]) {
+  const groups = new Map<string, { label: string; avatarUrl: string | null; tasks: TaskWithAssignees[] }>();
+
+  // Add unassigned group
+  groups.set('unassigned', { label: 'Não Atribuído', avatarUrl: null, tasks: [] });
+
+  tasks.forEach((task) => {
+    if (task.assignees.length === 0) {
+      groups.get('unassigned')!.tasks.push(task);
+    } else {
+      task.assignees.forEach((assignee) => {
+        if (!groups.has(assignee.id)) {
+          groups.set(assignee.id, {
+            label: assignee.full_name || 'Sem nome',
+            avatarUrl: assignee.avatar_url,
+            tasks: [],
+          });
+        }
+        // Avoid duplicate tasks for same assignee
+        if (!groups.get(assignee.id)!.tasks.find((t) => t.id === task.id)) {
+          groups.get(assignee.id)!.tasks.push(task);
+        }
+      });
+    }
+  });
+
+  return Array.from(groups.entries())
+    .map(([key, value]) => ({
+      key,
+      label: value.label,
+      avatarUrl: value.avatarUrl,
+      tasks: value.tasks,
+    }))
+    .filter((g) => g.tasks.length > 0);
+}
+
+// Group tasks by priority
+function groupTasksByPriority(tasks: TaskWithAssignees[]) {
+  const priorityOrder = ['urgent', 'high', 'medium', 'low'];
+  const groups = new Map<string, TaskWithAssignees[]>();
+
+  priorityOrder.forEach((p) => groups.set(p, []));
+
+  tasks.forEach((task) => {
+    const priority = task.priority || 'medium';
+    if (groups.has(priority)) {
+      groups.get(priority)!.push(task);
+    } else {
+      groups.get('medium')!.push(task);
+    }
+  });
+
+  return priorityOrder
+    .map((p) => ({
+      key: p,
+      label: priorityConfig[p]?.label || p,
+      color: priorityConfig[p]?.color || 'bg-gray-500',
+      tasks: groups.get(p) || [],
+    }))
+    .filter((g) => g.tasks.length > 0);
+}
+
+const getInitials = (name: string | null) => {
+  if (!name) return 'U';
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tasksWithAssignees }: TaskListViewProps) => {
   const navigate = useNavigate();
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [moveTaskId, setMoveTaskId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const deleteTask = useDeleteTask();
   const archiveTask = useArchiveTask();
@@ -94,6 +250,18 @@ export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) 
         newSet.delete(taskId);
       } else {
         newSet.add(taskId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    setCollapsedGroups((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupKey)) {
+        newSet.delete(groupKey);
+      } else {
+        newSet.add(groupKey);
       }
       return newSet;
     });
@@ -196,6 +364,165 @@ export const TaskListView = ({ tasks, workspaceId, listId }: TaskListViewProps) 
     );
   };
 
+  // Convert TaskWithAssignees to Task format for rendering
+  const convertToTask = (t: TaskWithAssignees): Task => ({
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    status_id: t.status_id,
+    priority: t.priority,
+    assignee_id: t.assignees[0]?.id || null,
+    start_date: t.start_date,
+    due_date: t.due_date,
+    list_id: t.list_id,
+    workspace_id: t.workspace_id,
+    parent_id: t.parent_id,
+    completed_at: t.completed_at,
+    status: t.status ? { name: t.status.name, color: t.status.color } : undefined,
+    assignee: t.assignees[0] || undefined,
+  });
+
+  const renderGroupedTable = (groupTasks: TaskWithAssignees[]) => {
+    const convertedTasks = groupTasks.map(convertToTask);
+    const filteredTasks = convertedTasks.filter(t => !t.parent_id);
+
+    if (filteredTasks.length === 0) return null;
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Tarefa</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Prioridade</TableHead>
+            <TableHead>Início</TableHead>
+            <TableHead>Entrega</TableHead>
+            <TableHead>Atrasada</TableHead>
+            <TableHead className="w-12">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredTasks.map((task) => renderTaskRow(task))}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  // Render grouped view
+  if (groupBy !== 'none' && tasksWithAssignees) {
+    let groups: { key: string; label: string; tasks: TaskWithAssignees[]; color?: string | null; avatarUrl?: string | null }[] = [];
+
+    switch (groupBy) {
+      case 'due_date':
+        groups = groupTasksByDueDate(tasksWithAssignees);
+        break;
+      case 'status':
+        groups = groupTasksByStatus(tasksWithAssignees);
+        break;
+      case 'assignee':
+        groups = groupTasksByAssignee(tasksWithAssignees);
+        break;
+      case 'priority':
+        groups = groupTasksByPriority(tasksWithAssignees);
+        break;
+    }
+
+    if (groups.length === 0) {
+      return (
+        <div className="border rounded-lg p-8 text-center text-muted-foreground">
+          Nenhuma tarefa encontrada
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="space-y-4">
+          {groups.map((group) => {
+            const isCollapsed = collapsedGroups.has(group.key);
+
+            return (
+              <Collapsible key={group.key} open={!isCollapsed} onOpenChange={() => toggleGroup(group.key)}>
+                <div className="border rounded-lg overflow-hidden">
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center gap-3 p-3 bg-muted/30 hover:bg-muted/50 cursor-pointer">
+                      {isCollapsed ? (
+                        <ChevronRight className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+
+                      {groupBy === 'assignee' && (
+                        group.avatarUrl ? (
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={group.avatarUrl} />
+                            <AvatarFallback className="text-xs">
+                              {getInitials(group.label)}
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                        )
+                      )}
+
+                      {groupBy === 'status' && group.color && (
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: group.color }}
+                        />
+                      )}
+
+                      {groupBy === 'priority' && group.color && (
+                        <div className={cn('w-3 h-3 rounded-full', group.color)} />
+                      )}
+
+                      <span className="font-medium">{group.label}</span>
+                      <Badge variant="secondary" className="ml-auto">
+                        {group.tasks.length}
+                      </Badge>
+                    </div>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    {renderGroupedTable(group.tasks)}
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            );
+          })}
+        </div>
+
+        <TaskMoveDialog
+          taskId={moveTaskId}
+          open={!!moveTaskId}
+          onOpenChange={(open) => !open && setMoveTaskId(null)}
+          workspaceId={workspaceId}
+          currentListId={listId}
+        />
+
+        <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita. A tarefa será permanentemente excluída.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
+
+  // Render flat table (original behavior)
   return (
     <>
       <div className="border rounded-lg">
