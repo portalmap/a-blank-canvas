@@ -36,6 +36,8 @@ import { useDeleteTask, useArchiveTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 import { GroupByOption } from '@/components/everything/GroupBySelector';
 import { TaskWithAssignees } from '@/hooks/useTasksWithAssignees';
+import { SortableTableHead } from '@/components/tasks/SortableTableHead';
+import type { SortConfig, ColumnId } from '@/hooks/useColumnPreferences';
 
 interface Task {
   id: string;
@@ -68,6 +70,8 @@ interface TaskListViewProps {
   tasksWithAssignees?: TaskWithAssignees[];
   selectedTaskIds?: string[];
   onSelectionChange?: (taskIds: string[]) => void;
+  sortConfig?: SortConfig | null;
+  onSortChange?: (column: ColumnId) => void;
 }
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
@@ -230,7 +234,7 @@ const getInitials = (name: string | null) => {
     .slice(0, 2);
 };
 
-export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tasksWithAssignees, selectedTaskIds = [], onSelectionChange }: TaskListViewProps) => {
+export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tasksWithAssignees, selectedTaskIds = [], onSelectionChange, sortConfig = null, onSortChange }: TaskListViewProps) => {
   const navigate = useNavigate();
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [moveTaskId, setMoveTaskId] = useState<string | null>(null);
@@ -424,11 +428,23 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
         <TableHeader>
           <TableRow>
             {onSelectionChange && <TableHead className="w-10"></TableHead>}
-            <TableHead>Tarefa</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Prioridade</TableHead>
-            <TableHead>Início</TableHead>
-            <TableHead>Entrega</TableHead>
+            {onSortChange ? (
+              <>
+                <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig} onSort={onSortChange} />
+                <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig} onSort={onSortChange} />
+                <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig} onSort={onSortChange} />
+                <SortableTableHead columnId="start_date" label="Início" sortConfig={sortConfig} onSort={onSortChange} />
+                <SortableTableHead columnId="due_date" label="Entrega" sortConfig={sortConfig} onSort={onSortChange} />
+              </>
+            ) : (
+              <>
+                <TableHead>Tarefa</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Prioridade</TableHead>
+                <TableHead>Início</TableHead>
+                <TableHead>Entrega</TableHead>
+              </>
+            )}
             <TableHead>Atrasada</TableHead>
             <TableHead className="w-12">Ações</TableHead>
           </TableRow>
