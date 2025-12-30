@@ -25,6 +25,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AcceptInvite from "./pages/AcceptInvite";
 import TaskView from "./pages/TaskView";
+import EverythingView from "./pages/EverythingView";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
                       <main className="flex-1 overflow-auto">
                         <Routes>
                           <Route path="/" element={<WorkspaceOverview />} />
+                          <Route path="/everything" element={<EverythingView />} />
                           <Route path="/spaces" element={<SpacesView />} />
                           <Route path="/space/:spaceId" element={<SpaceDetailView />} />
                           <Route path="/folder/:folderId" element={<FolderDetailView />} />

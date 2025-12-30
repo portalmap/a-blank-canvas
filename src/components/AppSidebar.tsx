@@ -1,4 +1,4 @@
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose, Layers } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -23,6 +23,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 const mainNavItems = [
   { title: 'Workspace', url: '/', icon: Home },
 ];
+
+const everythingNavItem = { title: 'Tudo', url: '/everything', icon: Layers };
 
 const modulesNavItems = [
   { title: 'Chat', url: '/chat', icon: MessageSquare },
@@ -110,6 +112,29 @@ export function AppSidebar() {
           <SidebarGroupLabel>Módulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Everything - Tudo link */}
+              <SidebarMenuItem>
+                <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton asChild>
+                      <NavLink 
+                        to={everythingNavItem.url}
+                        className="hover:bg-sidebar-accent"
+                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      >
+                        <everythingNavItem.icon className="h-4 w-4" />
+                        {!isCollapsed && <span>{everythingNavItem.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right">
+                      {everythingNavItem.title}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </SidebarMenuItem>
+              
               {modulesNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
