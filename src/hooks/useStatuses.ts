@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export type StatusCategory = 'not_started' | 'active' | 'in_progress' | 'done';
+
 export const useStatuses = (workspaceId?: string) => {
   return useQuery({
     queryKey: ['statuses', workspaceId],

@@ -1346,6 +1346,7 @@ export type Database = {
       }
       statuses: {
         Row: {
+          category: string | null
           color: string | null
           created_at: string
           id: string
@@ -1359,6 +1360,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          category?: string | null
           color?: string | null
           created_at?: string
           id?: string
@@ -1372,6 +1374,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          category?: string | null
           color?: string | null
           created_at?: string
           id?: string
