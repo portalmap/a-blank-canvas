@@ -9,7 +9,9 @@ import { Calendar, GitBranch } from 'lucide-react';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Task {
   id: string;
@@ -63,6 +65,7 @@ const SubtaskBadge = ({ parentId }: { parentId: string }) => {
 
 export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { mutate: updateTask } = useUpdateTask();
   const createActivity = useCreateTaskActivity();
 
@@ -80,7 +83,7 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
     return new Date(dueDate) < new Date();
   };
 
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
 
     // Se não tem destino ou não mudou de lugar, ignora
@@ -93,6 +96,7 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
     if (destination.droppableId !== source.droppableId) {
       const oldStatus = statuses.find(s => s.id === source.droppableId);
       const newStatus = statuses.find(s => s.id === destination.droppableId);
+      const task = tasks.find(t => t.id === draggableId);
 
       updateTask({
         id: draggableId,
@@ -107,6 +111,28 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
         oldValue: oldStatus?.name || null,
         newValue: newStatus?.name || null,
       });
+
+      // Executar automações de mudança de status
+      if (task) {
+        try {
+          const automationResult = await executeStatusChangeAutomations({
+            taskId: draggableId,
+            workspaceId: task.workspace_id,
+            listId: task.list_id,
+            oldStatusId: source.droppableId,
+            newStatusId: destination.droppableId,
+          });
+
+          if (automationResult.automationsExecuted > 0) {
+            console.log(`${automationResult.automationsExecuted} automações executadas`);
+            // Invalidar queries para atualizar subtarefas
+            queryClient.invalidateQueries({ queryKey: ['subtasks', draggableId] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          }
+        } catch (error) {
+          console.error('Erro ao executar automações:', error);
+        }
+      }
     }
   };
 
