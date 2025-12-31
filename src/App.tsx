@@ -7,6 +7,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
 import { AppSidebar } from "@/components/AppSidebar";
 import WorkspaceOverview from "./pages/WorkspaceOverview";
 import SpacesView from "./pages/SpacesView";
@@ -62,8 +63,8 @@ const App = () => (
                           <Route path="/documents/:id" element={<DocumentView />} />
                           <Route path="/dashboards" element={<Dashboards />} />
                           <Route path="/dashboards/:id" element={<DashboardView />} />
-                          <Route path="/automations" element={<Automations />} />
-                          <Route path="/settings" element={<Settings />} />
+                          <Route path="/automations" element={<AdminRoute><Automations /></AdminRoute>} />
+                          <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </main>
