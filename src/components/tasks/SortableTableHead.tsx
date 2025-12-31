@@ -23,19 +23,19 @@ export function SortableTableHead({
 
   return (
     <TableHead 
-      className={cn("cursor-pointer select-none hover:bg-muted/50", className)}
+      className={cn("cursor-pointer select-none hover:text-foreground transition-colors", className)}
       onClick={() => onSort(columnId)}
     >
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         <span>{label}</span>
         {isActive ? (
           direction === 'asc' ? (
-            <ArrowUp className="h-4 w-4 text-primary" />
+            <ArrowUp className="h-3 w-3 text-foreground/70" />
           ) : (
-            <ArrowDown className="h-4 w-4 text-primary" />
+            <ArrowDown className="h-3 w-3 text-foreground/70" />
           )
         ) : (
-          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+          <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
         )}
       </div>
     </TableHead>
