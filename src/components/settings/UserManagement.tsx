@@ -437,6 +437,7 @@ export function UserManagement() {
                     setPermissionsUser({
                       id: member.user_id,
                       fullName: member.profile.full_name || member.email,
+                      workspaceId: member.workspace_id,
                     })
                   }
                   canEdit={canEdit}
@@ -478,7 +479,7 @@ export function UserManagement() {
           onOpenChange={(open) => !open && setPermissionsUser(null)}
           userId={permissionsUser.id}
           userName={permissionsUser.fullName}
-          workspaceId={currentWorkspace?.workspace_id || ""}
+          workspaceId={permissionsUser.workspaceId || ""}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["workspace-members-detailed"] });
             setPermissionsUser(null);
