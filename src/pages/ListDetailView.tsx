@@ -6,7 +6,7 @@ import { useFolders } from '@/hooks/useFolders';
 import { useList } from '@/hooks/useLists';
 import { useTasksWithAssignees, TaskWithAssignees } from '@/hooks/useTasksWithAssignees';
 import { useCreateTask } from '@/hooks/useTasks';
-import { useStatuses, useDefaultStatus } from '@/hooks/useStatuses';
+import { useStatusesForScope, useDefaultStatusForScope } from '@/hooks/useStatuses';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -37,8 +37,8 @@ const ListDetailView = () => {
 
   const { data: currentList, isLoading: listLoading } = useList(listId);
   const { data: tasksWithAssignees, isLoading: tasksLoading } = useTasksWithAssignees(listId);
-  const { data: statuses } = useStatuses(activeWorkspace?.id);
-  const { data: defaultStatus } = useDefaultStatus(activeWorkspace?.id);
+  const { data: statuses } = useStatusesForScope('list', listId, activeWorkspace?.id);
+  const { data: defaultStatus } = useDefaultStatusForScope('list', listId, activeWorkspace?.id);
   const createTask = useCreateTask();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);

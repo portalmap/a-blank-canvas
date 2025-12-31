@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
 import { Calendar, Clock, Flag, Check, X } from 'lucide-react';
 import { useUpdateTask } from '@/hooks/useTasks';
-import { useStatuses } from '@/hooks/useStatuses';
+import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
@@ -51,7 +51,7 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
   const updateTask = useUpdateTask();
   const createActivity = useCreateTaskActivity();
-  const { data: statuses } = useStatuses(task.workspace_id);
+  const { data: statuses } = useStatusesForScope('list', task.list_id, task.workspace_id);
 
   const handleSaveTitle = async () => {
     if (!editTitle.trim() || editTitle === task.title) {
