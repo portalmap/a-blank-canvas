@@ -2509,6 +2509,10 @@ export type Database = {
         Args: { _list_id: string; _user_id: string }
         Returns: boolean
       }
+      user_can_access_list_via_space: {
+        Args: { _list_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_can_access_space: {
         Args: { _space_id: string; _user_id: string }
         Returns: boolean
