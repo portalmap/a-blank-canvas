@@ -152,7 +152,7 @@ const DashboardEditorComponent = ({
 
   // Simple grid layout for cards
   return (
-    <div className="grid grid-cols-12 gap-4 auto-rows-min">
+    <div className="grid grid-cols-12 gap-4">
       {cards.map((card) => {
         const colSpan = card.position.w || 4;
         const rowSpan = card.position.h || 2;
@@ -160,10 +160,9 @@ const DashboardEditorComponent = ({
         return (
           <div
             key={card.id}
-            className="min-h-[200px]"
             style={{
               gridColumn: `span ${Math.min(colSpan, 12)}`,
-              gridRow: `span ${rowSpan}`,
+              height: `${rowSpan * 150}px`,
             }}
           >
             {renderCard(card)}

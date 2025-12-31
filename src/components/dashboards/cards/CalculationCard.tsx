@@ -57,7 +57,7 @@ const CalculationCardComponent = ({
   const percentage = total && total > 0 ? Math.round((value / total) * 100) : null;
 
   return (
-    <Card className="h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         <DropdownMenu>
