@@ -4,7 +4,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useStatuses } from "@/hooks/useStatuses";
+import { useStatusesForScope } from "@/hooks/useStatuses";
 import { useBulkUpdateStatus } from "@/hooks/useBulkTaskActions";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ interface StatusBulkPopoverProps {
   children: ReactNode;
   taskIds: string[];
   workspaceId: string;
+  listId?: string;
   onSuccess: () => void;
 }
 
@@ -19,10 +20,11 @@ export function StatusBulkPopover({
   children,
   taskIds,
   workspaceId,
+  listId,
   onSuccess,
 }: StatusBulkPopoverProps) {
   const [open, setOpen] = useState(false);
-  const { data: statuses } = useStatuses(workspaceId);
+  const { data: statuses } = useStatusesForScope('list', listId, workspaceId);
   const updateStatus = useBulkUpdateStatus();
 
   const handleSelectStatus = (statusId: string) => {

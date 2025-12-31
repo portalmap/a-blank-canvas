@@ -79,6 +79,7 @@ export function BulkActionsBar({
           <StatusBulkPopover
             taskIds={selectedTaskIds}
             workspaceId={workspaceId}
+            listId={listId}
             onSuccess={onClearSelection}
           >
             <Button variant="ghost" size="sm" className="h-8 gap-1">

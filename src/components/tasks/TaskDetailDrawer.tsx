@@ -10,7 +10,7 @@ import { Calendar, User, Clock, Flag, X, Check, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useUpdateTask } from '@/hooks/useTasks';
-import { useStatuses } from '@/hooks/useStatuses';
+import { useStatusesForScope } from '@/hooks/useStatuses';
 import { SubtaskList } from './SubtaskList';
 import { TaskComments } from './TaskComments';
 import { TaskChecklists } from './TaskChecklists';
@@ -52,7 +52,7 @@ export const TaskDetailDrawer = ({ task, open, onOpenChange }: TaskDetailDrawerP
   const [editDescription, setEditDescription] = useState('');
 
   const updateTask = useUpdateTask();
-  const { data: statuses } = useStatuses(task?.workspace_id);
+  const { data: statuses } = useStatusesForScope('list', task?.list_id, task?.workspace_id);
 
   if (!task) return null;
 
