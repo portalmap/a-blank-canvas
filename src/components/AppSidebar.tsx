@@ -16,6 +16,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
+import { useUserRole } from '@/hooks/useUserRole';
 import { SpaceTreeItem } from '@/components/workspace/SpaceTreeItem';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -40,9 +41,17 @@ export function AppSidebar() {
   const { signOut } = useAuth();
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
   const { data: spaces } = useSpaces(activeWorkspace?.id);
+  const { data: userRole } = useUserRole();
   
+  const isAdmin = userRole?.isAdmin ?? false;
   const isActive = (path: string) => location.pathname === path;
   const isCollapsed = state === 'collapsed';
+  
+  // Filtrar módulos - Automações só para admin
+  const filteredModulesNavItems = modulesNavItems.filter(item => {
+    if (item.url === '/automations') return isAdmin;
+    return true;
+  });
 
   // Resize handler
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -135,7 +144,7 @@ export function AppSidebar() {
                 </Tooltip>
               </SidebarMenuItem>
               
-              {modulesNavItems.map((item) => (
+              {filteredModulesNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
                     <TooltipTrigger asChild>
@@ -221,27 +230,29 @@ export function AppSidebar() {
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
-                  <TooltipTrigger asChild>
-                    <SidebarMenuButton asChild>
-                      <NavLink 
-                        to="/settings"
-                        className="hover:bg-sidebar-accent"
-                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-                      >
-                        <Settings className="h-4 w-4" />
-                        {!isCollapsed && <span>Configurações</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  {isCollapsed && (
-                    <TooltipContent side="right">
-                      Configurações
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </SidebarMenuItem>
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton asChild>
+                        <NavLink 
+                          to="/settings"
+                          className="hover:bg-sidebar-accent"
+                          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                        >
+                          <Settings className="h-4 w-4" />
+                          {!isCollapsed && <span>Configurações</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    {isCollapsed && (
+                      <TooltipContent side="right">
+                        Configurações
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
                   <TooltipTrigger asChild>
