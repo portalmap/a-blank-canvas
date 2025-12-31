@@ -13,6 +13,8 @@ interface AddUserRequest {
   email: string;
   role: 'global_owner' | 'owner_technical' | 'workspace_owner' | 'admin' | 'member' | 'limited_member' | 'guest';
   workspaceId?: string;
+  temporaryPassword?: string;
+  mustChangePassword?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -56,7 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const { email, role, workspaceId }: AddUserRequest = await req.json();
+    const { email, role, workspaceId, temporaryPassword, mustChangePassword }: AddUserRequest = await req.json();
 
     if (!email) {
       return new Response(
@@ -89,10 +91,18 @@ const handler = async (req: Request): Promise<Response> => {
     } else {
       // Create new user
       console.log("Creating new user...");
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      
+      // Create user with or without password
+      const createUserOptions: any = {
         email,
         email_confirm: true,
-      });
+      };
+      
+      if (temporaryPassword) {
+        createUserOptions.password = temporaryPassword;
+      }
+      
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser(createUserOptions);
 
       if (createError) {
         console.error("Error creating user:", createError);
@@ -105,27 +115,54 @@ const handler = async (req: Request): Promise<Response> => {
       userId = newUser.user.id;
       console.log(`New user created with ID: ${userId}`);
 
-      // Send welcome email with password reset link
-      const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email,
-      });
+      // If temporary password was set and must change password is enabled, update profile
+      if (temporaryPassword && mustChangePassword) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ must_change_password: true })
+          .eq('id', userId);
+        console.log("Set must_change_password flag for user");
+      }
 
-      if (!resetError && resetData?.properties?.action_link) {
+      // Only send recovery email if no temporary password was provided
+      if (!temporaryPassword) {
+        const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'recovery',
+          email,
+        });
+
+        if (!resetError && resetData?.properties?.action_link) {
+          await resend.emails.send({
+            from: "Sistema <onboarding@resend.dev>",
+            to: [email],
+            subject: "Bem-vindo! Defina sua senha",
+            html: `
+              <h1>Bem-vindo ao Sistema!</h1>
+              <p>Você foi adicionado ao sistema. Clique no link abaixo para definir sua senha:</p>
+              <p><a href="${resetData.properties.action_link}" style="display: inline-block; padding: 12px 24px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px;">Definir Senha</a></p>
+              <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+              <p>${resetData.properties.action_link}</p>
+              <p>Este link expira em 24 horas.</p>
+            `,
+          });
+          console.log("Welcome email sent successfully");
+        }
+      } else {
+        // Send email with temporary password info
         await resend.emails.send({
           from: "Sistema <onboarding@resend.dev>",
           to: [email],
-          subject: "Bem-vindo! Defina sua senha",
+          subject: "Bem-vindo! Suas credenciais de acesso",
           html: `
             <h1>Bem-vindo ao Sistema!</h1>
-            <p>Você foi adicionado ao sistema. Clique no link abaixo para definir sua senha:</p>
-            <p><a href="${resetData.properties.action_link}" style="display: inline-block; padding: 12px 24px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px;">Definir Senha</a></p>
-            <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
-            <p>${resetData.properties.action_link}</p>
-            <p>Este link expira em 24 horas.</p>
+            <p>Você foi adicionado ao sistema. Suas credenciais de acesso são:</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Senha:</strong> ${temporaryPassword}</p>
+            ${mustChangePassword ? '<p><em>Você será solicitado a alterar sua senha no primeiro login.</em></p>' : ''}
+            <p>Acesse o sistema para começar!</p>
           `,
         });
-        console.log("Welcome email sent successfully");
+        console.log("Welcome email with credentials sent successfully");
       }
     }
 
@@ -179,9 +216,12 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    const message = userExists 
-      ? 'Usuário adicionado com sucesso!' 
-      : 'Usuário criado e adicionado com sucesso! Email de boas-vindas enviado.';
+    let message = 'Usuário adicionado com sucesso!';
+    if (!userExists) {
+      message = temporaryPassword 
+        ? 'Usuário criado com senha temporária! Email com credenciais enviado.'
+        : 'Usuário criado! Email para definir senha enviado.';
+    }
 
     return new Response(
       JSON.stringify({ success: true, message, userId }),

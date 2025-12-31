@@ -6,11 +6,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, KeyRound, Eye, EyeOff, Shuffle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+
+const generateRandomPassword = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  let password = '';
+  for (let i = 0; i < 12; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+};
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -47,6 +57,13 @@ export function UserEditDialog({
   const [phone, setPhone] = useState(user.phone || "");
   const [bio, setBio] = useState(user.bio || "");
   const [role, setRole] = useState<WorkspaceRole>(user.role);
+
+  // Password reset state
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(true);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCurrentUserGlobalOwner, setIsCurrentUserGlobalOwner] = useState(false);
@@ -94,6 +111,37 @@ export function UserEditDialog({
   };
   
   const canEditRole = currentUserRole === "admin" && !user.isGlobalOwner && !user.isOwner;
+  const canResetPassword = isCurrentUserGlobalOwner || isCurrentUserOwner || currentUserRole === "admin";
+
+  const handleResetPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-user-password', {
+        body: {
+          userId: user.id,
+          newPassword,
+          mustChangePassword,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success("Senha resetada com sucesso!");
+      setNewPassword("");
+      setShowPasswordReset(false);
+      setMustChangePassword(true);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao resetar senha");
+    } finally {
+      setResettingPassword(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!canEditThisUser()) {
@@ -213,6 +261,99 @@ export function UserEditDialog({
                   <SelectItem value="guest">Convidado</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {/* Password Reset Section */}
+          {canResetPassword && (
+            <div className="space-y-3 pt-3 border-t">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Segurança</Label>
+                {!showPasswordReset && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPasswordReset(true)}
+                  >
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    Resetar Senha
+                  </Button>
+                )}
+              </div>
+
+              {showPasswordReset && (
+                <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">Nova Senha Temporária</Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          id="newPassword"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Mínimo 6 caracteres"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setNewPassword(generateRandomPassword())}
+                        title="Gerar senha aleatória"
+                      >
+                        <Shuffle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="mustChangePasswordEdit"
+                      checked={mustChangePassword}
+                      onCheckedChange={(checked) => setMustChangePassword(checked as boolean)}
+                    />
+                    <Label htmlFor="mustChangePasswordEdit" className="text-sm font-normal cursor-pointer">
+                      Exigir troca de senha no próximo login
+                    </Label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowPasswordReset(false);
+                        setNewPassword("");
+                      }}
+                      disabled={resettingPassword}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleResetPassword}
+                      disabled={resettingPassword || !newPassword}
+                    >
+                      {resettingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Confirmar Reset
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
