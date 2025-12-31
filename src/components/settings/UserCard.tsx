@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Crown, Shield, User, MoreVertical, Edit, Trash2, Eye, Wrench } from "lucide-react";
+import { Crown, Shield, User, MoreVertical, Edit, Trash2, Eye, Wrench, FolderKey } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,9 +25,11 @@ interface UserCardProps {
   onDelete: () => void;
   onDeleteFromSystem?: () => void;
   onViewDetails: () => void;
+  onManagePermissions?: () => void;
   canEdit: boolean;
   canDelete: boolean;
   canDeleteFromSystem?: boolean;
+  canManagePermissions?: boolean;
 }
 
 const roleConfig: Record<WorkspaceRole, { label: string; icon: any; variant: any }> = {
@@ -50,9 +52,11 @@ export function UserCard({
   onDelete,
   onDeleteFromSystem,
   onViewDetails,
+  onManagePermissions,
   canEdit,
   canDelete,
   canDeleteFromSystem,
+  canManagePermissions,
 }: UserCardProps) {
   // Determinar qual badge/ícone mostrar
   let displayConfig = roleConfig[role];
@@ -114,6 +118,12 @@ export function UserCard({
               <DropdownMenuItem onClick={onEdit}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
+              </DropdownMenuItem>
+            )}
+            {canManagePermissions && onManagePermissions && (
+              <DropdownMenuItem onClick={onManagePermissions}>
+                <FolderKey className="h-4 w-4 mr-2" />
+                Gerenciar Permissões de Spaces
               </DropdownMenuItem>
             )}
             {canDelete && (
