@@ -4,17 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronRight, FolderOpen, Layers } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type PermissionRole = Database["public"]["Enums"]["permission_role"];
 
-interface Resource {
+interface Space {
   id: string;
   name: string;
-  type: "space" | "folder" | "list";
+}
+
+interface WorkspaceWithSpaces {
+  id: string;
+  name: string;
+  spaces: Space[];
 }
 
 interface Permission {
@@ -37,38 +44,54 @@ export function UserPermissionsDialog({
   userId,
   userName,
   workspaceId,
-  onSuccess,
 }: UserPermissionsDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [resources, setResources] = useState<Resource[]>([]);
+  const [loadingResources, setLoadingResources] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WorkspaceWithSpaces[]>([]);
   const [permissions, setPermissions] = useState<Map<string, Permission>>(new Map());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (open) {
+    if (open && workspaceId) {
       loadResources();
       loadPermissions();
     }
   }, [open, userId, workspaceId]);
 
   const loadResources = async () => {
+    setLoadingResources(true);
     try {
-      // Carregar spaces
+      // Buscar o workspace específico
+      const { data: workspace, error: wsError } = await supabase
+        .from("workspaces")
+        .select("id, name")
+        .eq("id", workspaceId)
+        .single();
+
+      if (wsError) throw wsError;
+
+      // Buscar spaces desse workspace
       const { data: spaces, error: spacesError } = await supabase
         .from("spaces")
         .select("id, name")
-        .eq("workspace_id", workspaceId);
+        .eq("workspace_id", workspaceId)
+        .order("name");
 
       if (spacesError) throw spacesError;
 
-      const resourceList: Resource[] = spaces?.map(s => ({
-        id: s.id,
-        name: s.name,
-        type: "space" as const,
-      })) || [];
+      setWorkspaces([{
+        id: workspace.id,
+        name: workspace.name,
+        spaces: spaces || [],
+      }]);
 
-      setResources(resourceList);
+      // Expandir automaticamente o workspace
+      setExpanded(new Set([workspaceId]));
     } catch (error: any) {
       toast.error("Erro ao carregar recursos");
+      console.error(error);
+    } finally {
+      setLoadingResources(false);
     }
   };
 
@@ -92,24 +115,21 @@ export function UserPermissionsDialog({
       setPermissions(permMap);
     } catch (error: any) {
       toast.error("Erro ao carregar permissões");
+      console.error(error);
     }
   };
 
-  const handleToggleResource = async (resourceId: string, enabled: boolean) => {
+  const handleToggleResource = (resourceId: string, enabled: boolean) => {
+    const newPermissions = new Map(permissions);
     if (enabled) {
-      // Adicionar permissão
-      const newPermissions = new Map(permissions);
       newPermissions.set(resourceId, {
         resourceId,
         role: "viewer",
       });
-      setPermissions(newPermissions);
     } else {
-      // Remover permissão
-      const newPermissions = new Map(permissions);
       newPermissions.delete(resourceId);
-      setPermissions(newPermissions);
     }
+    setPermissions(newPermissions);
   };
 
   const handleRoleChange = (resourceId: string, role: PermissionRole) => {
@@ -119,6 +139,16 @@ export function UserPermissionsDialog({
       newPermissions.set(resourceId, { ...existing, role });
       setPermissions(newPermissions);
     }
+  };
+
+  const handleToggleExpand = (wsId: string) => {
+    const newExpanded = new Set(expanded);
+    if (newExpanded.has(wsId)) {
+      newExpanded.delete(wsId);
+    } else {
+      newExpanded.add(wsId);
+    }
+    setExpanded(newExpanded);
   };
 
   const handleSave = async () => {
@@ -148,66 +178,123 @@ export function UserPermissionsDialog({
       }
 
       toast.success("Permissões atualizadas com sucesso!");
-      onSuccess();
       onOpenChange(false);
     } catch (error: any) {
       toast.error(error.message || "Erro ao atualizar permissões");
+      console.error(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSelectedCount = (workspace: WorkspaceWithSpaces) => {
+    return workspace.spaces.filter(s => permissions.has(s.id)).length;
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Gerenciar Permissões</DialogTitle>
+          <DialogTitle>Gerenciar Permissões de Spaces</DialogTitle>
           <DialogDescription>
-            Defina permissões específicas para {userName}
+            Defina quais Spaces {userName} pode acessar
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {resources.length === 0 ? (
+        <div className="space-y-2 py-4">
+          {loadingResources ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : workspaces.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhum recurso disponível
+              Nenhum workspace encontrado
             </p>
           ) : (
-            resources.map((resource) => {
-              const permission = permissions.get(resource.id);
-              const enabled = !!permission;
+            workspaces.map((workspace) => {
+              const isExpanded = expanded.has(workspace.id);
+              const selectedCount = getSelectedCount(workspace);
 
               return (
-                <div key={resource.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3 flex-1">
-                    <Checkbox
-                      checked={enabled}
-                      onCheckedChange={(checked) =>
-                        handleToggleResource(resource.id, checked as boolean)
-                      }
+                <Collapsible
+                  key={workspace.id}
+                  open={isExpanded}
+                  onOpenChange={() => handleToggleExpand(workspace.id)}
+                >
+                  <CollapsibleTrigger className="flex items-center gap-3 w-full p-3 hover:bg-muted/50 rounded-lg transition-colors border">
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                        isExpanded && "rotate-90"
+                      )}
                     />
-                    <div className="flex-1">
-                      <Label className="font-medium">{resource.name}</Label>
-                      <p className="text-xs text-muted-foreground capitalize">{resource.type}</p>
-                    </div>
-                  </div>
+                    <FolderOpen className="h-5 w-5 text-primary" />
+                    <span className="font-medium flex-1 text-left">{workspace.name}</span>
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                      {selectedCount}/{workspace.spaces.length} spaces
+                    </span>
+                  </CollapsibleTrigger>
 
-                  {enabled && (
-                    <Select
-                      value={permission.role}
-                      onValueChange={(value) => handleRoleChange(resource.id, value as PermissionRole)}
-                    >
-                      <SelectTrigger className="w-[150px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="viewer">Visualizador</SelectItem>
-                        <SelectItem value="commenter">Comentarista</SelectItem>
-                        <SelectItem value="editor">Editor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                  <CollapsibleContent className="pl-6 mt-1">
+                    {workspace.spaces.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 pl-6">
+                        Nenhum space neste workspace
+                      </p>
+                    ) : (
+                      <div className="space-y-2 py-2">
+                        {workspace.spaces.map((space) => {
+                          const permission = permissions.get(space.id);
+                          const enabled = !!permission;
+
+                          return (
+                            <div
+                              key={space.id}
+                              className={cn(
+                                "flex items-center justify-between p-3 rounded-lg border transition-colors",
+                                enabled ? "bg-primary/5 border-primary/20" : "bg-background"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Checkbox
+                                  id={`space-${space.id}`}
+                                  checked={enabled}
+                                  onCheckedChange={(checked) =>
+                                    handleToggleResource(space.id, checked as boolean)
+                                  }
+                                />
+                                <Layers className="h-4 w-4 text-muted-foreground" />
+                                <Label
+                                  htmlFor={`space-${space.id}`}
+                                  className="font-normal cursor-pointer"
+                                >
+                                  {space.name}
+                                </Label>
+                              </div>
+
+                              {enabled && (
+                                <Select
+                                  value={permission.role}
+                                  onValueChange={(value) =>
+                                    handleRoleChange(space.id, value as PermissionRole)
+                                  }
+                                >
+                                  <SelectTrigger className="w-[140px] h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="viewer">Visualizador</SelectItem>
+                                    <SelectItem value="commenter">Comentarista</SelectItem>
+                                    <SelectItem value="editor">Editor</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
               );
             })
           )}
