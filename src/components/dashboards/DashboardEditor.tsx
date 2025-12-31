@@ -1,3 +1,4 @@
+import { useMemo, memo } from 'react';
 import { DashboardCard } from '@/hooks/useDashboards';
 import { PieChartCard } from './cards/PieChartCard';
 import { BarChartCard } from './cards/BarChartCard';
@@ -15,12 +16,23 @@ interface DashboardEditorProps {
   onDeleteCard: (cardId: string) => void;
 }
 
-export const DashboardEditor = ({
+const DashboardEditorComponent = ({
   cards,
   stats,
   onUpdateCard,
   onDeleteCard,
 }: DashboardEditorProps) => {
+  // Memoize stats to prevent re-renders
+  const memoizedStats = useMemo(() => ({
+    byStatus: stats?.byStatus || [],
+    byPriority: stats?.byPriority || [],
+    byAssignee: stats?.byAssignee || [],
+    overdueTasks: stats?.overdueTasks || [],
+    total: stats?.total || 0,
+    completed: stats?.completed || 0,
+    overdue: stats?.overdue || 0,
+    onTrack: stats?.onTrack || 0,
+  }), [stats]);
   if (cards.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-16">
@@ -49,7 +61,7 @@ export const DashboardEditor = ({
           <PieChartCard
             key={card.id}
             {...commonProps}
-            data={stats?.byStatus || []}
+            data={memoizedStats.byStatus}
             groupBy={card.config.groupBy}
           />
         );
@@ -60,10 +72,10 @@ export const DashboardEditor = ({
             {...commonProps}
             data={
               card.config.groupBy === 'priority'
-                ? stats?.byPriority || []
+                ? memoizedStats.byPriority
                 : card.config.groupBy === 'assignee'
-                ? stats?.byAssignee || []
-                : stats?.byStatus || []
+                ? memoizedStats.byAssignee
+                : memoizedStats.byStatus
             }
             groupBy={card.config.groupBy}
           />
@@ -82,16 +94,16 @@ export const DashboardEditor = ({
         let suffix = '';
         switch (card.config.metric) {
           case 'total':
-            value = stats?.total || 0;
+            value = memoizedStats.total;
             break;
           case 'completed':
-            value = stats?.completed || 0;
+            value = memoizedStats.completed;
             break;
           case 'overdue':
-            value = stats?.overdue || 0;
+            value = memoizedStats.overdue;
             break;
           case 'on_track':
-            value = stats?.onTrack || 0;
+            value = memoizedStats.onTrack;
             break;
         }
         return (
@@ -101,7 +113,7 @@ export const DashboardEditor = ({
             value={value}
             suffix={suffix}
             metric={card.config.metric}
-            total={stats?.total}
+            total={memoizedStats.total}
           />
         );
       case 'overdue_tasks':
@@ -110,7 +122,7 @@ export const DashboardEditor = ({
           <TaskListCard
             key={card.id}
             {...commonProps}
-            tasks={stats?.overdueTasks || []}
+            tasks={memoizedStats.overdueTasks}
             type={card.type === 'overdue_tasks' ? 'overdue' : 'all'}
           />
         );
@@ -119,7 +131,7 @@ export const DashboardEditor = ({
           <PriorityBreakdownCard
             key={card.id}
             {...commonProps}
-            data={stats?.byPriority || []}
+            data={memoizedStats.byPriority}
           />
         );
       case 'notes':
@@ -161,3 +173,5 @@ export const DashboardEditor = ({
     </div>
   );
 };
+
+export const DashboardEditor = memo(DashboardEditorComponent);

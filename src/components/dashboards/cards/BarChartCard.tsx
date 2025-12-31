@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,22 +27,28 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 const DEFAULT_COLOR = '#3b82f6';
 
-export const BarChartCard = ({
+const BarChartCardComponent = ({
   title,
   data,
   groupBy,
   onDelete,
   onEdit,
 }: BarChartCardProps) => {
-  const chartData = data.map((item) => ({
-    ...item,
-    displayName: groupBy === 'priority' 
-      ? item.name.charAt(0).toUpperCase() + item.name.slice(1)
-      : item.name,
-    color: item.color || PRIORITY_COLORS[item.name] || DEFAULT_COLOR,
-  }));
+  const chartData = useMemo(() => 
+    data.map((item) => ({
+      ...item,
+      displayName: groupBy === 'priority' 
+        ? item.name.charAt(0).toUpperCase() + item.name.slice(1)
+        : item.name,
+      color: item.color || PRIORITY_COLORS[item.name] || DEFAULT_COLOR,
+    })),
+    [data, groupBy]
+  );
 
-  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+  const total = useMemo(() => 
+    chartData.reduce((sum, item) => sum + item.value, 0),
+    [chartData]
+  );
 
   return (
     <Card className="h-full">
@@ -96,3 +103,5 @@ export const BarChartCard = ({
     </Card>
   );
 };
+
+export const BarChartCard = memo(BarChartCardComponent);

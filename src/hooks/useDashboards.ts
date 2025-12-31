@@ -286,5 +286,7 @@ export const useDashboardStats = (dashboardId: string | undefined) => {
       };
     },
     enabled: !!activeWorkspace?.id,
+    staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: false,
   });
 };

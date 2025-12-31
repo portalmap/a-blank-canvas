@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,19 +20,25 @@ interface PieChartCardProps {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-export const PieChartCard = ({
+const PieChartCardComponent = ({
   title,
   data,
   groupBy,
   onDelete,
   onEdit,
 }: PieChartCardProps) => {
-  const chartData = data.map((item, index) => ({
-    ...item,
-    color: item.color || COLORS[index % COLORS.length],
-  }));
+  const chartData = useMemo(() => 
+    data.map((item, index) => ({
+      ...item,
+      color: item.color || COLORS[index % COLORS.length],
+    })),
+    [data]
+  );
 
-  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+  const total = useMemo(() => 
+    chartData.reduce((sum, item) => sum + item.value, 0),
+    [chartData]
+  );
 
   return (
     <Card className="h-full">
@@ -95,3 +102,5 @@ export const PieChartCard = ({
     </Card>
   );
 };
+
+export const PieChartCard = memo(PieChartCardComponent);

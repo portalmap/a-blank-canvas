@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { MoreHorizontal, Trash2, TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Clock, Target } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ const metricConfig = {
   },
 };
 
-export const CalculationCard = ({
+const CalculationCardComponent = ({
   title,
   value,
   suffix,
@@ -94,3 +95,5 @@ export const CalculationCard = ({
     </Card>
   );
 };
+
+export const CalculationCard = memo(CalculationCardComponent);

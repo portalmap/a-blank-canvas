@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { MoreHorizontal, Trash2, AlertTriangle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -35,7 +36,7 @@ const priorityColors: Record<string, string> = {
   urgent: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-500',
 };
 
-export const TaskListCard = ({
+const TaskListCardComponent = ({
   title,
   tasks,
   type,
@@ -103,8 +104,10 @@ export const TaskListCard = ({
               ))}
             </div>
           </ScrollArea>
-        )}
+          )}
       </CardContent>
     </Card>
   );
 };
+
+export const TaskListCard = memo(TaskListCardComponent);
