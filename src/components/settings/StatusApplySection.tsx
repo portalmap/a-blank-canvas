@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useStatusTemplates, useApplyStatusTemplate } from '@/hooks/useStatusTemplates';
 import { useSpaces } from '@/hooks/useSpaces';
-import { useFolders } from '@/hooks/useFolders';
+import { useFoldersForWorkspace } from '@/hooks/useFolders';
 import { useListsForWorkspace } from '@/hooks/useLists';
 import { toast } from 'sonner';
 
@@ -38,7 +38,7 @@ export function StatusApplySection({ workspaceId }: StatusApplySectionProps) {
 
   const { data: templates } = useStatusTemplates(workspaceId);
   const { data: spaces } = useSpaces(workspaceId);
-  const { data: folders } = useFolders();
+  const { data: folders } = useFoldersForWorkspace(workspaceId);
   const { data: lists } = useListsForWorkspace(workspaceId);
   const applyTemplate = useApplyStatusTemplate();
 

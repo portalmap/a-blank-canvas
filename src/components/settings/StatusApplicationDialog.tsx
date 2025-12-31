@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronRight, ChevronDown, Folder, List, Layout } from 'lucide-react';
 import { useSpaces } from '@/hooks/useSpaces';
-import { useFolders } from '@/hooks/useFolders';
+import { useFoldersForWorkspace } from '@/hooks/useFolders';
 import { useListsForWorkspace } from '@/hooks/useLists';
 import { useApplyStatusTemplate } from '@/hooks/useStatusTemplates';
 
@@ -37,7 +37,7 @@ export function StatusApplicationDialog({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
   const { data: spaces } = useSpaces(workspaceId);
-  const { data: folders } = useFolders(workspaceId);
+  const { data: folders } = useFoldersForWorkspace(workspaceId);
   const { data: lists } = useListsForWorkspace(workspaceId);
   const applyTemplate = useApplyStatusTemplate();
 
