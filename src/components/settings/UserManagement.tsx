@@ -433,9 +433,16 @@ export function UserManagement() {
                       createdAt: member.created_at,
                     })
                   }
+                  onManagePermissions={() =>
+                    setPermissionsUser({
+                      id: member.user_id,
+                      fullName: member.profile.full_name || member.email,
+                    })
+                  }
                   canEdit={canEdit}
                   canDelete={canDelete(member)}
                   canDeleteFromSystem={canDeleteFromSystem(member)}
+                  canManagePermissions={canEdit && !member.isGlobalOwner}
                 />
               ))
             )}
