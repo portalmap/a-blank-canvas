@@ -69,7 +69,7 @@ const TaskListCardComponent = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <CardContent className="flex-1 overflow-hidden">
+      <CardContent className="flex-1 min-h-0 overflow-hidden">
         {tasks.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm">
             <Clock className="h-8 w-8 mb-2 opacity-50" />

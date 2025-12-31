@@ -41,7 +41,7 @@ const PieChartCardComponent = ({
   );
 
   return (
-    <Card className="h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         <DropdownMenu>
@@ -58,7 +58,7 @@ const PieChartCardComponent = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <CardContent className="h-[calc(100%-60px)]">
+      <CardContent className="flex-1 min-h-0">
         {chartData.length === 0 || total === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
             Sem dados disponíveis

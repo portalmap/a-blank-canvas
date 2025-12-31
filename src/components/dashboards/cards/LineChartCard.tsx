@@ -28,7 +28,7 @@ export const LineChartCard = ({
   const chartData = data.length > 0 ? data : generateSampleData(timeRange);
 
   return (
-    <Card className="h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         <DropdownMenu>
@@ -45,7 +45,7 @@ export const LineChartCard = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <CardContent className="h-[calc(100%-60px)]">
+      <CardContent className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
