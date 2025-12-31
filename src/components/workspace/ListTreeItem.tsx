@@ -8,6 +8,7 @@ import { useDeleteList, useUpdateList } from "@/hooks/useLists";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { MoveListDialog } from "./MoveListDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,8 @@ interface ListTreeItemProps {
     id: string;
     name: string;
     workspace_id: string;
+    space_id: string;
+    folder_id?: string | null;
   };
 }
 
@@ -56,6 +59,7 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newName, setNewName] = useState('');
@@ -130,7 +134,7 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
               <Link className="mr-2 h-4 w-4" />
               Copiar Link
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+            <DropdownMenuItem onClick={() => setIsMoveDialogOpen(true)}>
               <Move className="mr-2 h-4 w-4" />
               Mover
             </DropdownMenuItem>
@@ -251,6 +255,13 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog for moving list */}
+      <MoveListDialog
+        open={isMoveDialogOpen}
+        onOpenChange={setIsMoveDialogOpen}
+        list={list}
+      />
     </>
   );
 }

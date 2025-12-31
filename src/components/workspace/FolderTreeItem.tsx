@@ -4,6 +4,7 @@ import { useLists, useCreateList } from "@/hooks/useLists";
 import { useDeleteFolder, useUpdateFolder } from "@/hooks/useFolders";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { toast } from "sonner";
+import { MoveFolderDialog } from "./MoveFolderDialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -57,6 +58,7 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
   const [newName, setNewName] = useState('');
@@ -137,7 +139,7 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
                 <Link className="mr-2 h-4 w-4" />
                 Copiar Link
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+              <DropdownMenuItem onClick={() => setIsMoveDialogOpen(true)}>
                 <Move className="mr-2 h-4 w-4" />
                 Mover
               </DropdownMenuItem>
@@ -265,6 +267,16 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog for moving folder */}
+      {activeWorkspace && (
+        <MoveFolderDialog
+          open={isMoveDialogOpen}
+          onOpenChange={setIsMoveDialogOpen}
+          folder={folder}
+          workspaceId={activeWorkspace.id}
+        />
+      )}
     </>
   );
 }
