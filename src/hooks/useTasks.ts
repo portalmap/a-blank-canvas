@@ -80,6 +80,9 @@ export const useMoveTask = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-with-assignees'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks-with-assignees'] });
       queryClient.invalidateQueries({ queryKey: ['task-activities', data.id] });
       toast.success('Tarefa movida com sucesso!');
     },
@@ -119,6 +122,9 @@ export const useArchiveTask = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-with-assignees', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks-with-assignees'] });
       queryClient.invalidateQueries({ queryKey: ['task-activities', data.id] });
       toast.success('Tarefa arquivada com sucesso!');
     },
@@ -196,6 +202,9 @@ export const useCreateTask = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-with-assignees', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks', data.workspace_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks-with-assignees', data.workspace_id] });
       queryClient.invalidateQueries({ queryKey: ['task-assignees', data.id] });
       queryClient.invalidateQueries({ queryKey: ['task-followers', data.id] });
       toast.success('Tarefa criada com sucesso!');
@@ -258,6 +267,9 @@ export const useUpdateTask = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-with-assignees', data.list_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks-with-assignees'] });
       queryClient.invalidateQueries({ queryKey: ['subtasks'] });
       queryClient.invalidateQueries({ queryKey: ['task', data.id] });
       toast.success('Tarefa atualizada com sucesso!');
@@ -308,6 +320,9 @@ export const useDeleteTask = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-with-assignees'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks-with-assignees'] });
       if (data?.parentId) {
         queryClient.invalidateQueries({ queryKey: ['subtasks', data.parentId] });
         queryClient.invalidateQueries({ queryKey: ['task-activities', data.parentId] });
