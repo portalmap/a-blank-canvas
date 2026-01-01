@@ -164,14 +164,14 @@ export function MyTasksCard() {
   if (isLoading) {
     return (
       <Card className="h-full">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
             Atribuídas a mim
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center justify-center h-48">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <CardContent className="flex items-center justify-center h-32">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
     );
@@ -179,35 +179,35 @@ export function MyTasksCard() {
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="pb-3 space-y-4">
+      <CardHeader className="pb-2 space-y-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
             Atribuídas a mim
-            <Badge variant="secondary" className="ml-2">
+            <Badge variant="secondary" className="ml-1 text-xs">
               {filteredTasks.length}
             </Badge>
           </CardTitle>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
             <Input
-              placeholder="Pesquisar tarefas..."
+              placeholder="Pesquisar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-48 h-8"
+              className="pl-7 w-36 h-7 text-xs"
             />
           </div>
         </div>
         
         <div className="flex items-center justify-between">
           <Tabs defaultValue="list" className="w-auto">
-            <TabsList className="h-8">
-              <TabsTrigger value="list" className="text-xs px-3 h-7">Lista</TabsTrigger>
-              <TabsTrigger value="kanban" className="text-xs px-3 h-7" disabled>Quadro</TabsTrigger>
+            <TabsList className="h-7">
+              <TabsTrigger value="list" className="text-xs px-2 h-6">Lista</TabsTrigger>
+              <TabsTrigger value="kanban" className="text-xs px-2 h-6" disabled>Quadro</TabsTrigger>
             </TabsList>
           </Tabs>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <GroupBySelector value={groupBy} onChange={setGroupBy} />
             <EverythingFilters
               filters={filters}
