@@ -119,7 +119,12 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
   const handleSave = async () => {
     if (!name.trim()) return;
 
-    const formattedItems = items.map((item, index) => ({
+    // Ordenar items pela sequência visual de categorias antes de salvar
+    const orderedItems = CATEGORY_ORDER.flatMap(category => 
+      items.filter(item => item.category === category)
+    );
+
+    const formattedItems = orderedItems.map((item, index) => ({
       name: item.name,
       color: item.color,
       is_default: item.is_default,
