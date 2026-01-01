@@ -7,6 +7,7 @@ import { UserManagement } from "@/components/settings/UserManagement";
 import { StatusSettings } from "@/components/settings/StatusSettings";
 import { WebhooksSettings } from "@/components/settings/webhooks/WebhooksSettings";
 import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettings";
+import { TaskImport } from "@/components/settings/TaskImport";
 
 export default function Settings() {
   return (
@@ -19,7 +20,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-8 lg:w-[960px]">
+        <TabsList className="grid w-full grid-cols-9 lg:w-[1080px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
@@ -28,6 +29,7 @@ export default function Settings() {
           <TabsTrigger value="invites">Convites</TabsTrigger>
           <TabsTrigger value="guests">Convidados</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+          <TabsTrigger value="import">Importar</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -60,6 +62,10 @@ export default function Settings() {
 
         <TabsContent value="webhooks" className="mt-6">
           <WebhooksSettings />
+        </TabsContent>
+
+        <TabsContent value="import" className="mt-6">
+          <TaskImport />
         </TabsContent>
       </Tabs>
     </div>
