@@ -24,28 +24,14 @@ const LIST_MAP: Record<string, string> = {
   "Designer/Edição de Vídeo | Accerth": "96c988df-e7bd-4d8d-ac56-b8e629808dfc",
 };
 
-// Mapeamento de usuários (incluindo variantes com/sem acentos)
+// Mapeamento de usuários
 const USER_MAP: Record<string, string> = {
   "Beatriz Santos": "a586595c-d580-49be-a7d7-ed6574303897",
   "Mirian Vilivas": "5e7a3657-7b0c-4312-ac0d-a129932ba69a",
   "Wendy Uda": "66941d98-068e-48fb-ad78-62bbc0db0753",
   "Dionatas Florêncio": "956df024-1054-440b-afb3-272dc4c77501", // Substituído por João Luiz
-  "Dionatas Florencio": "956df024-1054-440b-afb3-272dc4c77501",
   "João Luiz": "956df024-1054-440b-afb3-272dc4c77501",
-  "Joao Luiz": "956df024-1054-440b-afb3-272dc4c77501",
 };
-
-// Status ativos (não importar tarefas com esses status)
-const INACTIVE_STATUSES = [
-  "concluído",
-  "concluido",
-  "cancelled",
-  "cancelado",
-  "finalizado",
-  "postado/entregue",
-  "postado",
-  "entregue",
-];
 
 // Mapeamento de status ClickUp -> Nome do status no sistema
 const STATUS_MAP: Record<string, string> = {
@@ -59,10 +45,9 @@ const STATUS_MAP: Record<string, string> = {
   "revisão": "Em Progresso",
   "revisao": "Em Progresso",
   "aguardando feedback": "Env. Aprovação",
-  "demanda sem prazo": "Aguardando",
+  "demanda sem prazo": "A Fazer",
   "devolução de aprovação": "Em Progresso",
   "devolucao de aprovacao": "Em Progresso",
-  "temas enviados": "Temas Enviados",
 };
 
 // Mapeamento de prioridade ClickUp -> sistema
@@ -75,28 +60,7 @@ const PRIORITY_MAP: Record<string, string> = {
   "high": "high",
   "medium": "medium",
   "low": "low",
-  "null": "medium",
-  "": "medium",
 };
-
-// Função para converter timestamp Unix para data ISO
-function timestampToDate(timestamp: string | number | null): string | null {
-  if (!timestamp) return null;
-  const ts = typeof timestamp === 'string' ? parseInt(timestamp) : timestamp;
-  if (isNaN(ts) || ts === 0) return null;
-  const date = new Date(ts);
-  if (isNaN(date.getTime())) return null;
-  return date.toISOString().split('T')[0];
-}
-
-// Função para parsear assignees do formato ClickUp
-function parseAssignees(assigneesStr: string): string[] {
-  if (!assigneesStr) return [];
-  // Remove colchetes e aspas, divide por vírgula
-  const cleaned = assigneesStr.replace(/^\[|\]$/g, '').replace(/"/g, '');
-  if (!cleaned) return [];
-  return cleaned.split(',').map(a => a.trim()).filter(Boolean);
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
