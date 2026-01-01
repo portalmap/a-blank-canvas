@@ -18,7 +18,6 @@ export interface AllTask {
     id: string;
     name: string;
     color: string | null;
-    category: string | null;
   } | null;
   assignee: {
     id: string;
@@ -62,7 +61,7 @@ export function useAllTasks(workspaceId: string | undefined) {
           workspace_id,
           list_id,
           parent_id,
-          status:statuses(id, name, color, category),
+          status:statuses(id, name, color),
           assignee:profiles!tasks_assignee_id_fkey(id, full_name, avatar_url),
           list:lists(
             id,
@@ -107,7 +106,7 @@ export function useAllTasksWithAssignees(workspaceId: string | undefined) {
           workspace_id,
           list_id,
           parent_id,
-          status:statuses(id, name, color, category),
+          status:statuses(id, name, color),
           assignee:profiles!tasks_assignee_id_fkey(id, full_name, avatar_url),
           list:lists(
             id,

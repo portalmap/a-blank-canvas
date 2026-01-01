@@ -101,19 +101,11 @@ export function useTasksWithAssignees(listId?: string) {
       });
 
       // Combine tasks with assignees
-      const tasksWithAssignees: TaskWithAssignees[] = tasks.map(task => {
-        // Handle case where status might be returned as array by Supabase
-        let status = task.status;
-        if (Array.isArray(status)) {
-          status = status[0] || null;
-        }
-        
-        return {
-          ...task,
-          status: status as TaskWithAssignees['status'],
-          assignees: taskAssigneesMap.get(task.id) || [],
-        };
-      });
+      const tasksWithAssignees: TaskWithAssignees[] = tasks.map(task => ({
+        ...task,
+        status: task.status as TaskWithAssignees['status'],
+        assignees: taskAssigneesMap.get(task.id) || [],
+      }));
 
       return tasksWithAssignees;
     },

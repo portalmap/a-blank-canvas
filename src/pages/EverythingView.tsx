@@ -91,12 +91,9 @@ export default function EverythingView() {
         if (!filters.priorities.includes(task.priority)) return false;
       }
 
-      // Completed filter - check status category instead of just completed_at
-      if (!filters.showCompleted) {
-        const isCompleted = task.status?.category === 'done' || task.completed_at;
-        if (isCompleted) {
-          return false;
-        }
+      // Completed filter
+      if (!filters.showCompleted && task.completed_at) {
+        return false;
       }
 
       // Assignee filter
