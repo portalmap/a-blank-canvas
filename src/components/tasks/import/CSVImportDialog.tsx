@@ -29,7 +29,12 @@ export const CSVImportDialog = ({
     processMappings,
     executeImport,
     reset,
-  } = useCSVImport(listId, workspaceId);
+  } = useCSVImport({
+    workspaceId,
+    spaceIds: [], // Dialog mode doesn't use multi-space
+    autoCreateFolders: true,
+    autoCreateLists: true,
+  });
 
   const handleClose = () => {
     if (!isImporting) {

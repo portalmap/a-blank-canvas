@@ -1,4 +1,4 @@
-import { ArrowRight, Check, AlertCircle } from 'lucide-react';
+import { ArrowRight, Check, AlertCircle, FolderOpen, ListTodo, FileText, Calendar, Users, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,14 @@ interface CSVMappingStepProps {
   onBack: () => void;
   onContinue: () => void;
 }
+
+const CATEGORY_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
+  destination: { label: 'Destino', icon: <FolderOpen className="h-4 w-4" /> },
+  task: { label: 'Tarefa', icon: <FileText className="h-4 w-4" /> },
+  dates: { label: 'Datas', icon: <Calendar className="h-4 w-4" /> },
+  people: { label: 'Pessoas', icon: <Users className="h-4 w-4" /> },
+  other: { label: 'Outros', icon: <Tag className="h-4 w-4" /> },
+};
 
 export const CSVMappingStep = ({
   columns,
@@ -35,6 +43,21 @@ export const CSVMappingStep = ({
     );
   };
 
+  // Group fields by category for the dropdown
+  const groupedFields = (currentField: SystemField | null) => {
+    const available = getAvailableFields(currentField);
+    const groups: Record<string, typeof available> = {};
+    
+    available.forEach(field => {
+      if (!groups[field.category]) {
+        groups[field.category] = [];
+      }
+      groups[field.category].push(field);
+    });
+    
+    return groups;
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -43,22 +66,27 @@ export const CSVMappingStep = ({
           Conecte cada coluna do seu CSV com o campo correspondente no sistema.
           <br />
           <span className="text-primary">O campo "Nome da Tarefa" é obrigatório.</span>
+          <br />
+          <span className="text-muted-foreground">Use "Pasta" e "Lista" para organizar as tarefas automaticamente.</span>
         </p>
       </div>
 
       <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
-        {columns.map((column, index) => {
+        {columns.map((column) => {
           const mapping = mappings.find(m => m.csvColumn === column.name);
           const systemField = mapping?.systemField;
           const isTitle = systemField === 'title';
           const isIgnored = systemField === 'ignore';
+          const isDestination = systemField === 'folder' || systemField === 'list';
+          const groups = groupedFields(systemField);
           
           return (
             <div
               key={column.name}
               className={cn(
                 "flex items-center gap-4 p-4 transition-colors",
-                isIgnored && "opacity-50 bg-muted/30"
+                isIgnored && "opacity-50 bg-muted/30",
+                isDestination && "bg-primary/5"
               )}
             >
               {/* CSV Column */}
@@ -69,6 +97,12 @@ export const CSVMappingStep = ({
                     <Badge variant="default" className="shrink-0">
                       <Check className="h-3 w-3 mr-1" />
                       Obrigatório
+                    </Badge>
+                  )}
+                  {isDestination && (
+                    <Badge variant="secondary" className="shrink-0">
+                      <FolderOpen className="h-3 w-3 mr-1" />
+                      Destino
                     </Badge>
                   )}
                 </div>
@@ -83,25 +117,36 @@ export const CSVMappingStep = ({
               <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
 
               {/* System Field Selector */}
-              <div className="w-48 shrink-0">
+              <div className="w-52 shrink-0">
                 <Select
                   value={systemField || 'none'}
                   onValueChange={(value) => 
                     onUpdateMapping(column.name, value === 'none' ? null : value as SystemField)
                   }
                 >
-                  <SelectTrigger className={cn(isTitle && "border-primary")}>
+                  <SelectTrigger className={cn(
+                    isTitle && "border-primary",
+                    isDestination && "border-secondary"
+                  )}>
                     <SelectValue placeholder="Selecionar campo" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">
                       <span className="text-muted-foreground">Não mapear</span>
                     </SelectItem>
-                    {getAvailableFields(systemField).map(field => (
-                      <SelectItem key={field.value} value={field.value}>
-                        {field.label}
-                        {field.required && ' *'}
-                      </SelectItem>
+                    {Object.entries(groups).map(([category, fields]) => (
+                      <div key={category}>
+                        <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          {CATEGORY_LABELS[category]?.icon}
+                          {CATEGORY_LABELS[category]?.label}
+                        </div>
+                        {fields.map(field => (
+                          <SelectItem key={field.value} value={field.value}>
+                            {field.label}
+                            {field.required && ' *'}
+                          </SelectItem>
+                        ))}
+                      </div>
                     ))}
                   </SelectContent>
                 </Select>
