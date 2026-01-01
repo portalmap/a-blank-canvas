@@ -37,7 +37,7 @@ import { cn } from '@/lib/utils';
 import { GroupByOption } from '@/components/everything/GroupBySelector';
 import { TaskWithAssignees } from '@/hooks/useTasksWithAssignees';
 import { SortableTableHead } from '@/components/tasks/SortableTableHead';
-import type { SortConfig, ColumnId } from '@/hooks/useColumnPreferences';
+import { SortConfig, ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, AVAILABLE_COLUMNS } from '@/hooks/useColumnPreferences';
 
 interface Task {
   id: string;
@@ -72,6 +72,8 @@ interface TaskListViewProps {
   onSelectionChange?: (taskIds: string[]) => void;
   sortConfig?: SortConfig | null;
   onSortChange?: (column: ColumnId) => void;
+  visibleColumns?: ColumnId[];
+  columnOrder?: ColumnId[];
 }
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
@@ -234,7 +236,19 @@ const getInitials = (name: string | null) => {
     .slice(0, 2);
 };
 
-export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tasksWithAssignees, selectedTaskIds = [], onSelectionChange, sortConfig = null, onSortChange }: TaskListViewProps) => {
+export const TaskListView = ({ 
+  tasks, 
+  workspaceId, 
+  listId, 
+  groupBy = 'none', 
+  tasksWithAssignees, 
+  selectedTaskIds = [], 
+  onSelectionChange, 
+  sortConfig = null, 
+  onSortChange,
+  visibleColumns = DEFAULT_VISIBLE_COLUMNS,
+  columnOrder = DEFAULT_COLUMN_ORDER
+}: TaskListViewProps) => {
   const navigate = useNavigate();
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [moveTaskId, setMoveTaskId] = useState<string | null>(null);
@@ -243,6 +257,15 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
 
   const deleteTask = useDeleteTask();
   const archiveTask = useArchiveTask();
+
+  // Get ordered visible columns (excluding checkbox and actions which are handled separately)
+  const orderedVisibleColumns = columnOrder
+    .filter(colId => visibleColumns.includes(colId) && colId !== 'checkbox' && colId !== 'actions')
+    .map(colId => AVAILABLE_COLUMNS.find(c => c.id === colId)!)
+    .filter(Boolean);
+
+  // Check if a column is visible
+  const isColumnVisible = (colId: ColumnId) => visibleColumns.includes(colId);
 
   const handleSelectTask = (taskId: string, checked: boolean) => {
     if (!onSelectionChange) return;
@@ -308,26 +331,11 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
     const hasSubtasks = subtasks.length > 0;
     const isSelected = selectedTaskIds.includes(task.id);
 
-    return (
-      <>
-        <TableRow 
-          key={task.id} 
-          className={cn(
-            "cursor-pointer hover:bg-muted/50",
-            isSubtask && "bg-muted/20",
-            isSelected && "bg-primary/5"
-          )}
-          onClick={() => navigate(`/task/${task.id}`)}
-        >
-          {onSelectionChange && (
-            <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={(checked) => handleSelectTask(task.id, checked as boolean)}
-              />
-            </TableCell>
-          )}
-          <TableCell className={cn("font-medium", isSubtask && "pl-10")}>
+    // Render cell content based on column ID
+    const renderCellContent = (colId: ColumnId) => {
+      switch (colId) {
+        case 'title':
+          return (
             <div className="flex items-center">
               {!isSubtask && hasSubtasks && (
                 <button
@@ -347,52 +355,92 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
               </span>
               {!isSubtask && <SubtaskCount parentId={task.id} />}
             </div>
-          </TableCell>
-          <TableCell>
-            <StatusBadge status={task.status?.name || 'Sem status'} />
-          </TableCell>
-          <TableCell>
-            <PriorityBadge priority={task.priority} />
-          </TableCell>
-          <TableCell>
-            {task.start_date ? format(new Date(task.start_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-          </TableCell>
-          <TableCell>
-            {task.due_date ? format(new Date(task.due_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-          </TableCell>
-          <TableCell>
-            {isOverdue(task.due_date, task.completed_at) ? (
-              <span className="text-destructive font-medium">Sim</span>
-            ) : (
-              <span className="text-muted-foreground">Não</span>
-            )}
-          </TableCell>
-          <TableCell onClick={(e) => e.stopPropagation()}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setMoveTaskId(task.id)}>
-                  <FolderInput className="h-4 w-4 mr-2" />
-                  Mover
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => archiveTask.mutate(task.id)}>
-                  <Archive className="h-4 w-4 mr-2" />
-                  Arquivar
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setDeleteTaskId(task.id)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
+          );
+        case 'status':
+          return <StatusBadge status={task.status?.name || 'Sem status'} />;
+        case 'priority':
+          return <PriorityBadge priority={task.priority} />;
+        case 'start_date':
+          return task.start_date ? format(new Date(task.start_date), 'dd/MM/yyyy', { locale: ptBR }) : '-';
+        case 'due_date':
+          return task.due_date ? format(new Date(task.due_date), 'dd/MM/yyyy', { locale: ptBR }) : '-';
+        case 'assignee':
+          return task.assignee ? (
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={task.assignee.avatar_url || undefined} />
+              <AvatarFallback className="text-xs">
+                {getInitials(task.assignee.full_name)}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          );
+        case 'tags':
+          return <span className="text-muted-foreground">-</span>;
+        case 'comments':
+          return <span className="text-muted-foreground">-</span>;
+        case 'subtasks':
+          return <SubtaskCount parentId={task.id} />;
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <>
+        <TableRow 
+          key={task.id} 
+          className={cn(
+            "cursor-pointer hover:bg-muted/50",
+            isSubtask && "bg-muted/20",
+            isSelected && "bg-primary/5"
+          )}
+          onClick={() => navigate(`/task/${task.id}`)}
+        >
+          {onSelectionChange && (
+            <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={(checked) => handleSelectTask(task.id, checked as boolean)}
+              />
+            </TableCell>
+          )}
+          {orderedVisibleColumns.map((col) => (
+            <TableCell 
+              key={col.id}
+              className={cn(col.id === 'title' && isSubtask && "pl-10", col.id === 'title' && "font-medium")}
+            >
+              {renderCellContent(col.id)}
+            </TableCell>
+          ))}
+          {isColumnVisible('actions') && (
+            <TableCell onClick={(e) => e.stopPropagation()}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setMoveTaskId(task.id)}>
+                    <FolderInput className="h-4 w-4 mr-2" />
+                    Mover
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => archiveTask.mutate(task.id)}>
+                    <Archive className="h-4 w-4 mr-2" />
+                    Arquivar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setDeleteTaskId(task.id)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
+          )}
         </TableRow>
         {isExpanded && subtasks.map(subtask => renderTaskRow(subtask, true))}
       </>
@@ -429,24 +477,21 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
           <TableRow>
             {onSelectionChange && <TableHead className="w-10"></TableHead>}
             {onSortChange ? (
-              <>
-                <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig} onSort={onSortChange} />
-                <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig} onSort={onSortChange} />
-                <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig} onSort={onSortChange} />
-                <SortableTableHead columnId="start_date" label="Início" sortConfig={sortConfig} onSort={onSortChange} />
-                <SortableTableHead columnId="due_date" label="Entrega" sortConfig={sortConfig} onSort={onSortChange} />
-              </>
+              orderedVisibleColumns.map((col) => (
+                <SortableTableHead 
+                  key={col.id}
+                  columnId={col.id} 
+                  label={col.label} 
+                  sortConfig={sortConfig} 
+                  onSort={onSortChange} 
+                />
+              ))
             ) : (
-              <>
-                <TableHead>Tarefa</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Prioridade</TableHead>
-                <TableHead>Início</TableHead>
-                <TableHead>Entrega</TableHead>
-              </>
+              orderedVisibleColumns.map((col) => (
+                <TableHead key={col.id}>{col.label}</TableHead>
+              ))
             )}
-            <TableHead>Atrasada</TableHead>
-            <TableHead className="w-12">Ações</TableHead>
+            {isColumnVisible('actions') && <TableHead className="w-12">Ações</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -586,30 +631,30 @@ export const TaskListView = ({ tasks, workspaceId, listId, groupBy = 'none', tas
                 </TableHead>
               )}
               {onSortChange ? (
-                <>
-                  <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig || null} onSort={onSortChange} />
-                  <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig || null} onSort={onSortChange} />
-                  <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig || null} onSort={onSortChange} />
-                  <SortableTableHead columnId="start_date" label="Início" sortConfig={sortConfig || null} onSort={onSortChange} />
-                  <SortableTableHead columnId="due_date" label="Entrega" sortConfig={sortConfig || null} onSort={onSortChange} />
-                </>
+                orderedVisibleColumns.map((col) => (
+                  <SortableTableHead 
+                    key={col.id}
+                    columnId={col.id} 
+                    label={col.label} 
+                    sortConfig={sortConfig || null} 
+                    onSort={onSortChange} 
+                  />
+                ))
               ) : (
-                <>
-                  <TableHead>Tarefa</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead>Início</TableHead>
-                  <TableHead>Entrega</TableHead>
-                </>
+                orderedVisibleColumns.map((col) => (
+                  <TableHead key={col.id}>{col.label}</TableHead>
+                ))
               )}
-              <TableHead>Atrasada</TableHead>
-              <TableHead className="w-12">Ações</TableHead>
+              {isColumnVisible('actions') && <TableHead className="w-12">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {mainTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={onSelectionChange ? 8 : 7} className="text-center text-muted-foreground py-8">
+                <TableCell 
+                  colSpan={orderedVisibleColumns.length + (onSelectionChange ? 1 : 0) + (isColumnVisible('actions') ? 1 : 0)} 
+                  className="text-center text-muted-foreground py-8"
+                >
                   Nenhuma tarefa encontrada
                 </TableCell>
               </TableRow>

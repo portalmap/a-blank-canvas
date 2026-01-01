@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
@@ -61,7 +61,7 @@ const ListDetailView = () => {
   const [columnOrder, setColumnOrder] = useState<ColumnId[]>(DEFAULT_COLUMN_ORDER);
 
   // Update local state when preferences load
-  useMemo(() => {
+  useEffect(() => {
     if (columnPrefs) {
       setVisibleColumns(columnPrefs.visible_columns);
       setColumnOrder(columnPrefs.column_order);
@@ -379,6 +379,8 @@ const ListDetailView = () => {
                 onSelectionChange={setSelectedTaskIds}
                 sortConfig={sortConfig}
                 onSortChange={handleSortChange}
+                visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
               />
             )}
           </TabsContent>
