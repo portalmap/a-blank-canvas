@@ -8,11 +8,7 @@ import { useTasksWithAssignees, TaskWithAssignees } from '@/hooks/useTasksWithAs
 import { useCreateTask } from '@/hooks/useTasks';
 import { useStatusesForScope, useDefaultStatusForScope } from '@/hooks/useStatuses';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Plus, AlertCircle, Search, User } from 'lucide-react';
@@ -29,6 +25,7 @@ import { ColumnSelector } from '@/components/tasks/ColumnSelector';
 import { BulkActionsBar } from '@/components/tasks/BulkActionsBar';
 import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId, SortConfig } from '@/hooks/useColumnPreferences';
 import { useTaskSorting } from '@/hooks/useTaskSorting';
+import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
 
 const ListDetailView = () => {
   const { listId } = useParams<{ listId: string }>();
@@ -41,10 +38,8 @@ const ListDetailView = () => {
   const { data: defaultStatus } = useDefaultStatusForScope('list', listId, activeWorkspace?.id);
   const createTask = useCreateTask();
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDescription, setNewTaskDescription] = useState('');
-  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [selectedTaskForDrawer, setSelectedTaskForDrawer] = useState<any>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,21 +192,25 @@ const ListDetailView = () => {
   };
 
   const handleCreateTask = async () => {
-    if (!activeWorkspace || !listId || !newTaskTitle.trim() || !defaultStatus) return;
+    if (!activeWorkspace || !listId || !defaultStatus) return;
 
-    await createTask.mutateAsync({
+    const newTask = await createTask.mutateAsync({
       workspaceId: activeWorkspace.id,
       listId,
       statusId: defaultStatus.id,
-      title: newTaskTitle,
-      description: newTaskDescription,
-      priority: newTaskPriority,
+      title: 'Nova Tarefa',
+      description: null,
+      priority: 'medium',
     });
 
-    setNewTaskTitle('');
-    setNewTaskDescription('');
-    setNewTaskPriority('medium');
-    setIsDialogOpen(false);
+    if (newTask) {
+      const taskWithStatus = {
+        ...newTask,
+        status: statuses?.find(s => s.id === defaultStatus.id),
+      };
+      setSelectedTaskForDrawer(taskWithStatus);
+      setIsDrawerOpen(true);
+    }
   };
 
   if (!activeWorkspace || listLoading || !currentList || !currentSpace) {
@@ -303,8 +302,12 @@ const ListDetailView = () => {
               scopeId={listId!}
               scopeName={currentList.name}
             />
-            <Button onClick={() => setIsDialogOpen(true)} disabled={!defaultStatus}>
-              <Plus className="mr-2 h-4 w-4" />
+            <Button onClick={handleCreateTask} disabled={createTask.isPending || !defaultStatus}>
+              {createTask.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
               Nova Tarefa
             </Button>
           </div>
@@ -401,62 +404,11 @@ const ListDetailView = () => {
           </TabsContent>
         </Tabs>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Nova Tarefa</DialogTitle>
-              <DialogDescription>
-                Adicione uma nova tarefa nesta lista
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Título</Label>
-                <Input
-                  id="title"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  placeholder="Ex: Revisar documentação, Implementar feature X"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição (opcional)</Label>
-                <Textarea
-                  id="description"
-                  value={newTaskDescription}
-                  onChange={(e) => setNewTaskDescription(e.target.value)}
-                  placeholder="Descreva os detalhes da tarefa"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority">Prioridade</Label>
-                <Select value={newTaskPriority} onValueChange={(value: any) => setNewTaskPriority(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="urgent">Urgente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleCreateTask} 
-                disabled={!newTaskTitle.trim() || createTask.isPending || !defaultStatus}
-              >
-                {createTask.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Criar Tarefa
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <TaskDetailDrawer
+          task={selectedTaskForDrawer}
+          open={isDrawerOpen}
+          onOpenChange={setIsDrawerOpen}
+        />
       </div>
 
       {showAssigneePanel && (
