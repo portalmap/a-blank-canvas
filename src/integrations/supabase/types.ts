@@ -1523,6 +1523,7 @@ export type Database = {
           scope_id: string | null
           scope_type: Database["public"]["Enums"]["status_scope"]
           template_id: string | null
+          template_item_id: string | null
           workspace_id: string
         }
         Insert: {
@@ -1537,6 +1538,7 @@ export type Database = {
           scope_id?: string | null
           scope_type?: Database["public"]["Enums"]["status_scope"]
           template_id?: string | null
+          template_item_id?: string | null
           workspace_id: string
         }
         Update: {
@@ -1551,6 +1553,7 @@ export type Database = {
           scope_id?: string | null
           scope_type?: Database["public"]["Enums"]["status_scope"]
           template_id?: string | null
+          template_item_id?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -1559,6 +1562,13 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "status_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "statuses_template_item_id_fkey"
+            columns: ["template_item_id"]
+            isOneToOne: false
+            referencedRelation: "status_template_items"
             referencedColumns: ["id"]
           },
           {
@@ -2497,6 +2507,14 @@ export type Database = {
       is_global_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_system_admin: { Args: { _user_id: string }; Returns: boolean }
+      sync_template_statuses_for_list: {
+        Args: {
+          p_list_id: string
+          p_template_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       user_can_access_document: {
         Args: { _document_id: string; _user_id: string }
         Returns: boolean

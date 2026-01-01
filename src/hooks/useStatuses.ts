@@ -51,22 +51,49 @@ export const useStatusesForScope = (
           .single();
           
         if (list?.status_source === 'template' && list?.status_template_id) {
-          // Buscar status do template
-          const { data: items, error } = await supabase
-            .from('status_template_items')
+          // Buscar status sincronizados na tabela statuses (scope_type='list', scope_id=listId)
+          const { data: syncedStatuses, error: syncError } = await supabase
+            .from('statuses')
             .select('*')
-            .eq('template_id', list.status_template_id)
-            .order('order_index');
+            .eq('scope_type', 'list')
+            .eq('scope_id', scopeId)
+            .order('order_index', { ascending: true });
           
-          if (error) throw error;
+          if (!syncError && syncedStatuses && syncedStatuses.length > 0) {
+            return syncedStatuses.map(s => ({
+              id: s.id,
+              name: s.name,
+              color: s.color,
+              is_default: s.is_default,
+              order_index: s.order_index,
+              category: s.category,
+            }));
+          }
           
-          return items?.map(item => ({
-            id: item.id,
-            name: item.name,
-            color: item.color,
-            is_default: item.is_default || false,
-            order_index: item.order_index || 0,
-            category: item.category,
+          // Se não há status sincronizados, sincronizar agora
+          await supabase.rpc('sync_template_statuses_for_list', {
+            p_list_id: scopeId,
+            p_template_id: list.status_template_id,
+            p_workspace_id: workspaceId
+          });
+          
+          // Buscar novamente após sincronização
+          const { data: newStatuses, error: newError } = await supabase
+            .from('statuses')
+            .select('*')
+            .eq('scope_type', 'list')
+            .eq('scope_id', scopeId)
+            .order('order_index', { ascending: true });
+          
+          if (newError) throw newError;
+          
+          return newStatuses?.map(s => ({
+            id: s.id,
+            name: s.name,
+            color: s.color,
+            is_default: s.is_default,
+            order_index: s.order_index,
+            category: s.category,
           })) || [];
         }
       }
@@ -113,44 +140,42 @@ export const useDefaultStatusForScope = (
           .single();
           
         if (list?.status_source === 'template' && list?.status_template_id) {
-          // Buscar status default do template
-          const { data: item, error } = await supabase
-            .from('status_template_items')
+          // Buscar status sincronizados na tabela statuses
+          let { data: syncedStatuses } = await supabase
+            .from('statuses')
             .select('*')
-            .eq('template_id', list.status_template_id)
-            .eq('is_default', true)
-            .single();
+            .eq('scope_type', 'list')
+            .eq('scope_id', scopeId)
+            .order('order_index', { ascending: true });
           
-          if (error && error.code !== 'PGRST116') throw error;
-          
-          if (item) {
-            return {
-              id: item.id,
-              name: item.name,
-              color: item.color,
-              is_default: item.is_default || false,
-              order_index: item.order_index || 0,
-              category: item.category,
-            };
+          // Se não há status sincronizados, sincronizar agora
+          if (!syncedStatuses || syncedStatuses.length === 0) {
+            await supabase.rpc('sync_template_statuses_for_list', {
+              p_list_id: scopeId,
+              p_template_id: list.status_template_id,
+              p_workspace_id: workspaceId
+            });
+            
+            const { data: newStatuses } = await supabase
+              .from('statuses')
+              .select('*')
+              .eq('scope_type', 'list')
+              .eq('scope_id', scopeId)
+              .order('order_index', { ascending: true });
+            
+            syncedStatuses = newStatuses;
           }
           
-          // Se não houver default, pegar o primeiro
-          const { data: firstItem } = await supabase
-            .from('status_template_items')
-            .select('*')
-            .eq('template_id', list.status_template_id)
-            .order('order_index')
-            .limit(1)
-            .single();
-          
-          if (firstItem) {
+          if (syncedStatuses && syncedStatuses.length > 0) {
+            // Buscar o default ou primeiro
+            const defaultStatus = syncedStatuses.find(s => s.is_default) || syncedStatuses[0];
             return {
-              id: firstItem.id,
-              name: firstItem.name,
-              color: firstItem.color,
-              is_default: firstItem.is_default || false,
-              order_index: firstItem.order_index || 0,
-              category: firstItem.category,
+              id: defaultStatus.id,
+              name: defaultStatus.name,
+              color: defaultStatus.color,
+              is_default: defaultStatus.is_default,
+              order_index: defaultStatus.order_index,
+              category: defaultStatus.category,
             };
           }
         }
