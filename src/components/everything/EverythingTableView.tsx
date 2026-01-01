@@ -43,6 +43,8 @@ interface EverythingTableViewProps {
   onSelectionChange?: (taskIds: string[]) => void;
   sortConfig?: SortConfig | null;
   onSortChange?: (column: ColumnId) => void;
+  visibleColumns: ColumnId[];
+  columnOrder: ColumnId[];
 }
 
 const priorityConfig = {
@@ -146,7 +148,7 @@ function groupTasksByPriority(tasks: TaskWithAssignees[]) {
   });
 }
 
-export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSelectionChange, sortConfig = null, onSortChange }: EverythingTableViewProps) {
+export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSelectionChange, sortConfig = null, onSortChange, visibleColumns, columnOrder }: EverythingTableViewProps) {
   const navigate = useNavigate();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -212,8 +214,127 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
     return isPast(dueDate);
   };
 
+  // Get ordered visible columns (excluding checkbox and actions which are always shown)
+  const orderedColumns = columnOrder
+    .filter(col => visibleColumns.includes(col) && !['checkbox', 'actions'].includes(col));
+
   const renderTaskRow = (task: TaskWithAssignees) => {
     const isSelected = selectedTaskIds.includes(task.id);
+    
+    const renderCellContent = (columnId: ColumnId) => {
+      switch (columnId) {
+        case 'title':
+          return (
+            <TableCell key={columnId} className="max-w-md">
+              <div className="flex flex-col gap-1">
+                <span className="font-medium truncate">{task.title}</span>
+                {task.list && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
+                    <span>
+                      {task.list.space?.name}
+                      {task.list.folder && ` > ${task.list.folder.name}`}
+                      {` > ${task.list.name}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </TableCell>
+          );
+        case 'status':
+          return (
+            <TableCell key={columnId}>
+              {task.status && (
+                <Badge
+                  variant="outline"
+                  className="text-xs"
+                  style={{
+                    borderColor: task.status.color || undefined,
+                    backgroundColor: task.status.color ? `${task.status.color}20` : undefined,
+                  }}
+                >
+                  <div
+                    className="w-2 h-2 rounded-full mr-1.5"
+                    style={{ backgroundColor: task.status.color || '#6b7280' }}
+                  />
+                  {task.status.name}
+                </Badge>
+              )}
+            </TableCell>
+          );
+        case 'assignee':
+          return (
+            <TableCell key={columnId}>
+              <div className="flex -space-x-2">
+                {task.assignees.length > 0 ? (
+                  task.assignees.slice(0, 3).map((assignee) => (
+                    <Avatar key={assignee.id} className="h-7 w-7 border-2 border-background">
+                      <AvatarImage src={assignee.avatar_url || undefined} />
+                      <AvatarFallback className="text-xs">
+                        {getInitials(assignee.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">-</span>
+                )}
+                {task.assignees.length > 3 && (
+                  <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
+                    +{task.assignees.length - 3}
+                  </div>
+                )}
+              </div>
+            </TableCell>
+          );
+        case 'due_date':
+          return (
+            <TableCell key={columnId}>
+              {task.due_date ? (
+                <span
+                  className={cn(
+                    'text-sm flex items-center gap-1',
+                    isOverdue(task) && 'text-red-500 font-medium'
+                  )}
+                >
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(task.due_date), 'dd/MM/yy', { locale: ptBR })}
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">-</span>
+              )}
+            </TableCell>
+          );
+        case 'start_date':
+          return (
+            <TableCell key={columnId}>
+              {task.start_date ? (
+                <span className="text-sm flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(task.start_date), 'dd/MM/yy', { locale: ptBR })}
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">-</span>
+              )}
+            </TableCell>
+          );
+        case 'priority':
+          return (
+            <TableCell key={columnId}>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-xs text-white',
+                  priorityConfig[task.priority]?.color
+                )}
+              >
+                {priorityConfig[task.priority]?.label || 'Média'}
+              </Badge>
+            </TableCell>
+          );
+        default:
+          return null;
+      }
+    };
     
     return (
       <TableRow
@@ -229,142 +350,97 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
             />
           </TableCell>
         )}
-        <TableCell className="max-w-md">
-          <div className="flex flex-col gap-1">
-            <span className="font-medium truncate">{task.title}</span>
-            {task.list && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                <span>
-                  {task.list.space?.name}
-                  {task.list.folder && ` > ${task.list.folder.name}`}
-                  {` > ${task.list.name}`}
-                </span>
-              </div>
-            )}
-          </div>
-      </TableCell>
-      <TableCell>
-        {task.status && (
-          <Badge
-            variant="outline"
-            className="text-xs"
-            style={{
-              borderColor: task.status.color || undefined,
-              backgroundColor: task.status.color ? `${task.status.color}20` : undefined,
-            }}
-          >
-            <div
-              className="w-2 h-2 rounded-full mr-1.5"
-              style={{ backgroundColor: task.status.color || '#6b7280' }}
-            />
-            {task.status.name}
-          </Badge>
-        )}
-      </TableCell>
-      <TableCell>
-        <div className="flex -space-x-2">
-          {task.assignees.length > 0 ? (
-            task.assignees.slice(0, 3).map((assignee) => (
-              <Avatar key={assignee.id} className="h-7 w-7 border-2 border-background">
-                <AvatarImage src={assignee.avatar_url || undefined} />
-                <AvatarFallback className="text-xs">
-                  {getInitials(assignee.full_name)}
-                </AvatarFallback>
-              </Avatar>
-            ))
-          ) : (
-            <span className="text-sm text-muted-foreground">-</span>
-          )}
-          {task.assignees.length > 3 && (
-            <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
-              +{task.assignees.length - 3}
-            </div>
-          )}
-        </div>
-      </TableCell>
-      <TableCell>
-        {task.due_date ? (
-          <span
-            className={cn(
-              'text-sm flex items-center gap-1',
-              isOverdue(task) && 'text-red-500 font-medium'
-            )}
-          >
-            <Calendar className="h-3 w-3" />
-            {format(new Date(task.due_date), 'dd/MM/yy', { locale: ptBR })}
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">-</span>
-        )}
-      </TableCell>
-      <TableCell>
-        <Badge
-          variant="outline"
-          className={cn(
-            'text-xs text-white',
-            priorityConfig[task.priority]?.color
-          )}
-        >
-          {priorityConfig[task.priority]?.label || 'Média'}
-        </Badge>
-      </TableCell>
-      <TableCell>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/task/${task.id}`)}>
-              Ver detalhes
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </TableCell>
-    </TableRow>
+        {orderedColumns.map(col => renderCellContent(col))}
+        <TableCell>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate(`/task/${task.id}`)}>
+                Ver detalhes
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
     );
   };
+
+  // Column header mapping
+  const columnLabels: Record<ColumnId, string> = {
+    checkbox: '',
+    title: 'Tarefa',
+    status: 'Status',
+    assignee: 'Responsável',
+    due_date: 'Vencimento',
+    start_date: 'Data de início',
+    priority: 'Prioridade',
+    tags: 'Etiquetas',
+    comments: 'Comentários',
+    subtasks: 'Subtarefas',
+    actions: '',
+  };
+
+  const renderTableHeader = (tasksForSelection: TaskWithAssignees[]) => (
+    <TableHeader>
+      <TableRow>
+        {onSelectionChange && (
+          <TableHead className="w-10">
+            <Checkbox
+              checked={tasksForSelection.length > 0 && tasksForSelection.every(t => selectedTaskIds.includes(t.id))}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  const newIds = [...selectedTaskIds, ...tasksForSelection.map(t => t.id).filter(id => !selectedTaskIds.includes(id))];
+                  onSelectionChange(newIds);
+                } else {
+                  const groupIds = tasksForSelection.map(t => t.id);
+                  onSelectionChange(selectedTaskIds.filter(id => !groupIds.includes(id)));
+                }
+              }}
+            />
+          </TableHead>
+        )}
+        {onSortChange ? (
+          <>
+            {orderedColumns.map(col => (
+              <SortableTableHead 
+                key={col} 
+                columnId={col} 
+                label={columnLabels[col]} 
+                sortConfig={sortConfig} 
+                onSort={onSortChange}
+                className={col === 'title' ? 'w-[40%]' : undefined}
+              />
+            ))}
+          </>
+        ) : (
+          <>
+            {orderedColumns.map(col => (
+              <TableHead key={col} className={col === 'title' ? 'w-[40%]' : undefined}>
+                {columnLabels[col]}
+              </TableHead>
+            ))}
+          </>
+        )}
+        <TableHead className="w-10"></TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+
+  const colSpan = (onSelectionChange ? 1 : 0) + orderedColumns.length + 1;
 
   if (groupBy === 'none') {
     return (
       <Table>
-        <TableHeader>
-          <TableRow>
-            {onSelectionChange && (
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={tasks.length > 0 && selectedTaskIds.length === tasks.length}
-                  onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                />
-              </TableHead>
-            )}
-            {onSortChange ? (
-              <>
-                <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig} onSort={onSortChange} className="w-[40%]" />
-                <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig} onSort={onSortChange} />
-                <SortableTableHead columnId="assignee" label="Responsável" sortConfig={sortConfig} onSort={onSortChange} />
-                <SortableTableHead columnId="due_date" label="Vencimento" sortConfig={sortConfig} onSort={onSortChange} />
-                <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig} onSort={onSortChange} />
-              </>
-            ) : (
-              <>
-                <TableHead className="w-[40%]">Tarefa</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>Vencimento</TableHead>
-                <TableHead>Prioridade</TableHead>
-              </>
-            )}
-            <TableHead className="w-10"></TableHead>
-          </TableRow>
-        </TableHeader>
+        {renderTableHeader(tasks)}
         <TableBody>
           {tasks.map(renderTaskRow)}
           {tasks.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={colSpan} className="text-center text-muted-foreground py-8">
                 Nenhuma tarefa encontrada
               </TableCell>
             </TableRow>
@@ -402,44 +478,7 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
             </CollapsibleTrigger>
             <CollapsibleContent>
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    {onSelectionChange && (
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={tasksInGroup.length > 0 && tasksInGroup.every(t => selectedTaskIds.includes(t.id))}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              const newIds = [...selectedTaskIds, ...tasksInGroup.map(t => t.id).filter(id => !selectedTaskIds.includes(id))];
-                              onSelectionChange(newIds);
-                            } else {
-                              const groupIds = tasksInGroup.map(t => t.id);
-                              onSelectionChange(selectedTaskIds.filter(id => !groupIds.includes(id)));
-                            }
-                          }}
-                        />
-                      </TableHead>
-                    )}
-                    {onSortChange ? (
-                      <>
-                        <SortableTableHead columnId="title" label="Tarefa" sortConfig={sortConfig || null} onSort={onSortChange} className="w-[40%]" />
-                        <SortableTableHead columnId="status" label="Status" sortConfig={sortConfig || null} onSort={onSortChange} />
-                        <SortableTableHead columnId="assignee" label="Responsável" sortConfig={sortConfig || null} onSort={onSortChange} />
-                        <SortableTableHead columnId="due_date" label="Vencimento" sortConfig={sortConfig || null} onSort={onSortChange} />
-                        <SortableTableHead columnId="priority" label="Prioridade" sortConfig={sortConfig || null} onSort={onSortChange} />
-                      </>
-                    ) : (
-                      <>
-                        <TableHead className="w-[40%]">Tarefa</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Responsável</TableHead>
-                        <TableHead>Vencimento</TableHead>
-                        <TableHead>Prioridade</TableHead>
-                      </>
-                    )}
-                    <TableHead className="w-10"></TableHead>
-                  </TableRow>
-                </TableHeader>
+                {renderTableHeader(tasksInGroup)}
                 <TableBody>
                   {tasksInGroup.map(renderTaskRow)}
                 </TableBody>
