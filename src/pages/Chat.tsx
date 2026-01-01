@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Users, Rss } from 'lucide-react';
+import { MessageSquare, Users } from 'lucide-react';
 
 const Chat = () => {
   return (
@@ -13,7 +13,7 @@ const Chat = () => {
       </div>
 
       <Tabs defaultValue="channels" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="channels" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
             Canais
@@ -21,10 +21,6 @@ const Chat = () => {
           <TabsTrigger value="direct" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Mensagens
-          </TabsTrigger>
-          <TabsTrigger value="feed" className="flex items-center gap-2">
-            <Rss className="h-4 w-4" />
-            Feed
           </TabsTrigger>
         </TabsList>
 
@@ -55,22 +51,6 @@ const Chat = () => {
             <CardContent>
               <p className="text-muted-foreground text-center py-8">
                 Funcionalidade de mensagens diretas será implementada em breve
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="feed" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Feed</CardTitle>
-              <CardDescription>
-                Atualizações e anúncios do workspace
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-center py-8">
-                Funcionalidade de feed será implementada em breve
               </p>
             </CardContent>
           </Card>
