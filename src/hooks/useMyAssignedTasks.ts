@@ -62,7 +62,6 @@ export const useMyAssignedTasks = () => {
         `)
         .in('id', taskIds)
         .is('archived_at', null)
-        .is('completed_at', null)
         .order('due_date', { ascending: true, nullsFirst: false });
 
       if (tasksError) throw tasksError;
