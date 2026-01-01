@@ -10,20 +10,20 @@ const HomePage = () => {
         <p className="text-muted-foreground">Suas tarefas, comentários e atualizações do workspace</p>
       </div>
       
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-        {/* Feed - ocupa 2 colunas em telas grandes */}
-        <div className="lg:col-span-2 min-h-0 overflow-hidden">
-          <FeedCard />
-        </div>
-        
-        {/* Sidebar com Comentários e Tarefas */}
-        <div className="flex flex-col gap-6 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <AssignedCommentsCard />
-          </div>
-          <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-hidden">
+        {/* Linha superior: Tarefas e Comentários lado a lado */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0" style={{ flex: '0 0 45%' }}>
+          <div className="min-h-0 overflow-hidden">
             <MyTasksCard />
           </div>
+          <div className="min-h-0 overflow-hidden">
+            <AssignedCommentsCard />
+          </div>
+        </div>
+        
+        {/* Feed abaixo, ocupando o resto do espaço */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <FeedCard />
         </div>
       </div>
     </div>
