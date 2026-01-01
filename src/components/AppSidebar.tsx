@@ -21,9 +21,7 @@ import { SpaceTreeItem } from '@/components/workspace/SpaceTreeItem';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-const mainNavItems = [
-  { title: 'Workspace', url: '/', icon: Home },
-];
+const homeNavItem = { title: 'Início', url: '/', icon: Home };
 
 const everythingNavItem = { title: 'Tudo', url: '/everything', icon: Layers };
 
@@ -121,6 +119,30 @@ export function AppSidebar() {
           <SidebarGroupLabel>Módulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Início link */}
+              <SidebarMenuItem>
+                <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton asChild>
+                      <NavLink 
+                        to={homeNavItem.url}
+                        end
+                        className="hover:bg-sidebar-accent"
+                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      >
+                        <homeNavItem.icon className="h-4 w-4" />
+                        {!isCollapsed && <span>{homeNavItem.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right">
+                      {homeNavItem.title}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </SidebarMenuItem>
+
               {/* Everything - Tudo link */}
               <SidebarMenuItem>
                 <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
@@ -212,13 +234,12 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink 
-                      to="/" 
-                      end
+                      to="/workspaces" 
                       className="hover:bg-sidebar-accent"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                     >
                       <Home className="h-4 w-4" />
-                      {!isCollapsed && <span>Workspace</span>}
+                      {!isCollapsed && <span>Workspaces</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
