@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Plus, AlertCircle, Search, User } from 'lucide-react';
+import { Loader2, Plus, AlertCircle, Search, User, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskListView } from '@/components/views/TaskListView';
 import { TaskKanbanView } from '@/components/views/TaskKanbanView';
@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { ColumnSelector } from '@/components/tasks/ColumnSelector';
 import { BulkActionsBar } from '@/components/tasks/BulkActionsBar';
 import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId, SortConfig } from '@/hooks/useColumnPreferences';
+import { CSVImportDialog } from '@/components/tasks/import';
 import { useTaskSorting } from '@/hooks/useTaskSorting';
 
 const ListDetailView = () => {
@@ -42,6 +43,7 @@ const ListDetailView = () => {
   const createTask = useCreateTask();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
@@ -307,6 +309,10 @@ const ListDetailView = () => {
               <Plus className="mr-2 h-4 w-4" />
               Nova Tarefa
             </Button>
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Importar CSV
+            </Button>
           </div>
         </div>
 
@@ -477,6 +483,13 @@ const ListDetailView = () => {
         listId={listId}
         defaultStatusId={defaultStatus?.id}
         onClearSelection={() => setSelectedTaskIds([])}
+      />
+
+      <CSVImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        listId={listId!}
+        workspaceId={activeWorkspace.id}
       />
     </div>
   );
