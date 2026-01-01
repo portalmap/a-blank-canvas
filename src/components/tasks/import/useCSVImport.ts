@@ -12,6 +12,8 @@ export type SystemField =
   | 'due_date'
   | 'assignees'
   | 'tags'
+  | 'folder'
+  | 'list'
   | 'ignore';
 
 export interface CSVColumn {
@@ -33,6 +35,8 @@ export interface ParsedTask {
   due_date?: string;
   assignees?: string[];
   tags?: string[];
+  folder?: string;
+  list?: string;
   warnings: string[];
 }
 
@@ -40,21 +44,37 @@ export interface ImportResult {
   created: number;
   warnings: number;
   errors: string[];
+  foldersCreated: number;
+  listsCreated: number;
 }
 
-export const SYSTEM_FIELDS: { value: SystemField; label: string; required?: boolean }[] = [
-  { value: 'title', label: 'Nome da Tarefa', required: true },
-  { value: 'description', label: 'Descrição' },
-  { value: 'status', label: 'Status' },
-  { value: 'priority', label: 'Prioridade' },
-  { value: 'start_date', label: 'Data de Início' },
-  { value: 'due_date', label: 'Data de Entrega' },
-  { value: 'assignees', label: 'Responsáveis' },
-  { value: 'tags', label: 'Tags' },
-  { value: 'ignore', label: 'Ignorar Coluna' },
+export const SYSTEM_FIELDS: { value: SystemField; label: string; required?: boolean; category: 'destination' | 'task' | 'dates' | 'people' | 'other' }[] = [
+  // Destination fields
+  { value: 'folder', label: 'Pasta', category: 'destination' },
+  { value: 'list', label: 'Lista', category: 'destination' },
+  // Task fields
+  { value: 'title', label: 'Nome da Tarefa', required: true, category: 'task' },
+  { value: 'description', label: 'Descrição', category: 'task' },
+  { value: 'status', label: 'Status', category: 'task' },
+  { value: 'priority', label: 'Prioridade', category: 'task' },
+  // Date fields
+  { value: 'start_date', label: 'Data de Início', category: 'dates' },
+  { value: 'due_date', label: 'Data de Entrega', category: 'dates' },
+  // People fields
+  { value: 'assignees', label: 'Responsáveis', category: 'people' },
+  // Other
+  { value: 'tags', label: 'Tags', category: 'other' },
+  { value: 'ignore', label: 'Ignorar Coluna', category: 'other' },
 ];
 
-export const useCSVImport = (listId: string, workspaceId: string) => {
+interface UseCSVImportOptions {
+  workspaceId: string;
+  spaceIds: string[];
+  autoCreateFolders?: boolean;
+  autoCreateLists?: boolean;
+}
+
+export const useCSVImport = (options?: UseCSVImportOptions) => {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [csvData, setCsvData] = useState<string[][]>([]);
@@ -126,7 +146,14 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
         const lowerName = col.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         let detected: SystemField | null = null;
         
-        if (lowerName.includes('titulo') || lowerName.includes('nome') || lowerName.includes('title') || lowerName.includes('tarefa')) {
+        // Destination fields
+        if (lowerName.includes('pasta') || lowerName.includes('folder')) {
+          detected = 'folder';
+        } else if (lowerName.includes('lista') && !lowerName.includes('check')) {
+          detected = 'list';
+        }
+        // Task fields
+        else if (lowerName.includes('titulo') || lowerName.includes('nome') || lowerName.includes('title') || lowerName.includes('tarefa')) {
           detected = 'title';
         } else if (lowerName.includes('descric') || lowerName.includes('description')) {
           detected = 'description';
@@ -167,6 +194,11 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
       return;
     }
     
+    if (!options?.workspaceId) {
+      toast.error('Workspace não selecionado');
+      return;
+    }
+    
     const headers = csvData[0];
     const dataRows = csvData.slice(1);
     
@@ -174,19 +206,19 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
     const { data: members } = await supabase
       .from('workspace_members')
       .select('user_id, profiles:user_id(id, full_name)')
-      .eq('workspace_id', workspaceId);
+      .eq('workspace_id', options.workspaceId);
     
     // Get statuses for status matching
     const { data: statuses } = await supabase
       .from('statuses')
       .select('id, name')
-      .eq('workspace_id', workspaceId);
+      .eq('workspace_id', options.workspaceId);
     
     // Get tags for tag matching
     const { data: tags } = await supabase
       .from('task_tags')
       .select('id, name')
-      .eq('workspace_id', workspaceId);
+      .eq('workspace_id', options.workspaceId);
     
     const tasks: ParsedTask[] = dataRows.map(row => {
       const task: ParsedTask = { title: '', warnings: [] };
@@ -203,6 +235,12 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
             break;
           case 'description':
             task.description = value;
+            break;
+          case 'folder':
+            task.folder = value;
+            break;
+          case 'list':
+            task.list = value;
             break;
           case 'status':
             task.status = value;
@@ -247,7 +285,7 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
     
     setParsedTasks(tasks);
     setStep('preview');
-  }, [csvData, mappings, workspaceId]);
+  }, [csvData, mappings, options?.workspaceId]);
 
   const parseDate = (dateStr: string): string | null => {
     if (!dateStr) return null;
@@ -289,7 +327,13 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
 
   const executeImport = useCallback(async (): Promise<ImportResult> => {
     setIsImporting(true);
-    const result: ImportResult = { created: 0, warnings: 0, errors: [] };
+    const result: ImportResult = { created: 0, warnings: 0, errors: [], foldersCreated: 0, listsCreated: 0 };
+    
+    if (!options?.workspaceId || !options?.spaceIds?.length) {
+      result.errors.push('Configuração de destino inválida');
+      setIsImporting(false);
+      return result;
+    }
     
     try {
       // Get current user
@@ -300,7 +344,7 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
       const { data: statuses } = await supabase
         .from('statuses')
         .select('id, name, is_default')
-        .eq('workspace_id', workspaceId);
+        .eq('workspace_id', options.workspaceId);
       
       const defaultStatus = statuses?.find(s => s.is_default) || statuses?.[0];
       if (!defaultStatus) throw new Error('Nenhum status encontrado no workspace');
@@ -309,16 +353,163 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
       const { data: members } = await supabase
         .from('workspace_members')
         .select('user_id, profiles:user_id(id, full_name)')
-        .eq('workspace_id', workspaceId);
+        .eq('workspace_id', options.workspaceId);
       
       // Get existing tags
       const { data: existingTags } = await supabase
         .from('task_tags')
         .select('id, name')
-        .eq('workspace_id', workspaceId);
+        .eq('workspace_id', options.workspaceId);
+      
+      // Get existing folders for selected spaces
+      const { data: existingFolders } = await supabase
+        .from('folders')
+        .select('id, name, space_id')
+        .in('space_id', options.spaceIds);
+      
+      // Get existing lists for selected spaces
+      const { data: existingLists } = await supabase
+        .from('lists')
+        .select('id, name, space_id, folder_id')
+        .in('space_id', options.spaceIds);
+      
+      // Cache for created folders and lists
+      const folderCache: Map<string, string> = new Map();
+      const listCache: Map<string, string> = new Map();
+      
+      // Default to first space if no folder/list mapping
+      const defaultSpaceId = options.spaceIds[0];
+      
+      // Find or create a default list
+      let defaultListId = existingLists?.find(l => l.space_id === defaultSpaceId && !l.folder_id)?.id;
+      if (!defaultListId) {
+        const { data: newList } = await supabase
+          .from('lists')
+          .insert({
+            name: 'Importados',
+            space_id: defaultSpaceId,
+            workspace_id: options.workspaceId,
+          })
+          .select('id')
+          .single();
+        defaultListId = newList?.id;
+        result.listsCreated++;
+      }
+      
+      if (!defaultListId) throw new Error('Não foi possível criar lista padrão');
       
       for (const task of parsedTasks) {
         try {
+          let targetListId = defaultListId;
+          
+          // Handle folder and list from CSV
+          if (task.folder || task.list) {
+            const folderName = task.folder?.trim();
+            const listName = task.list?.trim();
+            
+            let targetFolderId: string | null = null;
+            
+            // Find or create folder
+            if (folderName) {
+              const cacheKey = `${defaultSpaceId}-${folderName.toLowerCase()}`;
+              if (folderCache.has(cacheKey)) {
+                targetFolderId = folderCache.get(cacheKey)!;
+              } else {
+                const existingFolder = existingFolders?.find(
+                  f => f.space_id === defaultSpaceId && f.name.toLowerCase() === folderName.toLowerCase()
+                );
+                
+                if (existingFolder) {
+                  targetFolderId = existingFolder.id;
+                  folderCache.set(cacheKey, existingFolder.id);
+                } else if (options.autoCreateFolders !== false) {
+                  const { data: newFolder } = await supabase
+                    .from('folders')
+                    .insert({
+                      name: folderName,
+                      space_id: defaultSpaceId,
+                    })
+                    .select('id')
+                    .single();
+                  
+                  if (newFolder) {
+                    targetFolderId = newFolder.id;
+                    folderCache.set(cacheKey, newFolder.id);
+                    result.foldersCreated++;
+                  }
+                }
+              }
+            }
+            
+            // Find or create list
+            if (listName) {
+              const listCacheKey = `${defaultSpaceId}-${targetFolderId || 'root'}-${listName.toLowerCase()}`;
+              if (listCache.has(listCacheKey)) {
+                targetListId = listCache.get(listCacheKey)!;
+              } else {
+                const existingList = existingLists?.find(
+                  l => l.space_id === defaultSpaceId && 
+                       l.name.toLowerCase() === listName.toLowerCase() &&
+                       (targetFolderId ? l.folder_id === targetFolderId : true)
+                );
+                
+                if (existingList) {
+                  targetListId = existingList.id;
+                  listCache.set(listCacheKey, existingList.id);
+                } else if (options.autoCreateLists !== false) {
+                  const { data: newList } = await supabase
+                    .from('lists')
+                    .insert({
+                      name: listName,
+                      space_id: defaultSpaceId,
+                      folder_id: targetFolderId,
+                      workspace_id: options.workspaceId,
+                    })
+                    .select('id')
+                    .single();
+                  
+                  if (newList) {
+                    targetListId = newList.id;
+                    listCache.set(listCacheKey, newList.id);
+                    result.listsCreated++;
+                  }
+                }
+              }
+            } else if (targetFolderId) {
+              // If we have a folder but no list, find or create a default list in that folder
+              const listCacheKey = `${defaultSpaceId}-${targetFolderId}-default`;
+              if (listCache.has(listCacheKey)) {
+                targetListId = listCache.get(listCacheKey)!;
+              } else {
+                const existingList = existingLists?.find(
+                  l => l.folder_id === targetFolderId
+                );
+                
+                if (existingList) {
+                  targetListId = existingList.id;
+                  listCache.set(listCacheKey, existingList.id);
+                } else {
+                  const { data: newList } = await supabase
+                    .from('lists')
+                    .insert({
+                      name: 'Tarefas',
+                      space_id: defaultSpaceId,
+                      folder_id: targetFolderId,
+                      workspace_id: options.workspaceId,
+                    })
+                    .select('id')
+                    .single();
+                  
+                  if (newList) {
+                    targetListId = newList.id;
+                    listCache.set(listCacheKey, newList.id);
+                    result.listsCreated++;
+                  }
+                }
+              }
+            }
+          }
+          
           // Find status
           let statusId = defaultStatus.id;
           if (task.status) {
@@ -338,8 +529,8 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
             .insert({
               title: task.title,
               description: task.description || null,
-              list_id: listId,
-              workspace_id: workspaceId,
+              list_id: targetListId,
+              workspace_id: options.workspaceId,
               status_id: statusId,
               priority: task.priority ? normalizePriority(task.priority) : 'medium',
               start_date: startDate,
@@ -384,7 +575,7 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
                   .from('task_tags')
                   .insert({
                     name: tagName,
-                    workspace_id: workspaceId,
+                    workspace_id: options.workspaceId,
                   })
                   .select('id')
                   .single();
@@ -413,8 +604,15 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks-with-assignees'] });
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
+      queryClient.invalidateQueries({ queryKey: ['lists'] });
       
-      toast.success(`${result.created} tarefas importadas com sucesso`);
+      const messages: string[] = [];
+      messages.push(`${result.created} tarefas importadas`);
+      if (result.foldersCreated > 0) messages.push(`${result.foldersCreated} pastas criadas`);
+      if (result.listsCreated > 0) messages.push(`${result.listsCreated} listas criadas`);
+      
+      toast.success(messages.join(', '));
       
     } catch (err: any) {
       result.errors.push(err.message);
@@ -424,7 +622,7 @@ export const useCSVImport = (listId: string, workspaceId: string) => {
     }
     
     return result;
-  }, [parsedTasks, listId, workspaceId, queryClient]);
+  }, [parsedTasks, options, queryClient]);
 
   const reset = useCallback(() => {
     setStep('upload');
