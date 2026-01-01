@@ -2040,13 +2040,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_status_id_fkey"
-            columns: ["status_id"]
-            isOneToOne: false
-            referencedRelation: "statuses"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "tasks_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
