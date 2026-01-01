@@ -9,6 +9,7 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { AppSidebar } from "@/components/AppSidebar";
+import HomePage from "./pages/HomePage";
 import WorkspaceOverview from "./pages/WorkspaceOverview";
 import SpacesView from "./pages/SpacesView";
 import SpaceDetailView from "./pages/SpaceDetailView";
@@ -50,7 +51,8 @@ const App = () => (
                       <AppSidebar />
                       <main className="flex-1 overflow-auto">
                         <Routes>
-                          <Route path="/" element={<WorkspaceOverview />} />
+                          <Route path="/" element={<HomePage />} />
+                          <Route path="/workspaces" element={<WorkspaceOverview />} />
                           <Route path="/everything" element={<EverythingView />} />
                           <Route path="/spaces" element={<SpacesView />} />
                           <Route path="/space/:spaceId" element={<SpaceDetailView />} />

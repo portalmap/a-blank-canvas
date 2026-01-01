@@ -1,0 +1,101 @@
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { MessageSquare, Check, ExternalLink } from 'lucide-react';
+import { useMyAssignedComments } from '@/hooks/useMyAssignedComments';
+import { useResolveCommentAssignment } from '@/hooks/useTaskComments';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+export const AssignedCommentsCard = () => {
+  const navigate = useNavigate();
+  const { data: comments = [], isLoading } = useMyAssignedComments();
+  const resolveComment = useResolveCommentAssignment();
+
+  const handleResolve = (e: React.MouseEvent, commentId: string, taskId: string) => {
+    e.stopPropagation();
+    resolveComment.mutate({ commentId, taskId });
+  };
+
+  const getInitials = (name: string | null) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  return (
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+          <MessageSquare className="h-5 w-5" />
+          Comentários atribuídos
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-auto">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+          </div>
+        ) : comments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-3" />
+            <p className="text-muted-foreground">Você não tem comentários atribuídos</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {comments.map(comment => (
+              <div
+                key={comment.id}
+                className="p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={comment.author?.avatar_url || undefined} />
+                    <AvatarFallback className="text-xs">
+                      {getInitials(comment.author?.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium">
+                        {comment.author?.full_name || 'Usuário'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(comment.created_at), {
+                          addSuffix: true,
+                          locale: ptBR,
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                      {comment.content}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => navigate(`/task/${comment.task_id}`)}
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {comment.task_title}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleResolve(e, comment.id, comment.task_id)}
+                        disabled={resolveComment.isPending}
+                        className="h-7 text-xs"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Resolver
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
