@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useAllTasksWithAssignees } from '@/hooks/useAllTasks';
+import { useFilteredAllTasks } from '@/hooks/useFilteredAllTasks';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useStatuses, useDefaultStatus } from '@/hooks/useStatuses';
 import { EverythingTableView } from '@/components/everything/EverythingTableView';
 import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
@@ -17,7 +18,8 @@ import { useTaskSorting } from '@/hooks/useTaskSorting';
 
 export default function EverythingView() {
   const { activeWorkspace } = useWorkspace();
-  const { data: tasks = [], isLoading } = useAllTasksWithAssignees(activeWorkspace?.id);
+  const { data: tasks = [], isLoading } = useFilteredAllTasks(activeWorkspace?.id);
+  const { data: roleInfo } = useUserRole();
   const { data: statuses = [] } = useStatuses(activeWorkspace?.id);
   const { data: defaultStatus } = useDefaultStatus(activeWorkspace?.id);
 
@@ -154,9 +156,16 @@ export default function EverythingView() {
         {/* Header */}
         <div className="border-b p-4">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Layers className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold">Tudo</h1>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <Layers className="h-6 w-6 text-primary" />
+                <h1 className="text-2xl font-bold">Tudo</h1>
+              </div>
+              <p className="text-sm text-muted-foreground ml-8">
+                {roleInfo?.isAdmin 
+                  ? 'Todas as tarefas do workspace' 
+                  : 'Suas tarefas atribuídas'}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
