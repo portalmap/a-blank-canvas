@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, User, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,7 @@ export default function EverythingView() {
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [columnOrder, setColumnOrder] = useState<ColumnId[]>(DEFAULT_COLUMN_ORDER);
 
-  useMemo(() => {
+  useEffect(() => {
     if (columnPrefs) {
       setVisibleColumns(columnPrefs.visible_columns);
       setColumnOrder(columnPrefs.column_order);
@@ -227,6 +227,8 @@ export default function EverythingView() {
               onSelectionChange={setSelectedTaskIds}
               sortConfig={sortConfig}
               onSortChange={handleSortChange}
+              visibleColumns={visibleColumns}
+              columnOrder={columnOrder}
             />
           )}
         </div>

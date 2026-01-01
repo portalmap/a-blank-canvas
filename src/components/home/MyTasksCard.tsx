@@ -275,7 +275,18 @@ export function MyTasksCard() {
                       </div>
                       
                       <div className="flex items-center gap-2 shrink-0">
-                        {task.status && (
+                        {visibleColumns.includes('priority') && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'text-xs text-white',
+                              priorityConfig[task.priority as keyof typeof priorityConfig]?.color
+                            )}
+                          >
+                            {priorityConfig[task.priority as keyof typeof priorityConfig]?.label || 'Média'}
+                          </Badge>
+                        )}
+                        {visibleColumns.includes('status') && task.status && (
                           <Badge
                             variant="outline"
                             className="text-xs"
@@ -287,7 +298,7 @@ export function MyTasksCard() {
                             {task.status.name}
                           </Badge>
                         )}
-                        {getDueDateDisplay(task.due_date)}
+                        {visibleColumns.includes('due_date') && getDueDateDisplay(task.due_date)}
                       </div>
                     </div>
                   ))}
