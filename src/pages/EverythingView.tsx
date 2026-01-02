@@ -3,7 +3,8 @@ import { Search, User, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useWorkspaces } from '@/hooks/useWorkspaces';
 import { useFilteredAllTasks } from '@/hooks/useFilteredAllTasks';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useStatuses, useDefaultStatus } from '@/hooks/useStatuses';
@@ -17,11 +18,20 @@ import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, Co
 import { useTaskSorting } from '@/hooks/useTaskSorting';
 
 export default function EverythingView() {
-  const { activeWorkspace } = useWorkspace();
-  const { data: tasks = [], isLoading } = useFilteredAllTasks(activeWorkspace?.id);
+  const { data: workspaces = [], isLoading: workspacesLoading } = useWorkspaces();
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  
+  // Auto-select first workspace
+  useEffect(() => {
+    if (workspaces.length > 0 && !selectedWorkspaceId) {
+      setSelectedWorkspaceId(workspaces[0].id);
+    }
+  }, [workspaces, selectedWorkspaceId]);
+
+  const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined);
   const { data: roleInfo } = useUserRole();
-  const { data: statuses = [] } = useStatuses(activeWorkspace?.id);
-  const { data: defaultStatus } = useDefaultStatus(activeWorkspace?.id);
+  const { data: statuses = [] } = useStatuses(selectedWorkspaceId ?? undefined);
+  const { data: defaultStatus } = useDefaultStatus(selectedWorkspaceId ?? undefined);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [groupBy, setGroupBy] = useState<GroupByOption>('due_date');
@@ -142,30 +152,40 @@ export default function EverythingView() {
     }));
   }, [statuses]);
 
-  if (!activeWorkspace) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">Selecione um workspace para ver todas as tarefas</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-full">
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="border-b p-4">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <Layers className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Tudo</h1>
               </div>
-              <p className="text-sm text-muted-foreground ml-8">
-                {roleInfo?.isAdmin 
-                  ? 'Todas as tarefas do workspace' 
-                  : 'Suas tarefas atribuídas'}
-              </p>
+              <div className="flex items-center gap-3 ml-8">
+                <Select 
+                  value={selectedWorkspaceId ?? ''} 
+                  onValueChange={setSelectedWorkspaceId}
+                  disabled={workspacesLoading}
+                >
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Selecione um workspace" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaces.map((ws) => (
+                      <SelectItem key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">
+                  {roleInfo?.isAdmin 
+                    ? 'Todas as tarefas do workspace' 
+                    : 'Suas tarefas atribuídas'}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -258,7 +278,7 @@ export default function EverythingView() {
 
       <BulkActionsBar
         selectedTaskIds={selectedTaskIds}
-        workspaceId={activeWorkspace?.id || ''}
+        workspaceId={selectedWorkspaceId || ''}
         defaultStatusId={defaultStatus?.id}
         onClearSelection={() => setSelectedTaskIds([])}
       />
