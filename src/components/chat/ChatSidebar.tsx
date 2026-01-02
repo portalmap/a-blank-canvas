@@ -101,10 +101,21 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   return (
     <div className="w-64 border-r bg-muted/30 flex flex-col">
       <div className="p-3 border-b">
-        <h2 className="font-semibold text-sm flex items-center gap-2">
-          <MessageCircle className="h-4 w-4" />
-          Chat
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-sm flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" />
+            Chat
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setShowCreateDialog(true)}
+            title="Novo canal"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
