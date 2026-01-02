@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface AuthContextType {
@@ -20,29 +20,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  const previousSessionRef = useRef<Session | null>(null);
+  const isInitialLoadRef = useRef(true);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (event === 'SIGNED_IN') {
-          navigate('/');
-        }
-      }
-    );
-
-    // Check for existing session
+    // Check for existing session first
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      previousSessionRef.current = session;
+      isInitialLoadRef.current = false;
       setLoading(false);
     });
 
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        
+        // Only navigate to home if:
+        // 1. It's a SIGNED_IN event
+        // 2. It's not the initial load (session restoration)
+        // 3. There was no previous session (genuine login, not token refresh)
+        // 4. User is on the auth page
+        if (
+          event === 'SIGNED_IN' && 
+          !isInitialLoadRef.current &&
+          !previousSessionRef.current &&
+          location.pathname === '/auth'
+        ) {
+          navigate('/');
+        }
+        
+        previousSessionRef.current = newSession;
+      }
+    );
+
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const signUp = async (email: string, password: string) => {
     try {
