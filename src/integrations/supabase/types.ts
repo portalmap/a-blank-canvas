@@ -2555,6 +2555,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_is_channel_member: {
+        Args: { _channel_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_is_workspace_admin: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
