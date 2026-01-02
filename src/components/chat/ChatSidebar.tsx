@@ -68,6 +68,18 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
       }
     });
 
+    // Ordenar canais alfabeticamente dentro de cada workspace
+    Object.values(grouped).forEach(group => {
+      group.spaceChannels.sort((a, b) => {
+        const nameA = (a.spaces?.name || a.name).toLowerCase();
+        const nameB = (b.spaces?.name || b.name).toLowerCase();
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+      group.customChannels.sort((a, b) => {
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase(), 'pt-BR');
+      });
+    });
+
     return grouped;
   }, [channels]);
 
@@ -96,7 +108,12 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
     );
   }
 
-  const workspaceIds = Object.keys(channelsByWorkspace);
+  // Ordenar workspaces alfabeticamente
+  const workspaceIds = Object.keys(channelsByWorkspace).sort((a, b) => {
+    const nameA = channelsByWorkspace[a].workspace.name.toLowerCase();
+    const nameB = channelsByWorkspace[b].workspace.name.toLowerCase();
+    return nameA.localeCompare(nameB, 'pt-BR');
+  });
 
   return (
     <div className="w-64 border-r bg-muted/30 flex flex-col">
