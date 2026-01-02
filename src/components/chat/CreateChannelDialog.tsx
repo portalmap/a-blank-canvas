@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCreateCustomChannel } from '@/hooks/useChat';
-import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
+import { useAllProfiles } from '@/hooks/useAllProfiles';
 import { useWorkspaces } from '@/hooks/useWorkspaces';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -40,7 +40,7 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
 
   const { user } = useAuth();
   const { data: workspaces } = useWorkspaces();
-  const { data: members } = useWorkspaceMembers(selectedWorkspaceId || undefined);
+  const { data: allProfiles } = useAllProfiles();
   const createChannel = useCreateCustomChannel();
 
   // Auto-select first workspace when dialog opens
@@ -50,12 +50,7 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
     }
   }, [open, workspaces, selectedWorkspaceId]);
 
-  // Reset members when workspace changes
-  useEffect(() => {
-    setSelectedMembers([]);
-  }, [selectedWorkspaceId]);
-
-  const otherMembers = members?.filter(m => m.user_id !== user?.id) || [];
+  const otherUsers = allProfiles?.filter(p => p.id !== user?.id) || [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,30 +134,29 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
               />
             </div>
 
-            {otherMembers.length > 0 && (
+            {otherUsers.length > 0 && (
               <div className="space-y-2">
                 <Label>Adicionar membros</Label>
                 <ScrollArea className="h-[150px] border rounded-md p-2">
                   <div className="space-y-1">
-                    {otherMembers.map((member) => {
-                      const profile = (member as any).profiles;
-                      const memberName = profile?.full_name || 'Usuário';
-                      const initials = memberName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+                    {otherUsers.map((profile) => {
+                      const userName = profile.full_name || 'Usuário';
+                      const initials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
                       return (
                         <label
-                          key={member.user_id}
+                          key={profile.id}
                           className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer"
                         >
                           <Checkbox
-                            checked={selectedMembers.includes(member.user_id)}
-                            onCheckedChange={() => toggleMember(member.user_id)}
+                            checked={selectedMembers.includes(profile.id)}
+                            onCheckedChange={() => toggleMember(profile.id)}
                           />
                           <Avatar className="h-6 w-6">
-                            <AvatarImage src={profile?.avatar_url || undefined} />
+                            <AvatarImage src={profile.avatar_url || undefined} />
                             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                           </Avatar>
-                          <span className="text-sm">{memberName}</span>
+                          <span className="text-sm">{userName}</span>
                         </label>
                       );
                     })}
