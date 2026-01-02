@@ -1,14 +1,28 @@
 import { useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Loader2 } from 'lucide-react';
 import { ChatSidebar, ChatRoom, ChannelMembersDialog } from '@/components/chat';
 import { useChatChannels } from '@/hooks/useChat';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 const Chat = () => {
   const [selectedChannelId, setSelectedChannelId] = useState<string>();
   const [showMembersDialog, setShowMembersDialog] = useState(false);
-  const { data: channels } = useChatChannels();
+  const { activeWorkspace } = useWorkspace();
+  const { data: channels, isLoading } = useChatChannels();
 
   const selectedChannel = channels?.find(c => c.id === selectedChannelId);
+
+  // Show loading while workspace is being loaded
+  if (!activeWorkspace) {
+    return (
+      <div className="flex h-[calc(100vh-0px)] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-0px)]">
@@ -39,7 +53,9 @@ const Chat = () => {
             <MessageCircle className="h-16 w-16 text-muted-foreground/30 mb-4" />
             <h2 className="text-xl font-semibold mb-2">Selecione um canal</h2>
             <p className="text-muted-foreground max-w-md">
-              Escolha um canal de Space ou crie um canal personalizado para começar a conversar com sua equipe.
+              {isLoading 
+                ? 'Carregando canais...' 
+                : 'Escolha um canal de Space ou crie um canal personalizado para começar a conversar com sua equipe.'}
             </p>
           </div>
         )}
