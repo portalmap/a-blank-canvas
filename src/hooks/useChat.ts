@@ -34,6 +34,26 @@ export const useChatChannels = () => {
   });
 };
 
+// Hook to fetch all chat channels from all workspaces (global chat)
+export const useAllChatChannels = () => {
+  return useQuery({
+    queryKey: ['all-chat-channels'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chat_channels')
+        .select(`
+          *,
+          spaces:linked_space_id (name, color),
+          workspace:workspace_id (id, name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
 export const useSpaceChannel = (spaceId?: string) => {
   return useQuery({
     queryKey: ['space-channel', spaceId],
@@ -182,21 +202,21 @@ export const useSendMessage = () => {
 export const useCreateCustomChannel = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { activeWorkspace } = useWorkspace();
 
   return useMutation({
-    mutationFn: async ({ name, description, memberIds }: { 
+    mutationFn: async ({ name, description, memberIds, workspaceId }: { 
       name: string; 
       description?: string;
       memberIds: string[];
+      workspaceId: string;
     }) => {
-      if (!user?.id || !activeWorkspace?.id) throw new Error('Usuário ou workspace não encontrado');
+      if (!user?.id || !workspaceId) throw new Error('Usuário ou workspace não encontrado');
 
       // Create the channel
       const { data: channel, error: channelError } = await supabase
         .from('chat_channels')
         .insert({
-          workspace_id: activeWorkspace.id,
+          workspace_id: workspaceId,
           name,
           description,
           type: 'custom',
@@ -241,6 +261,7 @@ export const useCreateCustomChannel = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['all-chat-channels'] });
       toast.success('Canal criado com sucesso!');
     },
     onError: (error) => {

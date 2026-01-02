@@ -1,28 +1,14 @@
 import { useState } from 'react';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { ChatSidebar, ChatRoom, ChannelMembersDialog } from '@/components/chat';
-import { useChatChannels } from '@/hooks/useChat';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useAllChatChannels } from '@/hooks/useChat';
 
 const Chat = () => {
   const [selectedChannelId, setSelectedChannelId] = useState<string>();
   const [showMembersDialog, setShowMembersDialog] = useState(false);
-  const { activeWorkspace } = useWorkspace();
-  const { data: channels, isLoading } = useChatChannels();
+  const { data: channels, isLoading } = useAllChatChannels();
 
   const selectedChannel = channels?.find(c => c.id === selectedChannelId);
-
-  // Show loading while workspace is being loaded
-  if (!activeWorkspace) {
-    return (
-      <div className="flex h-[calc(100vh-0px)] items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Carregando workspace...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-[calc(100vh-0px)]">

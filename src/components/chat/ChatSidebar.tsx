@@ -1,24 +1,92 @@
-import { useState } from 'react';
-import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useChatChannels } from '@/hooks/useChat';
+import { useAllChatChannels } from '@/hooks/useChat';
 import { CreateChannelDialog } from './CreateChannelDialog';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface ChatSidebarProps {
   selectedChannelId?: string;
   onSelectChannel: (channelId: string) => void;
 }
 
-export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarProps) => {
-  const { data: channels, isLoading } = useChatChannels();
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [spacesExpanded, setSpacesExpanded] = useState(true);
-  const [customExpanded, setCustomExpanded] = useState(true);
+interface WorkspaceInfo {
+  id: string;
+  name: string;
+}
 
-  const spaceChannels = channels?.filter(c => c.type === 'space') || [];
-  const customChannels = channels?.filter(c => c.type === 'custom') || [];
+interface ChannelWithWorkspace {
+  id: string;
+  name: string;
+  type: string;
+  workspace_id: string;
+  spaces?: { name: string; color: string } | null;
+  workspace?: WorkspaceInfo | null;
+}
+
+export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarProps) => {
+  const { data: channels, isLoading } = useAllChatChannels();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, { spaces: boolean; custom: boolean }>>({});
+
+  // Group channels by workspace
+  const channelsByWorkspace = useMemo(() => {
+    if (!channels) return {};
+
+    const grouped: Record<string, {
+      workspace: WorkspaceInfo;
+      spaceChannels: ChannelWithWorkspace[];
+      customChannels: ChannelWithWorkspace[];
+    }> = {};
+
+    channels.forEach((channel: any) => {
+      const workspaceId = channel.workspace_id;
+      const workspaceInfo = channel.workspace || { id: workspaceId, name: 'Workspace' };
+
+      if (!grouped[workspaceId]) {
+        grouped[workspaceId] = {
+          workspace: workspaceInfo,
+          spaceChannels: [],
+          customChannels: [],
+        };
+        // Auto-expand workspaces by default
+        if (expandedWorkspaces[workspaceId] === undefined) {
+          setExpandedWorkspaces(prev => ({ ...prev, [workspaceId]: true }));
+        }
+        if (!expandedSections[workspaceId]) {
+          setExpandedSections(prev => ({ ...prev, [workspaceId]: { spaces: true, custom: true } }));
+        }
+      }
+
+      if (channel.type === 'space') {
+        grouped[workspaceId].spaceChannels.push(channel);
+      } else {
+        grouped[workspaceId].customChannels.push(channel);
+      }
+    });
+
+    return grouped;
+  }, [channels]);
+
+  const toggleWorkspace = (workspaceId: string) => {
+    setExpandedWorkspaces(prev => ({
+      ...prev,
+      [workspaceId]: !prev[workspaceId],
+    }));
+  };
+
+  const toggleSection = (workspaceId: string, section: 'spaces' | 'custom') => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [workspaceId]: {
+        ...prev[workspaceId],
+        [section]: !prev[workspaceId]?.[section],
+      },
+    }));
+  };
 
   if (isLoading) {
     return (
@@ -27,6 +95,8 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
       </div>
     );
   }
+
+  const workspaceIds = Object.keys(channelsByWorkspace);
 
   return (
     <div className="w-64 border-r bg-muted/30 flex flex-col">
@@ -39,95 +109,134 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
 
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {/* Space Channels */}
-          <div className="mb-4">
-            <button
-              onClick={() => setSpacesExpanded(!spacesExpanded)}
-              className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full px-2 py-1"
-            >
-              {spacesExpanded ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-              SPACES ({spaceChannels.length})
-            </button>
-            
-            {spacesExpanded && (
-              <div className="mt-1 space-y-0.5">
-                {spaceChannels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    onClick={() => onSelectChannel(channel.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                      selectedChannelId === channel.id
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted text-foreground"
-                    )}
-                  >
-                    <div
-                      className="h-2 w-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: (channel as any).spaces?.color || '#6366f1' }}
-                    />
-                    <span className="truncate">
-                      {(channel as any).spaces?.name || channel.name}
-                    </span>
-                  </button>
-                ))}
-                {spaceChannels.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-2 py-1">
-                    Nenhum space disponível
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+          {workspaceIds.length === 0 && (
+            <p className="text-xs text-muted-foreground px-2 py-4 text-center">
+              Nenhum canal disponível
+            </p>
+          )}
 
-          {/* Custom Channels */}
-          <div>
-            <button
-              onClick={() => setCustomExpanded(!customExpanded)}
-              className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full px-2 py-1"
-            >
-              {customExpanded ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-              PERSONALIZADOS ({customChannels.length})
-            </button>
-            
-            {customExpanded && (
-              <div className="mt-1 space-y-0.5">
-                {customChannels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    onClick={() => onSelectChannel(channel.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                      selectedChannelId === channel.id
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted text-foreground"
+          {workspaceIds.map((workspaceId) => {
+            const { workspace, spaceChannels, customChannels } = channelsByWorkspace[workspaceId];
+            const isWorkspaceExpanded = expandedWorkspaces[workspaceId] !== false;
+            const sections = expandedSections[workspaceId] || { spaces: true, custom: true };
+
+            return (
+              <Collapsible
+                key={workspaceId}
+                open={isWorkspaceExpanded}
+                onOpenChange={() => toggleWorkspace(workspaceId)}
+                className="mb-3"
+              >
+                <CollapsibleTrigger className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-muted text-sm font-medium">
+                  {isWorkspaceExpanded ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="truncate">{workspace.name}</span>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="pl-4">
+                  {/* Space Channels */}
+                  <div className="mt-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSection(workspaceId, 'spaces');
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full px-2 py-1"
+                    >
+                      {sections.spaces ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                      SPACES ({spaceChannels.length})
+                    </button>
+
+                    {sections.spaces && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {spaceChannels.map((channel) => (
+                          <button
+                            key={channel.id}
+                            onClick={() => onSelectChannel(channel.id)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                              selectedChannelId === channel.id
+                                ? "bg-primary/10 text-primary"
+                                : "hover:bg-muted text-foreground"
+                            )}
+                          >
+                            <div
+                              className="h-2 w-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: channel.spaces?.color || '#6366f1' }}
+                            />
+                            <span className="truncate">
+                              {channel.spaces?.name || channel.name}
+                            </span>
+                          </button>
+                        ))}
+                        {spaceChannels.length === 0 && (
+                          <p className="text-xs text-muted-foreground px-2 py-1">
+                            Nenhum space
+                          </p>
+                        )}
+                      </div>
                     )}
-                  >
-                    <Hash className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate">{channel.name}</span>
-                  </button>
-                ))}
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowCreateDialog(true)}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Novo canal
-                </Button>
-              </div>
-            )}
-          </div>
+                  </div>
+
+                  {/* Custom Channels */}
+                  <div className="mt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSection(workspaceId, 'custom');
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full px-2 py-1"
+                    >
+                      {sections.custom ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                      PERSONALIZADOS ({customChannels.length})
+                    </button>
+
+                    {sections.custom && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {customChannels.map((channel) => (
+                          <button
+                            key={channel.id}
+                            onClick={() => onSelectChannel(channel.id)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                              selectedChannelId === channel.id
+                                ? "bg-primary/10 text-primary"
+                                : "hover:bg-muted text-foreground"
+                            )}
+                          >
+                            <Hash className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="truncate">{channel.name}</span>
+                          </button>
+                        ))}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowCreateDialog(true)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Novo canal
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
         </div>
       </ScrollArea>
 
