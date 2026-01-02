@@ -2614,7 +2614,12 @@ export type Database = {
         | "on_task_linked"
         | "on_task_unblocked"
       chat_channel_role: "owner" | "member"
-      chat_channel_type: "client" | "department" | "project" | "custom"
+      chat_channel_type:
+        | "client"
+        | "department"
+        | "project"
+        | "custom"
+        | "space"
       list_view: "list" | "kanban" | "sprint"
       permission_role: "viewer" | "commenter" | "editor"
       status_scope: "workspace" | "space" | "folder" | "list"
@@ -2799,7 +2804,7 @@ export const Constants = {
         "on_task_unblocked",
       ],
       chat_channel_role: ["owner", "member"],
-      chat_channel_type: ["client", "department", "project", "custom"],
+      chat_channel_type: ["client", "department", "project", "custom", "space"],
       list_view: ["list", "kanban", "sprint"],
       permission_role: ["viewer", "commenter", "editor"],
       status_scope: ["workspace", "space", "folder", "list"],
