@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Hash, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -15,9 +15,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useCreateCustomChannel } from '@/hooks/useChat';
 import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useWorkspaces } from '@/hooks/useWorkspaces';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateChannelDialogProps {
@@ -29,22 +36,36 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  
-  const { activeWorkspace } = useWorkspace();
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
+
   const { user } = useAuth();
-  const { data: members } = useWorkspaceMembers(activeWorkspace?.id);
+  const { data: workspaces } = useWorkspaces();
+  const { data: members } = useWorkspaceMembers(selectedWorkspaceId || undefined);
   const createChannel = useCreateCustomChannel();
+
+  // Auto-select first workspace when dialog opens
+  useEffect(() => {
+    if (open && workspaces && workspaces.length > 0 && !selectedWorkspaceId) {
+      setSelectedWorkspaceId(workspaces[0].id);
+    }
+  }, [open, workspaces, selectedWorkspaceId]);
+
+  // Reset members when workspace changes
+  useEffect(() => {
+    setSelectedMembers([]);
+  }, [selectedWorkspaceId]);
 
   const otherMembers = members?.filter(m => m.user_id !== user?.id) || [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !selectedWorkspaceId) return;
 
     await createChannel.mutateAsync({
       name: name.trim(),
       description: description.trim() || undefined,
       memberIds: selectedMembers,
+      workspaceId: selectedWorkspaceId,
     });
 
     setName('');
@@ -76,6 +97,26 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Workspace Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="workspace">Workspace</Label>
+              <Select
+                value={selectedWorkspaceId}
+                onValueChange={setSelectedWorkspaceId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um workspace" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workspaces?.map((workspace) => (
+                    <SelectItem key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Nome do canal</Label>
               <Input
@@ -105,8 +146,8 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
                   <div className="space-y-1">
                     {otherMembers.map((member) => {
                       const profile = (member as any).profiles;
-                      const name = profile?.full_name || 'Usuário';
-                      const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+                      const memberName = profile?.full_name || 'Usuário';
+                      const initials = memberName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
                       return (
                         <label
@@ -121,7 +162,7 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
                             <AvatarImage src={profile?.avatar_url || undefined} />
                             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                           </Avatar>
-                          <span className="text-sm">{name}</span>
+                          <span className="text-sm">{memberName}</span>
                         </label>
                       );
                     })}
@@ -139,7 +180,10 @@ export const CreateChannelDialog = ({ open, onOpenChange }: CreateChannelDialogP
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={!name.trim() || createChannel.isPending}>
+            <Button 
+              type="submit" 
+              disabled={!name.trim() || !selectedWorkspaceId || createChannel.isPending}
+            >
               {createChannel.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Criar canal
             </Button>
