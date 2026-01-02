@@ -1,11 +1,29 @@
 import { useState, useMemo } from 'react';
-import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2 } from 'lucide-react';
+import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAllChatChannels } from '@/hooks/useChat';
+import { useAllChatChannels, useDeleteChannel } from '@/hooks/useChat';
 import { CreateChannelDialog } from './CreateChannelDialog';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ChatSidebarProps {
   selectedChannelId?: string;
@@ -22,15 +40,43 @@ interface ChannelWithWorkspace {
   name: string;
   type: string;
   workspace_id: string;
+  created_by_user_id: string;
   spaces?: { name: string; color: string } | null;
   workspace?: WorkspaceInfo | null;
 }
 
 export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarProps) => {
   const { data: channels, isLoading } = useAllChatChannels();
+  const { data: userRole } = useUserRole();
+  const { user } = useAuth();
+  const deleteChannel = useDeleteChannel();
+  
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({});
   const [expandedSections, setExpandedSections] = useState<Record<string, { spaces: boolean; custom: boolean }>>({});
+  const [channelToDelete, setChannelToDelete] = useState<ChannelWithWorkspace | null>(null);
+
+  const canDeleteChannel = (channel: ChannelWithWorkspace) => {
+    // Global owner, owner or admin can delete any channel
+    if (userRole?.isGlobalOwner || userRole?.isOwner || userRole?.isAdmin) {
+      return true;
+    }
+    // Channel creator can delete their own channel
+    return channel.created_by_user_id === user?.id;
+  };
+
+  const handleDeleteChannel = async () => {
+    if (!channelToDelete) return;
+    
+    await deleteChannel.mutateAsync(channelToDelete.id);
+    
+    // If the deleted channel was selected, clear selection
+    if (selectedChannelId === channelToDelete.id) {
+      onSelectChannel('');
+    }
+    
+    setChannelToDelete(null);
+  };
 
   // Group channels by workspace
   const channelsByWorkspace = useMemo(() => {
@@ -234,19 +280,44 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                     {sections.custom && (
                       <div className="mt-0.5 space-y-0.5">
                         {customChannels.map((channel) => (
-                          <button
-                            key={channel.id}
-                            onClick={() => onSelectChannel(channel.id)}
-                            className={cn(
-                              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                              selectedChannelId === channel.id
-                                ? "bg-primary/10 text-primary"
-                                : "hover:bg-muted text-foreground"
+                          <div key={channel.id} className="flex items-center group">
+                            <button
+                              onClick={() => onSelectChannel(channel.id)}
+                              className={cn(
+                                "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                                selectedChannelId === channel.id
+                                  ? "bg-primary/10 text-primary"
+                                  : "hover:bg-muted text-foreground"
+                              )}
+                            >
+                              <Hash className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate">{channel.name}</span>
+                            </button>
+                            
+                            {canDeleteChannel(channel) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => setChannelToDelete(channel)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Excluir canal
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
-                          >
-                            <Hash className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span className="truncate">{channel.name}</span>
-                          </button>
+                          </div>
                         ))}
 
                         <Button
@@ -272,6 +343,26 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
       />
+
+      <AlertDialog open={!!channelToDelete} onOpenChange={(open) => !open && setChannelToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Canal</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o canal "{channelToDelete?.name}"? Esta ação não pode ser desfeita e todas as mensagens serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteChannel}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
