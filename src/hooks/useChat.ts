@@ -344,3 +344,44 @@ export const useRemoveChannelMember = () => {
     },
   });
 };
+
+export const useDeleteChannel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (channelId: string) => {
+      // First delete channel members
+      const { error: membersError } = await supabase
+        .from('chat_channel_members')
+        .delete()
+        .eq('channel_id', channelId);
+
+      if (membersError) throw membersError;
+
+      // Then delete messages
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('channel_id', channelId);
+
+      if (messagesError) throw messagesError;
+
+      // Finally delete the channel
+      const { error } = await supabase
+        .from('chat_channels')
+        .delete()
+        .eq('id', channelId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['all-chat-channels'] });
+      toast.success('Canal excluído com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao excluir canal');
+      console.error(error);
+    },
+  });
+};
