@@ -26,6 +26,12 @@ import {
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
+const VALID_WORKSPACE_ROLES: WorkspaceRole[] = ['admin', 'member', 'limited_member', 'guest'];
+
+const isValidWorkspaceRole = (role: any): role is WorkspaceRole => {
+  return VALID_WORKSPACE_ROLES.includes(role);
+};
+
 interface WorkspaceMember {
   id: string;
   user_id: string;
@@ -413,7 +419,7 @@ export function UserManagement() {
                       avatarUrl: member.profile.avatar_url,
                       phone: member.profile.phone,
                       bio: member.profile.bio,
-                      role: member.role,
+                      role: isValidWorkspaceRole(member.role) ? member.role : 'member',
                       workspaceMemberId: member.id,
                       isGlobalOwner: member.isGlobalOwner,
                       isOwner: member.isOwner,
