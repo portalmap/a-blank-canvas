@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useWorkspaces } from '@/hooks/useWorkspaces';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useFilteredAllTasks } from '@/hooks/useFilteredAllTasks';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useStatuses, useDefaultStatus } from '@/hooks/useStatuses';
@@ -19,14 +20,28 @@ import { useTaskSorting } from '@/hooks/useTaskSorting';
 
 export default function EverythingView() {
   const { data: workspaces = [], isLoading: workspacesLoading } = useWorkspaces();
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  const { activeWorkspace, setActiveWorkspace } = useWorkspace();
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
+    activeWorkspace?.id || null
+  );
   
-  // Auto-select first workspace
+  // Sync with activeWorkspace or default to first workspace
   useEffect(() => {
-    if (workspaces.length > 0 && !selectedWorkspaceId) {
+    if (activeWorkspace?.id && workspaces.some(w => w.id === activeWorkspace.id)) {
+      setSelectedWorkspaceId(activeWorkspace.id);
+    } else if (workspaces.length > 0 && !selectedWorkspaceId) {
       setSelectedWorkspaceId(workspaces[0].id);
     }
-  }, [workspaces, selectedWorkspaceId]);
+  }, [activeWorkspace, workspaces, selectedWorkspaceId]);
+
+  // Update global context when workspace changes
+  const handleWorkspaceChange = (workspaceId: string) => {
+    setSelectedWorkspaceId(workspaceId);
+    const workspace = workspaces.find(w => w.id === workspaceId);
+    if (workspace) {
+      setActiveWorkspace(workspace);
+    }
+  };
 
   const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined);
   const { data: roleInfo } = useUserRole();
@@ -166,7 +181,7 @@ export default function EverythingView() {
               <div className="flex items-center gap-3 ml-8">
                 <Select 
                   value={selectedWorkspaceId ?? ''} 
-                  onValueChange={setSelectedWorkspaceId}
+                  onValueChange={handleWorkspaceChange}
                   disabled={workspacesLoading}
                 >
                   <SelectTrigger className="w-64">
