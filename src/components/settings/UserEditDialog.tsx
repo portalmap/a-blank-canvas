@@ -24,6 +24,12 @@ const generateRandomPassword = () => {
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
+const VALID_WORKSPACE_ROLES: WorkspaceRole[] = ['admin', 'member', 'limited_member', 'guest'];
+
+const isValidWorkspaceRole = (role: any): role is WorkspaceRole => {
+  return VALID_WORKSPACE_ROLES.includes(role);
+};
+
 interface UserEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,7 +62,9 @@ export function UserEditDialog({
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone || "");
   const [bio, setBio] = useState(user.bio || "");
-  const [role, setRole] = useState<WorkspaceRole>(user.role);
+  const [role, setRole] = useState<WorkspaceRole>(
+    isValidWorkspaceRole(user.role) ? user.role : 'member'
+  );
 
   // Password reset state
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -165,6 +173,12 @@ export function UserEditDialog({
 
       // Atualizar role se necessário e permitido
       if (canEditRole && role !== user.role && !user.isGlobalOwner && !user.isOwner) {
+        // Validar se o role é permitido
+        if (!isValidWorkspaceRole(role)) {
+          toast.error("Role inválido selecionado");
+          return;
+        }
+        
         const { error: roleError } = await supabase
           .from("workspace_members")
           .update({ role })
