@@ -218,6 +218,7 @@ export const useDefaultStatus = (workspaceId?: string) => {
         .from('statuses')
         .select('*')
         .eq('workspace_id', workspaceId)
+        .eq('scope_type', 'workspace')
         .eq('is_default', true)
         .single();
 
