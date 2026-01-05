@@ -266,11 +266,35 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Calendar className="h-4 w-4" /> Data de Início
           </label>
-          <Input 
-            type="date" 
-            value={task.start_date || ''} 
-            onChange={handleStartDateChange}
-          />
+          <div className="relative">
+            <Input 
+              type="date" 
+              value={task.start_date || ''} 
+              onChange={handleStartDateChange}
+              className="pr-8"
+            />
+            {task.start_date && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full w-8 hover:bg-transparent"
+                onClick={async () => {
+                  const oldDate = task.start_date || null;
+                  await updateTask.mutateAsync({ id: task.id, startDate: null });
+                  await createActivity.mutateAsync({
+                    taskId: task.id,
+                    activityType: 'start_date.changed',
+                    fieldName: 'start_date',
+                    oldValue: oldDate,
+                    newValue: null,
+                  });
+                }}
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -280,12 +304,35 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
           )}>
             <Clock className="h-4 w-4" /> Data de Entrega
           </label>
-          <Input 
-            type="date" 
-            value={task.due_date || ''} 
-            onChange={handleDueDateChange}
-            className={cn(isOverdue && "border-destructive")}
-          />
+          <div className="relative">
+            <Input 
+              type="date" 
+              value={task.due_date || ''} 
+              onChange={handleDueDateChange}
+              className={cn("pr-8", isOverdue && "border-destructive")}
+            />
+            {task.due_date && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full w-8 hover:bg-transparent"
+                onClick={async () => {
+                  const oldDate = task.due_date || null;
+                  await updateTask.mutateAsync({ id: task.id, dueDate: null });
+                  await createActivity.mutateAsync({
+                    taskId: task.id,
+                    activityType: 'due_date.changed',
+                    fieldName: 'due_date',
+                    oldValue: oldDate,
+                    newValue: null,
+                  });
+                }}
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </Button>
+            )}
+          </div>
           {isOverdue && (
             <p className="text-xs text-destructive">Tarefa atrasada!</p>
           )}
