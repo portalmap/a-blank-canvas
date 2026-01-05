@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,53 +6,51 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
-import { Calendar, User, Clock, Flag, X, Check, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { Calendar, Clock, Flag, X, Check, Loader2 } from 'lucide-react';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
+import { useTask } from '@/hooks/useTask';
 import { SubtaskList } from './SubtaskList';
 import { TaskComments } from './TaskComments';
 import { TaskChecklists } from './TaskChecklists';
+import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { cn } from '@/lib/utils';
 
-interface Task {
-  id: string;
-  title: string;
-  description?: string | null;
-  status_id: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  assignee_id?: string | null;
-  start_date?: string | null;
-  due_date?: string | null;
-  list_id: string;
-  workspace_id: string;
-  parent_id?: string | null;
-  completed_at?: string | null;
-  status?: {
-    name: string;
-    color: string | null;
-  };
-  assignee?: {
-    full_name: string | null;
-    avatar_url: string | null;
-  };
-}
-
 interface TaskDetailDrawerProps {
-  task: Task | null;
+  taskId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export const TaskDetailDrawer = ({ task, open, onOpenChange }: TaskDetailDrawerProps) => {
+export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawerProps) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
+  const { data: task, isLoading } = useTask(taskId);
   const updateTask = useUpdateTask();
-  const { data: statuses } = useStatusesForScope('list', task?.list_id, task?.workspace_id);
+  const { data: statuses } = useStatusesForScope('list', task?.list_id ?? undefined, task?.workspace_id);
+
+  // Sync local state when task data changes
+  useEffect(() => {
+    if (task) {
+      setEditTitle(task.title);
+      setEditDescription(task.description || '');
+    }
+  }, [task]);
+
+  if (!taskId) return null;
+
+  if (isLoading) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="sm:max-w-2xl flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   if (!task) return null;
 
@@ -200,32 +198,8 @@ export const TaskDetailDrawer = ({ task, open, onOpenChange }: TaskDetailDrawerP
             </div>
           </div>
 
-          {/* Responsável */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <User className="h-4 w-4" /> Responsável
-            </label>
-            <div className="flex items-center gap-2 p-2 border rounded-md">
-              {task.assignee ? (
-                <>
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    {task.assignee.avatar_url ? (
-                      <img 
-                        src={task.assignee.avatar_url} 
-                        alt={task.assignee.full_name || ''} 
-                        className="w-8 h-8 rounded-full"
-                      />
-                    ) : (
-                      <User className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                  <span>{task.assignee.full_name || 'Sem nome'}</span>
-                </>
-              ) : (
-                <span className="text-muted-foreground">Não atribuído</span>
-              )}
-            </div>
-          </div>
+          {/* Responsáveis */}
+          <TaskAssigneesManager taskId={task.id} workspaceId={task.workspace_id} />
 
           <Separator />
 
@@ -270,7 +244,13 @@ export const TaskDetailDrawer = ({ task, open, onOpenChange }: TaskDetailDrawerP
           {!task.parent_id && (
             <>
               <SubtaskList 
-                parentTask={task}
+                parentTask={{
+                  id: task.id,
+                  title: task.title,
+                  list_id: task.list_id || '',
+                  workspace_id: task.workspace_id,
+                  status_id: task.status_id || '',
+                }}
                 statuses={statuses || []}
               />
               <Separator />
