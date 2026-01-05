@@ -9,7 +9,6 @@ async function duplicateTaskWithRelations(
   workspaceId: string,
   statusId: string,
   userId: string,
-  addCopyPrefix: boolean = true,
   newParentId?: string | null
 ): Promise<string> {
   // Fetch original task
@@ -27,7 +26,7 @@ async function duplicateTaskWithRelations(
   const { data: newTask, error: newTaskError } = await supabase
     .from('tasks')
     .insert({
-      title: addCopyPrefix ? `(Cópia) ${task.title}` : task.title,
+      title: task.title,
       description: task.description,
       priority: task.priority,
       start_date: task.start_date,
@@ -116,7 +115,6 @@ async function duplicateTaskWithRelations(
       workspaceId,
       statusId,
       userId,
-      false, // Don't add "(Cópia)" prefix to subtasks
       newTask.id
     );
   }
@@ -196,7 +194,7 @@ export const useDuplicateList = () => {
         const { data: newList, error: newListError } = await supabase
           .from('lists')
           .insert({
-            name: `(Cópia) ${originalList.name}`,
+            name: originalList.name,
             description: originalList.description,
             default_view: originalList.default_view,
             workspace_id: workspaceId,
@@ -220,8 +218,7 @@ export const useDuplicateList = () => {
             newList.id,
             workspaceId,
             defaultStatusId,
-            user.id,
-            false // Don't add "(Cópia)" to tasks inside
+            user.id
           );
         }
       }
@@ -293,7 +290,7 @@ export const useDuplicateFolder = () => {
         const { data: newFolder, error: newFolderError } = await supabase
           .from('folders')
           .insert({
-            name: `(Cópia) ${originalFolder.name}`,
+            name: originalFolder.name,
             description: originalFolder.description,
             space_id: spaceId,
           })
@@ -339,8 +336,7 @@ export const useDuplicateFolder = () => {
               newList.id,
               workspaceId,
               defaultStatusId,
-              user.id,
-              false
+              user.id
             );
           }
         }
@@ -393,8 +389,7 @@ export const useDuplicateTask = () => {
         targetListId,
         list.workspace_id,
         defaultStatusId,
-        user.id,
-        true // Add "(Cópia)" prefix
+        user.id
       );
 
       return newTaskId;
