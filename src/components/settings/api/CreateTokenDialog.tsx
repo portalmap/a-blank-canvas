@@ -50,8 +50,8 @@ export function CreateTokenDialog({
 
     onSubmit({
       name: name.trim(),
-      targetListId: targetListId || undefined,
-      defaultStatusId: defaultStatusId || undefined,
+      targetListId: targetListId && targetListId !== "none" ? targetListId : undefined,
+      defaultStatusId: defaultStatusId && defaultStatusId !== "none" ? defaultStatusId : undefined,
     });
 
     // Reset form
@@ -89,7 +89,7 @@ export function CreateTokenDialog({
                 <SelectValue placeholder="Selecione uma lista padrão" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhuma (definir na requisição)</SelectItem>
+                <SelectItem value="none">Nenhuma (definir na requisição)</SelectItem>
                 {lists.map((list) => (
                   <SelectItem key={list.id} value={list.id}>
                     {list.name}
@@ -109,7 +109,7 @@ export function CreateTokenDialog({
                 <SelectValue placeholder="Usar padrão da lista" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Usar padrão da lista</SelectItem>
+                <SelectItem value="none">Usar padrão da lista</SelectItem>
                 {statuses.map((status) => (
                   <SelectItem key={status.id} value={status.id}>
                     <div className="flex items-center gap-2">
