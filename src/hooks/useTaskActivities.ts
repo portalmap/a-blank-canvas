@@ -28,7 +28,7 @@ export const useTaskActivities = (taskId?: string) => {
         .from('task_activities')
         .select('*')
         .eq('task_id', taskId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       if (!activities) return [];

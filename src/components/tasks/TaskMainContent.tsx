@@ -10,11 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { useUploadAttachment } from '@/hooks/useTaskAttachments';
 import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { cn } from '@/lib/utils';
+import { renderTextWithImagesAndLinks } from '@/lib/linkify';
+import { toast } from 'sonner';
 interface Task {
   id: string;
   title: string;
@@ -52,7 +55,32 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
   const updateTask = useUpdateTask();
   const createActivity = useCreateTaskActivity();
+  const uploadAttachment = useUploadAttachment();
   const { data: statuses } = useStatusesForScope('list', task.list_id, task.workspace_id);
+
+  // Handler para colar imagens
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          try {
+            toast.info('Fazendo upload da imagem...');
+            const uploaded = await uploadAttachment.mutateAsync({ taskId: task.id, file });
+            const imageMarkdown = `![${file.name}](${uploaded.file_url})`;
+            setEditDescription(prev => prev + (prev ? '\n' : '') + imageMarkdown);
+            toast.success('Imagem adicionada!');
+          } catch (error) {
+            console.error('Erro ao fazer upload da imagem:', error);
+            toast.error('Erro ao fazer upload da imagem');
+          }
+        }
+        break;
+      }
+    }
+  };
 
   const handleSaveTitle = async () => {
     if (!editTitle.trim() || editTitle === task.title) {
@@ -367,7 +395,8 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
             <Textarea
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
-              placeholder="Adicione uma descrição..."
+              onPaste={handlePaste}
+              placeholder="Adicione uma descrição... (Ctrl+V para colar imagens)"
               rows={4}
               autoFocus
             />
@@ -388,7 +417,9 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
               setIsEditingDescription(true);
             }}
           >
-            {task.description || (
+            {task.description ? (
+              renderTextWithImagesAndLinks(task.description)
+            ) : (
               <span className="text-muted-foreground">Clique para adicionar uma descrição...</span>
             )}
           </div>
@@ -405,7 +436,8 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
             <Textarea
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
-              placeholder="Adicione uma descrição..."
+              onPaste={handlePaste}
+              placeholder="Adicione uma descrição... (Ctrl+V para colar imagens)"
               className="min-h-[300px] resize-none"
               autoFocus
             />

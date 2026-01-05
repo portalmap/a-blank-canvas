@@ -20,6 +20,7 @@ import { TaskActivity, getActivityLabel } from '@/hooks/useTaskActivities';
 import { useResolveCommentAssignment, useTaskComments } from '@/hooks/useTaskComments';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { cn } from '@/lib/utils';
+import { renderTextWithImagesAndLinks } from '@/lib/linkify';
 
 interface TaskActivityItemProps {
   activity: TaskActivity;
@@ -190,10 +191,10 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
             {(activity.activity_type === 'comment.created' || activity.activity_type === 'assignment.created') && 
              activity.metadata?.content && (
               <div className={cn(
-                "mt-2 p-3 rounded-md text-sm",
+                "mt-2 p-3 rounded-md text-sm whitespace-pre-wrap",
                 isResolved ? "bg-muted/30" : "bg-muted/50"
               )}>
-                {activity.metadata.content}
+                {renderTextWithImagesAndLinks(activity.metadata.content)}
               </div>
             )}
 
