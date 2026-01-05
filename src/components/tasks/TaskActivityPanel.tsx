@@ -220,7 +220,20 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={selectedAssignee ? "Descreva a ação para o usuário atribuído..." : "Escreva um comentário..."}
+          onPaste={async (e) => {
+            const items = e.clipboardData.items;
+            for (const item of items) {
+              if (item.type.startsWith('image/')) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (file) {
+                  handleFilesSelected([file]);
+                }
+                break;
+              }
+            }
+          }}
+          placeholder={selectedAssignee ? "Descreva a ação para o usuário atribuído..." : "Escreva um comentário... (Ctrl+V para colar imagens)"}
           className="min-h-[80px] resize-none"
         />
         <div className="flex justify-between items-center">

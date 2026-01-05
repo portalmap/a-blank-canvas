@@ -32,7 +32,6 @@ export const CommentAttachmentButton = ({
         ref={inputRef}
         type="file"
         multiple
-        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
         onChange={handleChange}
         className="hidden"
       />
