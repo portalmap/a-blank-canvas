@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.webhook-enqueue]
 verify_jwt = true
+
+[functions.api-tasks]
+verify_jwt = false
