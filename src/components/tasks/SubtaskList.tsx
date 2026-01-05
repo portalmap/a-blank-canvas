@@ -4,12 +4,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
-import { Plus, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useSubtasks, useCreateSubtask } from '@/hooks/useSubtasks';
 import { useDefaultStatus } from '@/hooks/useStatuses';
-import { useUpdateTask } from '@/hooks/useTasks';
+import { useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Task {
   id: string;
@@ -34,13 +50,26 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [subtaskToDelete, setSubtaskToDelete] = useState<{ id: string; title: string } | null>(null);
   const navigate = useNavigate();
 
   const { data: subtasks, isLoading } = useSubtasks(parentTask.id);
   const { data: defaultStatus } = useDefaultStatus(parentTask.workspace_id);
   const createSubtask = useCreateSubtask();
   const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
   const createActivity = useCreateTaskActivity();
+
+  const handleDeleteSubtask = async () => {
+    if (!subtaskToDelete) return;
+    
+    await deleteTask.mutateAsync({
+      id: subtaskToDelete.id,
+      taskTitle: subtaskToDelete.title,
+    });
+    
+    setSubtaskToDelete(null);
+  };
 
   const handleCreateSubtask = async () => {
     if (!newSubtaskTitle.trim() || !defaultStatus) return;
@@ -140,7 +169,7 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
                   <div
                     key={subtask.id}
                     className={cn(
-                      "flex items-center gap-3 p-2 rounded-md border hover:bg-muted/50 cursor-pointer",
+                      "group flex items-center gap-3 p-2 rounded-md border hover:bg-muted/50 cursor-pointer",
                       subtask.completed_at && "opacity-60"
                     )}
                     onClick={() => navigate(`/task/${subtask.id}`)}
@@ -158,6 +187,30 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
                     </span>
                     <StatusBadge status={status?.name || 'Sem status'} />
                     <PriorityBadge priority={subtask.priority} />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSubtaskToDelete({ id: subtask.id, title: subtask.title });
+                          }}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 );
               })}
@@ -206,6 +259,25 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
         </div>
       )}
 
+      <AlertDialog open={!!subtaskToDelete} onOpenChange={(open) => !open && setSubtaskToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir subtarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A subtarefa "{subtaskToDelete?.title}" será excluída permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSubtask}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteTask.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

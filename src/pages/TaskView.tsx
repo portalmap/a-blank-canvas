@@ -6,6 +6,7 @@ import { useSpaces } from '@/hooks/useSpaces';
 import { useFolders } from '@/hooks/useFolders';
 import { useList, useListsForWorkspace } from '@/hooks/useLists';
 import { useDuplicateTask } from '@/hooks/useDuplicate';
+import { useDeleteTask } from '@/hooks/useTasks';
 import { 
   Breadcrumb, 
   BreadcrumbItem, 
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, ArrowLeft, PanelRightClose, PanelRight, Copy, MoreHorizontal } from 'lucide-react';
+import { Loader2, ArrowLeft, PanelRightClose, PanelRight, Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 import { TaskMainContent } from '@/components/tasks/TaskMainContent';
 import { TaskActivityPanel } from '@/components/tasks/TaskActivityPanel';
 import { useState, useEffect } from 'react';
@@ -36,6 +37,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -87,9 +98,11 @@ const TaskView = () => {
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const [hasLoggedCreation, setHasLoggedCreation] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string>('');
 
   const { data: task, isLoading: taskLoading } = useTask(taskId);
+  const deleteTask = useDeleteTask();
   const { data: currentList } = useList(task?.list_id);
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: folders } = useFolders(currentList?.space_id);
@@ -115,6 +128,18 @@ const TaskView = () => {
     if (newTaskId) {
       navigate(`/task/${newTaskId}`);
     }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!task) return;
+    
+    await deleteTask.mutateAsync({
+      id: task.id,
+      taskTitle: task.title,
+    });
+    
+    setIsDeleteDialogOpen(false);
+    navigate(-1);
   };
 
   // Registrar atividade de criação se for a primeira visita
@@ -219,6 +244,13 @@ const TaskView = () => {
                   <Copy className="mr-2 h-4 w-4" />
                   Duplicar Tarefa
                 </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir Tarefa
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             
@@ -304,6 +336,27 @@ const TaskView = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Task Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A tarefa "{task.title}" será excluída permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTask}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteTask.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
