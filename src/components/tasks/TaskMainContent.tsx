@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
-import { Calendar, Clock, Flag, Check, X } from 'lucide-react';
+import { Calendar, Clock, Flag, Check, X, Maximize2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
@@ -14,7 +15,6 @@ import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { cn } from '@/lib/utils';
-
 interface Task {
   id: string;
   title: string;
@@ -46,6 +46,7 @@ interface TaskMainContentProps {
 export const TaskMainContent = ({ task }: TaskMainContentProps) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
@@ -346,7 +347,21 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
       {/* Descrição */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Descrição</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">Descrição</label>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setEditDescription(task.description || '');
+              setIsDescriptionExpanded(true);
+            }}
+            title="Expandir descrição"
+            className="h-7 w-7 p-0"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </Button>
+        </div>
         {isEditingDescription ? (
           <div className="space-y-2">
             <Textarea
@@ -379,6 +394,35 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
           </div>
         )}
       </div>
+
+      {/* Modal de descrição expandida */}
+      <Dialog open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Descrição</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto max-h-[60vh]">
+            <Textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Adicione uma descrição..."
+              className="min-h-[300px] resize-none"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setIsDescriptionExpanded(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => {
+              handleSaveDescription();
+              setIsDescriptionExpanded(false);
+            }}>
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Separator />
 
