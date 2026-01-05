@@ -38,7 +38,7 @@ const ListDetailView = () => {
   const { data: defaultStatus } = useDefaultStatusForScope('list', listId, activeWorkspace?.id);
   const createTask = useCreateTask();
 
-  const [selectedTaskForDrawer, setSelectedTaskForDrawer] = useState<any>(null);
+  const [selectedTaskIdForDrawer, setSelectedTaskIdForDrawer] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Filter states
@@ -204,11 +204,7 @@ const ListDetailView = () => {
     });
 
     if (newTask) {
-      const taskWithStatus = {
-        ...newTask,
-        status: statuses?.find(s => s.id === defaultStatus.id),
-      };
-      setSelectedTaskForDrawer(taskWithStatus);
+      setSelectedTaskIdForDrawer(newTask.id);
       setIsDrawerOpen(true);
     }
   };
@@ -407,7 +403,7 @@ const ListDetailView = () => {
         </Tabs>
 
         <TaskDetailDrawer
-          task={selectedTaskForDrawer}
+          taskId={selectedTaskIdForDrawer}
           open={isDrawerOpen}
           onOpenChange={setIsDrawerOpen}
         />
