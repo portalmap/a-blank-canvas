@@ -9,6 +9,7 @@ import { useDefaultStatus } from '@/hooks/useStatuses';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { cn } from '@/lib/utils';
+import { TaskDetailDrawer } from './TaskDetailDrawer';
 
 interface Task {
   id: string;
@@ -33,6 +34,7 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
 
   const { data: subtasks, isLoading } = useSubtasks(parentTask.id);
   const { data: defaultStatus } = useDefaultStatus(parentTask.workspace_id);
@@ -141,10 +143,12 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
                       "flex items-center gap-3 p-2 rounded-md border hover:bg-muted/50 cursor-pointer",
                       subtask.completed_at && "opacity-60"
                     )}
+                    onClick={() => setSelectedSubtaskId(subtask.id)}
                   >
                     <Checkbox 
                       checked={!!subtask.completed_at}
                       onCheckedChange={() => handleToggleComplete(subtask)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <span className={cn(
                       "flex-1 text-sm",
@@ -201,6 +205,12 @@ export const SubtaskList = ({ parentTask, statuses }: SubtaskListProps) => {
           )}
         </div>
       )}
+
+      <TaskDetailDrawer
+        taskId={selectedSubtaskId}
+        open={!!selectedSubtaskId}
+        onOpenChange={(open) => !open && setSelectedSubtaskId(null)}
+      />
     </div>
   );
 };
