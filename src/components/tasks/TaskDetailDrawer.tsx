@@ -172,11 +172,25 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
               <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Calendar className="h-4 w-4" /> Data de Início
               </label>
-              <Input 
-                type="date" 
-                value={task.start_date || ''} 
-                onChange={handleStartDateChange}
-              />
+              <div className="relative">
+                <Input 
+                  type="date" 
+                  value={task.start_date || ''} 
+                  onChange={handleStartDateChange}
+                  className="pr-8"
+                />
+                {task.start_date && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full w-8 hover:bg-transparent"
+                    onClick={() => updateTask.mutateAsync({ id: task.id, startDate: null })}
+                  >
+                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -186,12 +200,25 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
               )}>
                 <Clock className="h-4 w-4" /> Data de Entrega
               </label>
-              <Input 
-                type="date" 
-                value={task.due_date || ''} 
-                onChange={handleDueDateChange}
-                className={cn(isOverdue && "border-destructive")}
-              />
+              <div className="relative">
+                <Input 
+                  type="date" 
+                  value={task.due_date || ''} 
+                  onChange={handleDueDateChange}
+                  className={cn("pr-8", isOverdue && "border-destructive")}
+                />
+                {task.due_date && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full w-8 hover:bg-transparent"
+                    onClick={() => updateTask.mutateAsync({ id: task.id, dueDate: null })}
+                  >
+                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                  </Button>
+                )}
+              </div>
               {isOverdue && (
                 <p className="text-xs text-destructive">Tarefa atrasada!</p>
               )}
