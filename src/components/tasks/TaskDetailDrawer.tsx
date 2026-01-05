@@ -252,7 +252,7 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
               </div>
             ) : (
               <div 
-                className="min-h-[80px] p-3 border rounded-md cursor-pointer hover:bg-muted/50"
+                className="min-h-[80px] p-3 border rounded-md cursor-pointer hover:bg-muted/50 whitespace-pre-wrap"
                 onClick={() => {
                   setEditDescription(task.description || '');
                   setIsEditingDescription(true);
