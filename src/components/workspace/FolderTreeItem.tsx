@@ -102,14 +102,14 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
   return (
     <>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="flex items-center w-full group">
-          <CollapsibleTrigger className="p-1.5 hover:bg-sidebar-accent rounded-md">
+        <div className="flex items-center w-full group min-w-0">
+          <CollapsibleTrigger className="p-1.5 hover:bg-sidebar-accent rounded-md flex-shrink-0">
             <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
           </CollapsibleTrigger>
           
           <NavLink
             to={`/folder/${folder.id}`}
-            className="flex items-center gap-2 flex-1 px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm"
+            className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden px-2 py-1.5 hover:bg-sidebar-accent rounded-md text-sm"
             activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
           >
             <Folder className="h-4 w-4 flex-shrink-0" />
@@ -121,7 +121,7 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
               <Button 
                 variant="ghost" 
                 size="icon"
-                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-4 w-4" />
