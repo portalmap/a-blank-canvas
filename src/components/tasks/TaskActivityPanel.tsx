@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,15 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
   const createActivity = useCreateTaskActivity();
   const createNotification = useCreateNotification();
   const uploadAttachment = useUploadAttachment();
+  
+  const activitiesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll para o final quando atividades carregam
+  useEffect(() => {
+    if (activities && activities.length > 0 && activitiesEndRef.current) {
+      activitiesEndRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [activities]);
 
   const handleFilesSelected = (files: File[]) => {
     const newFiles = files.map(file => {
@@ -168,6 +177,7 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
                 taskId={taskId}
               />
             ))}
+            <div ref={activitiesEndRef} />
           </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
