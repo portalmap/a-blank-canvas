@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useFolders } from '@/hooks/useFolders';
-import { useList } from '@/hooks/useLists';
+import { useList, useListsForWorkspace } from '@/hooks/useLists';
+import { useDuplicateTask } from '@/hooks/useDuplicate';
 import { 
   Breadcrumb, 
   BreadcrumbItem, 
@@ -15,12 +16,34 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, ArrowLeft, PanelRightClose, PanelRight } from 'lucide-react';
+import { Loader2, ArrowLeft, PanelRightClose, PanelRight, Copy, MoreHorizontal } from 'lucide-react';
 import { TaskMainContent } from '@/components/tasks/TaskMainContent';
 import { TaskActivityPanel } from '@/components/tasks/TaskActivityPanel';
 import { useState, useEffect } from 'react';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 const useTask = (taskId?: string) => {
   return useQuery({
@@ -63,15 +86,36 @@ const TaskView = () => {
   const { activeWorkspace } = useWorkspace();
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const [hasLoggedCreation, setHasLoggedCreation] = useState(false);
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [selectedListId, setSelectedListId] = useState<string>('');
 
   const { data: task, isLoading: taskLoading } = useTask(taskId);
   const { data: currentList } = useList(task?.list_id);
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: folders } = useFolders(currentList?.space_id);
+  const { data: allLists } = useListsForWorkspace(activeWorkspace?.id);
+  const duplicateTask = useDuplicateTask();
   const createActivity = useCreateTaskActivity();
 
   const currentSpace = spaces?.find(s => s.id === currentList?.space_id);
   const currentFolder = folders?.find(f => f.id === currentList?.folder_id);
+
+  const handleDuplicateTask = async () => {
+    if (!task || !selectedListId) return;
+    
+    const newTaskId = await duplicateTask.mutateAsync({
+      taskId: task.id,
+      targetListId: selectedListId,
+    });
+    
+    setIsDuplicateDialogOpen(false);
+    setSelectedListId('');
+    
+    // Navigate to the new task
+    if (newTaskId) {
+      navigate(`/task/${newTaskId}`);
+    }
+  };
 
   // Registrar atividade de criação se for a primeira visita
   useEffect(() => {
@@ -160,7 +204,24 @@ const TaskView = () => {
             </Breadcrumb>
           )}
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => {
+                  setSelectedListId(task.list_id);
+                  setIsDuplicateDialogOpen(true);
+                }}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicar Tarefa
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
             <Button
               variant="ghost"
               size="icon"
@@ -200,6 +261,49 @@ const TaskView = () => {
           </div>
         )}
       </div>
+
+      {/* Duplicate Task Dialog */}
+      <Dialog open={isDuplicateDialogOpen} onOpenChange={setIsDuplicateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duplicar Tarefa</DialogTitle>
+            <DialogDescription>
+              Selecione a lista de destino para duplicar "{task.title}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Lista de destino</Label>
+              <Select value={selectedListId} onValueChange={setSelectedListId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma lista" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allLists?.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name}
+                      {list.id === task.list_id && (
+                        <span className="text-muted-foreground text-xs ml-2">(atual)</span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDuplicateDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleDuplicateTask}
+              disabled={!selectedListId || duplicateTask.isPending}
+            >
+              {duplicateTask.isPending ? 'Duplicando...' : 'Duplicar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

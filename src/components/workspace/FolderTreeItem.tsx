@@ -2,9 +2,11 @@ import { useState } from "react";
 import { ChevronRight, Folder, MoreHorizontal, List, Trash2, Pencil, Link, Move, Copy, Archive, ListPlus } from "lucide-react";
 import { useLists, useCreateList } from "@/hooks/useLists";
 import { useDeleteFolder, useUpdateFolder } from "@/hooks/useFolders";
+import { useDuplicateFolder } from "@/hooks/useDuplicate";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { toast } from "sonner";
 import { MoveFolderDialog } from "./MoveFolderDialog";
+import { DuplicateDialog } from "./DuplicateDialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -66,6 +68,9 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
   const createList = useCreateList();
   const deleteFolder = useDeleteFolder();
   const updateFolder = useUpdateFolder();
+  const duplicateFolder = useDuplicateFolder();
+
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
 
   const handleCreateList = async () => {
     if (!activeWorkspace || !newListName.trim()) return;
@@ -143,7 +148,7 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
                 <Move className="mr-2 h-4 w-4" />
                 Mover
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+              <DropdownMenuItem onClick={() => setIsDuplicateDialogOpen(true)}>
                 <Copy className="mr-2 h-4 w-4" />
                 Duplicar
               </DropdownMenuItem>
@@ -275,6 +280,25 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
           onOpenChange={setIsMoveDialogOpen}
           folder={folder}
           workspaceId={activeWorkspace.id}
+        />
+      )}
+
+      {/* Dialog for duplicating folder */}
+      {activeWorkspace && (
+        <DuplicateDialog
+          open={isDuplicateDialogOpen}
+          onOpenChange={setIsDuplicateDialogOpen}
+          type="folder"
+          itemName={folder.name}
+          workspaceId={activeWorkspace.id}
+          currentSpaceId={folder.space_id}
+          onDuplicate={async (targetSpaceIds) => {
+            await duplicateFolder.mutateAsync({
+              folderId: folder.id,
+              targetSpaceIds,
+            });
+          }}
+          isPending={duplicateFolder.isPending}
         />
       )}
     </>

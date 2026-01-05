@@ -5,10 +5,12 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useStatuses } from "@/hooks/useStatuses";
 import { useCreateTask } from "@/hooks/useTasks";
 import { useDeleteList, useUpdateList } from "@/hooks/useLists";
+import { useDuplicateList } from "@/hooks/useDuplicate";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MoveListDialog } from "./MoveListDialog";
+import { DuplicateDialog } from "./DuplicateDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,11 +57,13 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
   const createTask = useCreateTask();
   const deleteList = useDeleteList();
   const updateList = useUpdateList();
+  const duplicateList = useDuplicateList();
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newName, setNewName] = useState('');
@@ -138,7 +142,7 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
               <Move className="mr-2 h-4 w-4" />
               Mover
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+            <DropdownMenuItem onClick={() => setIsDuplicateDialogOpen(true)}>
               <Copy className="mr-2 h-4 w-4" />
               Duplicar
             </DropdownMenuItem>
@@ -261,6 +265,24 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
         open={isMoveDialogOpen}
         onOpenChange={setIsMoveDialogOpen}
         list={list}
+      />
+
+      {/* Dialog for duplicating list */}
+      <DuplicateDialog
+        open={isDuplicateDialogOpen}
+        onOpenChange={setIsDuplicateDialogOpen}
+        type="list"
+        itemName={list.name}
+        workspaceId={list.workspace_id}
+        currentSpaceId={list.space_id}
+        onDuplicate={async (targetSpaceIds, targetFolderId) => {
+          await duplicateList.mutateAsync({
+            listId: list.id,
+            targetSpaceIds,
+            targetFolderId,
+          });
+        }}
+        isPending={duplicateList.isPending}
       />
     </>
   );
