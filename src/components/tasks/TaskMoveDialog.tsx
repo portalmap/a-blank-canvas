@@ -43,7 +43,7 @@ export const TaskMoveDialog = ({
   const { data: spaces, isLoading: spacesLoading } = useSpaces(workspaceId);
   const { data: folders } = useFolders(selectedSpaceId || undefined);
   const { data: spaceLists } = useLists({ spaceId: selectedSpaceId || undefined });
-  const { data: folderLists } = useLists({ folderId: selectedFolderId || undefined });
+  const { data: folderLists } = useLists({ folderId: selectedFolderId && selectedFolderId !== "none" ? selectedFolderId : undefined });
   
   const moveTask = useMoveTask();
 
@@ -80,7 +80,7 @@ export const TaskMoveDialog = ({
   };
 
   // Combine lists from space and folder
-  const availableLists = selectedFolderId
+  const availableLists = selectedFolderId && selectedFolderId !== "none"
     ? folderLists || []
     : spaceLists?.filter(l => !l.folder_id) || [];
 
@@ -118,7 +118,7 @@ export const TaskMoveDialog = ({
             {selectedSpaceId && folders && folders.length > 0 && (
               <div className="space-y-2">
                 <Label>Pasta (opcional)</Label>
-                <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
+                <Select value={selectedFolderId} onValueChange={(value) => setSelectedFolderId(value === "none" ? "" : value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma pasta" />
                   </SelectTrigger>
