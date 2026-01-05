@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/select";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const GATEWAY_ENDPOINT = `${SUPABASE_URL}/functions/v1/api-gateway`;
+const TASKS_ENDPOINT = `${SUPABASE_URL}/functions/v1/api-tasks`;
 
 export function ApiSettings() {
   const { activeWorkspace, setActiveWorkspace } = useWorkspace();
@@ -41,14 +43,13 @@ export function ApiSettings() {
   const { toast } = useToast();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
 
-  const endpointUrl = `${SUPABASE_URL}/functions/v1/api-tasks`;
-
-  const copyEndpoint = async () => {
-    await navigator.clipboard.writeText(endpointUrl);
+  const copyEndpoint = async (url: string, label: string) => {
+    await navigator.clipboard.writeText(url);
     toast({
       title: "URL copiada",
-      description: "A URL do endpoint foi copiada para a área de transferência.",
+      description: `A URL do endpoint ${label} foi copiada para a área de transferência.`,
     });
   };
 
@@ -149,23 +150,110 @@ export function ApiSettings() {
             </div>
           )}
 
-          {/* Endpoint URL */}
+          {/* API Completa Endpoint */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">URL do Endpoint</label>
+            <label className="text-sm font-medium">API Completa (todos os recursos)</label>
             <div className="flex items-center gap-2">
               <Input
                 readOnly
-                value={endpointUrl}
+                value={GATEWAY_ENDPOINT}
                 className="font-mono text-sm"
               />
-              <Button variant="outline" size="icon" onClick={copyEndpoint}>
+              <Button variant="outline" size="icon" onClick={() => copyEndpoint(GATEWAY_ENDPOINT, "API Completa")}>
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Use esta URL para enviar requisições POST com tarefas.
+              RESTful API com acesso a todos os recursos do workspace.
             </p>
           </div>
+
+          {/* API de Tarefas Endpoint */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">API de Tarefas (apenas criar tarefas)</label>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={TASKS_ENDPOINT}
+                className="font-mono text-sm"
+              />
+              <Button variant="outline" size="icon" onClick={() => copyEndpoint(TASKS_ENDPOINT, "API de Tarefas")}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Endpoint legado para criar tarefas via POST.
+            </p>
+          </div>
+
+          {/* Documentation Toggle */}
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={() => setShowDocs(!showDocs)}
+          >
+            {showDocs ? "Ocultar Documentação" : "Ver Documentação da API"}
+          </Button>
+
+          {showDocs && (
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-4 text-sm">
+              <h4 className="font-semibold">Endpoints Disponíveis</h4>
+              <div className="font-mono text-xs space-y-1">
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /spaces</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /folders</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /lists</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /tasks</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /subtasks</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /statuses</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /tags</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /comments</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /checklists</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /checklist-items</p>
+                <p><span className="text-green-600">GET/POST/DELETE</span> /assignees</p>
+                <p><span className="text-green-600">GET/POST/DELETE</span> /attachments</p>
+                <p><span className="text-blue-600">GET</span> /members</p>
+              </div>
+
+              <h4 className="font-semibold mt-4">Exemplo de Uso</h4>
+              <pre className="bg-background p-3 rounded text-xs overflow-x-auto">
+{`// Listar tarefas
+GET ${GATEWAY_ENDPOINT}/tasks
+Authorization: Bearer {SEU_TOKEN}
+
+// Criar tarefa
+POST ${GATEWAY_ENDPOINT}/tasks
+Authorization: Bearer {SEU_TOKEN}
+Content-Type: application/json
+
+{
+  "title": "Nova Tarefa",
+  "list_id": "uuid-da-lista",
+  "description": "Descrição opcional",
+  "priority": "high"
+}
+
+// Atualizar tarefa
+PUT ${GATEWAY_ENDPOINT}/tasks/{task_id}
+Authorization: Bearer {SEU_TOKEN}
+Content-Type: application/json
+
+{
+  "title": "Título Atualizado",
+  "status_id": "uuid-do-status"
+}`}
+              </pre>
+
+              <h4 className="font-semibold mt-4">Query Parameters</h4>
+              <ul className="text-xs space-y-1 text-muted-foreground">
+                <li><code className="bg-background px-1 rounded">/tasks?list_id=uuid</code> - Filtrar tarefas por lista</li>
+                <li><code className="bg-background px-1 rounded">/tasks?status_id=uuid</code> - Filtrar por status</li>
+                <li><code className="bg-background px-1 rounded">/lists?space_id=uuid</code> - Filtrar listas por espaço</li>
+                <li><code className="bg-background px-1 rounded">/folders?space_id=uuid</code> - Filtrar pastas por espaço</li>
+                <li><code className="bg-background px-1 rounded">/comments?task_id=uuid</code> - Comentários de uma tarefa</li>
+                <li><code className="bg-background px-1 rounded">/subtasks?parent_id=uuid</code> - Subtarefas de uma tarefa</li>
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
 
