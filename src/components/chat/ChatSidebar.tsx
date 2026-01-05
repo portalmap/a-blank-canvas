@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUnreadChannels } from '@/hooks/useChatUnread';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   const { data: userRole } = useUserRole();
   const { user } = useAuth();
   const deleteChannel = useDeleteChannel();
+  const { data: unreadChannelIds } = useUnreadChannels();
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({});
@@ -249,6 +251,9 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                             <span className="truncate">
                               {channel.spaces?.name || channel.name}
                             </span>
+                            {unreadChannelIds?.includes(channel.id) && (
+                              <span className="ml-auto h-2 w-2 rounded-full bg-destructive flex-shrink-0" />
+                            )}
                           </button>
                         ))}
                         {spaceChannels.length === 0 && (
@@ -292,6 +297,9 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                             >
                               <Hash className="h-3.5 w-3.5 flex-shrink-0" />
                               <span className="truncate">{channel.name}</span>
+                              {unreadChannelIds?.includes(channel.id) && (
+                                <span className="ml-auto h-2 w-2 rounded-full bg-destructive flex-shrink-0" />
+                              )}
                             </button>
                             
                             {canDeleteChannel(channel) && (

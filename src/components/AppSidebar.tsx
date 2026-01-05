@@ -20,6 +20,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { SpaceTreeItem } from '@/components/workspace/SpaceTreeItem';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useUnreadChannels } from '@/hooks/useChatUnread';
 
 const homeNavItem = { title: 'Início', url: '/', icon: Home };
 
@@ -40,10 +41,12 @@ export function AppSidebar() {
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: userRole } = useUserRole();
+  const { data: unreadChannels } = useUnreadChannels();
   
   const isAdmin = userRole?.isAdmin ?? false;
   const isActive = (path: string) => location.pathname === path;
   const isCollapsed = state === 'collapsed';
+  const hasUnreadMessages = unreadChannels && unreadChannels.length > 0;
   
   // Filtrar módulos - Automações só para admin
   const filteredModulesNavItems = modulesNavItems.filter(item => {
@@ -176,8 +179,16 @@ export function AppSidebar() {
                           className="hover:bg-sidebar-accent"
                           activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                         >
-                          <item.icon className="h-4 w-4" />
+                          <div className="relative">
+                            <item.icon className="h-4 w-4" />
+                            {item.url === '/chat' && hasUnreadMessages && (
+                              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
+                            )}
+                          </div>
                           {!isCollapsed && <span>{item.title}</span>}
+                          {!isCollapsed && item.url === '/chat' && hasUnreadMessages && (
+                            <span className="ml-auto h-2 w-2 rounded-full bg-destructive flex-shrink-0" />
+                          )}
                         </NavLink>
                       </SidebarMenuButton>
                     </TooltipTrigger>
