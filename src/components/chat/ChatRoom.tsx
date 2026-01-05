@@ -3,6 +3,7 @@ import { Hash, Users, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChatMessages, ChatMessageWithSender } from '@/hooks/useChat';
+import { useMarkChannelAsRead } from '@/hooks/useChatUnread';
 import { ChatMessageItem } from './ChatMessageItem';
 import { ChatInput } from './ChatInput';
 
@@ -22,7 +23,15 @@ export const ChatRoom = ({
   onOpenMembers 
 }: ChatRoomProps) => {
   const { data: messages, isLoading } = useChatMessages(channelId);
+  const markAsRead = useMarkChannelAsRead();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Marcar canal como lido quando abrir ou receber novas mensagens
+  useEffect(() => {
+    if (channelId) {
+      markAsRead.mutate({ channelId });
+    }
+  }, [channelId, messages?.length]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
