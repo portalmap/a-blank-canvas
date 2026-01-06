@@ -128,12 +128,16 @@ Deno.serve(async (req) => {
       case "task-tags":
         result = await handleTaskTags(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams);
         break;
+      case "workspaces":
+        result = await handleWorkspaces(supabase, req.method, workspaceId, await parseBody(req));
+        break;
       case "":
         result = { 
           data: { 
             message: "API Gateway v1.0",
             workspace_id: workspaceId,
             endpoints: [
+              "GET/PUT /workspaces",
               "GET/POST /spaces",
               "GET/POST /folders",
               "GET/POST /lists",
@@ -1060,6 +1064,36 @@ async function handleTaskTags(supabase: any, method: string, id: string | null, 
         .eq("tag_id", query.tag_id);
       if (deleteError) return { error: deleteError.message, status: 400 };
       return { data: { deleted: true } };
+    default:
+      return { error: "Método não permitido", status: 405 };
+  }
+}
+
+// ============ WORKSPACES ============
+async function handleWorkspaces(supabase: any, method: string, workspaceId: string, body: any) {
+  switch (method) {
+    case "GET":
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("id, name, description, created_at, updated_at")
+        .eq("id", workspaceId)
+        .single();
+      if (error) return { error: error.message, status: 404 };
+      return { data };
+    case "PUT":
+      const updateData: any = {};
+      if (body?.name !== undefined) updateData.name = body.name;
+      if (body?.description !== undefined) updateData.description = body.description;
+      updateData.updated_at = new Date().toISOString();
+
+      const { data: updated, error: updateError } = await supabase
+        .from("workspaces")
+        .update(updateData)
+        .eq("id", workspaceId)
+        .select("id, name, description, created_at, updated_at")
+        .single();
+      if (updateError) return { error: updateError.message, status: 400 };
+      return { data: updated };
     default:
       return { error: "Método não permitido", status: 405 };
   }
