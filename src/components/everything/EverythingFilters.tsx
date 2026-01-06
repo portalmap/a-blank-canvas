@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Filter, X, Check } from 'lucide-react';
+import { Filter, X, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 export interface FilterState {
   statuses: string[];
   priorities: string[];
+  tags: string[];
   showCompleted: boolean;
 }
 
@@ -21,6 +22,7 @@ interface EverythingFiltersProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
   availableStatuses: Array<{ id: string; name: string; color: string | null }>;
+  availableTags?: Array<{ id: string; name: string; color: string | null }>;
 }
 
 const priorityOptions = [
@@ -30,12 +32,13 @@ const priorityOptions = [
   { value: 'low', label: 'Baixa', color: 'bg-blue-500' },
 ];
 
-export function EverythingFilters({ filters, onChange, availableStatuses }: EverythingFiltersProps) {
+export function EverythingFilters({ filters, onChange, availableStatuses, availableTags = [] }: EverythingFiltersProps) {
   const [open, setOpen] = useState(false);
 
   const activeFilterCount = 
     filters.statuses.length + 
     filters.priorities.length + 
+    (filters.tags?.length || 0) +
     (filters.showCompleted ? 0 : 1);
 
   const toggleStatus = (statusId: string) => {
@@ -52,10 +55,19 @@ export function EverythingFilters({ filters, onChange, availableStatuses }: Ever
     onChange({ ...filters, priorities: newPriorities });
   };
 
+  const toggleTag = (tagId: string) => {
+    const currentTags = filters.tags || [];
+    const newTags = currentTags.includes(tagId)
+      ? currentTags.filter(t => t !== tagId)
+      : [...currentTags, tagId];
+    onChange({ ...filters, tags: newTags });
+  };
+
   const clearFilters = () => {
     onChange({
       statuses: [],
       priorities: [],
+      tags: [],
       showCompleted: true,
     });
   };
@@ -138,6 +150,38 @@ export function EverythingFilters({ filters, onChange, availableStatuses }: Ever
               ))}
             </div>
           </div>
+
+          {/* Tags Filter */}
+          {availableTags.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5" />
+                  Etiquetas
+                </Label>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                  {availableTags.map((tag) => (
+                    <div
+                      key={tag.id}
+                      className="flex items-center gap-2 cursor-pointer"
+                      onClick={() => toggleTag(tag.id)}
+                    >
+                      <Checkbox
+                        checked={(filters.tags || []).includes(tag.id)}
+                        onCheckedChange={() => toggleTag(tag.id)}
+                      />
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: tag.color || '#6b7280' }}
+                      />
+                      <span className="text-sm truncate">{tag.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 

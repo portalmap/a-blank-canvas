@@ -15,6 +15,7 @@ import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
+import { TaskTagsSelector } from './TaskTagsSelector';
 import { cn } from '@/lib/utils';
 import { renderTextWithImagesAndLinks } from '@/lib/linkify';
 import { toast } from 'sonner';
@@ -370,6 +371,9 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
       {/* Responsáveis */}
       <TaskAssigneesManager taskId={task.id} workspaceId={task.workspace_id} />
+
+      {/* Etiquetas */}
+      <TaskTagsSelector taskId={task.id} workspaceId={task.workspace_id} />
 
       <Separator />
 

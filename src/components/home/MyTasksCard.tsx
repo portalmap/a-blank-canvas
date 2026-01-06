@@ -35,6 +35,7 @@ export function MyTasksCard() {
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
     priorities: [],
+    tags: [],
     showCompleted: false,
   });
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({

@@ -47,6 +47,7 @@ const ListDetailView = () => {
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
     priorities: [],
+    tags: [],
     showCompleted: true,
   });
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);

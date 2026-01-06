@@ -53,6 +53,7 @@ export default function EverythingView() {
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
     priorities: [],
+    tags: [],
     showCompleted: false,
   });
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
