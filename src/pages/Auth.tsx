@@ -40,8 +40,8 @@ const Auth = () => {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <div className="bg-primary rounded-lg p-3">
-              <CheckSquare className="h-10 w-10 text-primary-foreground" />
+            <div className="bg-primary rounded-lg p-3 flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-3xl leading-none">X</span>
             </div>
           </div>
           <h1 className="text-3xl font-bold tracking-tight">X Flow</h1>
