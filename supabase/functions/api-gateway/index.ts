@@ -468,7 +468,6 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           priority: body.priority || null,
           due_date: body.due_date || null,
           start_date: body.start_date || null,
-          time_estimate: body.time_estimate || null,
         })
         .select()
         .single();
@@ -495,7 +494,6 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
       if (body.priority !== undefined) updateData.priority = body.priority;
       if (body.due_date !== undefined) updateData.due_date = body.due_date;
       if (body.start_date !== undefined) updateData.start_date = body.start_date;
-      if (body.time_estimate !== undefined) updateData.time_estimate = body.time_estimate;
       if (body.completed_at !== undefined) updateData.completed_at = body.completed_at;
 
       const { data: updatedTask, error: updateError } = await supabase
