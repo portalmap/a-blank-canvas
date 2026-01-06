@@ -85,8 +85,8 @@ export function AppSidebar() {
           {/* Logo + Nome - só quando expandido */}
           {!isCollapsed && (
             <div className="flex items-center gap-2">
-              <div className="bg-sidebar-primary rounded-lg p-2">
-                <CheckSquare className="h-5 w-5 text-sidebar-primary-foreground" />
+              <div className="bg-sidebar-primary rounded-lg p-2 flex items-center justify-center">
+                <span className="text-sidebar-primary-foreground font-bold text-lg leading-none">X</span>
               </div>
               <span className="font-semibold text-sidebar-foreground">X Flow</span>
             </div>
