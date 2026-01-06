@@ -453,13 +453,33 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
       // Get default status if not provided
       let statusId = body.status_id;
       if (!statusId) {
-        const { data: defaultStatus } = await supabase
+        // Use limit(1) instead of single() to handle multiple defaults
+        const { data: defaultStatuses } = await supabase
           .from("statuses")
           .select("id")
           .eq("workspace_id", workspaceId)
           .eq("is_default", true)
-          .single();
-        statusId = defaultStatus?.id;
+          .limit(1);
+        
+        if (defaultStatuses && defaultStatuses.length > 0) {
+          statusId = defaultStatuses[0].id;
+        } else {
+          // Fallback: get any status from the workspace
+          const { data: anyStatus } = await supabase
+            .from("statuses")
+            .select("id")
+            .eq("workspace_id", workspaceId)
+            .order("order_index", { ascending: true })
+            .limit(1);
+          
+          if (anyStatus && anyStatus.length > 0) {
+            statusId = anyStatus[0].id;
+          }
+        }
+        
+        if (!statusId) {
+          return { error: "Nenhum status configurado para este workspace", status: 400 };
+        }
       }
 
       const { data: newTask, error: createError } = await supabase
