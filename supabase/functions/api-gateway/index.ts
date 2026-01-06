@@ -466,6 +466,8 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
         .from("tasks")
         .insert({
           list_id: body.list_id,
+          workspace_id: workspaceId,
+          created_by_user_id: "00000000-0000-0000-0000-000000000000",
           title: body.title,
           description: body.description || null,
           status_id: statusId,
