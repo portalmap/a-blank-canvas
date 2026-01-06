@@ -491,7 +491,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           title: body.title,
           description: body.description || null,
           status_id: statusId,
-          priority: body.priority || null,
+          priority: body.priority || "medium",
           due_date: body.due_date || null,
           start_date: body.start_date || null,
         })
