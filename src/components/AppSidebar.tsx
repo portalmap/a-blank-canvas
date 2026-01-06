@@ -88,7 +88,7 @@ export function AppSidebar() {
               <div className="bg-sidebar-primary rounded-lg p-2">
                 <CheckSquare className="h-5 w-5 text-sidebar-primary-foreground" />
               </div>
-              <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
+              <span className="font-semibold text-sidebar-foreground">X Flow</span>
             </div>
           )}
           
