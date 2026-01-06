@@ -453,32 +453,69 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
       // Get default status if not provided
       let statusId = body.status_id;
       if (!statusId) {
-        // Use limit(1) instead of single() to handle multiple defaults
-        const { data: defaultStatuses } = await supabase
-          .from("statuses")
-          .select("id")
-          .eq("workspace_id", workspaceId)
-          .eq("is_default", true)
-          .limit(1);
+        // Verificar se a lista usa status por template
+        const { data: listConfig } = await supabase
+          .from("lists")
+          .select("status_source")
+          .eq("id", body.list_id)
+          .single();
         
-        if (defaultStatuses && defaultStatuses.length > 0) {
-          statusId = defaultStatuses[0].id;
+        if (listConfig?.status_source === 'template') {
+          // Buscar status da própria lista
+          const { data: listStatuses } = await supabase
+            .from("statuses")
+            .select("id")
+            .eq("scope_type", "list")
+            .eq("scope_id", body.list_id)
+            .eq("is_default", true)
+            .limit(1);
+          
+          if (listStatuses && listStatuses.length > 0) {
+            statusId = listStatuses[0].id;
+          } else {
+            // Fallback: primeiro status da lista
+            const { data: anyListStatus } = await supabase
+              .from("statuses")
+              .select("id")
+              .eq("scope_type", "list")
+              .eq("scope_id", body.list_id)
+              .order("order_index", { ascending: true })
+              .limit(1);
+            
+            if (anyListStatus && anyListStatus.length > 0) {
+              statusId = anyListStatus[0].id;
+            }
+          }
         } else {
-          // Fallback: get any status from the workspace
-          const { data: anyStatus } = await supabase
+          // Status do workspace
+          const { data: defaultStatuses } = await supabase
             .from("statuses")
             .select("id")
             .eq("workspace_id", workspaceId)
-            .order("order_index", { ascending: true })
+            .eq("scope_type", "workspace")
+            .eq("is_default", true)
             .limit(1);
           
-          if (anyStatus && anyStatus.length > 0) {
-            statusId = anyStatus[0].id;
+          if (defaultStatuses && defaultStatuses.length > 0) {
+            statusId = defaultStatuses[0].id;
+          } else {
+            // Fallback: primeiro status do workspace
+            const { data: anyStatus } = await supabase
+              .from("statuses")
+              .select("id")
+              .eq("workspace_id", workspaceId)
+              .eq("scope_type", "workspace")
+              .order("order_index", { ascending: true })
+              .limit(1);
+            
+            if (anyStatus && anyStatus.length > 0) {
+              statusId = anyStatus[0].id;
+            }
           }
         }
         
         if (!statusId) {
-          return { error: "Nenhum status configurado para este workspace", status: 400 };
+          return { error: "Nenhum status configurado para esta lista ou workspace", status: 400 };
         }
       }
 
