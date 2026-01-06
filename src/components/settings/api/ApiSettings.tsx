@@ -205,7 +205,8 @@ export function ApiSettings() {
                 <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /tasks</p>
                 <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /subtasks</p>
                 <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /statuses</p>
-                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /tags</p>
+                <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /tags - Etiquetas do workspace</p>
+                <p><span className="text-green-600">GET/POST/DELETE</span> /task-tags - Relações tarefa-etiqueta</p>
                 <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /comments</p>
                 <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /checklists</p>
                 <p><span className="text-green-600">GET/POST/PUT/DELETE</span> /checklist-items</p>
@@ -251,7 +252,32 @@ Content-Type: application/json
                 <li><code className="bg-background px-1 rounded">/folders?space_id=uuid</code> - Filtrar pastas por espaço</li>
                 <li><code className="bg-background px-1 rounded">/comments?task_id=uuid</code> - Comentários de uma tarefa</li>
                 <li><code className="bg-background px-1 rounded">/subtasks?parent_id=uuid</code> - Subtarefas de uma tarefa</li>
+                <li><code className="bg-background px-1 rounded">/task-tags?task_id=uuid</code> - Etiquetas de uma tarefa</li>
               </ul>
+
+              <h4 className="font-semibold mt-4">Gerenciar Etiquetas</h4>
+              <pre className="bg-background p-3 rounded text-xs overflow-x-auto">
+{`// Listar etiquetas do workspace
+GET ${GATEWAY_ENDPOINT}/tags
+Authorization: Bearer {SEU_TOKEN}
+
+// Criar etiqueta
+POST ${GATEWAY_ENDPOINT}/tags
+{
+  "name": "Bug",
+  "color": "#ef4444"
+}
+
+// Adicionar etiqueta a uma tarefa
+POST ${GATEWAY_ENDPOINT}/task-tags
+{
+  "task_id": "uuid-da-tarefa",
+  "tag_id": "uuid-da-etiqueta"
+}
+
+// Remover etiqueta de uma tarefa
+DELETE ${GATEWAY_ENDPOINT}/task-tags?task_id=uuid&tag_id=uuid`}
+              </pre>
             </div>
           )}
         </CardContent>

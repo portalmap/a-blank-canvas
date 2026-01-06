@@ -79,6 +79,68 @@ export function useCreateTaskTag() {
   });
 }
 
+export function useUpdateTaskTag() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      tagId,
+      workspaceId,
+      name,
+      color,
+    }: {
+      tagId: string;
+      workspaceId: string;
+      name: string;
+      color?: string;
+    }) => {
+      const { data, error } = await supabase
+        .from("task_tags")
+        .update({
+          name,
+          color: color || "#6366f1",
+        })
+        .eq("id", tagId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["task-tags", variables.workspaceId],
+      });
+      toast({ title: "Etiqueta atualizada com sucesso" });
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao atualizar etiqueta",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useTagUsageCount(tagId: string | undefined) {
+  return useQuery({
+    queryKey: ["tag-usage-count", tagId],
+    queryFn: async () => {
+      if (!tagId) return 0;
+
+      const { count, error } = await supabase
+        .from("task_tag_relations")
+        .select("*", { count: "exact", head: true })
+        .eq("tag_id", tagId);
+
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!tagId,
+  });
+}
+
 export function useDeleteTaskTag() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

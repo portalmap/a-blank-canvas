@@ -125,6 +125,9 @@ Deno.serve(async (req) => {
       case "members":
         result = await handleMembers(supabase, req.method, resourceId, workspaceId, queryParams);
         break;
+      case "task-tags":
+        result = await handleTaskTags(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams);
+        break;
       case "":
         result = { 
           data: { 
@@ -137,7 +140,8 @@ Deno.serve(async (req) => {
               "GET/POST/PUT/DELETE /tasks",
               "GET/POST /subtasks",
               "GET/POST /statuses",
-              "GET/POST /tags",
+              "GET/POST/PUT/DELETE /tags",
+              "GET/POST/DELETE /task-tags",
               "GET/POST/PUT/DELETE /comments",
               "GET/POST/PUT/DELETE /checklists",
               "GET/POST/PUT/DELETE /checklist-items",
@@ -1021,4 +1025,44 @@ async function handleMembers(supabase: any, method: string, id: string | null, w
   
   if (error) return { error: error.message, status: 400 };
   return { data };
+}
+
+// ============ TASK-TAGS (Relations) ============
+async function handleTaskTags(supabase: any, method: string, id: string | null, workspaceId: string, body: any, query: any) {
+  switch (method) {
+    case "GET":
+      if (!query.task_id) return { error: "Parâmetro 'task_id' é obrigatório", status: 400 };
+      const { data, error } = await supabase
+        .from("task_tag_relations")
+        .select("*, tag:task_tags(*)")
+        .eq("task_id", query.task_id);
+      if (error) return { error: error.message, status: 400 };
+      return { data };
+    case "POST":
+      if (!body?.task_id) return { error: "Campo 'task_id' é obrigatório", status: 400 };
+      if (!body?.tag_id) return { error: "Campo 'tag_id' é obrigatório", status: 400 };
+      const { data: newRelation, error: createError } = await supabase
+        .from("task_tag_relations")
+        .insert({
+          task_id: body.task_id,
+          tag_id: body.tag_id,
+        })
+        .select("*, tag:task_tags(*)")
+        .single();
+      if (createError) return { error: createError.message, status: 400 };
+      return { data: newRelation, status: 201 };
+    case "DELETE":
+      if (!query.task_id || !query.tag_id) {
+        return { error: "Parâmetros 'task_id' e 'tag_id' são obrigatórios", status: 400 };
+      }
+      const { error: deleteError } = await supabase
+        .from("task_tag_relations")
+        .delete()
+        .eq("task_id", query.task_id)
+        .eq("tag_id", query.tag_id);
+      if (deleteError) return { error: deleteError.message, status: 400 };
+      return { data: { deleted: true } };
+    default:
+      return { error: "Método não permitido", status: 405 };
+  }
 }

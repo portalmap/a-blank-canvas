@@ -1,4 +1,4 @@
-import { Calendar, CircleDot, User, Flag } from 'lucide-react';
+import { Calendar, CircleDot, User, Flag, Tag } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export type GroupByOption = 'due_date' | 'status' | 'assignee' | 'priority' | 'none';
+export type GroupByOption = 'due_date' | 'status' | 'assignee' | 'priority' | 'tag' | 'none';
 
 interface GroupBySelectorProps {
   value: GroupByOption;
@@ -20,6 +20,7 @@ const groupByOptions = [
   { value: 'status', label: 'Status', icon: CircleDot },
   { value: 'assignee', label: 'Responsável', icon: User },
   { value: 'priority', label: 'Prioridade', icon: Flag },
+  { value: 'tag', label: 'Etiqueta', icon: Tag },
 ] as const;
 
 export function GroupBySelector({ value, onChange }: GroupBySelectorProps) {

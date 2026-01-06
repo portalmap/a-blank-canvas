@@ -15,6 +15,7 @@ import { SubtaskList } from './SubtaskList';
 import { TaskComments } from './TaskComments';
 import { TaskChecklists } from './TaskChecklists';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
+import { TaskTagsSelector } from './TaskTagsSelector';
 import { cn } from '@/lib/utils';
 
 interface TaskDetailDrawerProps {
@@ -229,6 +230,9 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
 
           {/* Responsáveis */}
           <TaskAssigneesManager taskId={task.id} workspaceId={task.workspace_id} />
+
+          {/* Etiquetas */}
+          <TaskTagsSelector taskId={task.id} workspaceId={task.workspace_id} />
 
           <Separator />
 

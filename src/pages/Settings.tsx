@@ -5,6 +5,7 @@ import { UserInviteForm } from "@/components/settings/UserInviteForm";
 import { GuestPermissionsManager } from "@/components/settings/GuestPermissionsManager";
 import { UserManagement } from "@/components/settings/UserManagement";
 import { StatusSettings } from "@/components/settings/StatusSettings";
+import { TagsSettings } from "@/components/settings/TagsSettings";
 import { WebhooksSettings } from "@/components/settings/webhooks/WebhooksSettings";
 import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettings";
 import { ApiSettings } from "@/components/settings/api/ApiSettings";
@@ -20,10 +21,11 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-9 lg:w-[1080px]">
+        <TabsList className="grid w-full grid-cols-10 lg:w-[1200px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
+          <TabsTrigger value="tags">Etiquetas</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="invites">Convites</TabsTrigger>
@@ -46,6 +48,10 @@ export default function Settings() {
 
         <TabsContent value="templates" className="mt-6">
           <SpaceTemplateSettings />
+        </TabsContent>
+
+        <TabsContent value="tags" className="mt-6">
+          <TagsSettings />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
