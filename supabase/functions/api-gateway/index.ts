@@ -482,12 +482,27 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
         }
       }
 
+      // Buscar um usuário admin do workspace para ser o criador da tarefa
+      const { data: workspaceAdmin } = await supabase
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", workspaceId)
+        .eq("role", "admin")
+        .limit(1)
+        .single();
+      
+      const creatorUserId = body.created_by_user_id || workspaceAdmin?.user_id || null;
+      
+      if (!creatorUserId) {
+        return { error: "Nenhum usuário admin encontrado no workspace para criar a tarefa", status: 400 };
+      }
+
       const { data: newTask, error: createError } = await supabase
         .from("tasks")
         .insert({
           list_id: body.list_id,
           workspace_id: workspaceId,
-          created_by_user_id: "00000000-0000-0000-0000-000000000000",
+          created_by_user_id: creatorUserId,
           title: body.title,
           description: body.description || null,
           status_id: statusId,
@@ -506,7 +521,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           file_url: body.attachment_url,
           file_name: body.attachment_name || "attachment",
           file_type: body.attachment_type || "application/octet-stream",
-          uploaded_by: "00000000-0000-0000-0000-000000000000",
+          uploaded_by: creatorUserId,
         });
       }
 
