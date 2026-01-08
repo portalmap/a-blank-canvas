@@ -93,10 +93,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get list info to verify workspace and get default status
+    // Get list info to verify workspace and check status_source
     const { data: listData, error: listError } = await supabase
       .from("lists")
-      .select("workspace_id, space_id")
+      .select("workspace_id, space_id, status_source")
       .eq("id", listId)
       .single();
 
@@ -116,37 +116,69 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Determine status_id
+    // Determine status_id based on list's status_source
     let statusId = payload.status_id || tokenData.default_status_id;
     if (!statusId) {
-      // Get default status for workspace
-      const { data: defaultStatus } = await supabase
-        .from("statuses")
-        .select("id")
-        .eq("workspace_id", tokenData.workspace_id)
-        .eq("is_default", true)
-        .limit(1)
-        .maybeSingle();
+      // Check if list uses template-based statuses
+      if (listData.status_source === 'template') {
+        // Get status from the list itself (scope_type = 'list')
+        const { data: listStatuses } = await supabase
+          .from("statuses")
+          .select("id")
+          .eq("scope_type", "list")
+          .eq("scope_id", listId)
+          .eq("is_default", true)
+          .limit(1);
 
-      if (defaultStatus) {
-        statusId = defaultStatus.id;
+        if (listStatuses && listStatuses.length > 0) {
+          statusId = listStatuses[0].id;
+        } else {
+          // Fallback: first status from the list
+          const { data: anyListStatus } = await supabase
+            .from("statuses")
+            .select("id")
+            .eq("scope_type", "list")
+            .eq("scope_id", listId)
+            .order("order_index", { ascending: true })
+            .limit(1);
+
+          if (anyListStatus && anyListStatus.length > 0) {
+            statusId = anyListStatus[0].id;
+          }
+        }
       } else {
-        // Fallback: get first status
-        const { data: firstStatus } = await supabase
+        // Get workspace-level status
+        const { data: defaultStatuses } = await supabase
           .from("statuses")
           .select("id")
           .eq("workspace_id", tokenData.workspace_id)
-          .limit(1)
-          .maybeSingle();
+          .eq("scope_type", "workspace")
+          .eq("is_default", true)
+          .limit(1);
 
-        if (firstStatus) {
-          statusId = firstStatus.id;
+        if (defaultStatuses && defaultStatuses.length > 0) {
+          statusId = defaultStatuses[0].id;
         } else {
-          return new Response(
-            JSON.stringify({ error: "No status available for this workspace" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          // Fallback: first workspace status
+          const { data: anyStatus } = await supabase
+            .from("statuses")
+            .select("id")
+            .eq("workspace_id", tokenData.workspace_id)
+            .eq("scope_type", "workspace")
+            .order("order_index", { ascending: true })
+            .limit(1);
+
+          if (anyStatus && anyStatus.length > 0) {
+            statusId = anyStatus[0].id;
+          }
         }
+      }
+
+      if (!statusId) {
+        return new Response(
+          JSON.stringify({ error: "No status available for this list or workspace" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
 
