@@ -683,11 +683,26 @@ async function handleStatuses(supabase: any, method: string, id: string | null, 
         if (error) return { error: error.message, status: 404 };
         return { data };
       } else {
-        const { data, error } = await supabase
+        // Build query with optional filters
+        let queryBuilder = supabase
           .from("statuses")
           .select("*")
-          .eq("workspace_id", workspaceId)
-          .order("order_index", { ascending: true });
+          .eq("workspace_id", workspaceId);
+        
+        // Filter by list_id (list-specific statuses)
+        if (query.list_id) {
+          queryBuilder = queryBuilder
+            .eq("scope_type", "list")
+            .eq("scope_id", query.list_id);
+        } else if (query.scope_type) {
+          // Filter by scope_type only
+          queryBuilder = queryBuilder.eq("scope_type", query.scope_type);
+        }
+        // If no filters, return all statuses (workspace + list)
+        
+        queryBuilder = queryBuilder.order("order_index", { ascending: true });
+        
+        const { data, error } = await queryBuilder;
         if (error) return { error: error.message, status: 400 };
         return { data };
       }
