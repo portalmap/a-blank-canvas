@@ -622,21 +622,110 @@ async function handleSubtasks(supabase: any, method: string, id: string | null, 
       if (!body?.title) return { error: "Campo 'title' é obrigatório", status: 400 };
       if (!body?.parent_id) return { error: "Campo 'parent_id' é obrigatório", status: 400 };
       
-      // Get parent task's list_id
+      // Get parent task's list_id AND workspace_id
       const { data: parentTask, error: parentError } = await supabase
         .from("tasks")
-        .select("list_id")
+        .select("list_id, workspace_id")
         .eq("id", body.parent_id)
         .single();
       if (parentError) return { error: "Tarefa pai não encontrada", status: 404 };
+
+      // Determine status_id for subtask
+      let subtaskStatusId = body.status_id;
+      if (!subtaskStatusId) {
+        // Check if list uses template statuses
+        const { data: listConfig } = await supabase
+          .from("lists")
+          .select("status_source")
+          .eq("id", parentTask.list_id)
+          .single();
+        
+        if (listConfig?.status_source === 'template') {
+          // Get list-specific status
+          const { data: listStatuses } = await supabase
+            .from("statuses")
+            .select("id")
+            .eq("scope_type", "list")
+            .eq("scope_id", parentTask.list_id)
+            .eq("is_default", true)
+            .limit(1);
+          
+          if (listStatuses && listStatuses.length > 0) {
+            subtaskStatusId = listStatuses[0].id;
+          } else {
+            // Fallback: first list status
+            const { data: anyListStatus } = await supabase
+              .from("statuses")
+              .select("id")
+              .eq("scope_type", "list")
+              .eq("scope_id", parentTask.list_id)
+              .order("order_index", { ascending: true })
+              .limit(1);
+            
+            if (anyListStatus && anyListStatus.length > 0) {
+              subtaskStatusId = anyListStatus[0].id;
+            }
+          }
+        }
+        
+        // Fallback to workspace status if no list status found
+        if (!subtaskStatusId) {
+          const { data: defaultStatuses } = await supabase
+            .from("statuses")
+            .select("id")
+            .eq("workspace_id", parentTask.workspace_id)
+            .eq("scope_type", "workspace")
+            .eq("is_default", true)
+            .limit(1);
+          
+          if (defaultStatuses && defaultStatuses.length > 0) {
+            subtaskStatusId = defaultStatuses[0].id;
+          } else {
+            const { data: anyStatus } = await supabase
+              .from("statuses")
+              .select("id")
+              .eq("workspace_id", parentTask.workspace_id)
+              .eq("scope_type", "workspace")
+              .order("order_index", { ascending: true })
+              .limit(1);
+            
+            if (anyStatus && anyStatus.length > 0) {
+              subtaskStatusId = anyStatus[0].id;
+            }
+          }
+        }
+        
+        if (!subtaskStatusId) {
+          return { error: "Nenhum status configurado para esta lista ou workspace", status: 400 };
+        }
+      }
+
+      // Get a workspace admin user to be the creator
+      const { data: subtaskWorkspaceAdmin } = await supabase
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", parentTask.workspace_id)
+        .eq("role", "admin")
+        .limit(1)
+        .single();
+      
+      const subtaskCreatorUserId = body.created_by_user_id || subtaskWorkspaceAdmin?.user_id || null;
+      
+      if (!subtaskCreatorUserId) {
+        return { error: "Nenhum usuário admin encontrado no workspace para criar a subtarefa", status: 400 };
+      }
 
       const { data: newSubtask, error: createError } = await supabase
         .from("tasks")
         .insert({
           list_id: parentTask.list_id,
+          workspace_id: parentTask.workspace_id,
+          created_by_user_id: subtaskCreatorUserId,
           parent_id: body.parent_id,
           title: body.title,
           description: body.description || null,
+          status_id: subtaskStatusId,
+          priority: body.priority || "medium",
         })
         .select()
         .single();
