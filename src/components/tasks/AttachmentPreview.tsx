@@ -41,6 +41,28 @@ export const AttachmentPreview = ({
     }
   };
 
+  const handleDownload = async () => {
+    if (!fileUrl || isFile) return;
+    
+    try {
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Erro ao baixar arquivo:', error);
+      window.open(fileUrl, '_blank');
+    }
+  };
+
   if (compact) {
     return (
       <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded text-sm group">
@@ -101,12 +123,10 @@ export const AttachmentPreview = ({
                 <Button
                   variant="secondary"
                   size="sm"
-                  asChild
+                  onClick={handleDownload}
                 >
-                  <a href={fileUrl} download={fileName}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Baixar
-                  </a>
+                  <Download className="h-4 w-4 mr-1" />
+                  Baixar
                 </Button>
               </>
             )}
@@ -146,11 +166,9 @@ export const AttachmentPreview = ({
             <Button
               variant="ghost"
               size="sm"
-              asChild
+              onClick={handleDownload}
             >
-              <a href={fileUrl} download={fileName}>
-                <Download className="h-4 w-4" />
-              </a>
+              <Download className="h-4 w-4" />
             </Button>
           )}
         </div>
