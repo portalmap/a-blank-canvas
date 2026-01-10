@@ -131,6 +131,9 @@ Deno.serve(async (req) => {
       case "workspaces":
         result = await handleWorkspaces(supabase, req.method, workspaceId, await parseBody(req));
         break;
+      case "activities":
+        result = await handleActivities(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams);
+        break;
       case "":
         result = { 
           data: { 
@@ -138,10 +141,10 @@ Deno.serve(async (req) => {
             workspace_id: workspaceId,
             endpoints: [
               "GET/PUT /workspaces",
-              "GET/POST /spaces",
+              "GET/POST /spaces?name={filter}",
               "GET/POST /folders",
               "GET/POST /lists",
-              "GET/POST/PUT/DELETE /tasks",
+              "GET/POST/PUT/DELETE /tasks?tag_name={filter}&space_id={filter}",
               "GET/POST /subtasks",
               "GET/POST /statuses",
               "GET/POST/PUT/DELETE /tags",
@@ -151,7 +154,8 @@ Deno.serve(async (req) => {
               "GET/POST/PUT/DELETE /checklist-items",
               "GET/POST/DELETE /assignees",
               "GET/POST/DELETE /attachments",
-              "GET /members"
+              "GET /members",
+              "GET/POST /activities"
             ]
           }, 
           status: 200 
@@ -214,11 +218,17 @@ async function handleSpaces(supabase: any, method: string, id: string | null, wo
         if (error) return { error: error.message, status: 404 };
         return { data };
       } else {
-        const { data, error } = await supabase
+        let queryBuilder = supabase
           .from("spaces")
           .select("*")
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false });
+          .eq("workspace_id", workspaceId);
+        
+        // Filter by name (case-insensitive, partial match)
+        if (query.name) {
+          queryBuilder = queryBuilder.ilike("name", `%${query.name}%`);
+        }
+        
+        const { data, error } = await queryBuilder.order("created_at", { ascending: false });
         if (error) return { error: error.message, status: 400 };
         return { data };
       }
@@ -413,9 +423,11 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           .from("tasks")
           .select(`
             *,
-            lists!inner(workspace_id),
+            lists!inner(workspace_id, name, space_id, space:spaces(id, name)),
             statuses(id, name, color),
-            task_assignees(user_id, profiles:user_id(id, full_name, avatar_url))
+            task_assignees(user_id, profiles:user_id(id, full_name, avatar_url)),
+            task_attachments(id, file_url, file_name, file_type, file_size),
+            task_tag_relations(id, tag:task_tags(id, name, color))
           `)
           .eq("id", id)
           .eq("lists.workspace_id", workspaceId)
@@ -423,18 +435,76 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
         if (error) return { error: error.message, status: 404 };
         return { data };
       } else {
+        // Check if filtering by tag_name - special handling for Portal integration
+        if (query.tag_name) {
+          // First, find the tag by name (case-insensitive)
+          const { data: tag, error: tagError } = await supabase
+            .from("task_tags")
+            .select("id")
+            .eq("workspace_id", workspaceId)
+            .ilike("name", query.tag_name)
+            .single();
+          
+          if (tagError || !tag) {
+            return { data: [] }; // No tasks with this tag
+          }
+          
+          // Get task IDs that have this tag
+          const { data: relations, error: relError } = await supabase
+            .from("task_tag_relations")
+            .select("task_id")
+            .eq("tag_id", tag.id);
+          
+          if (relError || !relations || relations.length === 0) {
+            return { data: [] };
+          }
+          
+          const taskIds = relations.map((r: any) => r.task_id);
+          
+          // Fetch full task details
+          let taskQuery = supabase
+            .from("tasks")
+            .select(`
+              *,
+              lists!inner(workspace_id, name, space_id, space:spaces(id, name)),
+              statuses(id, name, color),
+              task_assignees(user_id, profiles:user_id(id, full_name, avatar_url)),
+              task_attachments(id, file_url, file_name, file_type, file_size),
+              task_tag_relations(id, tag:task_tags(id, name, color))
+            `)
+            .in("id", taskIds)
+            .eq("lists.workspace_id", workspaceId)
+            .is("parent_id", null)
+            .is("archived_at", null);
+          
+          // Optional: filter by space_id
+          if (query.space_id) {
+            taskQuery = taskQuery.eq("lists.space_id", query.space_id);
+          }
+          
+          const { data: tasks, error: tasksError } = await taskQuery.order("created_at", { ascending: false });
+          if (tasksError) return { error: tasksError.message, status: 400 };
+          return { data: tasks || [] };
+        }
+        
+        // Standard task listing
         let queryBuilder = supabase
           .from("tasks")
           .select(`
             *,
-            lists!inner(workspace_id),
+            lists!inner(workspace_id, name, space_id, space:spaces(id, name)),
             statuses(id, name, color),
-            task_assignees(user_id, profiles:user_id(id, full_name, avatar_url))
+            task_assignees(user_id, profiles:user_id(id, full_name, avatar_url)),
+            task_tag_relations(id, tag:task_tags(id, name, color))
           `)
           .eq("lists.workspace_id", workspaceId)
           .is("parent_id", null);
+        
         if (query.list_id) {
           queryBuilder = queryBuilder.eq("list_id", query.list_id);
+        }
+        if (query.space_id) {
+          queryBuilder = queryBuilder.eq("lists.space_id", query.space_id);
         }
         if (query.status_id) {
           queryBuilder = queryBuilder.eq("status_id", query.status_id);
@@ -1272,6 +1342,62 @@ async function handleWorkspaces(supabase: any, method: string, workspaceId: stri
         .single();
       if (updateError) return { error: updateError.message, status: 400 };
       return { data: updated };
+    default:
+      return { error: "Método não permitido", status: 405 };
+  }
+}
+
+// ============ ACTIVITIES ============
+async function handleActivities(supabase: any, method: string, id: string | null, workspaceId: string, body: any, query: any) {
+  switch (method) {
+    case "GET":
+      if (!query.task_id) return { error: "Parâmetro 'task_id' é obrigatório", status: 400 };
+      const { data, error } = await supabase
+        .from("task_activities")
+        .select("*, profiles:user_id(id, full_name, avatar_url)")
+        .eq("task_id", query.task_id)
+        .order("created_at", { ascending: false });
+      if (error) return { error: error.message, status: 400 };
+      return { data };
+      
+    case "POST":
+      if (!body?.task_id) return { error: "Campo 'task_id' é obrigatório", status: 400 };
+      if (!body?.activity_type) return { error: "Campo 'activity_type' é obrigatório", status: 400 };
+      
+      // Get an admin user from the workspace if user_id not provided
+      let userId = body.user_id;
+      if (!userId) {
+        const { data: admin } = await supabase
+          .from("workspace_members")
+          .select("user_id")
+          .eq("workspace_id", workspaceId)
+          .eq("role", "admin")
+          .limit(1)
+          .single();
+        userId = admin?.user_id || null;
+      }
+      
+      if (!userId) {
+        return { error: "Nenhum usuário encontrado para registrar a atividade", status: 400 };
+      }
+      
+      const { data: newActivity, error: createError } = await supabase
+        .from("task_activities")
+        .insert({
+          task_id: body.task_id,
+          user_id: userId,
+          activity_type: body.activity_type,
+          field_name: body.field_name || null,
+          old_value: body.old_value || null,
+          new_value: body.new_value || null,
+          metadata: body.metadata || null,
+        })
+        .select("*, profiles:user_id(id, full_name, avatar_url)")
+        .single();
+        
+      if (createError) return { error: createError.message, status: 400 };
+      return { data: newActivity, status: 201 };
+      
     default:
       return { error: "Método não permitido", status: 405 };
   }
