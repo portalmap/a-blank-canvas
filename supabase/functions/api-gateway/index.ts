@@ -347,7 +347,10 @@ async function handleLists(supabase: any, method: string, id: string | null, wor
       if (id) {
         const { data, error } = await supabase
           .from("lists")
-          .select("*")
+          .select(`
+            *,
+            space:spaces(id, name, color, description)
+          `)
           .eq("id", id)
           .eq("workspace_id", workspaceId)
           .single();
@@ -356,7 +359,10 @@ async function handleLists(supabase: any, method: string, id: string | null, wor
       } else {
         let queryBuilder = supabase
           .from("lists")
-          .select("*")
+          .select(`
+            *,
+            space:spaces(id, name, color, description)
+          `)
           .eq("workspace_id", workspaceId);
         if (query.space_id) {
           queryBuilder = queryBuilder.eq("space_id", query.space_id);
