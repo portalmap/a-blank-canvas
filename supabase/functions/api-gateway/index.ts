@@ -1360,7 +1360,7 @@ async function handleActivities(supabase: any, method: string, id: string | null
       if (!query.task_id) return { error: "Parâmetro 'task_id' é obrigatório", status: 400 };
       const { data, error } = await supabase
         .from("task_activities")
-        .select("*, profiles:user_id(id, full_name, avatar_url)")
+        .select("*")
         .eq("task_id", query.task_id)
         .order("created_at", { ascending: false });
       if (error) return { error: error.message, status: 400 };
@@ -1398,7 +1398,7 @@ async function handleActivities(supabase: any, method: string, id: string | null
           new_value: body.new_value || null,
           metadata: body.metadata || null,
         })
-        .select("*, profiles:user_id(id, full_name, avatar_url)")
+        .select("*")
         .single();
         
       if (createError) return { error: createError.message, status: 400 };
