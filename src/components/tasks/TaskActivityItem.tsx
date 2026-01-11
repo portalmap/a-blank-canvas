@@ -61,6 +61,7 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
   const userName = activity.user?.full_name || 'Usuário';
   const userInitial = userName.charAt(0).toUpperCase();
   const isAutomation = activity.metadata?.created_by === 'automation';
+  const isPortal = activity.metadata?.created_by === 'portal';
   
   const { data: comments } = useTaskComments(taskId);
   const resolveAssignment = useResolveCommentAssignment();
@@ -142,6 +143,12 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
                     ⚡ {activity.metadata?.automation_name || 'Automação'}
                   </span>{' '}
                 </>
+              ) : isPortal ? (
+                <>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    🌐 Portal MAP
+                  </span>{' '}
+                </>
               ) : (
                 <span className="font-medium">{userName}</span>
               )}{' '}
@@ -189,12 +196,12 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
             
             {/* Comment/Assignment content */}
             {(activity.activity_type === 'comment.created' || activity.activity_type === 'assignment.created') && 
-             activity.metadata?.content && (
+             (activity.metadata?.content || activity.metadata?.comment_content) && (
               <div className={cn(
                 "mt-2 p-3 rounded-md text-sm whitespace-pre-wrap",
                 isResolved ? "bg-muted/30" : "bg-muted/50"
               )}>
-                {renderTextWithImagesAndLinks(activity.metadata.content)}
+                {renderTextWithImagesAndLinks(activity.metadata.content || activity.metadata.comment_content)}
               </div>
             )}
 
