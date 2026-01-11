@@ -86,9 +86,9 @@ export function AppSidebar() {
           {!isCollapsed && (
             <div className="flex items-center gap-2">
               <div className="bg-sidebar-primary rounded-lg p-2 flex items-center justify-center">
-                <span className="text-sidebar-primary-foreground font-bold text-lg leading-none">X</span>
+                <span className="text-sidebar-primary-foreground font-bold text-lg leading-none">M</span>
               </div>
-              <span className="font-semibold text-sidebar-foreground">X Flow</span>
+              <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
             </div>
           )}
           

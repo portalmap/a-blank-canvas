@@ -41,10 +41,10 @@ const Auth = () => {
         <div className="text-center space-y-2">
           <div className="flex justify-center">
             <div className="bg-primary rounded-lg p-3 flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-3xl leading-none">X</span>
+              <span className="text-primary-foreground font-bold text-3xl leading-none">M</span>
             </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">X Flow</h1>
+          <h1 className="text-3xl font-bold tracking-tight">MAP Flow</h1>
           <p className="text-muted-foreground">Gerencie projetos com eficiência</p>
         </div>
 
