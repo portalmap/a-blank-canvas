@@ -39,7 +39,7 @@ export function EverythingFilters({ filters, onChange, availableStatuses, availa
     filters.statuses.length + 
     filters.priorities.length + 
     (filters.tags?.length || 0) +
-    (filters.showCompleted ? 0 : 1);
+    (filters.showCompleted ? 1 : 0);
 
   const toggleStatus = (statusId: string) => {
     const newStatuses = filters.statuses.includes(statusId)
@@ -68,7 +68,7 @@ export function EverythingFilters({ filters, onChange, availableStatuses, availa
       statuses: [],
       priorities: [],
       tags: [],
-      showCompleted: true,
+      showCompleted: false,
     });
   };
 
