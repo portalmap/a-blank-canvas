@@ -137,34 +137,34 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
   };
 
   return (
-    <>
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {sortedStatuses.map((status) => {
-            const statusTasks = getTasksByStatus(status.id);
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div className="flex gap-4 overflow-x-auto h-full pb-4">
+        {sortedStatuses.map((status) => {
+          const statusTasks = getTasksByStatus(status.id);
 
-            return (
-              <div
-                key={status.id}
-                className="flex-shrink-0 w-80"
-              >
-                <Droppable droppableId={status.id}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={cn(
-                        "bg-muted/50 rounded-lg p-4 min-h-[200px] transition-colors",
-                        snapshot.isDraggingOver && "bg-muted/80 ring-2 ring-primary/20"
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold">{status.name}</h3>
-                        <span className="text-sm text-muted-foreground">
-                          {statusTasks.length}
-                        </span>
-                      </div>
+          return (
+            <div
+              key={status.id}
+              className="flex-shrink-0 w-80 flex flex-col h-full min-h-0"
+            >
+              <Droppable droppableId={status.id}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={cn(
+                      "bg-muted/50 rounded-lg p-4 flex flex-col h-full min-h-[200px] transition-colors",
+                      snapshot.isDraggingOver && "bg-muted/80 ring-2 ring-primary/20"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                      <h3 className="font-semibold">{status.name}</h3>
+                      <span className="text-sm text-muted-foreground">
+                        {statusTasks.length}
+                      </span>
+                    </div>
 
+                    <div className="flex-1 overflow-y-auto min-h-0">
                       <div className="space-y-3">
                         {statusTasks.length === 0 ? (
                           <div className="text-center text-sm text-muted-foreground py-8">
@@ -224,14 +224,13 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
                         {provided.placeholder}
                       </div>
                     </div>
-                  )}
-                </Droppable>
-              </div>
-            );
-          })}
-        </div>
-      </DragDropContext>
-
-    </>
+                  </div>
+                )}
+              </Droppable>
+            </div>
+          );
+        })}
+      </div>
+    </DragDropContext>
   );
 };
