@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/collapsible';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, isToday, isTomorrow, isPast, isThisWeek, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal, FolderInput, Archive, Trash2, User } from 'lucide-react';
@@ -366,12 +367,19 @@ export const TaskListView = ({
           return task.due_date ? format(new Date(task.due_date), 'dd/MM/yyyy', { locale: ptBR }) : '-';
         case 'assignee':
           return task.assignee ? (
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={task.assignee.avatar_url || undefined} />
-              <AvatarFallback className="text-xs">
-                {getInitials(task.assignee.full_name)}
-              </AvatarFallback>
-            </Avatar>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={task.assignee.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {getInitials(task.assignee.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{task.assignee.full_name || 'Sem nome'}</p>
+              </TooltipContent>
+            </Tooltip>
           ) : (
             <span className="text-muted-foreground">-</span>
           );

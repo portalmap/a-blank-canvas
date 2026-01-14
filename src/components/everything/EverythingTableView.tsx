@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
@@ -268,20 +269,38 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
               <div className="flex -space-x-2">
                 {task.assignees.length > 0 ? (
                   task.assignees.slice(0, 3).map((assignee) => (
-                    <Avatar key={assignee.id} className="h-7 w-7 border-2 border-background">
-                      <AvatarImage src={assignee.avatar_url || undefined} />
-                      <AvatarFallback className="text-xs">
-                        {getInitials(assignee.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <Tooltip key={assignee.id}>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-7 w-7 border-2 border-background">
+                          <AvatarImage src={assignee.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs">
+                            {getInitials(assignee.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{assignee.full_name || 'Sem nome'}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   ))
                 ) : (
                   <span className="text-sm text-muted-foreground">-</span>
                 )}
                 {task.assignees.length > 3 && (
-                  <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
-                    +{task.assignees.length - 3}
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background cursor-default">
+                        +{task.assignees.length - 3}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="flex flex-col gap-1">
+                        {task.assignees.slice(3).map((assignee) => (
+                          <span key={assignee.id}>{assignee.full_name || 'Sem nome'}</span>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
             </TableCell>
