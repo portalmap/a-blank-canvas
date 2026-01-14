@@ -13,6 +13,7 @@ interface TaskPayload {
   priority?: "low" | "medium" | "high" | "urgent";
   list_id?: string;
   status_id?: string;
+  status_name?: string;  // Nome do status (ex: "Instagram") - busca case-insensitive
   attachment_url?: string;
 }
 
@@ -116,23 +117,49 @@ Deno.serve(async (req) => {
       );
     }
 
-    // SEMPRE buscar status válido da LISTA de destino
-    // Isso previne que tarefas sejam criadas com status de outra lista
+    // Resolver status_id com base no payload
     let statusId: string | null = null;
     
-    // Primeiro, verificar se há status disponível para a lista
-    const { data: listDefaultStatus } = await supabase
-      .from("statuses")
-      .select("id")
-      .eq("scope_type", "list")
-      .eq("scope_id", listId)
-      .eq("is_default", true)
-      .maybeSingle();
+    console.log(`Resolving status for list ${listId}...`);
 
-    if (listDefaultStatus) {
-      statusId = listDefaultStatus.id;
-    } else {
-      // Fallback: primeiro status da lista
+    // PRIORIDADE 1: Se status_name foi enviado, buscar pelo nome (case-insensitive)
+    if (payload.status_name) {
+      console.log(`Looking for status by name: "${payload.status_name}"`);
+      
+      const { data: namedStatus } = await supabase
+        .from("statuses")
+        .select("id, name")
+        .eq("scope_type", "list")
+        .eq("scope_id", listId)
+        .ilike("name", payload.status_name)
+        .maybeSingle();
+
+      if (namedStatus) {
+        statusId = namedStatus.id;
+        console.log(`Found status by name "${payload.status_name}": ${statusId}`);
+      } else {
+        console.warn(`Status "${payload.status_name}" not found in list ${listId}, falling back to default`);
+      }
+    }
+
+    // PRIORIDADE 2: Status default da lista
+    if (!statusId) {
+      const { data: listDefaultStatus } = await supabase
+        .from("statuses")
+        .select("id")
+        .eq("scope_type", "list")
+        .eq("scope_id", listId)
+        .eq("is_default", true)
+        .maybeSingle();
+
+      if (listDefaultStatus) {
+        statusId = listDefaultStatus.id;
+        console.log(`Using default list status: ${statusId}`);
+      }
+    }
+
+    // PRIORIDADE 3: Primeiro status da lista
+    if (!statusId) {
       const { data: firstListStatus } = await supabase
         .from("statuses")
         .select("id")
@@ -143,10 +170,11 @@ Deno.serve(async (req) => {
 
       if (firstListStatus && firstListStatus.length > 0) {
         statusId = firstListStatus[0].id;
+        console.log(`Using first list status: ${statusId}`);
       }
     }
 
-    // Se não encontrou status na lista, tentar workspace (para listas sem template)
+    // PRIORIDADE 4: Status do workspace (para listas sem template)
     if (!statusId) {
       const { data: workspaceDefaultStatus } = await supabase
         .from("statuses")
@@ -158,6 +186,7 @@ Deno.serve(async (req) => {
 
       if (workspaceDefaultStatus) {
         statusId = workspaceDefaultStatus.id;
+        console.log(`Using default workspace status: ${statusId}`);
       } else {
         const { data: firstWorkspaceStatus } = await supabase
           .from("statuses")
@@ -169,6 +198,7 @@ Deno.serve(async (req) => {
 
         if (firstWorkspaceStatus && firstWorkspaceStatus.length > 0) {
           statusId = firstWorkspaceStatus[0].id;
+          console.log(`Using first workspace status: ${statusId}`);
         }
       }
     }
@@ -180,7 +210,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Using status ${statusId} for list ${listId}`);
+    console.log(`Final status resolved: ${statusId} for list ${listId}`);
 
     // Create the task
     const { data: task, error: taskError } = await supabase
