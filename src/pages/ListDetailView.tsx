@@ -320,7 +320,7 @@ const ListDetailView = () => {
           </Alert>
         )}
 
-        <Tabs defaultValue={viewMode} className="flex-1 flex flex-col min-h-0">
+        <Tabs defaultValue={viewMode} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <TabsList>
               <TabsTrigger value="list">Lista</TabsTrigger>
@@ -382,15 +382,13 @@ const ListDetailView = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="kanban" className="flex-1 min-h-0 mt-0">
+          <TabsContent value="kanban" className="flex-1 min-h-0 overflow-hidden mt-0">
             {tasksLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <div className="h-full">
-                <TaskKanbanView tasks={tasksForViews} statuses={statuses || []} />
-              </div>
+              <TaskKanbanView tasks={tasksForViews} statuses={statuses || []} />
             )}
           </TabsContent>
 

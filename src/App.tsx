@@ -47,9 +47,9 @@ const App = () => (
           element={
             <ProtectedRoute>
                   <SidebarProvider>
-                    <div className="flex min-h-screen w-full">
+                    <div className="flex h-screen w-full overflow-hidden">
                       <AppSidebar />
-                      <main className="flex-1 overflow-auto">
+                      <main className="flex-1 overflow-hidden">
                         <Routes>
                           <Route path="/" element={<HomePage />} />
                           <Route path="/workspaces" element={<WorkspaceOverview />} />
