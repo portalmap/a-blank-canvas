@@ -526,8 +526,31 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
       if (!body?.title) return { error: "Campo 'title' é obrigatório", status: 400 };
       if (!body?.list_id) return { error: "Campo 'list_id' é obrigatório", status: 400 };
       
-      // Get default status if not provided
+      // Resolver status_id com base no payload
       let statusId = body.status_id;
+      console.log(`[api-gateway] Creating task in list ${body.list_id}, status_id: ${body.status_id}, status_name: ${body.status_name}`);
+      
+      // PRIORIDADE 1: Se status_name foi enviado, buscar pelo nome (case-insensitive)
+      if (!statusId && body.status_name) {
+        console.log(`[api-gateway] Looking for status by name: "${body.status_name}"`);
+        
+        const { data: namedStatus } = await supabase
+          .from("statuses")
+          .select("id, name")
+          .eq("scope_type", "list")
+          .eq("scope_id", body.list_id)
+          .ilike("name", body.status_name)
+          .maybeSingle();
+
+        if (namedStatus) {
+          statusId = namedStatus.id;
+          console.log(`[api-gateway] Found status by name "${body.status_name}": ${statusId}`);
+        } else {
+          console.warn(`[api-gateway] Status "${body.status_name}" not found in list ${body.list_id}, falling back to default`);
+        }
+      }
+      
+      // PRIORIDADE 2: Fallback para status default
       if (!statusId) {
         // Verificar se a lista usa status por template
         const { data: listConfig } = await supabase
@@ -548,6 +571,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           
           if (listStatuses && listStatuses.length > 0) {
             statusId = listStatuses[0].id;
+            console.log(`[api-gateway] Using default list status: ${statusId}`);
           } else {
             // Fallback: primeiro status da lista
             const { data: anyListStatus } = await supabase
@@ -560,6 +584,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
             
             if (anyListStatus && anyListStatus.length > 0) {
               statusId = anyListStatus[0].id;
+              console.log(`[api-gateway] Using first list status: ${statusId}`);
             }
           }
         } else {
@@ -574,6 +599,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           
           if (defaultStatuses && defaultStatuses.length > 0) {
             statusId = defaultStatuses[0].id;
+            console.log(`[api-gateway] Using default workspace status: ${statusId}`);
           } else {
             // Fallback: primeiro status do workspace
             const { data: anyStatus } = await supabase
@@ -586,6 +612,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
             
             if (anyStatus && anyStatus.length > 0) {
               statusId = anyStatus[0].id;
+              console.log(`[api-gateway] Using first workspace status: ${statusId}`);
             }
           }
         }
@@ -594,6 +621,8 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           return { error: "Nenhum status configurado para esta lista ou workspace", status: 400 };
         }
       }
+      
+      console.log(`[api-gateway] Final status resolved: ${statusId}`);
 
       // Buscar um usuário admin do workspace para ser o criador da tarefa
       const { data: workspaceAdmin } = await supabase
