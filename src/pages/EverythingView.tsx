@@ -133,10 +133,14 @@ export default function EverythingView() {
         if (!filters.priorities.includes(task.priority)) return false;
       }
 
-      // Completed filter
-      if (!filters.showCompleted && task.completed_at) {
+    // Completed filter - verifica completed_at OU status com nome "Concluído"
+    if (!filters.showCompleted) {
+      const isCompleted = task.completed_at || 
+        (task.status?.name?.toLowerCase() === 'concluído');
+      if (isCompleted) {
         return false;
       }
+    }
 
       // Assignee filter
       if (selectedAssignees.length > 0 || includeUnassigned) {
