@@ -98,6 +98,15 @@ export default function EverythingView() {
     };
   }, [tasks]);
 
+  // Available statuses for filtering
+  const availableStatuses = useMemo(() => {
+    return statuses.map((s) => ({
+      id: s.id,
+      name: s.name,
+      color: s.color,
+    }));
+  }, [statuses]);
+
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -109,9 +118,14 @@ export default function EverythingView() {
         if (!matchesTitle && !matchesDescription) return false;
       }
 
-      // Status filter
+      // Status filter - comparar por NOME em vez de ID
+      // (tarefas usam status de lista com IDs diferentes dos status de workspace)
       if (filters.statuses.length > 0 && task.status) {
-        if (!filters.statuses.includes(task.status.id)) return false;
+        const selectedStatusNames = filters.statuses.map(statusId => 
+          availableStatuses.find(s => s.id === statusId)?.name
+        ).filter(Boolean);
+        
+        if (!selectedStatusNames.includes(task.status.name)) return false;
       }
 
       // Priority filter
@@ -136,7 +150,7 @@ export default function EverythingView() {
 
       return true;
     });
-  }, [tasks, searchQuery, filters, selectedAssignees, includeUnassigned]);
+  }, [tasks, searchQuery, filters, selectedAssignees, includeUnassigned, availableStatuses]);
 
   // Apply sorting
   const sortedTasks = useTaskSorting(filteredTasks, sortConfig);
@@ -160,13 +174,6 @@ export default function EverythingView() {
     );
   };
 
-  const availableStatuses = useMemo(() => {
-    return statuses.map((s) => ({
-      id: s.id,
-      name: s.name,
-      color: s.color,
-    }));
-  }, [statuses]);
 
   return (
     <div className="flex h-full">
