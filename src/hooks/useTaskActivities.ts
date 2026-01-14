@@ -97,6 +97,33 @@ export const useCreateTaskActivity = () => {
   });
 };
 
+export const useUpdateActivityMetadata = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      activityId,
+      metadata,
+    }: {
+      activityId: string;
+      metadata: Record<string, any>;
+    }) => {
+      const { data, error } = await supabase
+        .from('task_activities')
+        .update({ metadata })
+        .eq('id', activityId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['task-activities', data.task_id] });
+    },
+  });
+};
+
 // Helpers para traduzir tipos de atividade
 export const getActivityLabel = (activity: TaskActivity): string => {
   // Handle assignee activities
@@ -152,9 +179,12 @@ export const getActivityLabel = (activity: TaskActivity): string => {
     case 'description.changed':
       return activity.new_value ? `${prefix}atualizou a descrição` : `${prefix}removeu a descrição`;
     case 'comment.created':
+      if (activity.metadata?.edited_at) {
+        return `${prefix}adicionou um comentário (editado)`;
+      }
       return `${prefix}adicionou um comentário`;
     case 'comment.edited':
-      return `${prefix}editou um comentário`;
+      return `${prefix}editou um comentário`; // Fallback para atividades antigas
     case 'assignment.created':
       return `${prefix}criou uma atribuição para "${activity.metadata?.assignee_name || 'usuário'}"`;
     case 'assignment.resolved':

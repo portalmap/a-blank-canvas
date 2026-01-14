@@ -19,7 +19,7 @@ import {
   Paperclip,
   Pencil
 } from 'lucide-react';
-import { TaskActivity, getActivityLabel, useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { TaskActivity, getActivityLabel, useCreateTaskActivity, useUpdateActivityMetadata } from '@/hooks/useTaskActivities';
 import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } from '@/hooks/useTaskComments';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -75,6 +75,7 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
   const { data: comments } = useTaskComments(taskId);
   const resolveAssignment = useResolveCommentAssignment();
   const createActivity = useCreateTaskActivity();
+  const updateActivityMetadata = useUpdateActivityMetadata();
   const updateComment = useUpdateTaskComment();
   
   // Verificar se o usuário atual é o autor
@@ -151,14 +152,16 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
         authorId: activity.user_id,
       });
 
-      // Criar atividade de edição
-      await createActivity.mutateAsync({
-        taskId,
-        activityType: 'comment.edited',
+      // Atualizar a atividade existente com o novo conteúdo e flag de edição
+      await updateActivityMetadata.mutateAsync({
+        activityId: activity.id,
         metadata: {
+          ...activity.metadata,
           comment_id: activity.metadata.comment_id,
           content: editContent.trim(),
           old_content: oldContent,
+          edited_at: new Date().toISOString(),
+          edit_count: (activity.metadata?.edit_count || 0) + 1,
         },
       });
 
