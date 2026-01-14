@@ -163,12 +163,56 @@ export const useCreateTask = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // VALIDAÇÃO: Verificar se o statusId pertence à lista
+      let validatedStatusId = statusId;
+      
+      if (statusId) {
+        const { data: validStatus } = await supabase
+          .from('statuses')
+          .select('id')
+          .eq('id', statusId)
+          .eq('scope_id', listId)
+          .eq('scope_type', 'list')
+          .maybeSingle();
+        
+        // Se o status não pertence à lista, buscar o default da lista
+        if (!validStatus) {
+          console.warn(`Status ${statusId} não pertence à lista ${listId}. Buscando status default...`);
+          
+          const { data: defaultStatus } = await supabase
+            .from('statuses')
+            .select('id')
+            .eq('scope_id', listId)
+            .eq('scope_type', 'list')
+            .eq('is_default', true)
+            .maybeSingle();
+          
+          if (defaultStatus) {
+            validatedStatusId = defaultStatus.id;
+          } else {
+            // Fallback: primeiro status da lista
+            const { data: firstStatus } = await supabase
+              .from('statuses')
+              .select('id')
+              .eq('scope_id', listId)
+              .eq('scope_type', 'list')
+              .order('order_index', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            
+            if (firstStatus) {
+              validatedStatusId = firstStatus.id;
+            }
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('tasks')
         .insert({ 
           workspace_id: workspaceId,
           list_id: listId,
-          status_id: statusId,
+          status_id: validatedStatusId,
           title, 
           description,
           priority,
