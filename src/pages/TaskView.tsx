@@ -1,9 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useSpaces } from '@/hooks/useSpaces';
-import { useFolders } from '@/hooks/useFolders';
+import { useSpace } from '@/hooks/useSpaces';
+import { useFolder } from '@/hooks/useFolders';
 import { useList, useListsForWorkspace } from '@/hooks/useLists';
 import { useDuplicateTask } from '@/hooks/useDuplicate';
 import { useDeleteTask } from '@/hooks/useTasks';
@@ -94,7 +93,6 @@ const useTask = (taskId?: string) => {
 const TaskView = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
-  const { activeWorkspace } = useWorkspace();
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const [hasLoggedCreation, setHasLoggedCreation] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
@@ -104,14 +102,27 @@ const TaskView = () => {
   const { data: task, isLoading: taskLoading } = useTask(taskId);
   const deleteTask = useDeleteTask();
   const { data: currentList } = useList(task?.list_id);
-  const { data: spaces } = useSpaces(activeWorkspace?.id);
-  const { data: folders } = useFolders(currentList?.space_id);
-  const { data: allLists } = useListsForWorkspace(activeWorkspace?.id);
+  const { data: currentSpace } = useSpace(currentList?.space_id);
+  const { data: currentFolder } = useFolder(currentList?.folder_id);
+  const { data: allLists } = useListsForWorkspace(task?.workspace_id);
   const duplicateTask = useDuplicateTask();
   const createActivity = useCreateTaskActivity();
 
-  const currentSpace = spaces?.find(s => s.id === currentList?.space_id);
-  const currentFolder = folders?.find(f => f.id === currentList?.folder_id);
+  // Fetch workspace directly from task to display in breadcrumb
+  const { data: taskWorkspace } = useQuery({
+    queryKey: ['workspace', task?.workspace_id],
+    queryFn: async () => {
+      if (!task?.workspace_id) return null;
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('id, name')
+        .eq('id', task.workspace_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!task?.workspace_id,
+  });
 
   const handleDuplicateTask = async () => {
     if (!task || !selectedListId) return;
@@ -189,12 +200,12 @@ const TaskView = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
 
-          {activeWorkspace && currentSpace && currentList && (
+          {taskWorkspace && currentSpace && currentList && (
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
                   <BreadcrumbLink onClick={() => navigate('/')}>
-                    {activeWorkspace.name}
+                    {taskWorkspace.name}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
