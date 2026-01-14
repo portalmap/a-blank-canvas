@@ -116,71 +116,71 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Determine status_id based on list's status_source
-    let statusId = payload.status_id || tokenData.default_status_id;
+    // SEMPRE buscar status válido da LISTA de destino
+    // Isso previne que tarefas sejam criadas com status de outra lista
+    let statusId: string | null = null;
+    
+    // Primeiro, verificar se há status disponível para a lista
+    const { data: listDefaultStatus } = await supabase
+      .from("statuses")
+      .select("id")
+      .eq("scope_type", "list")
+      .eq("scope_id", listId)
+      .eq("is_default", true)
+      .maybeSingle();
+
+    if (listDefaultStatus) {
+      statusId = listDefaultStatus.id;
+    } else {
+      // Fallback: primeiro status da lista
+      const { data: firstListStatus } = await supabase
+        .from("statuses")
+        .select("id")
+        .eq("scope_type", "list")
+        .eq("scope_id", listId)
+        .order("order_index", { ascending: true })
+        .limit(1);
+
+      if (firstListStatus && firstListStatus.length > 0) {
+        statusId = firstListStatus[0].id;
+      }
+    }
+
+    // Se não encontrou status na lista, tentar workspace (para listas sem template)
     if (!statusId) {
-      // Check if list uses template-based statuses
-      if (listData.status_source === 'template') {
-        // Get status from the list itself (scope_type = 'list')
-        const { data: listStatuses } = await supabase
-          .from("statuses")
-          .select("id")
-          .eq("scope_type", "list")
-          .eq("scope_id", listId)
-          .eq("is_default", true)
-          .limit(1);
+      const { data: workspaceDefaultStatus } = await supabase
+        .from("statuses")
+        .select("id")
+        .eq("workspace_id", tokenData.workspace_id)
+        .eq("scope_type", "workspace")
+        .eq("is_default", true)
+        .maybeSingle();
 
-        if (listStatuses && listStatuses.length > 0) {
-          statusId = listStatuses[0].id;
-        } else {
-          // Fallback: first status from the list
-          const { data: anyListStatus } = await supabase
-            .from("statuses")
-            .select("id")
-            .eq("scope_type", "list")
-            .eq("scope_id", listId)
-            .order("order_index", { ascending: true })
-            .limit(1);
-
-          if (anyListStatus && anyListStatus.length > 0) {
-            statusId = anyListStatus[0].id;
-          }
-        }
+      if (workspaceDefaultStatus) {
+        statusId = workspaceDefaultStatus.id;
       } else {
-        // Get workspace-level status
-        const { data: defaultStatuses } = await supabase
+        const { data: firstWorkspaceStatus } = await supabase
           .from("statuses")
           .select("id")
           .eq("workspace_id", tokenData.workspace_id)
           .eq("scope_type", "workspace")
-          .eq("is_default", true)
+          .order("order_index", { ascending: true })
           .limit(1);
 
-        if (defaultStatuses && defaultStatuses.length > 0) {
-          statusId = defaultStatuses[0].id;
-        } else {
-          // Fallback: first workspace status
-          const { data: anyStatus } = await supabase
-            .from("statuses")
-            .select("id")
-            .eq("workspace_id", tokenData.workspace_id)
-            .eq("scope_type", "workspace")
-            .order("order_index", { ascending: true })
-            .limit(1);
-
-          if (anyStatus && anyStatus.length > 0) {
-            statusId = anyStatus[0].id;
-          }
+        if (firstWorkspaceStatus && firstWorkspaceStatus.length > 0) {
+          statusId = firstWorkspaceStatus[0].id;
         }
       }
-
-      if (!statusId) {
-        return new Response(
-          JSON.stringify({ error: "No status available for this list or workspace" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
     }
+
+    if (!statusId) {
+      return new Response(
+        JSON.stringify({ error: "No status available for this list or workspace" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Using status ${statusId} for list ${listId}`);
 
     // Create the task
     const { data: task, error: taskError } = await supabase
