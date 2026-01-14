@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, ClipboardList, ChevronRight, Calendar, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Search, ClipboardList, ChevronRight, Calendar, Loader2, Maximize2 } from 'lucide-react';
 import { useMyAssignedTasks, MyAssignedTask } from '@/hooks/useMyAssignedTasks';
 import { useStatuses } from '@/hooks/useStatuses';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -44,6 +47,7 @@ export function MyTasksCard() {
     medium: true,
     low: true,
   });
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const { data: columnPrefs } = useColumnPreferences(null, 'everything');
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
@@ -178,27 +182,118 @@ export function MyTasksCard() {
     );
   }
 
-  return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="pb-2 space-y-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" />
-            Atribuídas a mim
-            <Badge variant="secondary" className="ml-1 text-xs">
-              {filteredTasks.length}
+  const TaskListContent = ({ maxHeight }: { maxHeight?: string }) => (
+    <div className={cn("space-y-2", maxHeight && `overflow-auto ${maxHeight}`)}>
+      {Object.entries(groupedTasks).map(([group, groupTasks]) => (
+        <Collapsible
+          key={group}
+          open={expandedGroups[group] !== false}
+          onOpenChange={() => toggleGroup(group)}
+        >
+          <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 px-2 hover:bg-accent/50 rounded-md transition-colors">
+            <ChevronRight className={cn(
+              "h-4 w-4 transition-transform",
+              expandedGroups[group] !== false && "rotate-90"
+            )} />
+            {groupBy === 'priority' && (
+              <div className={cn(
+                "h-2 w-2 rounded-full",
+                priorityConfig[group as keyof typeof priorityConfig]?.color
+              )} />
+            )}
+            <span className="text-sm font-medium">{getGroupLabel(group)}</span>
+            <Badge variant="outline" className="ml-auto text-xs">
+              {groupTasks.length}
             </Badge>
-          </CardTitle>
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-            <Input
-              placeholder="Pesquisar..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-7 w-36 h-7 text-xs"
-            />
+          </CollapsibleTrigger>
+          
+          <CollapsibleContent className="space-y-1 ml-6">
+            {groupTasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => navigate(`/task/${task.id}`)}
+                className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50 cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <span className="text-sm truncate">{task.title}</span>
+                  {task.list && (
+                    <span className="text-xs text-muted-foreground truncate hidden group-hover:inline">
+                      {task.list.name}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2 shrink-0">
+                  {visibleColumns.includes('priority') && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'text-xs text-white',
+                        priorityConfig[task.priority as keyof typeof priorityConfig]?.color
+                      )}
+                    >
+                      {priorityConfig[task.priority as keyof typeof priorityConfig]?.label || 'Média'}
+                    </Badge>
+                  )}
+                  {visibleColumns.includes('status') && task.status && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs"
+                      style={{
+                        borderColor: task.status.color,
+                        color: task.status.color,
+                      }}
+                    >
+                      {task.status.name}
+                    </Badge>
+                  )}
+                  {visibleColumns.includes('due_date') && getDueDateDisplay(task.due_date)}
+                </div>
+              </div>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      ))}
+    </div>
+  );
+
+  return (
+    <>
+      <Card className="h-full flex flex-col">
+        <CardHeader className="pb-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Atribuídas a mim
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {filteredTasks.length}
+              </Badge>
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                <Input
+                  placeholder="Pesquisar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-7 w-36 h-7 text-xs"
+                />
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setIsExpanded(true)}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Expandir</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
-        </div>
         
         <div className="flex items-center justify-between">
           <Tabs defaultValue="list" className="w-auto">
@@ -227,88 +322,72 @@ export function MyTasksCard() {
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-auto pt-0">
-        {filteredTasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-            <ClipboardList className="h-12 w-12 mb-3 opacity-50" />
-            <p className="text-sm font-medium">Nenhuma tarefa encontrada</p>
-            <p className="text-xs">Você não tem tarefas atribuídas no momento</p>
+        <CardContent className="flex-1 overflow-auto pt-0">
+          {filteredTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+              <ClipboardList className="h-12 w-12 mb-3 opacity-50" />
+              <p className="text-sm font-medium">Nenhuma tarefa encontrada</p>
+              <p className="text-xs">Você não tem tarefas atribuídas no momento</p>
+            </div>
+          ) : (
+            <TaskListContent />
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Atribuídas a mim
+              <Badge variant="secondary" className="ml-1">
+                {filteredTasks.length}
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex items-center justify-between gap-4 pb-2">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <GroupBySelector value={groupBy} onChange={setGroupBy} />
+              <EverythingFilters
+                filters={filters}
+                onChange={setFilters}
+                availableStatuses={availableStatuses}
+              />
+              <ColumnSelector
+                listId={null}
+                scope="everything"
+                visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                onColumnsChange={setVisibleColumns}
+                onOrderChange={setColumnOrder}
+              />
+            </div>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {Object.entries(groupedTasks).map(([group, groupTasks]) => (
-              <Collapsible
-                key={group}
-                open={expandedGroups[group] !== false}
-                onOpenChange={() => toggleGroup(group)}
-              >
-                <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 px-2 hover:bg-accent/50 rounded-md transition-colors">
-                  <ChevronRight className={cn(
-                    "h-4 w-4 transition-transform",
-                    expandedGroups[group] !== false && "rotate-90"
-                  )} />
-                  {groupBy === 'priority' && (
-                    <div className={cn(
-                      "h-2 w-2 rounded-full",
-                      priorityConfig[group as keyof typeof priorityConfig]?.color
-                    )} />
-                  )}
-                  <span className="text-sm font-medium">{getGroupLabel(group)}</span>
-                  <Badge variant="outline" className="ml-auto text-xs">
-                    {groupTasks.length}
-                  </Badge>
-                </CollapsibleTrigger>
-                
-                <CollapsibleContent className="space-y-1 ml-6">
-                  {groupTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      onClick={() => navigate(`/task/${task.id}`)}
-                      className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50 cursor-pointer transition-colors group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <span className="text-sm truncate">{task.title}</span>
-                        {task.list && (
-                          <span className="text-xs text-muted-foreground truncate hidden group-hover:inline">
-                            {task.list.name}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 shrink-0">
-                        {visibleColumns.includes('priority') && (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              'text-xs text-white',
-                              priorityConfig[task.priority as keyof typeof priorityConfig]?.color
-                            )}
-                          >
-                            {priorityConfig[task.priority as keyof typeof priorityConfig]?.label || 'Média'}
-                          </Badge>
-                        )}
-                        {visibleColumns.includes('status') && task.status && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs"
-                            style={{
-                              borderColor: task.status.color,
-                              color: task.status.color,
-                            }}
-                          >
-                            {task.status.name}
-                          </Badge>
-                        )}
-                        {visibleColumns.includes('due_date') && getDueDateDisplay(task.due_date)}
-                      </div>
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+
+          <div className="flex-1 overflow-auto">
+            {filteredTasks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                <ClipboardList className="h-12 w-12 mb-3 opacity-50" />
+                <p className="text-sm font-medium">Nenhuma tarefa encontrada</p>
+                <p className="text-xs">Você não tem tarefas atribuídas no momento</p>
+              </div>
+            ) : (
+              <TaskListContent maxHeight="max-h-[60vh]" />
+            )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
