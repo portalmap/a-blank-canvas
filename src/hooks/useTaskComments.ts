@@ -146,6 +146,50 @@ export const useResolveCommentAssignment = () => {
   });
 };
 
+export const useUpdateTaskComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      commentId, 
+      taskId, 
+      content,
+      authorId,
+    }: { 
+      commentId: string; 
+      taskId: string; 
+      content: string;
+      authorId: string;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Verificar se o usuário é o autor (proteção adicional no frontend)
+      if (authorId !== user.id) {
+        throw new Error('Você não tem permissão para editar este comentário');
+      }
+
+      const { error } = await supabase
+        .from('task_comments')
+        .update({ 
+          content,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', commentId);
+
+      if (error) throw error;
+      return { commentId, taskId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['task-comments', data.taskId] });
+      toast.success('Comentário atualizado!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao atualizar comentário');
+    },
+  });
+};
+
 export const useDeleteTaskComment = () => {
   const queryClient = useQueryClient();
 

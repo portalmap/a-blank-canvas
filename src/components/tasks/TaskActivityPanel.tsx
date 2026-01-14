@@ -123,7 +123,10 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
           await createActivity.mutateAsync({
             taskId,
             activityType: 'comment.created',
-            metadata: { content: newComment.trim() },
+            metadata: { 
+              comment_id: comment.id,
+              content: newComment.trim(),
+            },
           });
         }
       }

@@ -153,6 +153,8 @@ export const getActivityLabel = (activity: TaskActivity): string => {
       return activity.new_value ? `${prefix}atualizou a descrição` : `${prefix}removeu a descrição`;
     case 'comment.created':
       return `${prefix}adicionou um comentário`;
+    case 'comment.edited':
+      return `${prefix}editou um comentário`;
     case 'assignment.created':
       return `${prefix}criou uma atribuição para "${activity.metadata?.assignee_name || 'usuário'}"`;
     case 'assignment.resolved':
