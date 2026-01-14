@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+interface OverdueTask {
+  id: string;
+  title: string;
+  due_date: string;
+  list_name?: string;
+  priority?: string;
+}
+
 interface TaskStats {
   total: number;
   completed: number;
@@ -9,6 +17,7 @@ interface TaskStats {
   highPriority: number;
   byStatus: { name: string; color: string; count: number }[];
   completionRate: number;
+  overdueTasks: OverdueTask[];
 }
 
 interface UseTaskStatsOptions {
@@ -31,6 +40,7 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
           highPriority: 0,
           byStatus: [],
           completionRate: 0,
+          overdueTasks: [],
         };
       }
 
@@ -56,6 +66,7 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
           highPriority: 0,
           byStatus: [],
           completionRate: 0,
+          overdueTasks: [],
         };
       }
 
@@ -66,6 +77,7 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
         .from('tasks')
         .select(`
           id,
+          title,
           completed_at,
           due_date,
           priority,
@@ -77,6 +89,9 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
             id,
             name,
             color
+          ),
+          lists (
+            name
           )
         `)
         .in('list_id', listIds)
@@ -101,13 +116,21 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
       const total = tasks?.length || 0;
       const completed = tasks?.filter(t => t.completed_at !== null).length || 0;
       
-      const overdue = tasks?.filter(t => {
+      const overdueTasks = tasks?.filter(t => {
         if (t.completed_at) return false;
         if (!t.due_date) return false;
         const dueDate = new Date(t.due_date);
         dueDate.setHours(0, 0, 0, 0);
         return dueDate < now;
-      }).length || 0;
+      }).map(t => ({
+        id: t.id,
+        title: t.title,
+        due_date: t.due_date!,
+        list_name: (t.lists as { name: string } | null)?.name,
+        priority: t.priority || undefined,
+      })) || [];
+
+      const overdue = overdueTasks.length;
 
       const onTrack = tasks?.filter(t => {
         if (t.completed_at) return false;
@@ -151,6 +174,7 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
         highPriority,
         byStatus,
         completionRate,
+        overdueTasks,
       };
     },
     enabled: !!id,
