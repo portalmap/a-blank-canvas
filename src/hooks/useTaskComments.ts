@@ -136,6 +136,7 @@ export const useResolveCommentAssignment = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['task-comments', data.taskId] });
+      queryClient.invalidateQueries({ queryKey: ['my-assigned-comments'] });
       toast.success('Atribuição resolvida!');
     },
     onError: (error) => {
