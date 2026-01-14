@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Plus, 
   Edit2, 
@@ -14,11 +16,12 @@ import {
   Zap,
   CheckCircle2,
   UserCheck,
-  Paperclip
+  Paperclip,
+  Pencil
 } from 'lucide-react';
-import { TaskActivity, getActivityLabel } from '@/hooks/useTaskActivities';
-import { useResolveCommentAssignment, useTaskComments } from '@/hooks/useTaskComments';
-import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { TaskActivity, getActivityLabel, useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } from '@/hooks/useTaskComments';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { renderTextWithImagesAndLinks } from '@/lib/linkify';
 
@@ -30,6 +33,7 @@ interface TaskActivityItemProps {
 const getActivityIcon = (type: string) => {
   if (type === 'task.created') return Plus;
   if (type === 'comment.created') return MessageSquare;
+  if (type === 'comment.edited') return Pencil;
   if (type === 'assignment.created') return UserCheck;
   if (type === 'assignment.resolved') return CheckCircle2;
   if (type === 'attachment.added') return Paperclip;
@@ -44,6 +48,7 @@ const getActivityIcon = (type: string) => {
 const getActivityColor = (type: string) => {
   if (type === 'task.created') return 'bg-green-500/10 text-green-500';
   if (type === 'comment.created') return 'bg-blue-500/10 text-blue-500';
+  if (type === 'comment.edited') return 'bg-blue-500/10 text-blue-500';
   if (type === 'assignment.created') return 'bg-amber-500/10 text-amber-500';
   if (type === 'assignment.resolved') return 'bg-emerald-500/10 text-emerald-500';
   if (type === 'attachment.added') return 'bg-indigo-500/10 text-indigo-500';
@@ -56,6 +61,9 @@ const getActivityColor = (type: string) => {
 };
 
 export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  
   const Icon = getActivityIcon(activity.activity_type);
   const iconColorClass = getActivityColor(activity.activity_type);
   const userName = activity.user?.full_name || 'Usuário';
@@ -63,9 +71,18 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
   const isAutomation = activity.metadata?.created_by === 'automation';
   const isPortal = activity.metadata?.created_by === 'portal';
   
+  const { user } = useAuth();
   const { data: comments } = useTaskComments(taskId);
   const resolveAssignment = useResolveCommentAssignment();
   const createActivity = useCreateTaskActivity();
+  const updateComment = useUpdateTaskComment();
+  
+  // Verificar se o usuário atual é o autor
+  const isAuthor = user?.id === activity.user_id;
+  const canEdit = (activity.activity_type === 'comment.created' || 
+                   activity.activity_type === 'comment.edited') && 
+                  isAuthor && 
+                  activity.metadata?.comment_id;
   
   const timeAgo = formatDistanceToNow(new Date(activity.created_at), { 
     addSuffix: true, 
@@ -110,9 +127,51 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
     }
   };
 
+  const handleStartEdit = () => {
+    const currentContent = activity.metadata?.content || activity.metadata?.comment_content || '';
+    setEditContent(currentContent);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditContent('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!activity.metadata?.comment_id || !taskId || !editContent.trim()) return;
+    
+    const oldContent = activity.metadata?.content || activity.metadata?.comment_content;
+    
+    try {
+      await updateComment.mutateAsync({
+        commentId: activity.metadata.comment_id,
+        taskId,
+        content: editContent.trim(),
+        authorId: activity.user_id,
+      });
+
+      // Criar atividade de edição
+      await createActivity.mutateAsync({
+        taskId,
+        activityType: 'comment.edited',
+        metadata: {
+          comment_id: activity.metadata.comment_id,
+          content: editContent.trim(),
+          old_content: oldContent,
+        },
+      });
+
+      setIsEditing(false);
+      setEditContent('');
+    } catch (error) {
+      console.error('Erro ao editar comentário:', error);
+    }
+  };
+
   return (
     <div className={cn(
-      "flex gap-3 py-3 border-b border-border/50 last:border-0",
+      "group flex gap-3 py-3 border-b border-border/50 last:border-0",
       isResolved && "opacity-60"
     )}>
       {/* Timeline dot */}
@@ -195,14 +254,59 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
             )}
             
             {/* Comment/Assignment content */}
-            {(activity.activity_type === 'comment.created' || activity.activity_type === 'assignment.created') && 
+            {(activity.activity_type === 'comment.created' || 
+              activity.activity_type === 'comment.edited' ||
+              activity.activity_type === 'assignment.created') && 
              (activity.metadata?.content || activity.metadata?.comment_content) && (
-              <div className={cn(
-                "mt-2 p-3 rounded-md text-sm whitespace-pre-wrap",
-                isResolved ? "bg-muted/30" : "bg-muted/50"
-              )}>
-                {renderTextWithImagesAndLinks(activity.metadata.content || activity.metadata.comment_content)}
-              </div>
+              <>
+                {isEditing ? (
+                  <div className="mt-2 space-y-2">
+                    <Textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleCancelEdit}
+                        disabled={updateComment.isPending}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={handleSaveEdit} 
+                        disabled={updateComment.isPending || !editContent.trim()}
+                      >
+                        {updateComment.isPending ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={cn(
+                    "mt-2 p-3 rounded-md text-sm whitespace-pre-wrap relative",
+                    isResolved ? "bg-muted/30" : "bg-muted/50"
+                  )}>
+                    {renderTextWithImagesAndLinks(activity.metadata.content || activity.metadata.comment_content)}
+                    
+                    {/* Edit button - only for author */}
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={handleStartEdit}
+                        title="Editar comentário"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             {/* Resolved indicator */}
