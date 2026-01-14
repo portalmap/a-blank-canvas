@@ -241,9 +241,9 @@ const ListDetailView = () => {
   }));
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 container mx-auto p-6 space-y-6 overflow-auto">
-        <Breadcrumb>
+    <div className="flex h-full overflow-hidden">
+      <div className="flex-1 flex flex-col gap-6 container mx-auto p-6 overflow-hidden">
+        <Breadcrumb className="flex-shrink-0">
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink onClick={() => navigate('/')}>
@@ -273,7 +273,7 @@ const ListDetailView = () => {
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="flex justify-between items-start gap-4">
+        <div className="flex justify-between items-start gap-4 flex-shrink-0">
           <div className="flex-1">
             <h1 className="text-3xl font-bold">{currentList.name}</h1>
             {currentList.description && (
@@ -291,7 +291,7 @@ const ListDetailView = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-4">
             <QuickAutomationButtons
               workspaceId={activeWorkspace.id}
@@ -311,7 +311,7 @@ const ListDetailView = () => {
         </div>
 
         {!defaultStatus && statuses !== undefined && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="flex-shrink-0">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Status não configurados</AlertTitle>
             <AlertDescription>
@@ -320,8 +320,8 @@ const ListDetailView = () => {
           </Alert>
         )}
 
-        <Tabs defaultValue={viewMode} className="w-full">
-          <div className="flex items-center justify-between mb-4">
+        <Tabs defaultValue={viewMode} className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <TabsList>
               <TabsTrigger value="list">Lista</TabsTrigger>
               <TabsTrigger value="kanban">Kanban</TabsTrigger>
@@ -360,7 +360,7 @@ const ListDetailView = () => {
             </div>
           </div>
 
-          <TabsContent value="list">
+          <TabsContent value="list" className="flex-1 overflow-auto mt-0">
             {tasksLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -382,17 +382,19 @@ const ListDetailView = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="kanban">
+          <TabsContent value="kanban" className="flex-1 min-h-0 mt-0">
             {tasksLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <TaskKanbanView tasks={tasksForViews} statuses={statuses || []} />
+              <div className="h-full">
+                <TaskKanbanView tasks={tasksForViews} statuses={statuses || []} />
+              </div>
             )}
           </TabsContent>
 
-          <TabsContent value="sprint">
+          <TabsContent value="sprint" className="flex-1 overflow-auto mt-0">
             {tasksLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
