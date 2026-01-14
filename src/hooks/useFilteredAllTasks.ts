@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserRole } from './useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { AllTask } from './useAllTasks';
 
@@ -10,14 +9,35 @@ export type TaskWithAssignees = AllTask & {
 
 export function useFilteredAllTasks(workspaceId: string | undefined) {
   const { user } = useAuth();
-  const { data: roleInfo, isLoading: roleLoading } = useUserRole();
 
   return useQuery({
-    queryKey: ['filtered-all-tasks', workspaceId, user?.id, roleInfo?.isAdmin],
+    queryKey: ['filtered-all-tasks', workspaceId, user?.id],
     queryFn: async () => {
       if (!workspaceId || !user) return [];
 
-      const isAdmin = roleInfo?.isAdmin ?? false;
+      // Check role directly for the specific workspace being queried
+      const { data: globalRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const hasGlobalAdmin = globalRoles?.some(r => 
+        ['global_owner', 'owner', 'admin'].includes(r.role)
+      ) ?? false;
+
+      let isAdmin = hasGlobalAdmin;
+
+      // If no global admin role, check workspace-specific role
+      if (!isAdmin) {
+        const { data: membership } = await supabase
+          .from('workspace_members')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('workspace_id', workspaceId)
+          .single();
+
+        isAdmin = membership?.role === 'admin';
+      }
 
       // Admin: fetch all tasks
       // Member: fetch only tasks where they are assigned
@@ -118,6 +138,6 @@ export function useFilteredAllTasks(workspaceId: string | undefined) {
         assignees: assigneesByTask[task.id] || [],
       })) as unknown as TaskWithAssignees[];
     },
-    enabled: !!workspaceId && !!user && !roleLoading,
+    enabled: !!workspaceId && !!user,
   });
 }
