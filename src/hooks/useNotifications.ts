@@ -68,7 +68,9 @@ export const useCreateNotification = () => {
       referenceType?: string;
       referenceId?: string;
     }) => {
-      const { data, error } = await supabase
+      // Não usar .select().single() pois a RLS de SELECT só permite ver próprias notificações
+      // Isso causava falha ao criar notificação para outro usuário
+      const { error } = await supabase
         .from('notifications')
         .insert({
           user_id: notification.userId,
@@ -79,12 +81,12 @@ export const useCreateNotification = () => {
           link: notification.link,
           reference_type: notification.referenceType,
           reference_id: notification.referenceId,
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
-      return data;
+      
+      // Retornar userId para invalidar as queries corretas
+      return { user_id: notification.userId };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notifications', data.user_id] });
