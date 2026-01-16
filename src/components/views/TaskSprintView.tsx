@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays, startOfMonth, endOfMonth, startOfDay, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { PriorityBadge } from '@/components/ui/badge-variant';
 import { Badge } from '@/components/ui/badge';
 import { useSubtasks } from '@/hooks/useSubtasks';
@@ -69,8 +70,8 @@ export const TaskSprintView = ({ tasks }: TaskSprintViewProps) => {
     }
 
     const dates = tasksWithDates.flatMap((task) => [
-      new Date(task.start_date!),
-      new Date(task.due_date!),
+      parseLocalDate(task.start_date!)!,
+      parseLocalDate(task.due_date!)!,
     ]);
 
     return {
@@ -83,8 +84,8 @@ export const TaskSprintView = ({ tasks }: TaskSprintViewProps) => {
   const dayWidth = 120; // pixels per day
 
   const getTaskPosition = (task: Task) => {
-    const start = new Date(task.start_date!);
-    const end = new Date(task.due_date!);
+    const start = parseLocalDate(task.start_date!)!;
+    const end = parseLocalDate(task.due_date!)!;
     
     const daysFromStart = differenceInDays(start, dateRange.start);
     const duration = differenceInDays(end, start) + 1;
@@ -97,7 +98,7 @@ export const TaskSprintView = ({ tasks }: TaskSprintViewProps) => {
 
   const isOverdue = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
-    const due = startOfDay(new Date(dueDate));
+    const due = startOfDay(parseLocalDate(dueDate)!);
     const today = startOfDay(new Date());
     return isBefore(due, today);
   };

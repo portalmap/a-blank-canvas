@@ -18,6 +18,7 @@ import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { TaskTagsSelector } from './TaskTagsSelector';
 import { cn } from '@/lib/utils';
 import { startOfDay, isBefore, isEqual } from 'date-fns';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 interface TaskDetailDrawerProps {
   taskId: string | null;
@@ -85,8 +86,8 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
     await updateTask.mutateAsync({ id: task.id, dueDate: e.target.value || null });
   };
 
-  // Comparar apenas datas, ignorando horários
-  const dueDate = task.due_date ? startOfDay(new Date(task.due_date)) : null;
+  // Comparar apenas datas, ignorando horários (usando parseLocalDate para evitar problemas de timezone)
+  const dueDate = task.due_date ? startOfDay(parseLocalDate(task.due_date)!) : null;
   const today = startOfDay(new Date());
   const isDueToday = dueDate && isEqual(dueDate, today) && !task.completed_at;
   const isOverdue = dueDate && isBefore(dueDate, today) && !task.completed_at;

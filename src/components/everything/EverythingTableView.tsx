@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, MoreHorizontal, Calendar, MapPin } from 'lucide-react';
 import { format, isToday, isTomorrow, isPast, isThisWeek, addDays, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
 import {
   Table,
@@ -75,8 +76,7 @@ function groupTasksByDueDate(tasks: TaskWithAssignees[]) {
     if (!task.due_date) {
       groups['Sem data'].push(task);
     } else {
-      const dueDate = new Date(task.due_date);
-      dueDate.setHours(0, 0, 0, 0);
+      const dueDate = parseLocalDate(task.due_date)!;
 
       if (isPast(dueDate) && !isToday(dueDate) && !task.completed_at) {
         groups['Em atraso'].push(task);
@@ -210,9 +210,8 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
 
   const isOverdue = (task: TaskWithAssignees) => {
     if (!task.due_date || task.completed_at) return false;
-    const dueDate = new Date(task.due_date);
-    dueDate.setHours(23, 59, 59, 999);
-    return isPast(dueDate);
+    const dueDate = parseLocalDate(task.due_date)!;
+    return isPast(dueDate) && !isToday(dueDate);
   };
 
   // Get ordered visible columns (excluding checkbox and actions which are always shown)
@@ -316,7 +315,7 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
                   )}
                 >
                   <Calendar className="h-3 w-3" />
-                  {format(new Date(task.due_date), 'dd/MM/yy', { locale: ptBR })}
+                  {format(parseLocalDate(task.due_date)!, 'dd/MM/yy', { locale: ptBR })}
                 </span>
               ) : (
                 <span className="text-sm text-muted-foreground">-</span>
@@ -329,7 +328,7 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
               {task.start_date ? (
                 <span className="text-sm flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {format(new Date(task.start_date), 'dd/MM/yy', { locale: ptBR })}
+                  {format(parseLocalDate(task.start_date)!, 'dd/MM/yy', { locale: ptBR })}
                 </span>
               ) : (
                 <span className="text-sm text-muted-foreground">-</span>

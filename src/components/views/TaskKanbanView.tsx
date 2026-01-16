@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { PriorityBadge } from '@/components/ui/badge-variant';
 import { format, startOfDay, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { Calendar, GitBranch } from 'lucide-react';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { useUpdateTask } from '@/hooks/useTasks';
@@ -80,14 +81,14 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
 
   const isOverdue = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
-    const due = startOfDay(new Date(dueDate));
+    const due = startOfDay(parseLocalDate(dueDate)!);
     const today = startOfDay(new Date());
     return isBefore(due, today);
   };
 
   const isDueToday = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
-    return isToday(new Date(dueDate));
+    return isToday(parseLocalDate(dueDate)!);
   };
 
   const onDragEnd = async (result: DropResult) => {
