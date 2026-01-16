@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { startOfDay, isBefore } from 'date-fns';
 
 interface OverdueTask {
   id: string;
@@ -110,18 +111,17 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
 
       if (tasksError) throw tasksError;
 
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
+      const today = startOfDay(new Date());
 
       const total = tasks?.length || 0;
       const completed = tasks?.filter(t => t.completed_at !== null).length || 0;
       
+      // Tarefa atrasada: due_date ANTES de hoje (não inclui o dia de hoje)
       const overdueTasks = tasks?.filter(t => {
         if (t.completed_at) return false;
         if (!t.due_date) return false;
-        const dueDate = new Date(t.due_date);
-        dueDate.setHours(0, 0, 0, 0);
-        return dueDate < now;
+        const dueDate = startOfDay(new Date(t.due_date));
+        return isBefore(dueDate, today);
       }).map(t => ({
         id: t.id,
         title: t.title,
@@ -132,12 +132,12 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
 
       const overdue = overdueTasks.length;
 
+      // No prazo: não concluída e (sem due_date OU due_date >= hoje)
       const onTrack = tasks?.filter(t => {
         if (t.completed_at) return false;
         if (!t.due_date) return true;
-        const dueDate = new Date(t.due_date);
-        dueDate.setHours(0, 0, 0, 0);
-        return dueDate >= now;
+        const dueDate = startOfDay(new Date(t.due_date));
+        return !isBefore(dueDate, today); // >= hoje
       }).length || 0;
 
       const highPriority = tasks?.filter(t => 

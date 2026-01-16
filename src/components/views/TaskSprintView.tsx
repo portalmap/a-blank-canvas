@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, differenceInDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, differenceInDays, startOfMonth, endOfMonth, startOfDay, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PriorityBadge } from '@/components/ui/badge-variant';
 import { Badge } from '@/components/ui/badge';
@@ -97,7 +97,9 @@ export const TaskSprintView = ({ tasks }: TaskSprintViewProps) => {
 
   const isOverdue = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
-    return new Date(dueDate) < new Date();
+    const due = startOfDay(new Date(dueDate));
+    const today = startOfDay(new Date());
+    return isBefore(due, today);
   };
 
   return (

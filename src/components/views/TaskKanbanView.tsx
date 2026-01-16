@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PriorityBadge } from '@/components/ui/badge-variant';
-import { format } from 'date-fns';
+import { format, startOfDay, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, GitBranch } from 'lucide-react';
 import { useSubtasks } from '@/hooks/useSubtasks';
@@ -80,7 +80,14 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
 
   const isOverdue = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
-    return new Date(dueDate) < new Date();
+    const due = startOfDay(new Date(dueDate));
+    const today = startOfDay(new Date());
+    return isBefore(due, today);
+  };
+
+  const isDueToday = (dueDate: string | null, completedAt?: string | null) => {
+    if (!dueDate || completedAt) return false;
+    return isToday(new Date(dueDate));
   };
 
   const onDragEnd = async (result: DropResult) => {
@@ -205,12 +212,17 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
                                           "flex items-center gap-2 text-xs",
                                           isOverdue(task.due_date, task.completed_at) 
                                             ? "text-destructive" 
-                                            : "text-muted-foreground"
+                                            : isDueToday(task.due_date, task.completed_at)
+                                              ? "text-amber-600"
+                                              : "text-muted-foreground"
                                         )}>
                                           <Calendar className="h-3 w-3" />
                                           {format(new Date(task.due_date), 'dd/MM/yyyy', { locale: ptBR })}
                                           {isOverdue(task.due_date, task.completed_at) && (
                                             <span className="font-medium">Atrasada</span>
+                                          )}
+                                          {isDueToday(task.due_date, task.completed_at) && (
+                                            <span className="font-medium">Hoje</span>
                                           )}
                                         </div>
                                       )}
