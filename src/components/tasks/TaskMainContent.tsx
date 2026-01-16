@@ -19,6 +19,7 @@ import { TaskTagsSelector } from './TaskTagsSelector';
 import { cn } from '@/lib/utils';
 import { renderTextWithImagesAndLinks } from '@/lib/linkify';
 import { toast } from 'sonner';
+import { startOfDay, isBefore, isEqual } from 'date-fns';
 interface Task {
   id: string;
   title: string;
@@ -210,7 +211,11 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
     }
   };
 
-  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !task.completed_at;
+  // Comparar apenas datas, ignorando horários
+  const dueDate = task.due_date ? startOfDay(new Date(task.due_date)) : null;
+  const today = startOfDay(new Date());
+  const isDueToday = dueDate && isEqual(dueDate, today) && !task.completed_at;
+  const isOverdue = dueDate && isBefore(dueDate, today) && !task.completed_at;
 
   return (
     <div className="space-y-6">
@@ -363,8 +368,11 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
               </Button>
             )}
           </div>
+          {isDueToday && (
+            <p className="text-xs text-amber-600 font-medium">Entregar hoje</p>
+          )}
           {isOverdue && (
-            <p className="text-xs text-destructive">Tarefa atrasada!</p>
+            <p className="text-xs text-destructive font-medium">Tarefa atrasada!</p>
           )}
         </div>
       </div>

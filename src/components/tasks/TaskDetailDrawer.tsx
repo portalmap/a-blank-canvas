@@ -17,6 +17,7 @@ import { TaskChecklists } from './TaskChecklists';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { TaskTagsSelector } from './TaskTagsSelector';
 import { cn } from '@/lib/utils';
+import { startOfDay, isBefore, isEqual } from 'date-fns';
 
 interface TaskDetailDrawerProps {
   taskId: string | null;
@@ -84,7 +85,11 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
     await updateTask.mutateAsync({ id: task.id, dueDate: e.target.value || null });
   };
 
-  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !task.completed_at;
+  // Comparar apenas datas, ignorando horários
+  const dueDate = task.due_date ? startOfDay(new Date(task.due_date)) : null;
+  const today = startOfDay(new Date());
+  const isDueToday = dueDate && isEqual(dueDate, today) && !task.completed_at;
+  const isOverdue = dueDate && isBefore(dueDate, today) && !task.completed_at;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -222,8 +227,11 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
                   </Button>
                 )}
               </div>
+              {isDueToday && (
+                <p className="text-xs text-amber-600 font-medium">Entregar hoje</p>
+              )}
               {isOverdue && (
-                <p className="text-xs text-destructive">Tarefa atrasada!</p>
+                <p className="text-xs text-destructive font-medium">Tarefa atrasada!</p>
               )}
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
+import { startOfDay, isBefore } from 'date-fns';
 
 export interface DashboardCard {
   id: string;
@@ -219,11 +220,12 @@ export const useDashboardStats = (dashboardId: string | undefined) => {
       if (error) throw error;
 
       const now = new Date();
+      const todayStart = startOfDay(now);
       const total = tasks?.length || 0;
       const completed = tasks?.filter(t => t.completed_at).length || 0;
       const overdue = tasks?.filter(t => 
         t.due_date && 
-        new Date(t.due_date) < now && 
+        isBefore(startOfDay(new Date(t.due_date)), todayStart) && 
         !t.completed_at
       ).length || 0;
 
@@ -258,7 +260,7 @@ export const useDashboardStats = (dashboardId: string | undefined) => {
       // Overdue tasks list
       const overdueTasks = tasks?.filter(t => 
         t.due_date && 
-        new Date(t.due_date) < now && 
+        isBefore(startOfDay(new Date(t.due_date)), todayStart) && 
         !t.completed_at
       ).slice(0, 10) || [];
 
