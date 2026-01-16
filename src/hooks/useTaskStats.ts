@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, isBefore } from 'date-fns';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 interface OverdueTask {
   id: string;
@@ -120,7 +121,7 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
       const overdueTasks = tasks?.filter(t => {
         if (t.completed_at) return false;
         if (!t.due_date) return false;
-        const dueDate = startOfDay(new Date(t.due_date));
+        const dueDate = startOfDay(parseLocalDate(t.due_date)!);
         return isBefore(dueDate, today);
       }).map(t => ({
         id: t.id,
@@ -136,7 +137,7 @@ export const useTaskStats = ({ type, id, startDate, endDate }: UseTaskStatsOptio
       const onTrack = tasks?.filter(t => {
         if (t.completed_at) return false;
         if (!t.due_date) return true;
-        const dueDate = startOfDay(new Date(t.due_date));
+        const dueDate = startOfDay(parseLocalDate(t.due_date)!);
         return !isBefore(dueDate, today); // >= hoje
       }).length || 0;
 

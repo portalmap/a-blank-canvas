@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
 import { startOfDay, isBefore } from 'date-fns';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 export interface DashboardCard {
   id: string;
@@ -260,7 +261,7 @@ export const useDashboardStats = (dashboardId: string | undefined) => {
       // Overdue tasks list
       const overdueTasks = tasks?.filter(t => 
         t.due_date && 
-        isBefore(startOfDay(new Date(t.due_date)), todayStart) && 
+        isBefore(startOfDay(parseLocalDate(t.due_date)!), todayStart) && 
         !t.completed_at
       ).slice(0, 10) || [];
 

@@ -16,8 +16,9 @@ import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, Co
 import { GroupBySelector, GroupByOption } from '@/components/everything/GroupBySelector';
 import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
 import { ColumnSelector } from '@/components/tasks/ColumnSelector';
-import { format, isToday, isPast, parseISO } from 'date-fns';
+import { format, isToday, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 
 const priorityConfig = {
@@ -118,7 +119,7 @@ export function MyTasksCard() {
       filteredTasks.forEach(task => {
         let groupKey = 'Sem data';
         if (task.due_date) {
-          const date = parseISO(task.due_date);
+          const date = parseLocalDate(task.due_date)!;
           if (isPast(date) && !isToday(date)) {
             groupKey = 'Atrasadas';
           } else if (isToday(date)) {
@@ -143,7 +144,7 @@ export function MyTasksCard() {
 
   const getDueDateDisplay = (dueDate: string | null) => {
     if (!dueDate) return null;
-    const date = parseISO(dueDate);
+    const date = parseLocalDate(dueDate)!;
     const isOverdue = isPast(date) && !isToday(date);
     const isDueToday = isToday(date);
 

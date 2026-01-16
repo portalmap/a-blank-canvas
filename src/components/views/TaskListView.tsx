@@ -30,6 +30,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, isToday, isTomorrow, isPast, isThisWeek, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal, FolderInput, Archive, Trash2, User } from 'lucide-react';
 import { TaskMoveDialog } from '@/components/tasks/TaskMoveDialog';
 import { useSubtasks } from '@/hooks/useSubtasks';
@@ -116,7 +117,7 @@ function groupTasksByDueDate(tasks: TaskWithAssignees[]) {
     if (!task.due_date) {
       groups.noDueDate.push(task);
     } else {
-      const dueDate = new Date(task.due_date);
+      const dueDate = parseLocalDate(task.due_date)!;
       if (isPast(dueDate) && !isToday(dueDate) && !task.completed_at) {
         groups.overdue.push(task);
       } else if (isToday(dueDate)) {
@@ -362,9 +363,9 @@ export const TaskListView = ({
         case 'priority':
           return <PriorityBadge priority={task.priority} />;
         case 'start_date':
-          return task.start_date ? format(new Date(task.start_date), 'dd/MM/yyyy', { locale: ptBR }) : '-';
+          return task.start_date ? format(parseLocalDate(task.start_date)!, 'dd/MM/yyyy', { locale: ptBR }) : '-';
         case 'due_date':
-          return task.due_date ? format(new Date(task.due_date), 'dd/MM/yyyy', { locale: ptBR }) : '-';
+          return task.due_date ? format(parseLocalDate(task.due_date)!, 'dd/MM/yyyy', { locale: ptBR }) : '-';
         case 'assignee':
           return task.assignee ? (
             <Tooltip>
