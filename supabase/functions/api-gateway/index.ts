@@ -349,7 +349,8 @@ async function handleLists(supabase: any, method: string, id: string | null, wor
           .from("lists")
           .select(`
             *,
-            space:spaces(id, name, color, description)
+            space:spaces(id, name, color, description),
+            folder:folders(id, name)
           `)
           .eq("id", id)
           .eq("workspace_id", workspaceId)
@@ -361,7 +362,8 @@ async function handleLists(supabase: any, method: string, id: string | null, wor
           .from("lists")
           .select(`
             *,
-            space:spaces(id, name, color, description)
+            space:spaces(id, name, color, description),
+            folder:folders(id, name)
           `)
           .eq("workspace_id", workspaceId);
         if (query.space_id) {
