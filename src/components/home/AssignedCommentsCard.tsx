@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -97,6 +98,9 @@ export const AssignedCommentsCard = () => {
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
               Comentários atribuídos
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {comments.length}
+              </Badge>
             </CardTitle>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -132,6 +136,9 @@ export const AssignedCommentsCard = () => {
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
               Comentários atribuídos
+              <Badge variant="secondary" className="ml-1">
+                {comments.length}
+              </Badge>
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto">
