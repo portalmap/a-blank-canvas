@@ -499,15 +499,25 @@ export const useApplySpaceTemplate = () => {
         supabase.from('space_template_tasks').select('*').eq('template_id', templateId).order('order_index'),
       ]);
 
-      // Get default status for workspace
+      // Get default status for workspace (filter by scope_type to avoid multiple results)
       const { data: defaultStatus } = await supabase
         .from('statuses')
         .select('id')
         .eq('workspace_id', workspaceId)
+        .eq('scope_type', 'workspace')
         .eq('is_default', true)
         .single();
 
       if (!defaultStatus) throw new Error('Status padrão não encontrado');
+
+      // Extract company name from spaceName
+      // If name is "MAP | King Talhas", companyName is "King Talhas"
+      // If name is just "King Talhas", companyName is "King Talhas"
+      const extractCompanyName = (name: string): string => {
+        const parts = name.split('|');
+        return parts.length > 1 ? parts[parts.length - 1].trim() : name.trim();
+      };
+      const companyName = extractCompanyName(spaceName);
 
       // Create space
       const { data: space, error: spaceError } = await supabase
@@ -531,7 +541,7 @@ export const useApplySpaceTemplate = () => {
             .from('folders')
             .insert({
               space_id: space.id,
-              name: folder.name,
+              name: `${folder.name.trim()} | ${companyName}`,
               description: folder.description,
             })
             .select()
@@ -552,7 +562,7 @@ export const useApplySpaceTemplate = () => {
               workspace_id: workspaceId,
               space_id: space.id,
               folder_id: list.folder_ref_id ? folderIdMap[list.folder_ref_id] : null,
-              name: list.name,
+              name: `${list.name.trim()} | ${companyName}`,
               description: list.description,
               default_view: list.default_view as 'list' | 'kanban' | 'sprint',
             })

@@ -63,7 +63,8 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
     setSelectedTemplateId(templateId);
     const template = templates?.find(t => t.id === templateId);
     if (template) {
-      setSpaceName(template.name);
+      // When using template, clear name so user enters only company name
+      setSpaceName('');
       setSpaceColor(template.color || '#6366f1');
     }
     setStep('form');
@@ -72,12 +73,16 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
   const handleCreate = async () => {
     if (!spaceName.trim()) return;
 
-    if (selectedTemplateId) {
-      // Aplica o template no workspace atual
+    if (selectedTemplateId && selectedTemplate) {
+      // Build final space name: template base name + company name
+      // Template name is "MAP | ", user enters "King Talhas"
+      // Final name is "MAP | King Talhas"
+      const finalSpaceName = `${selectedTemplate.name.trim()}${spaceName.trim()}`;
+      
       await applyTemplate.mutateAsync({
         templateId: selectedTemplateId,
         workspaceId,
-        spaceName,
+        spaceName: finalSpaceName,
         spaceDescription: spaceDescription || undefined,
         spaceColor,
       });
@@ -182,13 +187,24 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
         {step === 'form' && (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nome</Label>
+              <Label htmlFor="name">
+                {selectedTemplateId ? 'Nome da Empresa' : 'Nome'}
+              </Label>
               <Input
                 id="name"
                 value={spaceName}
                 onChange={(e) => setSpaceName(e.target.value)}
-                placeholder="Ex: Projetos, Marketing, Vendas"
+                placeholder={selectedTemplateId 
+                  ? "Ex: King Talhas, Accerth" 
+                  : "Ex: Projetos, Marketing, Vendas"
+                }
               />
+              {selectedTemplateId && selectedTemplate && (
+                <p className="text-xs text-muted-foreground">
+                  O nome será usado em: {selectedTemplate.name}{spaceName || '[empresa]'}, 
+                  pastas e listas seguirão o mesmo padrão
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Descrição (opcional)</Label>
