@@ -73,29 +73,34 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
   const handleCreate = async () => {
     if (!spaceName.trim()) return;
 
-    if (selectedTemplateId && selectedTemplate) {
-      // Build final space name: template base name + company name
-      // Template name is "MAP | ", user enters "King Talhas"
-      // Final name is "MAP | King Talhas"
-      const finalSpaceName = `${selectedTemplate.name.trim()}${spaceName.trim()}`;
-      
-      await applyTemplate.mutateAsync({
-        templateId: selectedTemplateId,
-        workspaceId,
-        spaceName: finalSpaceName,
-        spaceDescription: spaceDescription || undefined,
-        spaceColor,
-      });
-    } else {
-      await createSpace.mutateAsync({
-        workspaceId,
-        name: spaceName,
-        description: spaceDescription || undefined,
-        color: spaceColor,
-      });
-    }
+    try {
+      if (selectedTemplateId && selectedTemplate) {
+        // Build final space name: template base name + company name
+        // Template name is "MAP | ", user enters "King Talhas"
+        // Final name is "MAP | King Talhas"
+        const finalSpaceName = `${selectedTemplate.name.trim()}${spaceName.trim()}`;
+        
+        await applyTemplate.mutateAsync({
+          templateId: selectedTemplateId,
+          workspaceId,
+          spaceName: finalSpaceName,
+          spaceDescription: spaceDescription || undefined,
+          spaceColor,
+        });
+      } else {
+        await createSpace.mutateAsync({
+          workspaceId,
+          name: spaceName,
+          description: spaceDescription || undefined,
+          color: spaceColor,
+        });
+      }
 
-    handleClose();
+      handleClose();
+    } catch (error: any) {
+      // Error is already handled by the hook with toast
+      console.error('Erro ao criar space:', error);
+    }
   };
 
   const isPending = createSpace.isPending || applyTemplate.isPending;
