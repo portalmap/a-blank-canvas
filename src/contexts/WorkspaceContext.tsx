@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Workspace {
   id: string;
@@ -54,6 +55,27 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       clearActiveWorkspace();
     }
   }, [user]);
+
+  // Validate workspace membership when loading from localStorage
+  useEffect(() => {
+    const validateWorkspaceMembership = async () => {
+      if (!user || !activeWorkspace) return;
+      
+      const { data } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('workspace_id', activeWorkspace.id)
+        .eq('user_id', user.id)
+        .single();
+      
+      // If user is not a member, clear the stored workspace
+      if (!data) {
+        clearActiveWorkspace();
+      }
+    };
+    
+    validateWorkspaceMembership();
+  }, [user?.id, activeWorkspace?.id]);
 
   const isWorkspaceSelected = activeWorkspace !== null;
 
