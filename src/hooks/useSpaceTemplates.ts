@@ -492,20 +492,32 @@ export const useApplySpaceTemplate = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      // Verify user has permission to create spaces in this workspace
-      const { data: membership, error: membershipError } = await supabase
-        .from('workspace_members')
+      // Check global roles first (global_owner, owner, admin have permission everywhere)
+      const { data: globalRoles } = await supabase
+        .from('user_roles')
         .select('role')
-        .eq('workspace_id', workspaceId)
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
-      if (!membership || membershipError) {
-        throw new Error('Você não tem permissão para criar Spaces neste workspace. Por favor, selecione outro workspace.');
-      }
+      const hasGlobalPermission = globalRoles?.some(r => 
+        ['global_owner', 'owner', 'admin'].includes(r.role)
+      );
 
-      if (!['admin', 'member'].includes(membership.role)) {
-        throw new Error('Apenas administradores e membros podem criar Spaces.');
+      // If no global permission, verify workspace membership
+      if (!hasGlobalPermission) {
+        const { data: membership, error: membershipError } = await supabase
+          .from('workspace_members')
+          .select('role')
+          .eq('workspace_id', workspaceId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (!membership || membershipError) {
+          throw new Error('Você não tem permissão para criar Spaces neste workspace. Por favor, selecione outro workspace.');
+        }
+
+        if (!['admin', 'member'].includes(membership.role)) {
+          throw new Error('Apenas administradores e membros podem criar Spaces.');
+        }
       }
 
       // Fetch template structure
