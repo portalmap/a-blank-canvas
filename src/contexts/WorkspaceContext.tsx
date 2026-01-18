@@ -15,6 +15,7 @@ interface WorkspaceContextType {
   setActiveWorkspace: (workspace: Workspace | null) => void;
   clearActiveWorkspace: () => void;
   isWorkspaceSelected: boolean;
+  isValidatingWorkspace: boolean;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -22,7 +23,8 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 const STORAGE_KEY = 'active-workspace';
 
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [isValidatingWorkspace, setIsValidatingWorkspace] = useState(true);
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -59,23 +61,58 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   // Validate workspace membership when loading from localStorage
   useEffect(() => {
     const validateWorkspaceMembership = async () => {
-      if (!user || !activeWorkspace) return;
-      
-      const { data } = await supabase
+      // Wait for auth to finish loading
+      if (authLoading) {
+        setIsValidatingWorkspace(true);
+        return;
+      }
+
+      if (!user) {
+        setIsValidatingWorkspace(false);
+        return;
+      }
+
+      if (!activeWorkspace) {
+        setIsValidatingWorkspace(false);
+        return;
+      }
+
+      setIsValidatingWorkspace(true);
+
+      // Check global roles first (global_owner, owner, admin have access everywhere)
+      const { data: globalRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const hasGlobalPermission = globalRoles?.some(r => 
+        ['global_owner', 'owner', 'admin'].includes(r.role)
+      );
+
+      // If has global permission, skip workspace membership check
+      if (hasGlobalPermission) {
+        setIsValidatingWorkspace(false);
+        return;
+      }
+
+      // Check workspace membership
+      const { data: membership } = await supabase
         .from('workspace_members')
-        .select('id')
+        .select('role')
         .eq('workspace_id', activeWorkspace.id)
         .eq('user_id', user.id)
         .single();
       
-      // If user is not a member, clear the stored workspace
-      if (!data) {
+      // If user is not a member with valid role, clear the stored workspace
+      if (!membership || !['admin', 'member'].includes(membership.role)) {
         clearActiveWorkspace();
       }
+
+      setIsValidatingWorkspace(false);
     };
     
     validateWorkspaceMembership();
-  }, [user?.id, activeWorkspace?.id]);
+  }, [authLoading, user?.id, activeWorkspace?.id]);
 
   const isWorkspaceSelected = activeWorkspace !== null;
 
@@ -86,6 +123,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         setActiveWorkspace,
         clearActiveWorkspace,
         isWorkspaceSelected,
+        isValidatingWorkspace: authLoading || isValidatingWorkspace,
       }}
     >
       {children}
