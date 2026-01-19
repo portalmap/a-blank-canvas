@@ -31,6 +31,15 @@ export const useTaskAttachments = (taskId?: string) => {
   });
 };
 
+// Sanitiza nome do arquivo removendo acentos e caracteres especiais
+const sanitizeFileName = (name: string): string => {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-zA-Z0-9._-]/g, '_') // Substitui caracteres especiais por "_"
+    .replace(/_+/g, '_'); // Remove underscores duplicados
+};
+
 export const useUploadAttachment = () => {
   const queryClient = useQueryClient();
 
@@ -45,9 +54,9 @@ export const useUploadAttachment = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      // Gerar caminho único para o arquivo
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${taskId}/${Date.now()}_${file.name}`;
+      // Gerar caminho único para o arquivo com nome sanitizado
+      const safeName = sanitizeFileName(file.name);
+      const fileName = `${user.id}/${taskId}/${Date.now()}_${safeName}`;
 
       // Upload para o storage
       const { data: uploadData, error: uploadError } = await supabase.storage
