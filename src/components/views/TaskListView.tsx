@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
@@ -396,9 +396,8 @@ export const TaskListView = ({
     };
 
     return (
-      <>
+      <Fragment key={task.id}>
         <TableRow 
-          key={task.id} 
           className={cn(
             "cursor-pointer hover:bg-muted/50",
             isSubtask && "bg-muted/20",
@@ -452,7 +451,7 @@ export const TaskListView = ({
           )}
         </TableRow>
         {isExpanded && subtasks.map(subtask => renderTaskRow(subtask, true))}
-      </>
+      </Fragment>
     );
   };
 
