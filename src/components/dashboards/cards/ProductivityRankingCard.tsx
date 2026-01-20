@@ -1,9 +1,8 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   DropdownMenu, 
@@ -14,6 +13,7 @@ import {
 import { Trophy, MoreVertical, Trash2, Edit, Loader2, Users } from 'lucide-react';
 import { ProductivityRankingResult, UserProductivityStats } from '@/hooks/useProductivityRanking';
 import { cn } from '@/lib/utils';
+import { UserProductivityDetailsDialog } from './UserProductivityDetailsDialog';
 
 interface ProductivityRankingCardProps {
   title: string;
@@ -55,15 +55,22 @@ const getInitials = (name: string): string => {
     .slice(0, 2);
 };
 
-const RankingItem = ({ user, position }: { user: UserProductivityStats; position: number }) => {
+const RankingItem = ({ user, position, onSelect }: { 
+  user: UserProductivityStats; 
+  position: number;
+  onSelect: (user: UserProductivityStats) => void;
+}) => {
   const medal = getMedalIcon(position);
   const progressValue = Math.min(user.productivityScore, 200) / 2; // Max 200% = 100% da barra
 
   return (
-    <div className={cn(
-      "flex items-center gap-3 p-3 rounded-lg transition-colors",
-      position <= 3 ? "bg-muted/50" : "hover:bg-muted/30"
-    )}>
+    <div 
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer",
+        position <= 3 ? "bg-muted/50 hover:bg-muted/70" : "hover:bg-muted/30"
+      )}
+      onClick={() => onSelect(user)}
+    >
       {/* Posição */}
       <div className="w-8 text-center font-bold text-muted-foreground">
         {medal || position}
@@ -119,7 +126,10 @@ const ProductivityRankingCardComponent = ({
   onEdit,
   isLoading = false,
 }: ProductivityRankingCardProps) => {
+  const [selectedUser, setSelectedUser] = useState<UserProductivityStats | null>(null);
+
   return (
+    <>
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
@@ -165,7 +175,8 @@ const ProductivityRankingCardComponent = ({
                   <RankingItem 
                     key={user.userId} 
                     user={user} 
-                    position={index + 1} 
+                    position={index + 1}
+                    onSelect={setSelectedUser}
                   />
                 ))}
               </div>
@@ -189,6 +200,13 @@ const ProductivityRankingCardComponent = ({
         )}
       </CardContent>
     </Card>
+
+    <UserProductivityDetailsDialog
+      user={selectedUser}
+      open={!!selectedUser}
+      onOpenChange={(open) => !open && setSelectedUser(null)}
+    />
+    </>
   );
 };
 
