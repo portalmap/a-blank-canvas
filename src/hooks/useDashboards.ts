@@ -22,7 +22,8 @@ export interface DashboardCard {
     content?: string;
     scope?: ProductivityScope;
     spaceId?: string;
-    userId?: string;
+    userId?: string;      // Deprecated - use userIds
+    userIds?: string[];   // Array de IDs de usuários para escopo 'user'
   };
   position: { x: number; y: number; w: number; h: number };
 }

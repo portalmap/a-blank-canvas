@@ -8,8 +8,11 @@ import { CalculationCard } from './cards/CalculationCard';
 import { TaskListCard } from './cards/TaskListCard';
 import { PriorityBreakdownCard } from './cards/PriorityBreakdownCard';
 import { NotesCard } from './cards/NotesCard';
-import { ProductivityCard } from './cards/ProductivityCard';
+import { ProductivityCard, ProductivityScopeInfo } from './cards/ProductivityCard';
 import { LayoutDashboard } from 'lucide-react';
+import { useSpaces } from '@/hooks/useSpaces';
+import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 interface DashboardEditorProps {
   cards: DashboardCard[];
@@ -190,17 +193,61 @@ const ProductivityCardWrapper = ({
   card: DashboardCard; 
   commonProps: { title: string; onDelete: () => void; onEdit: () => void } 
 }) => {
+  const { activeWorkspace } = useWorkspace();
+  
+  // Suporta tanto userIds quanto userId (para compatibilidade)
+  const effectiveUserIds = card.config.userIds || (card.config.userId ? [card.config.userId] : undefined);
+  
   const { data: productivityStats, isLoading } = useProductivityStats({
     scope: card.config.scope || 'workspace',
     spaceId: card.config.spaceId,
-    userId: card.config.userId,
+    userIds: effectiveUserIds,
   });
+  
+  const { data: spaces = [] } = useSpaces(activeWorkspace?.id);
+  const { data: members = [] } = useWorkspaceMembers(activeWorkspace?.id);
+
+  // Construir scopeInfo baseado na configuração do card
+  const scopeInfo: ProductivityScopeInfo | undefined = useMemo(() => {
+    const scope = card.config.scope || 'workspace';
+    
+    switch (scope) {
+      case 'workspace':
+        return { scope, label: 'Workspace', details: 'Todas as tarefas' };
+      case 'my_tasks':
+        return { scope, label: 'Minhas Tarefas' };
+      case 'space': {
+        const spaceName = spaces.find(s => s.id === card.config.spaceId)?.name;
+        return { scope, label: 'Space', details: spaceName };
+      }
+      case 'user': {
+        const userIds = effectiveUserIds || [];
+        if (userIds.length === 0) {
+          return { scope, label: 'Por Usuário', details: 'Nenhum selecionado' };
+        }
+        if (userIds.length === members.length && members.length > 0) {
+          return { scope, label: 'Por Usuário', details: 'Todos' };
+        }
+        const names = userIds
+          .map(id => members.find(m => m.user_id === id)?.profile?.full_name)
+          .filter(Boolean) as string[];
+        
+        if (names.length <= 2) {
+          return { scope, label: 'Por Usuário', details: names.join(', ') };
+        }
+        return { scope, label: 'Por Usuário', details: `${names.slice(0, 2).join(', ')} +${names.length - 2}` };
+      }
+      default:
+        return undefined;
+    }
+  }, [card.config, spaces, members, effectiveUserIds]);
 
   return (
     <ProductivityCard
       {...commonProps}
       stats={productivityStats || null}
       isLoading={isLoading}
+      scopeInfo={scopeInfo}
     />
   );
 };

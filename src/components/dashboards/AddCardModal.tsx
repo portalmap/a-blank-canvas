@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   PieChart, BarChart3, LineChart, Calculator, ListTodo, 
   AlertTriangle, FileText, Target, TrendingUp 
@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -147,13 +148,40 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard, workspaceId }: Add
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
   const [scope, setScope] = useState<ProductivityScope>('workspace');
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>('');
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectAllUsers, setSelectAllUsers] = useState(false);
   
   const { activeWorkspace } = useWorkspace();
   const effectiveWorkspaceId = workspaceId || activeWorkspace?.id;
   
   const { data: spaces = [] } = useSpaces(effectiveWorkspaceId);
   const { data: members = [] } = useWorkspaceMembers(effectiveWorkspaceId);
+
+  // Sync selectAllUsers state when members load
+  useEffect(() => {
+    if (members.length > 0 && selectedUserIds.length === members.length) {
+      setSelectAllUsers(true);
+    } else {
+      setSelectAllUsers(false);
+    }
+  }, [selectedUserIds, members]);
+
+  const handleSelectAllUsers = (checked: boolean) => {
+    setSelectAllUsers(checked);
+    if (checked) {
+      setSelectedUserIds(members.map(m => m.user_id));
+    } else {
+      setSelectedUserIds([]);
+    }
+  };
+
+  const handleUserToggle = (userId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds(prev => [...prev, userId]);
+    } else {
+      setSelectedUserIds(prev => prev.filter(id => id !== userId));
+    }
+  };
 
   const resetForm = () => {
     setStep('type');
@@ -164,7 +192,8 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard, workspaceId }: Add
     setTimeRange('week');
     setScope('workspace');
     setSelectedSpaceId('');
-    setSelectedUserId('');
+    setSelectedUserIds([]);
+    setSelectAllUsers(false);
   };
 
   const handleClose = () => {
@@ -189,7 +218,7 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard, workspaceId }: Add
     if (selectedType.hasScope && scope === 'space' && !selectedSpaceId) {
       return;
     }
-    if (selectedType.hasScope && scope === 'user' && !selectedUserId) {
+    if (selectedType.hasScope && scope === 'user' && selectedUserIds.length === 0) {
       return;
     }
 
@@ -203,7 +232,7 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard, workspaceId }: Add
         ...(selectedType.hasTimeRange && { timeRange }),
         ...(selectedType.hasScope && { scope }),
         ...(selectedType.hasScope && scope === 'space' && { spaceId: selectedSpaceId }),
-        ...(selectedType.hasScope && scope === 'user' && { userId: selectedUserId }),
+        ...(selectedType.hasScope && scope === 'user' && { userIds: selectedUserIds }),
       },
       position: { x: 0, y: 0, w: 4, h: 3 },
     };
@@ -369,19 +398,46 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard, workspaceId }: Add
 
             {selectedType?.hasScope && scope === 'user' && (
               <div className="space-y-2">
-                <Label>Selecione o Usuário</Label>
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Escolha um usuário..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map((member) => (
-                      <SelectItem key={member.user_id} value={member.user_id}>
+                <Label>Selecione os Usuários</Label>
+                <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                  {/* Opção Selecionar Todos */}
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <Checkbox 
+                      id="select-all-users"
+                      checked={selectAllUsers}
+                      onCheckedChange={(checked) => handleSelectAllUsers(!!checked)}
+                    />
+                    <label htmlFor="select-all-users" className="text-sm font-medium cursor-pointer">
+                      Selecionar Todos ({members.length})
+                    </label>
+                  </div>
+                  
+                  {/* Lista de usuários com checkbox */}
+                  {members.map((member) => (
+                    <div key={member.user_id} className="flex items-center gap-2">
+                      <Checkbox 
+                        id={`user-${member.user_id}`}
+                        checked={selectedUserIds.includes(member.user_id)}
+                        onCheckedChange={(checked) => handleUserToggle(member.user_id, !!checked)}
+                      />
+                      <label 
+                        htmlFor={`user-${member.user_id}`} 
+                        className="text-sm cursor-pointer"
+                      >
                         {member.profile?.full_name || 'Usuário sem nome'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </label>
+                    </div>
+                  ))}
+                  
+                  {members.length === 0 && (
+                    <p className="text-sm text-muted-foreground py-2">
+                      Nenhum usuário encontrado
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {selectedUserIds.length} usuário(s) selecionado(s)
+                </p>
               </div>
             )}
 

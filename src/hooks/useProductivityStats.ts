@@ -24,7 +24,8 @@ export type ProductivityScope = 'workspace' | 'my_tasks' | 'space' | 'user';
 interface UseProductivityStatsOptions {
   scope?: ProductivityScope;
   spaceId?: string;
-  userId?: string;
+  userId?: string;        // Deprecated - use userIds
+  userIds?: string[];     // Array de IDs de usuários
   startDate?: Date;
   endDate?: Date;
 }
@@ -63,10 +64,13 @@ const calculateScore = (early: number, onTime: number, noDueDate: number, late: 
 export const useProductivityStats = (options: UseProductivityStatsOptions = {}) => {
   const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
-  const { scope = 'workspace', spaceId, userId, startDate, endDate } = options;
+  const { scope = 'workspace', spaceId, userId, userIds, startDate, endDate } = options;
+  
+  // Suporta tanto userId quanto userIds (prioriza userIds)
+  const effectiveUserIds = userIds || (userId ? [userId] : []);
 
   return useQuery({
-    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, userId, user?.id, startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, effectiveUserIds, user?.id, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async (): Promise<ProductivityStats> => {
       if (!activeWorkspace?.id) {
         return {
@@ -126,14 +130,14 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
           const list = t.lists as { id: string; space_id: string } | null;
           return list?.space_id === spaceId;
         });
-      } else if (scope === 'user' && userId) {
-        // Filtrar por usuário específico
+      } else if (scope === 'user' && effectiveUserIds.length > 0) {
+        // Filtrar por usuários específicos (suporta múltiplos)
         const taskIds = filteredTasks.map(t => t.id);
         if (taskIds.length > 0) {
           const { data: assignees } = await supabase
             .from('task_assignees')
             .select('task_id')
-            .eq('user_id', userId)
+            .in('user_id', effectiveUserIds)
             .in('task_id', taskIds);
           
           const userTaskIds = new Set(assignees?.map(a => a.task_id) || []);
