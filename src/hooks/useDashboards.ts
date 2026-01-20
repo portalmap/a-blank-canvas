@@ -7,9 +7,11 @@ import { Json } from '@/integrations/supabase/types';
 import { startOfDay, isBefore } from 'date-fns';
 import { parseLocalDate } from '@/lib/dateUtils';
 
+import { ProductivityScope } from './useProductivityStats';
+
 export interface DashboardCard {
   id: string;
-  type: 'pie_chart' | 'bar_chart' | 'line_chart' | 'task_list' | 'calculation' | 'notes' | 'overdue_tasks' | 'priority_breakdown';
+  type: 'pie_chart' | 'bar_chart' | 'line_chart' | 'task_list' | 'calculation' | 'notes' | 'overdue_tasks' | 'priority_breakdown' | 'productivity';
   title: string;
   config: {
     dataSource?: 'workspace' | 'space' | 'folder' | 'list';
@@ -18,6 +20,8 @@ export interface DashboardCard {
     timeRange?: 'week' | 'month' | 'quarter' | 'year';
     metric?: 'total' | 'completed' | 'overdue' | 'on_track';
     content?: string;
+    scope?: ProductivityScope;
+    spaceId?: string;
   };
   position: { x: number; y: number; w: number; h: number };
 }

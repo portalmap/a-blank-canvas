@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   PieChart, BarChart3, LineChart, Calculator, ListTodo, 
-  AlertTriangle, FileText, Target 
+  AlertTriangle, FileText, Target, TrendingUp 
 } from 'lucide-react';
 import {
   Dialog,
@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/select';
 import { DashboardCard } from '@/hooks/useDashboards';
 import { cn } from '@/lib/utils';
+import { useSpaces } from '@/hooks/useSpaces';
+import { ProductivityScope } from '@/hooks/useProductivityStats';
 
 interface AddCardModalProps {
   open: boolean;
@@ -39,6 +41,7 @@ interface CardTypeConfig {
   hasGroupBy?: boolean;
   hasMetric?: boolean;
   hasTimeRange?: boolean;
+  hasScope?: boolean;
 }
 
 const cardTypes: CardTypeConfig[] = [
@@ -89,6 +92,14 @@ const cardTypes: CardTypeConfig[] = [
     category: 'Status',
   },
   {
+    id: 'productivity',
+    name: 'Produtividade',
+    description: 'Score de entregas (0-200%)',
+    icon: TrendingUp,
+    category: 'Métricas',
+    hasScope: true,
+  },
+  {
     id: 'notes',
     name: 'Notas',
     description: 'Texto livre para anotações',
@@ -117,6 +128,12 @@ const timeRangeOptions = [
   { value: 'year', label: 'Último Ano' },
 ];
 
+const scopeOptions = [
+  { value: 'workspace', label: 'Todo o Workspace' },
+  { value: 'my_tasks', label: 'Minhas Tarefas' },
+  { value: 'space', label: 'Por Space' },
+];
+
 export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProps) => {
   const [step, setStep] = useState<'type' | 'config'>('type');
   const [selectedType, setSelectedType] = useState<typeof cardTypes[number] | null>(null);
@@ -124,6 +141,10 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
   const [groupBy, setGroupBy] = useState<'status' | 'priority' | 'assignee'>('status');
   const [metric, setMetric] = useState<'total' | 'completed' | 'overdue' | 'on_track'>('total');
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
+  const [scope, setScope] = useState<ProductivityScope>('workspace');
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string>('');
+  
+  const { data: spaces = [] } = useSpaces();
 
   const resetForm = () => {
     setStep('type');
@@ -132,6 +153,8 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
     setGroupBy('status');
     setMetric('total');
     setTimeRange('week');
+    setScope('workspace');
+    setSelectedSpaceId('');
   };
 
   const handleClose = () => {
@@ -151,6 +174,11 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
 
   const handleAdd = () => {
     if (!selectedType || !title.trim()) return;
+    
+    // Validate scope + space selection for productivity
+    if (selectedType.hasScope && scope === 'space' && !selectedSpaceId) {
+      return;
+    }
 
     const card: DashboardCard = {
       id: `card-${Date.now()}`,
@@ -160,8 +188,10 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
         ...(selectedType.hasGroupBy && { groupBy }),
         ...(selectedType.hasMetric && { metric }),
         ...(selectedType.hasTimeRange && { timeRange }),
+        ...(selectedType.hasScope && { scope }),
+        ...(selectedType.hasScope && scope === 'space' && { spaceId: selectedSpaceId }),
       },
-      position: { x: 0, y: 0, w: 4, h: 2 },
+      position: { x: 0, y: 0, w: 4, h: 3 },
     };
 
     onAddCard(card);
@@ -280,6 +310,42 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
                     {timeRangeOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {selectedType?.hasScope && (
+              <div className="space-y-2">
+                <Label>Escopo</Label>
+                <Select value={scope} onValueChange={(v) => setScope(v as ProductivityScope)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {scopeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {selectedType?.hasScope && scope === 'space' && (
+              <div className="space-y-2">
+                <Label>Selecione o Space</Label>
+                <Select value={selectedSpaceId} onValueChange={setSelectedSpaceId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha um space..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {spaces.map((space) => (
+                      <SelectItem key={space.id} value={space.id}>
+                        {space.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

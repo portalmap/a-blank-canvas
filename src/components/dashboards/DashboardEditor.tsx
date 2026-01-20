@@ -1,5 +1,6 @@
 import { useMemo, memo } from 'react';
 import { DashboardCard } from '@/hooks/useDashboards';
+import { useProductivityStats } from '@/hooks/useProductivityStats';
 import { PieChartCard } from './cards/PieChartCard';
 import { BarChartCard } from './cards/BarChartCard';
 import { LineChartCard } from './cards/LineChartCard';
@@ -7,6 +8,7 @@ import { CalculationCard } from './cards/CalculationCard';
 import { TaskListCard } from './cards/TaskListCard';
 import { PriorityBreakdownCard } from './cards/PriorityBreakdownCard';
 import { NotesCard } from './cards/NotesCard';
+import { ProductivityCard } from './cards/ProductivityCard';
 import { LayoutDashboard } from 'lucide-react';
 
 interface DashboardEditorProps {
@@ -145,6 +147,14 @@ const DashboardEditorComponent = ({
             }
           />
         );
+      case 'productivity':
+        return (
+          <ProductivityCardWrapper
+            key={card.id}
+            card={card}
+            commonProps={commonProps}
+          />
+        );
       default:
         return null;
     }
@@ -170,6 +180,27 @@ const DashboardEditorComponent = ({
         );
       })}
     </div>
+  );
+};
+// Wrapper component for ProductivityCard to use hooks
+const ProductivityCardWrapper = ({ 
+  card, 
+  commonProps 
+}: { 
+  card: DashboardCard; 
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void } 
+}) => {
+  const { data: productivityStats, isLoading } = useProductivityStats({
+    scope: card.config.scope || 'workspace',
+    spaceId: card.config.spaceId,
+  });
+
+  return (
+    <ProductivityCard
+      {...commonProps}
+      stats={productivityStats || null}
+      isLoading={isLoading}
+    />
   );
 };
 
