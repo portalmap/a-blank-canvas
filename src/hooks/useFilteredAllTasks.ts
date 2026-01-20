@@ -3,15 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AllTask } from './useAllTasks';
 
+export type ViewMode = 'assigned' | 'my-spaces';
+
 export type TaskWithAssignees = AllTask & { 
   assignees: Array<{ id: string; full_name: string | null; avatar_url: string | null }> 
 };
 
-export function useFilteredAllTasks(workspaceId: string | undefined) {
+export function useFilteredAllTasks(
+  workspaceId: string | undefined,
+  viewMode: ViewMode = 'assigned'
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['filtered-all-tasks', workspaceId, user?.id],
+    queryKey: ['filtered-all-tasks', workspaceId, user?.id, viewMode],
     queryFn: async () => {
       if (!workspaceId || !user) return [];
 
@@ -40,20 +45,69 @@ export function useFilteredAllTasks(workspaceId: string | undefined) {
       }
 
       // Admin: fetch all tasks
-      // Member: fetch only tasks where they are assigned
+      // Member with 'my-spaces': fetch tasks from spaces they have permission
+      // Member with 'assigned': fetch only tasks assigned to them
       let taskIds: string[] | null = null;
+      let listIds: string[] | null = null;
 
       if (!isAdmin) {
-        // Get task IDs where user is assigned
-        const { data: assignments, error: assignError } = await supabase
-          .from('task_assignees')
-          .select('task_id')
-          .eq('user_id', user.id);
+        if (viewMode === 'my-spaces') {
+          // Get spaces where user has permission
+          const { data: spacePerms, error: spacePermsError } = await supabase
+            .from('space_permissions')
+            .select('space_id')
+            .eq('user_id', user.id);
 
-        if (assignError) throw assignError;
-        if (!assignments || assignments.length === 0) return [];
+          if (spacePermsError) throw spacePermsError;
 
-        taskIds = assignments.map(a => a.task_id);
+          const spaceIds = spacePerms?.map(p => p.space_id) || [];
+
+          if (spaceIds.length === 0) return [];
+
+          // Get lists from those spaces (direct lists + lists inside folders)
+          const { data: directLists, error: directListsError } = await supabase
+            .from('lists')
+            .select('id')
+            .in('space_id', spaceIds);
+
+          if (directListsError) throw directListsError;
+
+          // Also get lists from folders in those spaces
+          const { data: folders, error: foldersError } = await supabase
+            .from('folders')
+            .select('id')
+            .in('space_id', spaceIds);
+
+          if (foldersError) throw foldersError;
+
+          const folderIds = folders?.map(f => f.id) || [];
+          let folderListIds: string[] = [];
+
+          if (folderIds.length > 0) {
+            const { data: folderLists, error: folderListsError } = await supabase
+              .from('lists')
+              .select('id')
+              .in('folder_id', folderIds);
+
+            if (folderListsError) throw folderListsError;
+            folderListIds = folderLists?.map(l => l.id) || [];
+          }
+
+          listIds = [...(directLists?.map(l => l.id) || []), ...folderListIds];
+
+          if (listIds.length === 0) return [];
+        } else {
+          // viewMode === 'assigned': Get task IDs where user is assigned
+          const { data: assignments, error: assignError } = await supabase
+            .from('task_assignees')
+            .select('task_id')
+            .eq('user_id', user.id);
+
+          if (assignError) throw assignError;
+          if (!assignments || assignments.length === 0) return [];
+
+          taskIds = assignments.map(a => a.task_id);
+        }
       }
 
       // Fetch tasks
@@ -88,8 +142,10 @@ export function useFilteredAllTasks(workspaceId: string | undefined) {
         .is('parent_id', null)
         .order('created_at', { ascending: false });
 
-      // If not admin, filter by assigned task IDs
-      if (taskIds !== null) {
+      // Apply filters based on mode
+      if (listIds !== null) {
+        query = query.in('list_id', listIds);
+      } else if (taskIds !== null) {
         query = query.in('id', taskIds);
       }
 

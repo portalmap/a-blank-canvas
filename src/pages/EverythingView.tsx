@@ -43,11 +43,6 @@ export default function EverythingView() {
     }
   };
 
-  const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined);
-  const { data: roleInfo } = useUserRole();
-  const { data: statuses = [] } = useStatuses(selectedWorkspaceId ?? undefined);
-  const { data: defaultStatus } = useDefaultStatus(selectedWorkspaceId ?? undefined);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [groupBy, setGroupBy] = useState<GroupByOption>('due_date');
   const [filters, setFilters] = useState<FilterState>({
@@ -55,12 +50,18 @@ export default function EverythingView() {
     priorities: [],
     tags: [],
     showCompleted: false,
+    viewMode: 'assigned',
   });
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [showAssigneePanel, setShowAssigneePanel] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+
+  const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined, filters.viewMode);
+  const { data: roleInfo } = useUserRole();
+  const { data: statuses = [] } = useStatuses(selectedWorkspaceId ?? undefined);
+  const { data: defaultStatus } = useDefaultStatus(selectedWorkspaceId ?? undefined);
 
   // Column preferences
   const { data: columnPrefs } = useColumnPreferences(null, 'everything');
@@ -210,7 +211,9 @@ export default function EverythingView() {
                 <span className="text-sm text-muted-foreground">
                   {roleInfo?.isAdmin 
                     ? 'Todas as tarefas do workspace' 
-                    : 'Suas tarefas atribuídas'}
+                    : filters.viewMode === 'my-spaces'
+                      ? 'Todas as tarefas dos seus Spaces'
+                      : 'Suas tarefas atribuídas'}
                 </span>
               </div>
             </div>
@@ -242,6 +245,7 @@ export default function EverythingView() {
                 filters={filters}
                 onChange={setFilters}
                 availableStatuses={availableStatuses}
+                isAdmin={roleInfo?.isAdmin}
               />
               <ColumnSelector
                 listId={null}

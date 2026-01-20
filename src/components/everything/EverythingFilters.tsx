@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Filter, X, Tag } from 'lucide-react';
+import { Filter, X, Tag, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -10,12 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
+export type ViewMode = 'assigned' | 'my-spaces';
 
 export interface FilterState {
   statuses: string[];
   priorities: string[];
   tags: string[];
   showCompleted: boolean;
+  viewMode: ViewMode;
 }
 
 interface EverythingFiltersProps {
@@ -23,6 +27,7 @@ interface EverythingFiltersProps {
   onChange: (filters: FilterState) => void;
   availableStatuses: Array<{ id: string; name: string; color: string | null }>;
   availableTags?: Array<{ id: string; name: string; color: string | null }>;
+  isAdmin?: boolean;
 }
 
 const priorityOptions = [
@@ -32,7 +37,7 @@ const priorityOptions = [
   { value: 'low', label: 'Baixa', color: 'bg-blue-500' },
 ];
 
-export function EverythingFilters({ filters, onChange, availableStatuses, availableTags = [] }: EverythingFiltersProps) {
+export function EverythingFilters({ filters, onChange, availableStatuses, availableTags = [], isAdmin = false }: EverythingFiltersProps) {
   const [open, setOpen] = useState(false);
 
   const activeFilterCount = 
@@ -69,6 +74,7 @@ export function EverythingFilters({ filters, onChange, availableStatuses, availa
       priorities: [],
       tags: [],
       showCompleted: false,
+      viewMode: filters.viewMode, // Mantém o viewMode atual
     });
   };
 
@@ -102,9 +108,38 @@ export function EverythingFilters({ filters, onChange, availableStatuses, availa
             )}
           </div>
 
-          <Separator />
+          {/* View Scope Filter - Only for non-admins */}
+          {!isAdmin && (
+            <>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5" />
+                  Escopo de visualização
+                </Label>
+                <RadioGroup
+                  value={filters.viewMode}
+                  onValueChange={(value: ViewMode) => onChange({ ...filters, viewMode: value })}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="assigned" id="assigned" />
+                    <Label htmlFor="assigned" className="text-sm font-normal cursor-pointer">
+                      Apenas minhas tarefas
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="my-spaces" id="my-spaces" />
+                    <Label htmlFor="my-spaces" className="text-sm font-normal cursor-pointer">
+                      Todas as tarefas dos meus Spaces
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <Separator />
+            </>
+          )}
 
-          {/* Status Filter */}
+          <Separator />
           <div className="space-y-2">
             <Label className="text-sm font-medium">Status</Label>
             <div className="grid grid-cols-2 gap-2">
