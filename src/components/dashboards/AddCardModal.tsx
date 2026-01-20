@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   PieChart, BarChart3, LineChart, Calculator, ListTodo, 
-  AlertTriangle, FileText, Target, TrendingUp 
+  AlertTriangle, FileText, Target, TrendingUp, Trophy 
 } from 'lucide-react';
 import {
   Dialog,
@@ -102,6 +102,14 @@ const cardTypes: CardTypeConfig[] = [
     icon: TrendingUp,
     category: 'Métricas',
     hasScope: true,
+  },
+  {
+    id: 'productivity_ranking',
+    name: 'Ranking de Produtividade',
+    description: 'Ranking da equipe por score',
+    icon: Trophy,
+    category: 'Métricas',
+    hasScope: false,
   },
   {
     id: 'notes',
@@ -234,7 +242,7 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard, workspaceId }: Add
         ...(selectedType.hasScope && scope === 'space' && { spaceId: selectedSpaceId }),
         ...(selectedType.hasScope && scope === 'user' && { userIds: selectedUserIds }),
       },
-      position: { x: 0, y: 0, w: 4, h: 3 },
+      position: { x: 0, y: 0, w: selectedType.id === 'productivity_ranking' ? 6 : 4, h: selectedType.id === 'productivity_ranking' ? 4 : 3 },
     };
 
     onAddCard(card);

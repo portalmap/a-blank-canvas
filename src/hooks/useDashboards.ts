@@ -11,7 +11,7 @@ import { ProductivityScope } from './useProductivityStats';
 
 export interface DashboardCard {
   id: string;
-  type: 'pie_chart' | 'bar_chart' | 'line_chart' | 'task_list' | 'calculation' | 'notes' | 'overdue_tasks' | 'priority_breakdown' | 'productivity';
+  type: 'pie_chart' | 'bar_chart' | 'line_chart' | 'task_list' | 'calculation' | 'notes' | 'overdue_tasks' | 'priority_breakdown' | 'productivity' | 'productivity_ranking';
   title: string;
   config: {
     dataSource?: 'workspace' | 'space' | 'folder' | 'list';
