@@ -19,11 +19,12 @@ export interface ProductivityStats {
   productivityScore: number; // 0-200%
 }
 
-export type ProductivityScope = 'workspace' | 'my_tasks' | 'space';
+export type ProductivityScope = 'workspace' | 'my_tasks' | 'space' | 'user';
 
 interface UseProductivityStatsOptions {
   scope?: ProductivityScope;
   spaceId?: string;
+  userId?: string;
   startDate?: Date;
   endDate?: Date;
 }
@@ -62,10 +63,10 @@ const calculateScore = (early: number, onTime: number, noDueDate: number, late: 
 export const useProductivityStats = (options: UseProductivityStatsOptions = {}) => {
   const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
-  const { scope = 'workspace', spaceId, startDate, endDate } = options;
+  const { scope = 'workspace', spaceId, userId, startDate, endDate } = options;
 
   return useQuery({
-    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, user?.id, startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, userId, user?.id, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async (): Promise<ProductivityStats> => {
       if (!activeWorkspace?.id) {
         return {
@@ -125,6 +126,21 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
           const list = t.lists as { id: string; space_id: string } | null;
           return list?.space_id === spaceId;
         });
+      } else if (scope === 'user' && userId) {
+        // Filtrar por usuário específico
+        const taskIds = filteredTasks.map(t => t.id);
+        if (taskIds.length > 0) {
+          const { data: assignees } = await supabase
+            .from('task_assignees')
+            .select('task_id')
+            .eq('user_id', userId)
+            .in('task_id', taskIds);
+          
+          const userTaskIds = new Set(assignees?.map(a => a.task_id) || []);
+          filteredTasks = filteredTasks.filter(t => userTaskIds.has(t.id));
+        } else {
+          filteredTasks = [];
+        }
       }
 
       // Classify tasks

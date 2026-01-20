@@ -22,6 +22,7 @@ export interface DashboardCard {
     content?: string;
     scope?: ProductivityScope;
     spaceId?: string;
+    userId?: string;
   };
   position: { x: number; y: number; w: number; h: number };
 }
