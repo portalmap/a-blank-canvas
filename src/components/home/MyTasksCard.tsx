@@ -41,6 +41,7 @@ export function MyTasksCard() {
     priorities: [],
     tags: [],
     showCompleted: false,
+    viewMode: 'assigned',
   });
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     urgent: true,

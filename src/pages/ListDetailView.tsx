@@ -49,6 +49,7 @@ const ListDetailView = () => {
     priorities: [],
     tags: [],
     showCompleted: true,
+    viewMode: 'assigned',
   });
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
