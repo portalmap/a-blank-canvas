@@ -1,6 +1,7 @@
 import { useMemo, memo } from 'react';
 import { DashboardCard } from '@/hooks/useDashboards';
 import { useProductivityStats } from '@/hooks/useProductivityStats';
+import { useProductivityRanking } from '@/hooks/useProductivityRanking';
 import { PieChartCard } from './cards/PieChartCard';
 import { BarChartCard } from './cards/BarChartCard';
 import { LineChartCard } from './cards/LineChartCard';
@@ -9,6 +10,7 @@ import { TaskListCard } from './cards/TaskListCard';
 import { PriorityBreakdownCard } from './cards/PriorityBreakdownCard';
 import { NotesCard } from './cards/NotesCard';
 import { ProductivityCard, ProductivityScopeInfo } from './cards/ProductivityCard';
+import { ProductivityRankingCard } from './cards/ProductivityRankingCard';
 import { LayoutDashboard } from 'lucide-react';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
@@ -158,6 +160,14 @@ const DashboardEditorComponent = ({
             commonProps={commonProps}
           />
         );
+      case 'productivity_ranking':
+        return (
+          <ProductivityRankingCardWrapper
+            key={card.id}
+            card={card}
+            commonProps={commonProps}
+          />
+        );
       default:
         return null;
     }
@@ -248,6 +258,25 @@ const ProductivityCardWrapper = ({
       stats={productivityStats || null}
       isLoading={isLoading}
       scopeInfo={scopeInfo}
+    />
+  );
+};
+
+// Wrapper component for ProductivityRankingCard to use hooks
+const ProductivityRankingCardWrapper = ({ 
+  card, 
+  commonProps 
+}: { 
+  card: DashboardCard; 
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void } 
+}) => {
+  const { data: rankingData, isLoading } = useProductivityRanking();
+
+  return (
+    <ProductivityRankingCard
+      {...commonProps}
+      data={rankingData || null}
+      isLoading={isLoading}
     />
   );
 };
