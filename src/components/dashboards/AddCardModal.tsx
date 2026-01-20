@@ -25,6 +25,7 @@ import { DashboardCard } from '@/hooks/useDashboards';
 import { cn } from '@/lib/utils';
 import { useSpaces } from '@/hooks/useSpaces';
 import { ProductivityScope } from '@/hooks/useProductivityStats';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 interface AddCardModalProps {
   open: boolean;
@@ -144,7 +145,8 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
   const [scope, setScope] = useState<ProductivityScope>('workspace');
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>('');
   
-  const { data: spaces = [] } = useSpaces();
+  const { activeWorkspace } = useWorkspace();
+  const { data: spaces = [] } = useSpaces(activeWorkspace?.id);
 
   const resetForm = () => {
     setStep('type');
