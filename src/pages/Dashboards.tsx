@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, LayoutDashboard } from 'lucide-react';
+import { Plus, LayoutDashboard, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDashboards, Dashboard } from '@/hooks/useDashboards';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { DashboardsSidebar } from '@/components/dashboards/DashboardsSidebar';
 import { DashboardsTable } from '@/components/dashboards/DashboardsTable';
 import { QuickAccessCards } from '@/components/dashboards/QuickAccessCards';
 import { CreateDashboardDialog } from '@/components/dashboards/CreateDashboardDialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Dashboards = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isWorkspaceSelected, isValidatingWorkspace } = useWorkspace();
   const { data: dashboards = [], isLoading } = useDashboards();
   const [filter, setFilter] = useState<'all' | 'mine' | 'shared' | 'private'>('all');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -40,6 +43,48 @@ const Dashboards = () => {
   const handleCreateSuccess = (dashboardId: string) => {
     navigate(`/dashboards/${dashboardId}`);
   };
+
+  // Loading state while validating workspace
+  if (isValidatingWorkspace) {
+    return (
+      <div className="flex h-full">
+        <div className="w-64 border-r p-4">
+          <Skeleton className="h-8 w-32 mb-4" />
+          <Skeleton className="h-6 w-full mb-2" />
+          <Skeleton className="h-6 w-full mb-2" />
+          <Skeleton className="h-6 w-full" />
+        </div>
+        <div className="flex-1 p-6">
+          <Skeleton className="h-10 w-48 mb-6" />
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No workspace selected
+  if (!isWorkspaceSelected) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Building2 className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Nenhum workspace selecionado</h2>
+          <p className="text-muted-foreground mb-4">
+            Selecione um workspace no menu lateral para visualizar e criar painéis.
+          </p>
+          <Button variant="outline" onClick={() => navigate('/')}>
+            Ir para o início
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full">
