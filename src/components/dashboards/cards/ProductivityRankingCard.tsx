@@ -105,8 +105,8 @@ const RankingItem = ({ user, position, onSelect }: {
 
       {/* Score e barra de progresso */}
       <div className="flex flex-col items-end gap-1 w-24">
-        <span className={cn("text-xs font-bold", getScoreColor(user.productivityScore))}>
-          {user.productivityScore}%
+        <span className={cn("text-sm font-bold tabular-nums", getScoreColor(user.productivityScore))}>
+          {user.productivityScore ?? 0}%
         </span>
         <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
           <div 
