@@ -90,16 +90,11 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
         .select(`
           id,
           completed_at,
-          due_date,
-          list:lists!inner(
-            id,
-            space_id,
-            folder:folders(space_id),
-            space:spaces!inner(workspace_id)
-          )
+          due_date
         `)
+        .eq('workspace_id', workspaceId)
         .not('completed_at', 'is', null)
-        .eq('list.space.workspace_id', workspaceId);
+        .is('archived_at', null);
 
       if (options.startDate) {
         tasksQuery = tasksQuery.gte('completed_at', options.startDate.toISOString());
