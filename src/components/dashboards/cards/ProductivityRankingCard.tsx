@@ -98,10 +98,10 @@ const RankingItem = ({ user, position }: { user: UserProductivityStats; position
 
       {/* Score e barra de progresso */}
       <div className="flex flex-col items-end gap-1 w-24">
-        <span className={cn("text-sm font-bold", getScoreColor(user.productivityScore))}>
+        <span className={cn("text-xs font-bold", getScoreColor(user.productivityScore))}>
           {user.productivityScore}%
         </span>
-        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
           <div 
             className={cn("h-full rounded-full transition-all", getProgressColor(user.productivityScore))}
             style={{ width: `${progressValue}%` }}
