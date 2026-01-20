@@ -32,6 +32,7 @@ interface AddCardModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddCard: (card: DashboardCard) => void;
+  workspaceId?: string;
 }
 
 interface CardTypeConfig {
@@ -137,7 +138,7 @@ const scopeOptions = [
   { value: 'user', label: 'Por Usuário' },
 ];
 
-export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProps) => {
+export const AddCardModal = ({ open, onOpenChange, onAddCard, workspaceId }: AddCardModalProps) => {
   const [step, setStep] = useState<'type' | 'config'>('type');
   const [selectedType, setSelectedType] = useState<typeof cardTypes[number] | null>(null);
   const [title, setTitle] = useState('');
@@ -149,8 +150,10 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   
   const { activeWorkspace } = useWorkspace();
-  const { data: spaces = [] } = useSpaces(activeWorkspace?.id);
-  const { data: members = [] } = useWorkspaceMembers(activeWorkspace?.id);
+  const effectiveWorkspaceId = workspaceId || activeWorkspace?.id;
+  
+  const { data: spaces = [] } = useSpaces(effectiveWorkspaceId);
+  const { data: members = [] } = useWorkspaceMembers(effectiveWorkspaceId);
 
   const resetForm = () => {
     setStep('type');
