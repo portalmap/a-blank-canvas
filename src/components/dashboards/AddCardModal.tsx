@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { useSpaces } from '@/hooks/useSpaces';
 import { ProductivityScope } from '@/hooks/useProductivityStats';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 
 interface AddCardModalProps {
   open: boolean;
@@ -133,6 +134,7 @@ const scopeOptions = [
   { value: 'workspace', label: 'Todo o Workspace' },
   { value: 'my_tasks', label: 'Minhas Tarefas' },
   { value: 'space', label: 'Por Space' },
+  { value: 'user', label: 'Por Usuário' },
 ];
 
 export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProps) => {
@@ -144,9 +146,11 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
   const [scope, setScope] = useState<ProductivityScope>('workspace');
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   
   const { activeWorkspace } = useWorkspace();
   const { data: spaces = [] } = useSpaces(activeWorkspace?.id);
+  const { data: members = [] } = useWorkspaceMembers(activeWorkspace?.id);
 
   const resetForm = () => {
     setStep('type');
@@ -157,6 +161,7 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
     setTimeRange('week');
     setScope('workspace');
     setSelectedSpaceId('');
+    setSelectedUserId('');
   };
 
   const handleClose = () => {
@@ -177,8 +182,11 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
   const handleAdd = () => {
     if (!selectedType || !title.trim()) return;
     
-    // Validate scope + space selection for productivity
+    // Validate scope + space/user selection for productivity
     if (selectedType.hasScope && scope === 'space' && !selectedSpaceId) {
+      return;
+    }
+    if (selectedType.hasScope && scope === 'user' && !selectedUserId) {
       return;
     }
 
@@ -192,6 +200,7 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
         ...(selectedType.hasTimeRange && { timeRange }),
         ...(selectedType.hasScope && { scope }),
         ...(selectedType.hasScope && scope === 'space' && { spaceId: selectedSpaceId }),
+        ...(selectedType.hasScope && scope === 'user' && { userId: selectedUserId }),
       },
       position: { x: 0, y: 0, w: 4, h: 3 },
     };
@@ -348,6 +357,24 @@ export const AddCardModal = ({ open, onOpenChange, onAddCard }: AddCardModalProp
                     {spaces.map((space) => (
                       <SelectItem key={space.id} value={space.id}>
                         {space.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {selectedType?.hasScope && scope === 'user' && (
+              <div className="space-y-2">
+                <Label>Selecione o Usuário</Label>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha um usuário..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        {member.profile?.full_name || 'Usuário sem nome'}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -193,6 +193,7 @@ const ProductivityCardWrapper = ({
   const { data: productivityStats, isLoading } = useProductivityStats({
     scope: card.config.scope || 'workspace',
     spaceId: card.config.spaceId,
+    userId: card.config.userId,
   });
 
   return (
