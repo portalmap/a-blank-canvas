@@ -245,7 +245,7 @@ export default function EverythingView() {
                 filters={filters}
                 onChange={setFilters}
                 availableStatuses={availableStatuses}
-                isAdmin={roleInfo?.isAdmin}
+                isAdmin={roleInfo?.isAdmin === true}
               />
               <ColumnSelector
                 listId={null}
