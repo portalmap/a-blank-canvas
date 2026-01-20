@@ -202,6 +202,7 @@ const DashboardView = () => {
         open={addCardModalOpen}
         onOpenChange={setAddCardModalOpen}
         onAddCard={handleAddCard}
+        workspaceId={dashboard.workspace_id}
       />
     </div>
   );
