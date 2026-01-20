@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { MoreVertical, TrendingUp, Star, Zap } from 'lucide-react';
 import {
   DropdownMenu,
@@ -8,8 +9,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ProductivityStats } from '@/hooks/useProductivityStats';
+import { ProductivityStats, ProductivityScope } from '@/hooks/useProductivityStats';
 import { cn } from '@/lib/utils';
+
+export interface ProductivityScopeInfo {
+  scope: ProductivityScope;
+  label: string;
+  details?: string;
+}
 
 interface ProductivityCardProps {
   title: string;
@@ -17,6 +24,7 @@ interface ProductivityCardProps {
   onDelete: () => void;
   onEdit: () => void;
   isLoading?: boolean;
+  scopeInfo?: ProductivityScopeInfo;
 }
 
 const getScoreColor = (score: number): string => {
@@ -48,6 +56,7 @@ const ProductivityCardComponent = ({
   onDelete,
   onEdit,
   isLoading = false,
+  scopeInfo,
 }: ProductivityCardProps) => {
   const score = stats?.productivityScore ?? 100;
   const progressPercentage = Math.min((score / 200) * 100, 100);
@@ -55,10 +64,24 @@ const ProductivityCardComponent = ({
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          {title}
-        </CardTitle>
+        <div className="flex-1 min-w-0">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            {title}
+          </CardTitle>
+          {scopeInfo && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              <Badge variant="outline" className="text-xs font-normal">
+                {scopeInfo.label}
+              </Badge>
+              {scopeInfo.details && (
+                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={scopeInfo.details}>
+                  {scopeInfo.details}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">
