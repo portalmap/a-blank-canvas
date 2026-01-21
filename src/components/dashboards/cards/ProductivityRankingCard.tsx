@@ -7,10 +7,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
-  DropdownMenuItem, 
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Trophy, MoreVertical, Trash2, Edit, Loader2, Users } from 'lucide-react';
+import { Trophy, MoreVertical, Trash2, Move, Maximize2, Loader2, Users } from 'lucide-react';
 import { ProductivityRankingResult, UserProductivityStats } from '@/hooks/useProductivityRanking';
 import { cn } from '@/lib/utils';
 import { UserProductivityDetailsDialog } from './UserProductivityDetailsDialog';
@@ -20,7 +21,9 @@ interface ProductivityRankingCardProps {
   data: ProductivityRankingResult | null;
   onDelete: () => void;
   onEdit: () => void;
+  onExpand?: () => void;
   isLoading?: boolean;
+  isExpanded?: boolean;
 }
 
 const getMedalIcon = (position: number): string | null => {
@@ -33,10 +36,10 @@ const getMedalIcon = (position: number): string | null => {
 };
 
 const getScoreColor = (score: number): string => {
-  if (score >= 150) return 'text-green-500';
-  if (score >= 100) return 'text-blue-500';
-  if (score >= 75) return 'text-yellow-500';
-  return 'text-red-500';
+  if (score >= 150) return 'text-green-600 dark:text-green-400';
+  if (score >= 100) return 'text-blue-600 dark:text-blue-400';
+  if (score >= 75) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-red-600 dark:text-red-400';
 };
 
 const getProgressColor = (score: number): string => {
@@ -61,7 +64,7 @@ const RankingItem = ({ user, position, onSelect }: {
   onSelect: (user: UserProductivityStats) => void;
 }) => {
   const medal = getMedalIcon(position);
-  const progressValue = Math.min(user.productivityScore, 200) / 2; // Max 200% = 100% da barra
+  const progressValue = Math.min(user.productivityScore, 200) / 2;
 
   return (
     <div 
@@ -89,13 +92,13 @@ const RankingItem = ({ user, position, onSelect }: {
         <p className="font-medium text-sm truncate">{user.userName}</p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {user.early > 0 && (
-            <span className="text-green-600">+{user.early} antecip.</span>
+            <span className="text-green-600 dark:text-green-400">+{user.early} antecip.</span>
           )}
           {user.onTime > 0 && (
-            <span className="text-blue-600">{user.onTime} no prazo</span>
+            <span className="text-blue-600 dark:text-blue-400">{user.onTime} no prazo</span>
           )}
           {user.late > 0 && (
-            <span className="text-red-600">{user.late} atras.</span>
+            <span className="text-red-600 dark:text-red-400">{user.late} atras.</span>
           )}
           {user.totalCompleted === 0 && (
             <span>Sem tarefas</span>
@@ -124,38 +127,54 @@ const ProductivityRankingCardComponent = ({
   data,
   onDelete,
   onEdit,
+  onExpand,
   isLoading = false,
+  isExpanded = false,
 }: ProductivityRankingCardProps) => {
   const [selectedUser, setSelectedUser] = useState<UserProductivityStats | null>(null);
 
   return (
     <>
-    <Card className="h-full flex flex-col">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+    <Card className="h-full flex flex-col overflow-hidden">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Trophy className="h-4 w-4 text-yellow-500" />
           <CardTitle className="text-sm font-medium">{title}</CardTitle>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="h-4 w-4" />
+        <div className="flex items-center gap-1">
+          {onExpand && !isExpanded && (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onExpand}>
+              <Maximize2 className="h-4 w-4" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit}>
-              <Edit className="mr-2 h-4 w-4" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover">
+              <DropdownMenuItem onClick={onEdit}>
+                <Move className="mr-2 h-4 w-4" />
+                Redimensionar
+              </DropdownMenuItem>
+              {onExpand && !isExpanded && (
+                <DropdownMenuItem onClick={onExpand}>
+                  <Maximize2 className="mr-2 h-4 w-4" />
+                  Expandir
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col pt-0">
+      <CardContent className="flex-1 flex flex-col pt-0 overflow-hidden min-h-0">
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -169,8 +188,8 @@ const ProductivityRankingCardComponent = ({
         ) : (
           <>
             {/* Lista de ranking com scroll */}
-            <ScrollArea className="flex-1 -mx-2">
-              <div className="space-y-1 px-2">
+            <ScrollArea className="flex-1 min-h-0 -mx-2">
+              <div className="space-y-1 px-2 pr-4">
                 {data.ranking.map((user, index) => (
                   <RankingItem 
                     key={user.userId} 
@@ -183,7 +202,7 @@ const ProductivityRankingCardComponent = ({
             </ScrollArea>
 
             {/* Footer com média da equipe */}
-            <div className="mt-3 pt-3 border-t flex items-center justify-between text-sm">
+            <div className="flex-shrink-0 mt-3 pt-3 border-t flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">
                   Média da Equipe
