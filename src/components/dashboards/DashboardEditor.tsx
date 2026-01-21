@@ -1,4 +1,4 @@
-import { useMemo, memo } from 'react';
+import { useMemo, memo, useState } from 'react';
 import { DashboardCard } from '@/hooks/useDashboards';
 import { useProductivityStats } from '@/hooks/useProductivityStats';
 import { useProductivityRanking } from '@/hooks/useProductivityRanking';
@@ -11,6 +11,8 @@ import { PriorityBreakdownCard } from './cards/PriorityBreakdownCard';
 import { NotesCard } from './cards/NotesCard';
 import { ProductivityCard, ProductivityScopeInfo } from './cards/ProductivityCard';
 import { ProductivityRankingCard } from './cards/ProductivityRankingCard';
+import { CardResizeDialog } from './CardResizeDialog';
+import { ExpandedCardDialog } from './ExpandedCardDialog';
 import { LayoutDashboard } from 'lucide-react';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
@@ -29,6 +31,8 @@ const DashboardEditorComponent = ({
   onUpdateCard,
   onDeleteCard,
 }: DashboardEditorProps) => {
+  const [resizingCardId, setResizingCardId] = useState<string | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   // Memoize stats to prevent re-renders
   const memoizedStats = useMemo(() => ({
     byStatus: stats?.byStatus || [],
@@ -55,11 +59,16 @@ const DashboardEditorComponent = ({
     );
   }
 
-  const renderCard = (card: DashboardCard) => {
+  const resizingCard = cards.find(c => c.id === resizingCardId);
+  const expandedCard = cards.find(c => c.id === expandedCardId);
+
+  const renderCard = (card: DashboardCard, isExpanded = false) => {
     const commonProps = {
       title: card.title,
       onDelete: () => onDeleteCard(card.id),
-      onEdit: () => onUpdateCard(card.id, {}),
+      onEdit: () => setResizingCardId(card.id),
+      onExpand: () => setExpandedCardId(card.id),
+      isExpanded,
     };
 
     switch (card.type) {
@@ -175,24 +184,50 @@ const DashboardEditorComponent = ({
 
   // Simple grid layout for cards
   return (
-    <div className="grid grid-cols-12 gap-4">
-      {cards.map((card) => {
-        const colSpan = card.position.w || 4;
-        const rowSpan = card.position.h || 2;
+    <>
+      <div className="grid grid-cols-12 gap-4">
+        {cards.map((card) => {
+          const colSpan = card.position.w || 4;
+          const rowSpan = card.position.h || 2;
 
-        return (
-          <div
-            key={card.id}
-            style={{
-              gridColumn: `span ${Math.min(colSpan, 12)}`,
-              height: `${rowSpan * 150}px`,
-            }}
-          >
-            {renderCard(card)}
-          </div>
-        );
-      })}
-    </div>
+          return (
+            <div
+              key={card.id}
+              style={{
+                gridColumn: `span ${Math.min(colSpan, 12)}`,
+                height: `${rowSpan * 150}px`,
+              }}
+            >
+              {renderCard(card)}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Resize Dialog */}
+      <CardResizeDialog
+        card={resizingCard}
+        open={!!resizingCardId}
+        onOpenChange={(open) => !open && setResizingCardId(null)}
+        onSave={(w, h) => {
+          if (resizingCard) {
+            onUpdateCard(resizingCard.id, { 
+              position: { ...resizingCard.position, w, h } 
+            });
+          }
+          setResizingCardId(null);
+        }}
+      />
+
+      {/* Expanded Card Dialog */}
+      <ExpandedCardDialog
+        title={expandedCard?.title || ''}
+        open={!!expandedCardId}
+        onOpenChange={(open) => !open && setExpandedCardId(null)}
+      >
+        {expandedCard && renderCard(expandedCard, true)}
+      </ExpandedCardDialog>
+    </>
   );
 };
 // Wrapper component for ProductivityCard to use hooks
@@ -201,7 +236,7 @@ const ProductivityCardWrapper = ({
   commonProps 
 }: { 
   card: DashboardCard; 
-  commonProps: { title: string; onDelete: () => void; onEdit: () => void } 
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean } 
 }) => {
   const { activeWorkspace } = useWorkspace();
   
@@ -264,11 +299,11 @@ const ProductivityCardWrapper = ({
 
 // Wrapper component for ProductivityRankingCard to use hooks
 const ProductivityRankingCardWrapper = ({ 
-  card, 
+  card: _card, 
   commonProps 
 }: { 
   card: DashboardCard; 
-  commonProps: { title: string; onDelete: () => void; onEdit: () => void } 
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean } 
 }) => {
   const { data: rankingData, isLoading } = useProductivityRanking();
 
