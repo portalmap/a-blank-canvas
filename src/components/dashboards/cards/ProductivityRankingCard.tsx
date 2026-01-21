@@ -143,7 +143,7 @@ const ProductivityRankingCardComponent = ({
         </div>
         <div className="flex items-center gap-1">
           {onExpand && !isExpanded && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onExpand}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onExpand(); }}>
               <Maximize2 className="h-4 w-4" />
             </Button>
           )}
@@ -154,18 +154,18 @@ const ProductivityRankingCardComponent = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-popover">
-              <DropdownMenuItem onClick={onEdit}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
                 <Move className="mr-2 h-4 w-4" />
                 Redimensionar
               </DropdownMenuItem>
               {onExpand && !isExpanded && (
-                <DropdownMenuItem onClick={onExpand}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExpand(); }}>
                   <Maximize2 className="mr-2 h-4 w-4" />
                   Expandir
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Excluir
               </DropdownMenuItem>
