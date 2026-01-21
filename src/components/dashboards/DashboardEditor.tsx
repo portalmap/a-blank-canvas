@@ -44,23 +44,51 @@ const DashboardEditorComponent = ({
     overdue: stats?.overdue || 0,
     onTrack: stats?.onTrack || 0,
   }), [stats]);
-  if (cards.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center py-16">
-        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <LayoutDashboard className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">Painel vazio</h3>
-        <p className="text-muted-foreground max-w-sm">
-          Clique em "Adicionar Card" para começar a criar seu painel personalizado
-          com gráficos, métricas e listas de tarefas.
-        </p>
-      </div>
-    );
-  }
-
   const resizingCard = cards.find(c => c.id === resizingCardId);
   const expandedCard = cards.find(c => c.id === expandedCardId);
+
+  const renderDialogs = () => (
+    <>
+      <CardResizeDialog
+        card={resizingCard}
+        open={!!resizingCardId}
+        onOpenChange={(open) => !open && setResizingCardId(null)}
+        onSave={(w, h) => {
+          if (resizingCard) {
+            onUpdateCard(resizingCard.id, { 
+              position: { ...resizingCard.position, w, h } 
+            });
+          }
+          setResizingCardId(null);
+        }}
+      />
+      <ExpandedCardDialog
+        title={expandedCard?.title || ''}
+        open={!!expandedCardId}
+        onOpenChange={(open) => !open && setExpandedCardId(null)}
+      >
+        {expandedCard && renderCard(expandedCard, true)}
+      </ExpandedCardDialog>
+    </>
+  );
+
+  if (cards.length === 0) {
+    return (
+      <>
+        <div className="flex flex-col items-center justify-center h-full text-center py-16">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <LayoutDashboard className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Painel vazio</h3>
+          <p className="text-muted-foreground max-w-sm">
+            Clique em "Adicionar Card" para começar a criar seu painel personalizado
+            com gráficos, métricas e listas de tarefas.
+          </p>
+        </div>
+        {renderDialogs()}
+      </>
+    );
+  }
 
   const renderCard = (card: DashboardCard, isExpanded = false) => {
     const commonProps = {
@@ -203,30 +231,7 @@ const DashboardEditorComponent = ({
           );
         })}
       </div>
-
-      {/* Resize Dialog */}
-      <CardResizeDialog
-        card={resizingCard}
-        open={!!resizingCardId}
-        onOpenChange={(open) => !open && setResizingCardId(null)}
-        onSave={(w, h) => {
-          if (resizingCard) {
-            onUpdateCard(resizingCard.id, { 
-              position: { ...resizingCard.position, w, h } 
-            });
-          }
-          setResizingCardId(null);
-        }}
-      />
-
-      {/* Expanded Card Dialog */}
-      <ExpandedCardDialog
-        title={expandedCard?.title || ''}
-        open={!!expandedCardId}
-        onOpenChange={(open) => !open && setExpandedCardId(null)}
-      >
-        {expandedCard && renderCard(expandedCard, true)}
-      </ExpandedCardDialog>
+      {renderDialogs()}
     </>
   );
 };
