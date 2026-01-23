@@ -489,8 +489,17 @@ export const useApplySpaceTemplate = () => {
       spaceDescription,
       spaceColor,
     }: ApplySpaceTemplateInput) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
+      // Robust session verification with token refresh if needed
+      let user = (await supabase.auth.getUser()).data.user;
+      
+      if (!user) {
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session?.user) {
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        }
+        user = refreshData.session.user;
+      }
 
       // Check global roles first (global_owner, owner, admin have permission everywhere)
       const { data: globalRoles } = await supabase
@@ -539,27 +548,48 @@ export const useApplySpaceTemplate = () => {
       if (!defaultStatus) throw new Error('Status padrão não encontrado');
 
       // Extract company name from spaceName
-      // If name is "MAP | King Talhas", companyName is "King Talhas"
-      // If name is just "King Talhas", companyName is "King Talhas"
       const extractCompanyName = (name: string): string => {
         const parts = name.split('|');
         return parts.length > 1 ? parts[parts.length - 1].trim() : name.trim();
       };
       const companyName = extractCompanyName(spaceName);
 
-      // Create space
-      const { data: space, error: spaceError } = await supabase
-        .from('spaces')
-        .insert({
-          workspace_id: workspaceId,
-          name: spaceName,
-          description: spaceDescription,
-          color: spaceColor,
-        })
-        .select()
-        .single();
+      // Create space with retry on RLS errors (handles token refresh race condition)
+      let space: { id: string; name: string } | null = null;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        const { data: spaceData, error: spaceError } = await supabase
+          .from('spaces')
+          .insert({
+            workspace_id: workspaceId,
+            name: spaceName,
+            description: spaceDescription,
+            color: spaceColor,
+          })
+          .select()
+          .single();
 
-      if (spaceError) throw spaceError;
+        if (!spaceError && spaceData) {
+          space = spaceData;
+          break;
+        }
+
+        // If RLS error and not last attempt, try refresh token
+        if (spaceError?.code === '42501' && attempt < 2) {
+          console.warn(`RLS error on spaces, refreshing session (attempt ${attempt + 1})`);
+          await supabase.auth.refreshSession();
+          await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+          lastError = spaceError;
+          continue;
+        }
+
+        throw spaceError;
+      }
+
+      if (!space) {
+        throw lastError || new Error('Falha ao criar space após tentativas');
+      }
 
       // Map template folder IDs to real folder IDs
       const folderIdMap: Record<string, string> = {};
@@ -627,9 +657,18 @@ export const useApplySpaceTemplate = () => {
       queryClient.invalidateQueries({ queryKey: ['spaces', variables.workspaceId] });
       toast.success('Space criado a partir do template!');
     },
-    onError: (error) => {
-      toast.error('Erro ao aplicar template');
-      console.error(error);
+    onError: (error: any) => {
+      console.error('Erro ao aplicar template:', error);
+      
+      if (error.code === '42501') {
+        toast.error('Erro de permissão. Sua sessão pode ter expirado. Tente novamente.');
+      } else if (error.message?.includes('Sessão expirada')) {
+        toast.error('Sua sessão expirou. Faça login novamente.');
+      } else if (error.message?.includes('permissão')) {
+        toast.error(error.message);
+      } else {
+        toast.error('Erro ao aplicar template. Tente novamente.');
+      }
     },
   });
 };
