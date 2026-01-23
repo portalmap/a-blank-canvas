@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { MoreHorizontal, Trash2, AlertTriangle, Clock } from 'lucide-react';
+import { MoreHorizontal, Trash2, Move, Maximize2, AlertTriangle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ interface TaskListCardProps {
   type: 'overdue' | 'all';
   onDelete: () => void;
   onEdit: () => void;
+  onExpand?: () => void;
 }
 
 const priorityColors: Record<string, string> = {
@@ -42,6 +44,7 @@ const TaskListCardComponent = ({
   type,
   onDelete,
   onEdit,
+  onExpand,
 }: TaskListCardProps) => {
   return (
     <Card className="h-full flex flex-col">
@@ -62,8 +65,19 @@ const TaskListCardComponent = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Move className="mr-2 h-4 w-4" />
+              Redimensionar
+            </DropdownMenuItem>
+            {onExpand && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExpand(); }}>
+                <Maximize2 className="mr-2 h-4 w-4" />
+                Expandir
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
               Remover
             </DropdownMenuItem>
           </DropdownMenuContent>

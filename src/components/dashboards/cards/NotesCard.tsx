@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreHorizontal, Trash2, Pencil, Check, X } from 'lucide-react';
+import { MoreHorizontal, Trash2, Move, Maximize2, Pencil, Check, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -16,6 +17,7 @@ interface NotesCardProps {
   onUpdateContent: (content: string) => void;
   onDelete: () => void;
   onEdit: () => void;
+  onExpand?: () => void;
 }
 
 export const NotesCard = ({
@@ -24,6 +26,7 @@ export const NotesCard = ({
   onUpdateContent,
   onDelete,
   onEdit,
+  onExpand,
 }: NotesCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
@@ -69,8 +72,19 @@ export const NotesCard = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                    <Trash2 className="h-4 w-4 mr-2" />
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                    <Move className="mr-2 h-4 w-4" />
+                    Redimensionar
+                  </DropdownMenuItem>
+                  {onExpand && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExpand(); }}>
+                      <Maximize2 className="mr-2 h-4 w-4" />
+                      Expandir
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
                     Remover
                   </DropdownMenuItem>
                 </DropdownMenuContent>

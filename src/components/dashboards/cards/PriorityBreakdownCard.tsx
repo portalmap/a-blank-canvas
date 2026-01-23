@@ -1,11 +1,11 @@
-import { MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Trash2, Move, Maximize2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ interface PriorityBreakdownCardProps {
   data: Array<{ name: string; value: number }>;
   onDelete: () => void;
   onEdit: () => void;
+  onExpand?: () => void;
 }
 
 const priorityConfig: Record<string, { label: string; color: string; progressColor: string }> = {
@@ -45,6 +46,7 @@ export const PriorityBreakdownCard = ({
   data,
   onDelete,
   onEdit,
+  onExpand,
 }: PriorityBreakdownCardProps) => {
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
@@ -64,8 +66,19 @@ export const PriorityBreakdownCard = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Move className="mr-2 h-4 w-4" />
+              Redimensionar
+            </DropdownMenuItem>
+            {onExpand && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExpand(); }}>
+                <Maximize2 className="mr-2 h-4 w-4" />
+                Expandir
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
               Remover
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -2,11 +2,12 @@ import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MoreVertical, TrendingUp, Star, Zap } from 'lucide-react';
+import { MoreVertical, TrendingUp, Star, Zap, Move, Maximize2, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ProductivityStats, ProductivityScope } from '@/hooks/useProductivityStats';
@@ -23,6 +24,7 @@ interface ProductivityCardProps {
   stats: ProductivityStats | null;
   onDelete: () => void;
   onEdit: () => void;
+  onExpand?: () => void;
   isLoading?: boolean;
   scopeInfo?: ProductivityScopeInfo;
 }
@@ -55,6 +57,7 @@ const ProductivityCardComponent = ({
   stats,
   onDelete,
   onEdit,
+  onExpand,
   isLoading = false,
   scopeInfo,
 }: ProductivityCardProps) => {
@@ -89,9 +92,20 @@ const ProductivityCardComponent = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit}>Editar</DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              Excluir
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Move className="mr-2 h-4 w-4" />
+              Redimensionar
+            </DropdownMenuItem>
+            {onExpand && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExpand(); }}>
+                <Maximize2 className="mr-2 h-4 w-4" />
+                Expandir
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Remover
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

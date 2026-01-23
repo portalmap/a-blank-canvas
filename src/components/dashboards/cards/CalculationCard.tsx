@@ -1,11 +1,12 @@
 import { memo } from 'react';
-import { MoreHorizontal, Trash2, TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Clock, Target } from 'lucide-react';
+import { MoreHorizontal, Trash2, Move, Maximize2, CheckCircle, AlertTriangle, Clock, Target } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ interface CalculationCardProps {
   total?: number;
   onDelete: () => void;
   onEdit: () => void;
+  onExpand?: () => void;
 }
 
 const metricConfig = {
@@ -51,6 +53,7 @@ const CalculationCardComponent = ({
   total,
   onDelete,
   onEdit,
+  onExpand,
 }: CalculationCardProps) => {
   const config = metricConfig[metric];
   const Icon = config.icon;
@@ -67,8 +70,19 @@ const CalculationCardComponent = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Move className="mr-2 h-4 w-4" />
+              Redimensionar
+            </DropdownMenuItem>
+            {onExpand && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExpand(); }}>
+                <Maximize2 className="mr-2 h-4 w-4" />
+                Expandir
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
               Remover
             </DropdownMenuItem>
           </DropdownMenuContent>
