@@ -35,7 +35,7 @@ export function MyTasksCard() {
   const { data: statuses = [] } = useStatuses(activeWorkspace?.id);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupBy, setGroupBy] = useState<GroupByOption>('priority');
+  const [groupBy, setGroupBy] = useState<GroupByOption>('due_date');
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
     priorities: [],
