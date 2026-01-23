@@ -5,8 +5,9 @@ export interface MyAssignedComment {
   id: string;
   content: string;
   created_at: string;
-  task_id: string;
-  task_title: string;
+  source_id: string;
+  source_type: 'task' | 'chat';
+  source_title: string;
   author: {
     id: string;
     full_name: string | null;
@@ -21,43 +22,89 @@ export const useMyAssignedComments = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Get comments assigned to user that are not resolved
-      const { data: comments, error: commentsError } = await supabase
+      // 1. Get task comments assigned to user that are not resolved
+      const { data: taskComments, error: taskCommentsError } = await supabase
         .from('task_comments')
         .select('id, content, created_at, task_id, author_id')
         .eq('assignee_id', user.id)
         .is('resolved_at', null)
         .order('created_at', { ascending: false });
 
-      if (commentsError) throw commentsError;
-      if (!comments || comments.length === 0) return [];
+      if (taskCommentsError) throw taskCommentsError;
+
+      // 2. Get chat messages assigned to user that are not resolved
+      const { data: chatMessages, error: chatMessagesError } = await supabase
+        .from('chat_messages')
+        .select('id, content, created_at, channel_id, sender_id')
+        .eq('assignee_id', user.id)
+        .is('resolved_at', null)
+        .order('created_at', { ascending: false });
+
+      if (chatMessagesError) throw chatMessagesError;
 
       // Get task titles
-      const taskIds = [...new Set(comments.map(c => c.task_id))];
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('id, title')
-        .in('id', taskIds);
+      const taskIds = [...new Set((taskComments || []).map(c => c.task_id))];
+      let taskMap = new Map<string, string>();
+      if (taskIds.length > 0) {
+        const { data: tasks } = await supabase
+          .from('tasks')
+          .select('id, title')
+          .in('id', taskIds);
+        taskMap = new Map(tasks?.map(t => [t.id, t.title]) || []);
+      }
 
-      const taskMap = new Map(tasks?.map(t => [t.id, t.title]) || []);
+      // Get channel names
+      const channelIds = [...new Set((chatMessages || []).map(m => m.channel_id))];
+      let channelMap = new Map<string, string>();
+      if (channelIds.length > 0) {
+        const { data: channels } = await supabase
+          .from('chat_channels')
+          .select('id, name')
+          .in('id', channelIds);
+        channelMap = new Map(channels?.map(c => [c.id, c.name]) || []);
+      }
 
       // Get author profiles
-      const authorIds = [...new Set(comments.map(c => c.author_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', authorIds);
+      const authorIds = [
+        ...new Set([
+          ...(taskComments || []).map(c => c.author_id),
+          ...(chatMessages || []).map(m => m.sender_id),
+        ])
+      ];
+      let profileMap = new Map<string, { id: string; full_name: string | null; avatar_url: string | null }>();
+      if (authorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', authorIds);
+        profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      }
 
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-      return comments.map(comment => ({
+      // Combine and format both types
+      const taskItems: MyAssignedComment[] = (taskComments || []).map(comment => ({
         id: comment.id,
         content: comment.content,
-        created_at: comment.created_at,
-        task_id: comment.task_id,
-        task_title: taskMap.get(comment.task_id) || 'Tarefa',
+        created_at: comment.created_at || '',
+        source_id: comment.task_id,
+        source_type: 'task' as const,
+        source_title: taskMap.get(comment.task_id) || 'Tarefa',
         author: profileMap.get(comment.author_id) || null,
-      })) as MyAssignedComment[];
+      }));
+
+      const chatItems: MyAssignedComment[] = (chatMessages || []).map(message => ({
+        id: message.id,
+        content: message.content,
+        created_at: message.created_at,
+        source_id: message.channel_id,
+        source_type: 'chat' as const,
+        source_title: channelMap.get(message.channel_id) || 'Canal',
+        author: profileMap.get(message.sender_id) || null,
+      }));
+
+      // Sort by date (most recent first)
+      return [...taskItems, ...chatItems].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     },
   });
 };

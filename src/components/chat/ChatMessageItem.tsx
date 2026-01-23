@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Pencil, Check, X } from 'lucide-react';
+import { Pencil, Check, X, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ChatMessageWithSender } from '@/hooks/useChat';
-import { useUpdateChatMessage } from '@/hooks/useChat';
+import { useUpdateChatMessage, useResolveChatAssignment } from '@/hooks/useChat';
 
 interface ChatMessageItemProps {
   message: ChatMessageWithSender;
@@ -19,12 +19,16 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMess
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const updateMessage = useUpdateChatMessage();
+  const resolveAssignment = useResolveChatAssignment();
 
   const senderName = message.sender?.full_name || 'Usuário';
   const initials = senderName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
   const isAuthor = currentUserId === message.sender_id;
   const isEdited = !!message.edited_at;
+  const isAssignee = currentUserId === message.assignee_id;
+  const hasAssignment = !!message.assignee_id && !message.resolved_at;
+  const isResolved = !!message.resolved_at;
 
   const handleSaveEdit = async () => {
     if (!editContent.trim() || editContent.trim() === message.content) {
@@ -46,6 +50,13 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMess
     setEditContent(message.content);
   };
 
+  const handleResolve = () => {
+    resolveAssignment.mutate({
+      messageId: message.id,
+      channelId: message.channel_id,
+    });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -53,6 +64,14 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMess
     } else if (e.key === 'Escape') {
       handleCancelEdit();
     }
+  };
+
+  const getAssigneeName = () => {
+    if (!message.assignee) return 'Usuário';
+    const fullName = message.assignee.full_name;
+    if (!fullName) return 'Usuário';
+    if (fullName.includes('@')) return fullName.split('@')[0];
+    return fullName;
   };
 
   return (
@@ -103,12 +122,42 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMess
             </Button>
           </div>
         ) : (
-          <p className="text-sm whitespace-pre-wrap break-words">
-            {message.content}
-            {isEdited && (
-              <span className="text-xs text-muted-foreground ml-1">(editado)</span>
+          <>
+            <p className="text-sm whitespace-pre-wrap break-words">
+              {message.content}
+              {isEdited && (
+                <span className="text-xs text-muted-foreground ml-1">(editado)</span>
+              )}
+            </p>
+            
+            {/* Indicador de atribuição */}
+            {hasAssignment && (
+              <div className="flex items-center gap-2 mt-1 text-xs text-primary">
+                <UserPlus className="h-3 w-3" />
+                <span>Atribuído a: {getAssigneeName()}</span>
+                {isAssignee && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2"
+                    onClick={handleResolve}
+                    disabled={resolveAssignment.isPending}
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    Resolver
+                  </Button>
+                )}
+              </div>
             )}
-          </p>
+
+            {/* Indicador de resolvido */}
+            {isResolved && (
+              <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                <Check className="h-3 w-3" />
+                <span>(resolvido)</span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

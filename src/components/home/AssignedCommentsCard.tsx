@@ -6,21 +6,35 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { MessageSquare, Check, ExternalLink, Maximize2 } from 'lucide-react';
-import { useMyAssignedComments } from '@/hooks/useMyAssignedComments';
+import { MessageSquare, Check, ExternalLink, Maximize2, Hash } from 'lucide-react';
+import { useMyAssignedComments, MyAssignedComment } from '@/hooks/useMyAssignedComments';
 import { useResolveCommentAssignment } from '@/hooks/useTaskComments';
+import { useResolveChatAssignment } from '@/hooks/useChat';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export const AssignedCommentsCard = () => {
   const navigate = useNavigate();
   const { data: comments = [], isLoading } = useMyAssignedComments();
-  const resolveComment = useResolveCommentAssignment();
+  const resolveTaskComment = useResolveCommentAssignment();
+  const resolveChatMessage = useResolveChatAssignment();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleResolve = (e: React.MouseEvent, commentId: string, taskId: string) => {
+  const handleResolve = (e: React.MouseEvent, comment: MyAssignedComment) => {
     e.stopPropagation();
-    resolveComment.mutate({ commentId, taskId });
+    if (comment.source_type === 'task') {
+      resolveTaskComment.mutate({ commentId: comment.id, taskId: comment.source_id });
+    } else {
+      resolveChatMessage.mutate({ messageId: comment.id, channelId: comment.source_id });
+    }
+  };
+
+  const handleNavigate = (comment: MyAssignedComment) => {
+    if (comment.source_type === 'task') {
+      navigate(`/task/${comment.source_id}`);
+    } else {
+      navigate(`/chat?channel=${comment.source_id}`);
+    }
   };
 
   const getInitials = (name: string | null) => {
@@ -28,11 +42,13 @@ export const AssignedCommentsCard = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const isResolving = resolveTaskComment.isPending || resolveChatMessage.isPending;
+
   const CommentsList = () => (
     <div className="space-y-3">
       {comments.map(comment => (
         <div
-          key={comment.id}
+          key={`${comment.source_type}-${comment.id}`}
           className="p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
         >
           <div className="flex items-start gap-3">
@@ -59,17 +75,26 @@ export const AssignedCommentsCard = () => {
               </p>
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() => navigate(`/task/${comment.task_id}`)}
+                  onClick={() => handleNavigate(comment)}
                   className="text-xs text-primary hover:underline flex items-center gap-1"
                 >
-                  <ExternalLink className="h-3 w-3" />
-                  {comment.task_title}
+                  {comment.source_type === 'task' ? (
+                    <>
+                      <ExternalLink className="h-3 w-3" />
+                      {comment.source_title}
+                    </>
+                  ) : (
+                    <>
+                      <Hash className="h-3 w-3" />
+                      #{comment.source_title}
+                    </>
+                  )}
                 </button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={(e) => handleResolve(e, comment.id, comment.task_id)}
-                  disabled={resolveComment.isPending}
+                  onClick={(e) => handleResolve(e, comment)}
+                  disabled={isResolving}
                   className="h-7 text-xs"
                 >
                   <Check className="h-3 w-3 mr-1" />
