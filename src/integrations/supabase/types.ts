@@ -288,6 +288,7 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          assignee_id: string | null
           attachments: Json | null
           channel_id: string
           content: string
@@ -296,9 +297,12 @@ export type Database = {
           edited_at: string | null
           id: string
           read_at: string | null
+          resolved_at: string | null
+          resolved_by: string | null
           sender_id: string
         }
         Insert: {
+          assignee_id?: string | null
           attachments?: Json | null
           channel_id: string
           content: string
@@ -307,9 +311,12 @@ export type Database = {
           edited_at?: string | null
           id?: string
           read_at?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           sender_id: string
         }
         Update: {
+          assignee_id?: string | null
           attachments?: Json | null
           channel_id?: string
           content?: string
@@ -318,6 +325,8 @@ export type Database = {
           edited_at?: string | null
           id?: string
           read_at?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           sender_id?: string
         }
         Relationships: [

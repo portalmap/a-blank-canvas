@@ -13,6 +13,7 @@ interface ChatRoomProps {
   channelName: string;
   channelType: 'space' | 'custom';
   spaceColor?: string;
+  workspaceId?: string;
   onOpenMembers?: () => void;
 }
 
@@ -21,6 +22,7 @@ export const ChatRoom = ({
   channelName, 
   channelType,
   spaceColor,
+  workspaceId,
   onOpenMembers 
 }: ChatRoomProps) => {
   const { data: messages, isLoading } = useChatMessages(channelId);
@@ -102,7 +104,7 @@ export const ChatRoom = ({
       </ScrollArea>
 
       {/* Input */}
-      <ChatInput channelId={channelId} channelName={channelName} />
+      <ChatInput channelId={channelId} channelName={channelName} workspaceId={workspaceId} />
     </div>
   );
 };

@@ -84,7 +84,15 @@ export interface ChatMessageWithSender {
   read_at: string | null;
   edited_at: string | null;
   edit_count: number | null;
+  assignee_id: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
   sender: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+  assignee: {
     id: string;
     full_name: string | null;
     avatar_url: string | null;
@@ -109,23 +117,29 @@ export const useChatMessages = (channelId?: string) => {
       if (error) throw error;
       if (!messages || messages.length === 0) return [];
 
-      // Get unique sender IDs
+      // Get unique sender and assignee IDs
       const senderIds = [...new Set(messages.map(m => m.sender_id))];
+      const assigneeIds = [...new Set(messages.map(m => (m as any).assignee_id).filter(Boolean))];
+      const allUserIds = [...new Set([...senderIds, ...assigneeIds])];
 
-      // Fetch profiles for all senders
+      // Fetch profiles for all users
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
-        .in('id', senderIds);
+        .in('id', allUserIds);
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-      // Combine messages with sender info
+      // Combine messages with sender and assignee info
       return messages.map(msg => ({
         ...msg,
         edited_at: (msg as any).edited_at || null,
         edit_count: (msg as any).edit_count || 0,
+        assignee_id: (msg as any).assignee_id || null,
+        resolved_at: (msg as any).resolved_at || null,
+        resolved_by: (msg as any).resolved_by || null,
         sender: profileMap.get(msg.sender_id) || null,
+        assignee: (msg as any).assignee_id ? profileMap.get((msg as any).assignee_id) || null : null,
       }));
     },
     enabled: !!channelId,
@@ -156,11 +170,26 @@ export const useChatMessages = (channelId?: string) => {
               .eq('id', newMsg.sender_id)
               .maybeSingle();
 
+            // Fetch assignee profile if present
+            let assigneeProfile = null;
+            if ((newMsg as any).assignee_id) {
+              const { data: aProfile } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url')
+                .eq('id', (newMsg as any).assignee_id)
+                .maybeSingle();
+              assigneeProfile = aProfile;
+            }
+
             const messageWithSender: ChatMessageWithSender = {
               ...newMsg,
               edited_at: (newMsg as any).edited_at || null,
               edit_count: (newMsg as any).edit_count || 0,
+              assignee_id: (newMsg as any).assignee_id || null,
+              resolved_at: (newMsg as any).resolved_at || null,
+              resolved_by: (newMsg as any).resolved_by || null,
               sender: profile,
+              assignee: assigneeProfile,
             };
 
             queryClient.setQueryData(
@@ -201,7 +230,11 @@ export const useSendMessage = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ channelId, content }: { channelId: string; content: string }) => {
+    mutationFn: async ({ channelId, content, assigneeId }: { 
+      channelId: string; 
+      content: string;
+      assigneeId?: string;
+    }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
@@ -210,15 +243,50 @@ export const useSendMessage = () => {
           channel_id: channelId,
           sender_id: user.id,
           content,
+          assignee_id: assigneeId || null,
         })
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      return { ...data, hasAssignee: !!assigneeId };
     },
     onError: (error) => {
       toast.error('Erro ao enviar mensagem');
+      console.error(error);
+    },
+  });
+};
+
+export const useResolveChatAssignment = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ messageId, channelId }: { 
+      messageId: string; 
+      channelId: string;
+    }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+
+      const { error } = await supabase
+        .from('chat_messages')
+        .update({
+          resolved_at: new Date().toISOString(),
+          resolved_by: user.id,
+        })
+        .eq('id', messageId);
+
+      if (error) throw error;
+      return { messageId, channelId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['chat-messages', data.channelId] });
+      queryClient.invalidateQueries({ queryKey: ['my-assigned-comments'] });
+      toast.success('Atribuição resolvida!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao resolver atribuição');
       console.error(error);
     },
   });

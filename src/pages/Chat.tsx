@@ -28,6 +28,7 @@ const Chat = () => {
             }
             channelType={selectedChannel.type as 'space' | 'custom'}
             spaceColor={(selectedChannel as any).spaces?.color}
+            workspaceId={selectedChannel.workspace_id}
             onOpenMembers={
               selectedChannel.type === 'custom'
                 ? () => setShowMembersDialog(true)
