@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
-import { Calendar, Clock, Flag, X, Check, Loader2, Maximize2 } from 'lucide-react';
+import { Calendar, Clock, Flag, X, Loader2, Maximize2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
@@ -60,9 +60,21 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
   if (!task) return null;
 
   const handleSaveTitle = async () => {
-    if (!editTitle.trim()) return;
-    await updateTask.mutateAsync({ id: task.id, title: editTitle });
     setIsEditingTitle(false);
+    
+    const trimmedTitle = editTitle.trim();
+    // Só salva se houver mudança real e título não vazio
+    if (!trimmedTitle || trimmedTitle === task.title) {
+      setEditTitle(task.title); // Restaura o original
+      return;
+    }
+    
+    try {
+      await updateTask.mutateAsync({ id: task.id, title: trimmedTitle });
+    } catch (error) {
+      console.error('Erro ao atualizar título:', error);
+      setEditTitle(task.title); // Restaura em caso de erro
+    }
   };
 
   const handleSaveDescription = async () => {
@@ -98,20 +110,14 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
         <SheetHeader className="space-y-4">
           <div className="flex items-start justify-between gap-4">
             {isEditingTitle ? (
-              <div className="flex-1 flex gap-2">
-                <Input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="text-xl font-semibold"
-                  autoFocus
-                />
-                <Button size="icon" variant="ghost" onClick={handleSaveTitle}>
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => setIsEditingTitle(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="flex-1 text-xl font-semibold"
+                autoFocus
+                onBlur={handleSaveTitle}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              />
             ) : (
               <SheetTitle 
                 className="text-xl cursor-pointer hover:bg-muted/50 px-2 py-1 rounded -mx-2"
