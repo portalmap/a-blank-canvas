@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Trash2, Move, Maximize2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -16,6 +17,7 @@ interface PieChartCardProps {
   groupBy?: 'status' | 'priority' | 'assignee';
   onDelete: () => void;
   onEdit: () => void;
+  onExpand?: () => void;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -26,6 +28,7 @@ const PieChartCardComponent = ({
   groupBy,
   onDelete,
   onEdit,
+  onExpand,
 }: PieChartCardProps) => {
   const chartData = useMemo(() => 
     data.map((item, index) => ({
@@ -51,8 +54,19 @@ const PieChartCardComponent = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Move className="mr-2 h-4 w-4" />
+              Redimensionar
+            </DropdownMenuItem>
+            {onExpand && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExpand(); }}>
+                <Maximize2 className="mr-2 h-4 w-4" />
+                Expandir
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
               Remover
             </DropdownMenuItem>
           </DropdownMenuContent>
