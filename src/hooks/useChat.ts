@@ -82,6 +82,8 @@ export interface ChatMessageWithSender {
   sender_id: string;
   attachments: any;
   read_at: string | null;
+  edited_at: string | null;
+  edit_count: number | null;
   sender: {
     id: string;
     full_name: string | null;
@@ -121,6 +123,8 @@ export const useChatMessages = (channelId?: string) => {
       // Combine messages with sender info
       return messages.map(msg => ({
         ...msg,
+        edited_at: (msg as any).edited_at || null,
+        edit_count: (msg as any).edit_count || 0,
         sender: profileMap.get(msg.sender_id) || null,
       }));
     },
@@ -136,30 +140,51 @@ export const useChatMessages = (channelId?: string) => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'chat_messages',
           filter: `channel_id=eq.${channelId}`,
         },
         async (payload) => {
-          const newMsg = payload.new as ChatMessage;
-          
-          // Fetch sender profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url')
-            .eq('id', newMsg.sender_id)
-            .maybeSingle();
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new as ChatMessage;
+            
+            // Fetch sender profile
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url')
+              .eq('id', newMsg.sender_id)
+              .maybeSingle();
 
-          const messageWithSender: ChatMessageWithSender = {
-            ...newMsg,
-            sender: profile,
-          };
+            const messageWithSender: ChatMessageWithSender = {
+              ...newMsg,
+              edited_at: (newMsg as any).edited_at || null,
+              edit_count: (newMsg as any).edit_count || 0,
+              sender: profile,
+            };
 
-          queryClient.setQueryData(
-            ['chat-messages', channelId],
-            (old: ChatMessageWithSender[] | undefined) => [...(old || []), messageWithSender]
-          );
+            queryClient.setQueryData(
+              ['chat-messages', channelId],
+              (old: ChatMessageWithSender[] | undefined) => [...(old || []), messageWithSender]
+            );
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedMsg = payload.new as any;
+            
+            queryClient.setQueryData(
+              ['chat-messages', channelId],
+              (old: ChatMessageWithSender[] | undefined) => 
+                old?.map(msg => 
+                  msg.id === updatedMsg.id 
+                    ? { 
+                        ...msg, 
+                        content: updatedMsg.content,
+                        edited_at: updatedMsg.edited_at,
+                        edit_count: updatedMsg.edit_count,
+                      }
+                    : msg
+                ) || []
+            );
+          }
         }
       )
       .subscribe();
@@ -381,6 +406,53 @@ export const useDeleteChannel = () => {
     },
     onError: (error) => {
       toast.error('Erro ao excluir canal');
+      console.error(error);
+    },
+  });
+};
+
+export const useUpdateChatMessage = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ messageId, content, channelId }: { 
+      messageId: string; 
+      content: string;
+      channelId: string;
+    }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+
+      // Buscar o edit_count atual - usando type assertion porque a coluna foi adicionada recentemente
+      const { data: currentMessage } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('id', messageId)
+        .single();
+
+      const newEditCount = ((currentMessage as any)?.edit_count || 0) + 1;
+
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .update({
+          content,
+          edited_at: new Date().toISOString(),
+          edit_count: newEditCount,
+        })
+        .eq('id', messageId)
+        .eq('sender_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { ...data, channelId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['chat-messages', data.channelId] });
+      toast.success('Mensagem editada!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao editar mensagem');
       console.error(error);
     },
   });

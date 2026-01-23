@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChatMessages, ChatMessageWithSender } from '@/hooks/useChat';
 import { useMarkChannelAsRead } from '@/hooks/useChatUnread';
+import { useAuth } from '@/contexts/AuthContext';
 import { ChatMessageItem } from './ChatMessageItem';
 import { ChatInput } from './ChatInput';
 
@@ -24,6 +25,7 @@ export const ChatRoom = ({
 }: ChatRoomProps) => {
   const { data: messages, isLoading } = useChatMessages(channelId);
   const markAsRead = useMarkChannelAsRead();
+  const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Marcar canal como lido quando abrir ou receber novas mensagens
@@ -82,6 +84,7 @@ export const ChatRoom = ({
                   key={message.id}
                   message={message}
                   showAvatar={showAvatar}
+                  currentUserId={user?.id}
                 />
               );
             })}
