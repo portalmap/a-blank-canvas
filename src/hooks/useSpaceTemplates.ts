@@ -554,42 +554,32 @@ export const useApplySpaceTemplate = () => {
       };
       const companyName = extractCompanyName(spaceName);
 
-      // Create space with retry on RLS errors (handles token refresh race condition)
-      let space: { id: string; name: string } | null = null;
-      let lastError: Error | null = null;
-      
-      for (let attempt = 0; attempt <= 2; attempt++) {
-        const { data: spaceData, error: spaceError } = await supabase
-          .from('spaces')
-          .insert({
-            workspace_id: workspaceId,
-            name: spaceName,
-            description: spaceDescription,
-            color: spaceColor,
-          })
-          .select()
-          .single();
+      // Create space using secure RPC function to bypass RLS issues
+      const { data: spaceId, error: spaceError } = await supabase
+        .rpc('create_space_secure', {
+          p_workspace_id: workspaceId,
+          p_name: spaceName,
+          p_description: spaceDescription || null,
+          p_color: spaceColor || null,
+        });
 
-        if (!spaceError && spaceData) {
-          space = spaceData;
-          break;
-        }
-
-        // If RLS error and not last attempt, try refresh token
-        if (spaceError?.code === '42501' && attempt < 2) {
-          console.warn(`RLS error on spaces, refreshing session (attempt ${attempt + 1})`);
-          await supabase.auth.refreshSession();
-          await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
-          lastError = spaceError;
-          continue;
-        }
-
-        throw spaceError;
+      if (spaceError) {
+        console.error('Erro ao criar space via RPC:', spaceError);
+        throw new Error('Erro de permissão. Sua sessão pode ter expirado. Tente novamente.');
       }
 
-      if (!space) {
-        throw lastError || new Error('Falha ao criar space após tentativas');
+      // Fetch the created space to get full data
+      const { data: spaceData, error: fetchError } = await supabase
+        .from('spaces')
+        .select('*')
+        .eq('id', spaceId)
+        .single();
+
+      if (fetchError || !spaceData) {
+        throw new Error('Space criado mas não foi possível recuperar os dados');
       }
+
+      const space = spaceData;
 
       // Map template folder IDs to real folder IDs
       const folderIdMap: Record<string, string> = {};
