@@ -2569,6 +2569,15 @@ export type Database = {
         Args: { _editor_id: string; _target_user_id: string }
         Returns: boolean
       }
+      create_space_secure: {
+        Args: {
+          p_color?: string
+          p_description?: string
+          p_name: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       delete_user_completely: {
         Args: { target_user_id: string }
         Returns: boolean
