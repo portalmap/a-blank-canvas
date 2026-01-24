@@ -50,22 +50,38 @@ export const useCreateSpace = () => {
       description?: string;
       color?: string;
     }) => {
+      // Usar função segura do banco de dados
       const { data, error } = await supabase
-        .from('spaces')
-        .insert({ workspace_id: workspaceId, name, description, color })
-        .select()
-        .single();
+        .rpc('create_space_secure', {
+          p_workspace_id: workspaceId,
+          p_name: name,
+          p_description: description || null,
+          p_color: color || null,
+        });
 
       if (error) throw error;
-      return data;
+      
+      // Buscar o space criado para retornar os dados completos
+      const { data: space, error: fetchError } = await supabase
+        .from('spaces')
+        .select('*')
+        .eq('id', data)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      return space;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['spaces', variables.workspaceId] });
       toast.success('Space criado com sucesso!');
     },
-    onError: (error) => {
-      toast.error('Erro ao criar space');
-      console.error(error);
+    onError: (error: any) => {
+      console.error('Erro ao criar space:', error);
+      if (error.message?.includes('permissão')) {
+        toast.error('Você não tem permissão para criar spaces neste workspace');
+      } else {
+        toast.error('Erro ao criar space');
+      }
     },
   });
 };
