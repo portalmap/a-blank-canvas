@@ -50,60 +50,22 @@ export const useCreateSpace = () => {
       description?: string;
       color?: string;
     }) => {
-      // Verificação robusta de sessão
-      let user = (await supabase.auth.getUser()).data.user;
-      
-      if (!user) {
-        // Tentar refresh da sessão
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshData.session?.user) {
-          throw new Error('Sessão expirada. Por favor, faça login novamente.');
-        }
-        user = refreshData.session.user;
-      }
+      const { data, error } = await supabase
+        .from('spaces')
+        .insert({ workspace_id: workspaceId, name, description, color })
+        .select()
+        .single();
 
-      // Inserção com retry para erros de RLS
-      let lastError: Error | null = null;
-      
-      for (let attempt = 0; attempt <= 2; attempt++) {
-        const { data, error } = await supabase
-          .from('spaces')
-          .insert({ workspace_id: workspaceId, name, description, color })
-          .select()
-          .single();
-
-        if (!error && data) {
-          return data;
-        }
-
-        // Se erro RLS e não é a última tentativa, refresh token
-        if (error?.code === '42501' && attempt < 2) {
-          console.warn(`RLS error on spaces, refreshing session (attempt ${attempt + 1})`);
-          await supabase.auth.refreshSession();
-          await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
-          lastError = error;
-          continue;
-        }
-
-        throw error;
-      }
-
-      throw lastError || new Error('Falha ao criar space após tentativas');
+      if (error) throw error;
+      return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['spaces', variables.workspaceId] });
       toast.success('Space criado com sucesso!');
     },
-    onError: (error: any) => {
-      console.error('Erro ao criar space:', error);
-      
-      if (error.code === '42501') {
-        toast.error('Erro de permissão. Sua sessão pode ter expirado. Tente novamente.');
-      } else if (error.message?.includes('Sessão expirada')) {
-        toast.error('Sua sessão expirou. Faça login novamente.');
-      } else {
-        toast.error('Erro ao criar space');
-      }
+    onError: (error) => {
+      toast.error('Erro ao criar space');
+      console.error(error);
     },
   });
 };
