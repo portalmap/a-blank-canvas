@@ -9,6 +9,7 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { AppSidebar } from "@/components/AppSidebar";
+import { MobileHeader } from "@/components/MobileHeader";
 import HomePage from "./pages/HomePage";
 import WorkspaceOverview from "./pages/WorkspaceOverview";
 import SpacesView from "./pages/SpacesView";
@@ -46,11 +47,13 @@ const App = () => (
           path="/*"
           element={
             <ProtectedRoute>
-                  <SidebarProvider>
-                    <div className="flex h-screen w-full overflow-hidden">
-                      <AppSidebar />
-                      <main className="flex-1 overflow-auto">
-                        <Routes>
+                <SidebarProvider>
+                    <div className="flex flex-col h-screen w-full overflow-hidden">
+                      <MobileHeader />
+                      <div className="flex flex-1 overflow-hidden">
+                        <AppSidebar />
+                        <main className="flex-1 overflow-auto">
+                          <Routes>
                           <Route path="/" element={<HomePage />} />
                           <Route path="/workspaces" element={<WorkspaceOverview />} />
                           <Route path="/everything" element={<EverythingView />} />
@@ -68,8 +71,9 @@ const App = () => (
                           <Route path="/automations" element={<AdminRoute><Automations /></AdminRoute>} />
                           <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                           <Route path="*" element={<NotFound />} />
-                        </Routes>
-                      </main>
+                          </Routes>
+                        </main>
+                      </div>
                     </div>
                   </SidebarProvider>
                 </ProtectedRoute>
