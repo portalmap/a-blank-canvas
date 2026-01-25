@@ -9,6 +9,7 @@ import {
   useCreateSpaceTemplate, 
   useUpdateSpaceTemplate 
 } from '@/hooks/useSpaceTemplates';
+import { TemplateAutomationsSection } from './TemplateAutomationsSection';
 import { 
   ArrowLeft, 
   Plus, 
@@ -468,6 +469,15 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
           </div>
         </CardContent>
       </Card>
+
+      {/* Automations Section - Only show when editing existing template */}
+      {templateId && (
+        <TemplateAutomationsSection
+          templateId={templateId}
+          folders={template?.folders || []}
+          lists={template?.lists || []}
+        />
+      )}
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onClose}>
