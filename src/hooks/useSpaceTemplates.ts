@@ -589,7 +589,8 @@ export const useApplySpaceTemplate = () => {
             .from('folders')
             .insert({
               space_id: space.id,
-              name: `${folder.name.trim()} | ${companyName}`,
+              // IMPORTANT: Do NOT trim or add " | " - template name already includes " | " at the end
+              name: `${folder.name}${companyName}`,
               description: folder.description,
             })
             .select()
@@ -610,7 +611,8 @@ export const useApplySpaceTemplate = () => {
               workspace_id: workspaceId,
               space_id: space.id,
               folder_id: list.folder_ref_id ? folderIdMap[list.folder_ref_id] : null,
-              name: `${list.name.trim()} | ${companyName}`,
+              // IMPORTANT: Do NOT trim or add " | " - template name already includes " | " at the end
+              name: `${list.name}${companyName}`,
               description: list.description,
               default_view: list.default_view as 'list' | 'kanban' | 'sprint',
             })
