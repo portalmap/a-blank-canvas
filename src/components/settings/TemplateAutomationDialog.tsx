@@ -18,10 +18,14 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { ArrowRight, Zap, Target, X, LayoutGrid, Folder, List } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ArrowRight, Zap, Target, X, LayoutGrid, Folder, List, Filter } from 'lucide-react';
 import { TriggerSelector } from '@/components/automations/advanced/TriggerSelector';
 import { ActionSelector } from '@/components/automations/advanced/ActionSelector';
 import { ActionConfigForm } from '@/components/automations/advanced/ActionConfigForm';
+import { TriggerConfigForm } from '@/components/automations/advanced/TriggerConfigForm';
+import { ConditionsBuilder } from '@/components/automations/advanced/ConditionsBuilder';
+import { MultiActionSelector, type AutomationAction } from '@/components/automations/advanced/MultiActionSelector';
 import { getTriggerById, getCategoryByTriggerId } from '@/components/automations/advanced/triggerCategories';
 import { getActionById } from '@/components/automations/advanced/actionCategories';
 import { 
@@ -30,6 +34,7 @@ import {
   type TemplateAutomation 
 } from '@/hooks/useTemplateAutomations';
 import type { SpaceTemplateFolder, SpaceTemplateList } from '@/hooks/useSpaceTemplates';
+import type { AutomationCondition } from '@/components/automations/advanced/ConditionRow';
 import { toast } from 'sonner';
 
 interface TemplateAutomationDialogProps {
@@ -39,9 +44,12 @@ interface TemplateAutomationDialogProps {
   folders: SpaceTemplateFolder[];
   lists: SpaceTemplateList[];
   automation?: TemplateAutomation | null;
+  workspaceId: string;
 }
 
 type BuilderStep = 'trigger' | 'action';
+
+const generateId = () => `action-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 export function TemplateAutomationDialog({ 
   open, 
@@ -49,7 +57,8 @@ export function TemplateAutomationDialog({
   templateId,
   folders,
   lists,
-  automation
+  automation,
+  workspaceId
 }: TemplateAutomationDialogProps) {
   const createAutomation = useCreateTemplateAutomation();
   const updateAutomation = useUpdateTemplateAutomation();
@@ -60,22 +69,47 @@ export function TemplateAutomationDialog({
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [actionConfig, setActionConfig] = useState<Record<string, any>>({});
+  const [conditions, setConditions] = useState<AutomationCondition[]>([]);
+  const [actions, setActions] = useState<AutomationAction[]>([]);
   const [scopeType, setScopeType] = useState<'space' | 'folder' | 'list'>('space');
   const [folderRefId, setFolderRefId] = useState<string | undefined>();
   const [listRefId, setListRefId] = useState<string | undefined>();
   const [activeStep, setActiveStep] = useState<BuilderStep>('trigger');
+  const [showConditions, setShowConditions] = useState(false);
+  const [useMultipleActions, setUseMultipleActions] = useState(false);
 
   // Populate fields when editing
   useEffect(() => {
     if (automation && open) {
       setName(automation.description || '');
       setSelectedTrigger(automation.trigger);
-      setSelectedAction(automation.action_type);
-      setActionConfig(automation.action_config || {});
       setScopeType(automation.scope_type);
       setFolderRefId(automation.folder_ref_id || undefined);
       setListRefId(automation.list_ref_id || undefined);
       setActiveStep('trigger');
+
+      // Handle legacy single action or new multiple actions
+      const config = automation.action_config || {};
+      if (config.actions && Array.isArray(config.actions)) {
+        setUseMultipleActions(true);
+        setActions(config.actions);
+        setSelectedAction(null);
+        setActionConfig(config);
+      } else {
+        setUseMultipleActions(false);
+        setSelectedAction(automation.action_type);
+        setActionConfig(config);
+        setActions([]);
+      }
+
+      // Load conditions
+      if (config.conditions && Array.isArray(config.conditions)) {
+        setConditions(config.conditions);
+        setShowConditions(true);
+      } else {
+        setConditions([]);
+        setShowConditions(false);
+      }
     }
   }, [automation, open]);
 
@@ -84,10 +118,14 @@ export function TemplateAutomationDialog({
     setSelectedTrigger(null);
     setSelectedAction(null);
     setActionConfig({});
+    setConditions([]);
+    setActions([]);
     setScopeType('space');
     setFolderRefId(undefined);
     setListRefId(undefined);
     setActiveStep('trigger');
+    setShowConditions(false);
+    setUseMultipleActions(false);
   };
 
   const handleClose = () => {
@@ -98,9 +136,36 @@ export function TemplateAutomationDialog({
   };
 
   const handleSubmit = async () => {
-    if (!selectedTrigger || !selectedAction) {
-      toast.error('Selecione um gatilho e uma ação');
+    if (!selectedTrigger) {
+      toast.error('Selecione um gatilho');
       return;
+    }
+
+    // Validate actions
+    if (useMultipleActions) {
+      if (actions.length === 0) {
+        toast.error('Adicione pelo menos uma ação');
+        return;
+      }
+      const incompleteAction = actions.find(a => !a.type);
+      if (incompleteAction) {
+        toast.error('Complete a configuração de todas as ações');
+        return;
+      }
+    } else {
+      if (!selectedAction) {
+        toast.error('Selecione uma ação');
+        return;
+      }
+      const action = getActionById(selectedAction);
+      if (action?.configFields) {
+        for (const field of action.configFields) {
+          if (field.required && !actionConfig[field.name]) {
+            toast.error(`Preencha o campo: ${field.label}`);
+            return;
+          }
+        }
+      }
     }
 
     // Validate scope
@@ -114,19 +179,29 @@ export function TemplateAutomationDialog({
     }
 
     const trigger = getTriggerById(selectedTrigger);
-    const action = getActionById(selectedAction);
+    
+    // Build final action config
+    const finalActionConfig: Record<string, any> = {
+      ...actionConfig,
+    };
 
-    // Validate required config fields
-    if (action?.configFields) {
-      for (const field of action.configFields) {
-        if (field.required && !actionConfig[field.name]) {
-          toast.error(`Preencha o campo: ${field.label}`);
-          return;
-        }
-      }
+    // Add conditions if any
+    if (conditions.length > 0) {
+      finalActionConfig.conditions = conditions;
     }
 
-    const description = name || `Quando ${trigger?.label} → ${action?.label}`;
+    // Add multiple actions if using that mode
+    if (useMultipleActions) {
+      finalActionConfig.actions = actions;
+    }
+
+    // Determine primary action type
+    const primaryActionType = useMultipleActions 
+      ? (actions[0]?.type || 'set_status') 
+      : selectedAction;
+
+    const primaryAction = getActionById(primaryActionType || '');
+    const description = name || `Quando ${trigger?.label} → ${useMultipleActions ? `${actions.length} ações` : primaryAction?.label}`;
 
     try {
       if (isEditMode && automation) {
@@ -135,8 +210,8 @@ export function TemplateAutomationDialog({
           templateId,
           description,
           trigger: selectedTrigger as any,
-          action_type: selectedAction as any,
-          action_config: actionConfig,
+          action_type: primaryActionType as any,
+          action_config: finalActionConfig,
           scope_type: scopeType,
           folder_ref_id: scopeType === 'folder' ? folderRefId : null,
           list_ref_id: scopeType === 'list' ? listRefId : null,
@@ -146,8 +221,8 @@ export function TemplateAutomationDialog({
           templateId,
           description,
           trigger: selectedTrigger as any,
-          actionType: selectedAction as any,
-          actionConfig,
+          actionType: primaryActionType as any,
+          actionConfig: finalActionConfig,
           scopeType,
           folderRefId: scopeType === 'folder' ? folderRefId : undefined,
           listRefId: scopeType === 'list' ? listRefId : undefined,
@@ -311,6 +386,9 @@ export function TemplateAutomationDialog({
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedTrigger(null);
+                      // Clear trigger config
+                      const { trigger_config, ...rest } = actionConfig;
+                      setActionConfig(rest);
                     }}
                   >
                     <X className="h-3 w-3" />
@@ -333,6 +411,17 @@ export function TemplateAutomationDialog({
                   />
                 </div>
               )}
+
+              {/* Trigger Config Form (e.g., status from/to selection) */}
+              {selectedTrigger && workspaceId && (
+                <TriggerConfigForm
+                  triggerId={selectedTrigger}
+                  workspaceId={workspaceId}
+                  scopeType="workspace"
+                  config={actionConfig}
+                  onConfigChange={setActionConfig}
+                />
+              )}
             </Card>
 
             {/* Arrow */}
@@ -349,54 +438,122 @@ export function TemplateAutomationDialog({
               }`}
               onClick={() => setActiveStep('action')}
             >
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className="h-4 w-4 text-primary" />
-                <span className="font-medium text-sm">Ação</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-sm">Ação</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUseMultipleActions(!useMultipleActions);
+                    if (!useMultipleActions) {
+                      // Switch to multiple: convert current action to array
+                      if (selectedAction) {
+                        setActions([{ id: generateId(), type: selectedAction, config: actionConfig }]);
+                        setSelectedAction(null);
+                      }
+                    } else {
+                      // Switch to single: take first action
+                      if (actions.length > 0) {
+                        setSelectedAction(actions[0].type);
+                        setActionConfig({ ...actionConfig, ...actions[0].config });
+                      }
+                      setActions([]);
+                    }
+                  }}
+                >
+                  {useMultipleActions ? 'Ação única' : 'Múltiplas ações'}
+                </Button>
               </div>
 
-              {selectedActionData ? (
-                <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
-                  <selectedActionData.icon className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">{selectedActionData.label}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 ml-auto"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedAction(null);
-                      setActionConfig({});
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Clique para selecionar uma ação
-                </p>
-              )}
-
-              {activeStep === 'action' && (
-                <div className="mt-4 border-t pt-4">
-                  <ActionSelector
-                    selectedAction={selectedAction}
-                    onSelectAction={setSelectedAction}
-                  />
-                </div>
-              )}
-
-              {/* Action Config Form - Note: workspaceId is not available here */}
-              {selectedAction && (
-                <ActionConfigForm
-                  actionId={selectedAction}
-                  workspaceId=""
-                  config={actionConfig}
-                  onConfigChange={setActionConfig}
+              {useMultipleActions ? (
+                <MultiActionSelector
+                  workspaceId={workspaceId}
+                  actions={actions}
+                  onActionsChange={setActions}
                 />
+              ) : (
+                <>
+                  {selectedActionData ? (
+                    <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
+                      <selectedActionData.icon className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">{selectedActionData.label}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 ml-auto"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAction(null);
+                          // Keep trigger_config and conditions
+                          const { trigger_config, conditions: conds, ...rest } = actionConfig;
+                          setActionConfig({ trigger_config, conditions: conds });
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Clique para selecionar uma ação
+                    </p>
+                  )}
+
+                  {activeStep === 'action' && !selectedAction && (
+                    <div className="mt-4 border-t pt-4">
+                      <ActionSelector
+                        selectedAction={selectedAction}
+                        onSelectAction={setSelectedAction}
+                      />
+                    </div>
+                  )}
+
+                  {/* Action Config Form */}
+                  {selectedAction && (
+                    <ActionConfigForm
+                      actionId={selectedAction}
+                      workspaceId={workspaceId}
+                      config={actionConfig}
+                      onConfigChange={setActionConfig}
+                    />
+                  )}
+                </>
               )}
             </Card>
           </div>
+
+          {/* Conditions Section */}
+          <Collapsible open={showConditions} onOpenChange={setShowConditions}>
+            <Card className="p-4">
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center justify-between cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">Condições</span>
+                    {conditions.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {conditions.length}
+                      </Badge>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-7">
+                    {showConditions ? 'Ocultar' : 'Adicionar'}
+                  </Button>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <ConditionsBuilder
+                  workspaceId={workspaceId}
+                  conditions={conditions}
+                  onConditionsChange={setConditions}
+                />
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
 
         {/* Footer */}
@@ -406,7 +563,7 @@ export function TemplateAutomationDialog({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!selectedTrigger || !selectedAction || isPending}
+            disabled={!selectedTrigger || (!useMultipleActions && !selectedAction) || (useMultipleActions && actions.length === 0) || isPending}
           >
             {isPending 
               ? (isEditMode ? 'Salvando...' : 'Adicionando...') 

@@ -37,12 +37,14 @@ interface TemplateAutomationsSectionProps {
   templateId: string;
   folders: SpaceTemplateFolder[];
   lists: SpaceTemplateList[];
+  workspaceId: string;
 }
 
 export function TemplateAutomationsSection({ 
   templateId, 
   folders, 
-  lists 
+  lists,
+  workspaceId 
 }: TemplateAutomationsSectionProps) {
   const { data: automations = [], isLoading } = useTemplateAutomations(templateId);
   const deleteAutomation = useDeleteTemplateAutomation();
@@ -210,6 +212,7 @@ export function TemplateAutomationsSection({
         folders={folders}
         lists={lists}
         automation={editingAutomation}
+        workspaceId={workspaceId}
       />
 
       {/* Delete Confirmation */}

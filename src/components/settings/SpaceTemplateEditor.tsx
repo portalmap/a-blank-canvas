@@ -10,6 +10,7 @@ import {
   useUpdateSpaceTemplate 
 } from '@/hooks/useSpaceTemplates';
 import { TemplateAutomationsSection } from './TemplateAutomationsSection';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { 
   ArrowLeft, 
   Plus, 
@@ -66,6 +67,7 @@ interface SpaceTemplateEditorProps {
 }
 
 export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditorProps) => {
+  const { activeWorkspace } = useWorkspace();
   const { data: template, isLoading } = useSpaceTemplate(templateId);
   const createTemplate = useCreateSpaceTemplate();
   const updateTemplate = useUpdateSpaceTemplate();
@@ -471,11 +473,12 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
       </Card>
 
       {/* Automations Section - Only show when editing existing template */}
-      {templateId && (
+      {templateId && activeWorkspace && (
         <TemplateAutomationsSection
           templateId={templateId}
           folders={template?.folders || []}
           lists={template?.lists || []}
+          workspaceId={activeWorkspace.id}
         />
       )}
 

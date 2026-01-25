@@ -309,6 +309,8 @@ export const AdvancedAutomationBuilder = ({
                 <TriggerConfigForm
                   triggerId={selectedTrigger}
                   workspaceId={workspaceId}
+                  scopeType={scope.scopeType}
+                  scopeId={scope.scopeId}
                   config={actionConfig}
                   onConfigChange={setActionConfig}
                 />
