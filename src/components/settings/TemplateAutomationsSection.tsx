@@ -1,0 +1,238 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { 
+  Plus, 
+  Zap, 
+  Trash2, 
+  Edit,
+  LayoutGrid,
+  Folder,
+  List as ListIcon
+} from 'lucide-react';
+import { 
+  useTemplateAutomations, 
+  useDeleteTemplateAutomation, 
+  useToggleTemplateAutomation,
+  type TemplateAutomation 
+} from '@/hooks/useTemplateAutomations';
+import { getTriggerById } from '@/components/automations/advanced/triggerCategories';
+import { getActionById } from '@/components/automations/advanced/actionCategories';
+import type { SpaceTemplateFolder, SpaceTemplateList } from '@/hooks/useSpaceTemplates';
+import { TemplateAutomationDialog } from './TemplateAutomationDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface TemplateAutomationsSectionProps {
+  templateId: string;
+  folders: SpaceTemplateFolder[];
+  lists: SpaceTemplateList[];
+}
+
+export function TemplateAutomationsSection({ 
+  templateId, 
+  folders, 
+  lists 
+}: TemplateAutomationsSectionProps) {
+  const { data: automations = [], isLoading } = useTemplateAutomations(templateId);
+  const deleteAutomation = useDeleteTemplateAutomation();
+  const toggleAutomation = useToggleTemplateAutomation();
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAutomation, setEditingAutomation] = useState<TemplateAutomation | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleEdit = (automation: TemplateAutomation) => {
+    setEditingAutomation(automation);
+    setDialogOpen(true);
+  };
+
+  const handleCreate = () => {
+    setEditingAutomation(null);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteAutomation.mutate({ id, templateId });
+    setDeleteConfirmId(null);
+  };
+
+  const handleToggle = (automation: TemplateAutomation) => {
+    toggleAutomation.mutate({ 
+      id: automation.id, 
+      templateId, 
+      enabled: !automation.enabled 
+    });
+  };
+
+  const getScopeLabel = (automation: TemplateAutomation) => {
+    if (automation.scope_type === 'space') {
+      return 'Todo o Space';
+    }
+    if (automation.scope_type === 'folder' && automation.folder_ref_id) {
+      const folder = folders.find(f => f.id === automation.folder_ref_id);
+      return folder?.name || 'Pasta';
+    }
+    if (automation.scope_type === 'list' && automation.list_ref_id) {
+      const list = lists.find(l => l.id === automation.list_ref_id);
+      return list?.name || 'Lista';
+    }
+    return 'Desconhecido';
+  };
+
+  const getScopeIcon = (scopeType: string) => {
+    switch (scopeType) {
+      case 'space': return LayoutGrid;
+      case 'folder': return Folder;
+      case 'list': return ListIcon;
+      default: return LayoutGrid;
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                Automações do Template
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Estas automações serão criadas automaticamente quando um Space for criado a partir deste template.
+              </CardDescription>
+            </div>
+            <Button onClick={handleCreate} size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Adicionar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground py-4 text-center">
+              Carregando...
+            </div>
+          ) : automations.length === 0 ? (
+            <div className="text-center py-8 border border-dashed rounded-lg">
+              <Zap className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">
+                Nenhuma automação configurada neste template.
+              </p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar Automação
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {automations.map((automation) => {
+                const trigger = getTriggerById(automation.trigger);
+                const action = getActionById(automation.action_type);
+                const ScopeIcon = getScopeIcon(automation.scope_type);
+
+                return (
+                  <div 
+                    key={automation.id} 
+                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      automation.enabled 
+                        ? 'bg-card hover:bg-accent/50' 
+                        : 'bg-muted/50 opacity-60'
+                    }`}
+                  >
+                    <Switch
+                      checked={automation.enabled}
+                      onCheckedChange={() => handleToggle(automation)}
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {automation.description || `${trigger?.label} → ${action?.label}`}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {trigger?.label || automation.trigger}
+                        </Badge>
+                        <span className="text-muted-foreground">→</span>
+                        <Badge variant="outline" className="text-xs">
+                          {action?.label || automation.action_type}
+                        </Badge>
+                        <span className="text-muted-foreground">|</span>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <ScopeIcon className="h-3 w-3" />
+                          <span>{getScopeLabel(automation)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleEdit(automation)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteConfirmId(automation.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create/Edit Dialog */}
+      <TemplateAutomationDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        templateId={templateId}
+        folders={folders}
+        lists={lists}
+        automation={editingAutomation}
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Automação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta automação do template? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

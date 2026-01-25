@@ -643,6 +643,49 @@ export const useApplySpaceTemplate = () => {
         }
       }
 
+      // Fetch template automations and create real automations
+      const { data: templateAutomations } = await supabase
+        .from('space_template_automations')
+        .select('*')
+        .eq('template_id', templateId)
+        .eq('enabled', true);
+
+      if (templateAutomations && templateAutomations.length > 0) {
+        for (const automation of templateAutomations) {
+          let scopeType: 'workspace' | 'space' | 'folder' | 'list';
+          let scopeId: string;
+
+          if (automation.scope_type === 'space') {
+            scopeType = 'space';
+            scopeId = space.id;
+          } else if (automation.scope_type === 'folder' && automation.folder_ref_id) {
+            scopeType = 'folder';
+            scopeId = folderIdMap[automation.folder_ref_id];
+          } else if (automation.scope_type === 'list' && automation.list_ref_id) {
+            scopeType = 'list';
+            scopeId = listIdMap[automation.list_ref_id];
+          } else {
+            // Default to space if scope not properly set
+            scopeType = 'space';
+            scopeId = space.id;
+          }
+
+          // Only create if we have a valid scopeId
+          if (scopeId) {
+            await supabase.from('automations').insert({
+              workspace_id: workspaceId,
+              description: automation.description,
+              trigger: automation.trigger,
+              action_type: automation.action_type,
+              action_config: automation.action_config,
+              scope_type: scopeType,
+              scope_id: scopeId,
+              enabled: true,
+            });
+          }
+        }
+      }
+
       return space;
     },
     onSuccess: (_, variables) => {

@@ -1334,6 +1334,73 @@ export type Database = {
           },
         ]
       }
+      space_template_automations: {
+        Row: {
+          action_config: Json
+          action_type: Database["public"]["Enums"]["automation_action"]
+          created_at: string
+          description: string | null
+          enabled: boolean
+          folder_ref_id: string | null
+          id: string
+          list_ref_id: string | null
+          scope_type: string
+          template_id: string
+          trigger: Database["public"]["Enums"]["automation_trigger"]
+          updated_at: string
+        }
+        Insert: {
+          action_config?: Json
+          action_type: Database["public"]["Enums"]["automation_action"]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          folder_ref_id?: string | null
+          id?: string
+          list_ref_id?: string | null
+          scope_type: string
+          template_id: string
+          trigger?: Database["public"]["Enums"]["automation_trigger"]
+          updated_at?: string
+        }
+        Update: {
+          action_config?: Json
+          action_type?: Database["public"]["Enums"]["automation_action"]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          folder_ref_id?: string | null
+          id?: string
+          list_ref_id?: string | null
+          scope_type?: string
+          template_id?: string
+          trigger?: Database["public"]["Enums"]["automation_trigger"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_template_automations_folder_ref_id_fkey"
+            columns: ["folder_ref_id"]
+            isOneToOne: false
+            referencedRelation: "space_template_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_template_automations_list_ref_id_fkey"
+            columns: ["list_ref_id"]
+            isOneToOne: false
+            referencedRelation: "space_template_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_template_automations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "space_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       space_template_folders: {
         Row: {
           description: string | null
