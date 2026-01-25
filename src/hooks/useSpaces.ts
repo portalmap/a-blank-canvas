@@ -12,7 +12,7 @@ export const useSpaces = (workspaceId?: string) => {
         .from('spaces')
         .select('*')
         .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false });
+        .order('name', { ascending: true });
 
       if (error) throw error;
       return data;
