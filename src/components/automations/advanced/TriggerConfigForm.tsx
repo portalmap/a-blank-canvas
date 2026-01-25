@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,12 +6,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, ChevronDown, ChevronUp } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useStatusesForScope } from '@/hooks/useStatuses';
 
 interface TriggerConfigFormProps {
   triggerId: string;
   workspaceId: string;
   config: Record<string, any>;
   onConfigChange: (config: Record<string, any>) => void;
+  // New props for scope-based filtering
+  scopeType?: 'workspace' | 'space' | 'folder' | 'list';
+  scopeId?: string;
 }
 
 export const TriggerConfigForm = ({
@@ -21,26 +23,18 @@ export const TriggerConfigForm = ({
   workspaceId,
   config,
   onConfigChange,
+  scopeType = 'workspace',
+  scopeId,
 }: TriggerConfigFormProps) => {
   const [fromOpen, setFromOpen] = useState(true);
   const [toOpen, setToOpen] = useState(true);
 
-  // Fetch statuses for the workspace
-  const { data: statuses = [] } = useQuery({
-    queryKey: ['workspace-statuses', workspaceId],
-    queryFn: async () => {
-      if (!workspaceId) return [];
-      const { data, error } = await supabase
-        .from('statuses')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('order_index');
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!workspaceId,
-  });
+  // Fetch statuses for the specific scope (list > folder > space > workspace)
+  const { data: statuses = [] } = useStatusesForScope(
+    scopeType === 'workspace' ? 'workspace' : scopeType as 'list' | 'folder' | 'space',
+    scopeId,
+    workspaceId
+  );
 
   // Only show config for status change trigger
   if (triggerId !== 'on_status_changed') {
