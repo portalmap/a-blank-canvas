@@ -101,6 +101,7 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
             taskId,
             activityType: 'assignment.created',
             metadata: { 
+              comment_id: comment.id,
               content: newComment.trim(),
               assignee_id: selectedAssignee.user_id,
               assignee_name: selectedAssignee.profile?.full_name || 'Usuário',
