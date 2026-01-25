@@ -87,6 +87,7 @@ export const ChatRoom = ({
                   message={message}
                   showAvatar={showAvatar}
                   currentUserId={user?.id}
+                  workspaceId={workspaceId}
                 />
               );
             })}

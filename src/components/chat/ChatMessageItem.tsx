@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Pencil, Check, X, UserPlus } from 'lucide-react';
@@ -8,18 +8,42 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ChatMessageWithSender } from '@/hooks/useChat';
 import { useUpdateChatMessage, useResolveChatAssignment } from '@/hooks/useChat';
+import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
+import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 
 interface ChatMessageItemProps {
   message: ChatMessageWithSender;
   showAvatar: boolean;
   currentUserId?: string;
+  workspaceId?: string;
 }
 
-export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMessageItemProps) => {
+export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceId }: ChatMessageItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
+  const [editAssignee, setEditAssignee] = useState<WorkspaceMember | null>(null);
   const updateMessage = useUpdateChatMessage();
   const resolveAssignment = useResolveChatAssignment();
+
+  // Initialize editAssignee when entering edit mode
+  useEffect(() => {
+    if (isEditing && message.assignee) {
+      setEditAssignee({
+        id: '',
+        user_id: message.assignee.id,
+        workspace_id: workspaceId || '',
+        role: 'member',
+        created_at: '',
+        profile: {
+          id: message.assignee.id,
+          full_name: message.assignee.full_name,
+          avatar_url: message.assignee.avatar_url,
+        },
+      } as WorkspaceMember);
+    } else if (!isEditing) {
+      setEditAssignee(null);
+    }
+  }, [isEditing, message.assignee, workspaceId]);
 
   const senderName = message.sender?.full_name || 'Usuário';
   const initials = senderName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -31,7 +55,18 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMess
   const isResolved = !!message.resolved_at;
 
   const handleSaveEdit = async () => {
-    if (!editContent.trim() || editContent.trim() === message.content) {
+    const contentChanged = editContent.trim() !== message.content;
+    const assigneeChanged = editAssignee?.user_id !== message.assignee_id;
+    
+    // If nothing changed, just close
+    if (!contentChanged && !assigneeChanged) {
+      setIsEditing(false);
+      setEditContent(message.content);
+      return;
+    }
+    
+    // Content must not be empty
+    if (!editContent.trim()) {
       setIsEditing(false);
       setEditContent(message.content);
       return;
@@ -41,6 +76,7 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMess
       messageId: message.id,
       content: editContent.trim(),
       channelId: message.channel_id,
+      assigneeId: editAssignee?.user_id || null,
     });
     setIsEditing(false);
   };
@@ -94,32 +130,45 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId }: ChatMess
         )}
         
         {isEditing ? (
-          <div className="flex gap-2 items-center">
-            <Input
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              onKeyDown={handleKeyDown}
-              autoFocus
-              className="flex-1"
-            />
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              className="h-8 w-8"
-              onClick={handleSaveEdit}
-              disabled={updateMessage.isPending}
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              className="h-8 w-8"
-              onClick={handleCancelEdit}
-              disabled={updateMessage.isPending}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+          <div className="space-y-2">
+            {/* Assignee selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Atribuir a:</span>
+              <CommentAssigneeSelector
+                workspaceId={workspaceId}
+                selectedAssignee={editAssignee}
+                onSelect={setEditAssignee}
+              />
+            </div>
+            
+            {/* Content input and buttons */}
+            <div className="flex gap-2 items-center">
+              <Input
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                className="flex-1"
+              />
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className="h-8 w-8"
+                onClick={handleSaveEdit}
+                disabled={updateMessage.isPending}
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className="h-8 w-8"
+                onClick={handleCancelEdit}
+                disabled={updateMessage.isPending}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         ) : (
           <>
