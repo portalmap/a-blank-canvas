@@ -72,16 +72,17 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
     try {
       // Upload arquivos primeiro
       for (const { file } of pendingFiles) {
-        await uploadAttachment.mutateAsync({ taskId, file });
+        const uploaded = await uploadAttachment.mutateAsync({ taskId, file });
         
-        // Registrar atividade para cada anexo
+        // Registrar atividade para cada anexo com URL
         await createActivity.mutateAsync({
           taskId,
           activityType: 'attachment.added',
           metadata: { 
-            file_name: file.name,
-            file_type: file.type,
-            file_size: file.size,
+            file_name: uploaded.file_name,
+            file_type: uploaded.file_type,
+            file_size: uploaded.file_size,
+            file_url: uploaded.file_url,
           },
         });
       }

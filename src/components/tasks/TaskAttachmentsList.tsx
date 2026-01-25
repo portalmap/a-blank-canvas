@@ -29,6 +29,12 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
           activityType: 'attachment.added',
           fieldName: 'attachment',
           newValue: uploaded.file_name,
+          metadata: {
+            file_name: uploaded.file_name,
+            file_type: uploaded.file_type,
+            file_size: uploaded.file_size,
+            file_url: uploaded.file_url,
+          },
         });
         toast.success(`Anexo "${file.name}" adicionado!`);
       } catch (error) {
