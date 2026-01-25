@@ -81,7 +81,8 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
   // Verificar se o usuário atual é o autor
   const isAuthor = user?.id === activity.user_id;
   const canEdit = (activity.activity_type === 'comment.created' || 
-                   activity.activity_type === 'comment.edited') && 
+                   activity.activity_type === 'comment.edited' ||
+                   activity.activity_type === 'assignment.created') && 
                   isAuthor && 
                   activity.metadata?.comment_id;
   
