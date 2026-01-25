@@ -312,6 +312,30 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
               </>
             )}
 
+            {/* Attachment preview */}
+            {activity.activity_type === 'attachment.added' && activity.metadata?.file_url && (
+              <div className="mt-2">
+                {activity.metadata.file_type?.startsWith('image/') ? (
+                  <img 
+                    src={activity.metadata.file_url}
+                    alt={activity.metadata.file_name || 'Anexo'}
+                    className="h-20 w-20 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                    onClick={() => window.open(activity.metadata.file_url, '_blank')}
+                  />
+                ) : (
+                  <a 
+                    href={activity.metadata.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    <Paperclip className="h-3 w-3" />
+                    {activity.metadata.file_name}
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* Resolved indicator */}
             {activity.activity_type === 'assignment.resolved' && (
               <div className="mt-2 flex items-center gap-2 p-2 bg-emerald-500/10 rounded-md text-sm text-emerald-700 dark:text-emerald-300">
