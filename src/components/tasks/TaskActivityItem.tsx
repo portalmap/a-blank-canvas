@@ -24,10 +24,13 @@ import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } fr
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { renderTextWithImagesAndLinks } from '@/lib/linkify';
+import { CommentAssigneeSelector } from './CommentAssigneeSelector';
+import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 
 interface TaskActivityItemProps {
   activity: TaskActivity;
   taskId?: string;
+  workspaceId?: string;
 }
 
 const getActivityIcon = (type: string) => {
@@ -60,9 +63,10 @@ const getActivityColor = (type: string) => {
   return 'bg-muted text-muted-foreground';
 };
 
-export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) => {
+export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivityItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [editAssignee, setEditAssignee] = useState<WorkspaceMember | null>(null);
   
   const Icon = getActivityIcon(activity.activity_type);
   const iconColorClass = getActivityColor(activity.activity_type);
@@ -132,6 +136,25 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
   const handleStartEdit = () => {
     const currentContent = activity.metadata?.content || activity.metadata?.comment_content || '';
     setEditContent(currentContent);
+    
+    // Inicializar editAssignee com dados atuais para assignment.created
+    if (activity.activity_type === 'assignment.created' && activity.metadata?.assignee_id) {
+      setEditAssignee({
+        id: '',
+        user_id: activity.metadata.assignee_id,
+        workspace_id: workspaceId || '',
+        role: 'member' as const,
+        created_at: '',
+        profile: { 
+          id: activity.metadata.assignee_id,
+          full_name: activity.metadata.assignee_name || null,
+          avatar_url: null,
+        },
+      });
+    } else {
+      setEditAssignee(null);
+    }
+    
     setIsEditing(true);
   };
 
@@ -144,6 +167,8 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
     if (!activity.metadata?.comment_id || !taskId || !editContent.trim()) return;
     
     const oldContent = activity.metadata?.content || activity.metadata?.comment_content;
+    const newAssigneeId = editAssignee?.user_id || null;
+    const newAssigneeName = editAssignee?.profile?.full_name || null;
     
     try {
       await updateComment.mutateAsync({
@@ -151,9 +176,10 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
         taskId,
         content: editContent.trim(),
         authorId: activity.user_id,
+        assigneeId: newAssigneeId,
       });
 
-      // Atualizar a atividade existente com o novo conteúdo e flag de edição
+      // Atualizar a atividade existente com o novo conteúdo, atribuído e flag de edição
       await updateActivityMetadata.mutateAsync({
         activityId: activity.id,
         metadata: {
@@ -161,6 +187,8 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
           comment_id: activity.metadata.comment_id,
           content: editContent.trim(),
           old_content: oldContent,
+          assignee_id: newAssigneeId,
+          assignee_name: newAssigneeName,
           edited_at: new Date().toISOString(),
           edit_count: (activity.metadata?.edit_count || 0) + 1,
         },
@@ -168,6 +196,7 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
 
       setIsEditing(false);
       setEditContent('');
+      setEditAssignee(null);
     } catch (error) {
       console.error('Erro ao editar comentário:', error);
     }
@@ -265,6 +294,18 @@ export const TaskActivityItem = ({ activity, taskId }: TaskActivityItemProps) =>
               <>
                 {isEditing ? (
                   <div className="mt-2 space-y-2">
+                    {/* Seletor de atribuído - apenas para comentários do tipo assignment */}
+                    {activity.activity_type === 'assignment.created' && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Atribuir a:</span>
+                        <CommentAssigneeSelector
+                          workspaceId={workspaceId}
+                          selectedAssignee={editAssignee}
+                          onSelect={setEditAssignee}
+                        />
+                      </div>
+                    )}
+                    
                     <Textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
