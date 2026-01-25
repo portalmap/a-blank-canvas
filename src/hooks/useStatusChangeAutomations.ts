@@ -14,6 +14,23 @@ interface AutomationExecutionResult {
   errors: string[];
 }
 
+interface AutomationCondition {
+  id: string;
+  field: 'tag' | 'priority' | 'assignee' | 'due_date' | 'has_subtasks';
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'is_set' | 'is_not_set' | 'any_of' | 'none_of';
+  value: string | string[];
+  logic: 'AND' | 'OR';
+}
+
+interface TaskData {
+  id: string;
+  priority: string;
+  due_date: string | null;
+  tags: string[];
+  assignees: string[];
+  hasSubtasks: boolean;
+}
+
 // Helper para registrar atividade de automação
 const logAutomationActivity = async (
   taskId: string,
@@ -38,6 +55,151 @@ const logAutomationActivity = async (
     });
   } catch (error) {
     console.error('Erro ao registrar atividade de automação:', error);
+  }
+};
+
+/**
+ * Evaluate a single condition against task data
+ */
+const evaluateSingleCondition = (condition: AutomationCondition, taskData: TaskData): boolean => {
+  const values = Array.isArray(condition.value) ? condition.value : [condition.value].filter(Boolean);
+
+  switch (condition.field) {
+    case 'priority':
+      switch (condition.operator) {
+        case 'equals':
+          return values.includes(taskData.priority);
+        case 'not_equals':
+          return !values.includes(taskData.priority);
+        case 'any_of':
+          return values.some(v => v === taskData.priority);
+        default:
+          return true;
+      }
+
+    case 'tag':
+      switch (condition.operator) {
+        case 'contains':
+          return values.some(v => taskData.tags.includes(v));
+        case 'not_contains':
+          return !values.some(v => taskData.tags.includes(v));
+        case 'any_of':
+          return values.some(v => taskData.tags.includes(v));
+        case 'none_of':
+          return !values.some(v => taskData.tags.includes(v));
+        default:
+          return true;
+      }
+
+    case 'assignee':
+      switch (condition.operator) {
+        case 'is_set':
+          return taskData.assignees.length > 0;
+        case 'is_not_set':
+          return taskData.assignees.length === 0;
+        case 'contains':
+          return values.some(v => taskData.assignees.includes(v));
+        case 'not_contains':
+          return !values.some(v => taskData.assignees.includes(v));
+        default:
+          return true;
+      }
+
+    case 'due_date':
+      switch (condition.operator) {
+        case 'is_set':
+          return !!taskData.due_date;
+        case 'is_not_set':
+          return !taskData.due_date;
+        default:
+          return true;
+      }
+
+    case 'has_subtasks':
+      switch (condition.operator) {
+        case 'is_set':
+          return taskData.hasSubtasks;
+        case 'is_not_set':
+          return !taskData.hasSubtasks;
+        default:
+          return true;
+      }
+
+    default:
+      return true;
+  }
+};
+
+/**
+ * Evaluate all conditions with AND/OR logic
+ */
+const evaluateConditions = (conditions: AutomationCondition[], taskData: TaskData): boolean => {
+  if (!conditions || conditions.length === 0) return true;
+
+  let result = evaluateSingleCondition(conditions[0], taskData);
+
+  for (let i = 1; i < conditions.length; i++) {
+    const prevCondition = conditions[i - 1];
+    const currentCondition = conditions[i];
+    const currentResult = evaluateSingleCondition(currentCondition, taskData);
+
+    if (prevCondition.logic === 'AND') {
+      result = result && currentResult;
+    } else {
+      result = result || currentResult;
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Fetch task data needed for condition evaluation
+ */
+const fetchTaskData = async (taskId: string): Promise<TaskData | null> => {
+  try {
+    // Fetch task basic info
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('id, priority, due_date')
+      .eq('id', taskId)
+      .single();
+
+    if (taskError || !task) return null;
+
+    // Fetch tags
+    const { data: tagRelations } = await supabase
+      .from('task_tag_relations')
+      .select('tag:task_tags(name)')
+      .eq('task_id', taskId);
+
+    const tags = tagRelations?.map((tr: any) => tr.tag?.name).filter(Boolean) || [];
+
+    // Fetch assignees
+    const { data: assigneeData } = await supabase
+      .from('task_assignees')
+      .select('user_id')
+      .eq('task_id', taskId);
+
+    const assignees = assigneeData?.map(a => a.user_id) || [];
+
+    // Check for subtasks
+    const { count: subtaskCount } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('parent_id', taskId);
+
+    return {
+      id: task.id,
+      priority: task.priority,
+      due_date: task.due_date,
+      tags,
+      assignees,
+      hasSubtasks: (subtaskCount || 0) > 0,
+    };
+  } catch (error) {
+    console.error('Error fetching task data for conditions:', error);
+    return null;
   }
 };
 
@@ -94,33 +256,72 @@ export const executeStatusChangeAutomations = async (
 
     console.log(`Found ${applicableAutomations.length} applicable automations for status change`);
 
-    // 5. Execute each automation
+    // 5. Fetch task data once for condition evaluation
+    let taskData: TaskData | null = null;
+
+    // 6. Execute each automation
     for (const automation of applicableAutomations) {
       try {
         const actionConfig = automation.action_config as Record<string, any> | null;
 
-        // Check if automation has status filter conditions
+        // Check if automation has status filter conditions (multi-select support)
         const triggerConfig = actionConfig?.trigger_config;
         if (triggerConfig) {
-          const { from_status_id, to_status_id } = triggerConfig;
+          // Support both legacy single ID and new array format
+          const fromStatusIds: string[] = triggerConfig.from_status_ids || 
+            (triggerConfig.from_status_id ? [triggerConfig.from_status_id] : []);
+          const toStatusIds: string[] = triggerConfig.to_status_ids || 
+            (triggerConfig.to_status_id ? [triggerConfig.to_status_id] : []);
           
           // Skip if from_status doesn't match (and it's specified)
-          if (from_status_id && from_status_id !== info.oldStatusId) {
+          if (fromStatusIds.length > 0 && !fromStatusIds.includes(info.oldStatusId)) {
             continue;
           }
           // Skip if to_status doesn't match (and it's specified)
-          if (to_status_id && to_status_id !== info.newStatusId) {
+          if (toStatusIds.length > 0 && !toStatusIds.includes(info.newStatusId)) {
+            continue;
+          }
+        }
+
+        // Check conditions
+        const conditions = actionConfig?.conditions as AutomationCondition[] | undefined;
+        if (conditions && conditions.length > 0) {
+          // Fetch task data if not already fetched
+          if (!taskData) {
+            taskData = await fetchTaskData(info.taskId);
+          }
+          
+          if (!taskData) {
+            console.error('Could not fetch task data for condition evaluation');
+            continue;
+          }
+
+          const conditionsMet = evaluateConditions(conditions, taskData);
+          if (!conditionsMet) {
+            console.log(`Conditions not met for automation ${automation.id}`);
             continue;
           }
         }
 
         const automationName = automation.description || `Automação ${automation.id.slice(0, 8)}`;
         
-        // Execute action based on type
-        await executeAction(automation.action_type, info, actionConfig, automationName);
+        // Check if automation has multiple actions
+        const actionsArray = actionConfig?.actions as Array<{ type: string; config: Record<string, any> }> | undefined;
+        
+        if (actionsArray && actionsArray.length > 0) {
+          // Execute multiple actions sequentially
+          for (const action of actionsArray) {
+            await executeAction(action.type, info, action.config, automationName);
+          }
+        } else {
+          // Execute single action (legacy support)
+          await executeAction(automation.action_type, info, actionConfig, automationName);
+        }
+        
         result.automationsExecuted++;
 
-        if (automation.action_type === 'create_subtask') {
+        if (automation.action_type === 'create_subtask' || 
+            actionsArray?.some(a => a.type === 'create_subtask')) {
           result.subtasksCreated++;
         }
       } catch (actionError) {
@@ -166,6 +367,18 @@ const executeAction = async (
 
     case 'set_due_date':
       await executeSetDueDate(info, config, automationName);
+      break;
+
+    case 'set_status':
+      await executeSetStatus(info, config, automationName);
+      break;
+
+    case 'add_tag':
+      await executeAddTag(info, config, automationName);
+      break;
+
+    case 'remove_tag':
+      await executeRemoveTag(info, config, automationName);
       break;
 
     default:
@@ -400,4 +613,105 @@ const executeSetDueDate = async (
   });
   
   console.log(`Due date set to ${dueDate} for task ${info.taskId}`);
+};
+
+/**
+ * Set status of the task
+ */
+const executeSetStatus = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const statusId = config?.status_id;
+  if (!statusId) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ status_id: statusId })
+    .eq('id', info.taskId);
+
+  if (error) throw error;
+  
+  console.log(`Status changed to ${statusId} for task ${info.taskId} via automation`);
+};
+
+/**
+ * Add a tag to the task
+ */
+const executeAddTag = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const tagName = config?.tag_name;
+  if (!tagName) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Find or create tag
+  let { data: tag } = await supabase
+    .from('task_tags')
+    .select('id')
+    .eq('workspace_id', info.workspaceId)
+    .eq('name', tagName)
+    .single();
+
+  if (!tag) {
+    const { data: newTag, error: createError } = await supabase
+      .from('task_tags')
+      .insert({ workspace_id: info.workspaceId, name: tagName })
+      .select('id')
+      .single();
+
+    if (createError) throw createError;
+    tag = newTag;
+  }
+
+  if (!tag) return;
+
+  // Add tag relation
+  await supabase
+    .from('task_tag_relations')
+    .upsert(
+      { task_id: info.taskId, tag_id: tag.id },
+      { onConflict: 'task_id,tag_id' }
+    );
+
+  console.log(`Tag "${tagName}" added to task ${info.taskId}`);
+};
+
+/**
+ * Remove a tag from the task
+ */
+const executeRemoveTag = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const tagName = config?.tag_name;
+  if (!tagName) return;
+
+  // Find tag
+  const { data: tag } = await supabase
+    .from('task_tags')
+    .select('id')
+    .eq('workspace_id', info.workspaceId)
+    .eq('name', tagName)
+    .single();
+
+  if (!tag) return;
+
+  // Remove tag relation
+  await supabase
+    .from('task_tag_relations')
+    .delete()
+    .eq('task_id', info.taskId)
+    .eq('tag_id', tag.id);
+
+  console.log(`Tag "${tagName}" removed from task ${info.taskId}`);
 };
