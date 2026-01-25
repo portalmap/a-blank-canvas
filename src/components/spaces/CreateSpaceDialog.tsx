@@ -78,7 +78,8 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
         // Build final space name: template base name + company name
         // Template name is "MAP | ", user enters "King Talhas"
         // Final name is "MAP | King Talhas"
-        const finalSpaceName = `${selectedTemplate.name.trim()}${spaceName.trim()}`;
+        // IMPORTANT: Do NOT trim template name to preserve the space after "|"
+        const finalSpaceName = `${selectedTemplate.name}${spaceName.trim()}`;
         
         await applyTemplate.mutateAsync({
           templateId: selectedTemplateId,
