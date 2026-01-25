@@ -9,9 +9,10 @@ import {
   useCreateSpaceTemplate, 
   useUpdateSpaceTemplate 
 } from '@/hooks/useSpaceTemplates';
+import { useStatusTemplates } from '@/hooks/useStatusTemplates';
 import { TemplateAutomationsSection } from './TemplateAutomationsSection';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { 
+import {
   ArrowLeft, 
   Plus, 
   Folder, 
@@ -51,6 +52,7 @@ interface ListItem {
   description: string;
   default_view: string;
   isExpanded: boolean;
+  status_template_id: string | null;
 }
 
 interface TaskItem {
@@ -69,6 +71,7 @@ interface SpaceTemplateEditorProps {
 export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditorProps) => {
   const { activeWorkspace } = useWorkspace();
   const { data: template, isLoading } = useSpaceTemplate(templateId);
+  const { data: statusTemplates = [] } = useStatusTemplates(activeWorkspace?.id);
   const createTemplate = useCreateSpaceTemplate();
   const updateTemplate = useUpdateSpaceTemplate();
 
@@ -109,6 +112,7 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
           description: l.description || '',
           default_view: l.default_view,
           isExpanded: true,
+          status_template_id: l.status_template_id || null,
         };
       });
       setLists(loadedLists);
@@ -143,7 +147,14 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
       description: '',
       default_view: 'list',
       isExpanded: true,
+      status_template_id: null,
     }]);
+  };
+
+  const updateListStatusTemplate = (listTempId: string, statusTemplateId: string | null) => {
+    setLists(lists.map(l => 
+      l.tempId === listTempId ? { ...l, status_template_id: statusTemplateId } : l
+    ));
   };
 
   const addTask = (listTempId: string) => {
@@ -205,6 +216,7 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
       description: l.description || null,
       default_view: l.default_view,
       order_index: i,
+      status_template_id: l.status_template_id || null,
     }));
 
     const tasksData = tasks.map((t, i) => ({
@@ -296,6 +308,7 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
 
   const renderList = (list: ListItem) => {
     const listTasks = getTasksForList(list.tempId);
+    const selectedTemplate = statusTemplates.find(st => st.id === list.status_template_id);
 
     return (
       <div key={list.tempId} className="border-l-2 border-muted ml-4">
@@ -317,6 +330,32 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
             className="h-8 text-sm flex-1"
             placeholder="Nome da lista"
           />
+          <Select 
+            value={list.status_template_id || 'inherit'}
+            onValueChange={(value) => updateListStatusTemplate(
+              list.tempId, 
+              value === 'inherit' ? null : value
+            )}
+          >
+            <SelectTrigger className="w-44 h-8">
+              <SelectValue placeholder="Status">
+                {list.status_template_id 
+                  ? selectedTemplate?.name || 'Template'
+                  : <span className="text-muted-foreground">Herdar Workspace</span>
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="inherit">
+                <span className="text-muted-foreground">Herdar Workspace</span>
+              </SelectItem>
+              {statusTemplates.map((st) => (
+                <SelectItem key={st.id} value={st.id}>
+                  {st.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeList(list.tempId)}>
             <X className="h-4 w-4" />
           </Button>
