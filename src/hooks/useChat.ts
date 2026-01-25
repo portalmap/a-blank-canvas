@@ -199,6 +199,17 @@ export const useChatMessages = (channelId?: string) => {
           } else if (payload.eventType === 'UPDATE') {
             const updatedMsg = payload.new as any;
             
+            // Fetch assignee profile if changed
+            let assigneeProfile = null;
+            if (updatedMsg.assignee_id) {
+              const { data: aProfile } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url')
+                .eq('id', updatedMsg.assignee_id)
+                .maybeSingle();
+              assigneeProfile = aProfile;
+            }
+            
             queryClient.setQueryData(
               ['chat-messages', channelId],
               (old: ChatMessageWithSender[] | undefined) => 
@@ -209,6 +220,10 @@ export const useChatMessages = (channelId?: string) => {
                         content: updatedMsg.content,
                         edited_at: updatedMsg.edited_at,
                         edit_count: updatedMsg.edit_count,
+                        assignee_id: updatedMsg.assignee_id,
+                        assignee: assigneeProfile,
+                        resolved_at: updatedMsg.resolved_at,
+                        resolved_by: updatedMsg.resolved_by,
                       }
                     : msg
                 ) || []
@@ -484,10 +499,11 @@ export const useUpdateChatMessage = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ messageId, content, channelId }: { 
+    mutationFn: async ({ messageId, content, channelId, assigneeId }: { 
       messageId: string; 
       content: string;
       channelId: string;
+      assigneeId?: string | null;
     }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
@@ -506,6 +522,7 @@ export const useUpdateChatMessage = () => {
           content,
           edited_at: new Date().toISOString(),
           edit_count: newEditCount,
+          assignee_id: assigneeId,
         })
         .eq('id', messageId)
         .eq('sender_id', user.id)
@@ -517,6 +534,7 @@ export const useUpdateChatMessage = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['chat-messages', data.channelId] });
+      queryClient.invalidateQueries({ queryKey: ['my-assigned-comments'] });
       toast.success('Mensagem editada!');
     },
     onError: (error) => {
