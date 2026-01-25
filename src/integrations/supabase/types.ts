@@ -1441,6 +1441,7 @@ export type Database = {
           id: string
           name: string
           order_index: number | null
+          status_template_id: string | null
           template_id: string
         }
         Insert: {
@@ -1450,6 +1451,7 @@ export type Database = {
           id?: string
           name: string
           order_index?: number | null
+          status_template_id?: string | null
           template_id: string
         }
         Update: {
@@ -1459,6 +1461,7 @@ export type Database = {
           id?: string
           name?: string
           order_index?: number | null
+          status_template_id?: string | null
           template_id?: string
         }
         Relationships: [
@@ -1467,6 +1470,13 @@ export type Database = {
             columns: ["folder_ref_id"]
             isOneToOne: false
             referencedRelation: "space_template_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_template_lists_status_template_id_fkey"
+            columns: ["status_template_id"]
+            isOneToOne: false
+            referencedRelation: "status_templates"
             referencedColumns: ["id"]
           },
           {

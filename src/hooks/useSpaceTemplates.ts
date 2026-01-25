@@ -18,6 +18,7 @@ export interface SpaceTemplateList {
   description: string | null;
   default_view: string;
   order_index: number;
+  status_template_id: string | null;
 }
 
 export interface SpaceTemplateTask {
@@ -125,7 +126,7 @@ interface CreateSpaceTemplateInput {
   description?: string;
   color?: string;
   folders?: { name: string; description: string | null; order_index: number }[];
-  lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number }[];
+  lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number; status_template_id?: string | null }[];
   tasks?: { listRefIndex: number; title: string; description: string | null; priority: string; order_index: number }[];
 }
 
@@ -185,6 +186,7 @@ export const useCreateSpaceTemplate = () => {
               description: l.description,
               default_view: l.default_view,
               order_index: l.order_index,
+              status_template_id: l.status_template_id || null,
             }))
           )
           .select();
@@ -233,7 +235,7 @@ interface UpdateSpaceTemplateInput {
   description?: string | null;
   color?: string | null;
   folders?: { name: string; description: string | null; order_index: number }[];
-  lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number }[];
+  lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number; status_template_id?: string | null }[];
   tasks?: { listRefIndex: number; title: string; description: string | null; priority: string; order_index: number }[];
 }
 
@@ -292,6 +294,7 @@ export const useUpdateSpaceTemplate = () => {
                 description: l.description,
                 default_view: l.default_view,
                 order_index: l.order_index,
+                status_template_id: l.status_template_id || null,
               }))
             )
             .select();
@@ -426,6 +429,7 @@ export const useDuplicateSpaceTemplate = () => {
               description: l.description,
               default_view: l.default_view,
               order_index: l.order_index,
+              status_template_id: l.status_template_id || null,
             }))
           )
           .select();
@@ -615,6 +619,9 @@ export const useApplySpaceTemplate = () => {
               name: `${list.name}${companyName}`,
               description: list.description,
               default_view: list.default_view as 'list' | 'kanban' | 'sprint',
+              // Apply status template if configured
+              status_template_id: list.status_template_id || null,
+              status_source: list.status_template_id ? 'template' : 'inherit',
             })
             .select()
             .single();
