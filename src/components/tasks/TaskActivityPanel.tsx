@@ -180,6 +180,7 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
                 key={activity.id} 
                 activity={activity} 
                 taskId={taskId}
+                workspaceId={effectiveWorkspaceId}
               />
             ))}
             <div ref={activitiesEndRef} />

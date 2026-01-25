@@ -155,11 +155,13 @@ export const useUpdateTaskComment = () => {
       taskId, 
       content,
       authorId,
+      assigneeId,
     }: { 
       commentId: string; 
       taskId: string; 
       content: string;
       authorId: string;
+      assigneeId?: string | null;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
@@ -173,6 +175,7 @@ export const useUpdateTaskComment = () => {
         .from('task_comments')
         .update({ 
           content,
+          assignee_id: assigneeId,
           updated_at: new Date().toISOString()
         })
         .eq('id', commentId);
@@ -182,6 +185,8 @@ export const useUpdateTaskComment = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['task-comments', data.taskId] });
+      queryClient.invalidateQueries({ queryKey: ['task-activities', data.taskId] });
+      queryClient.invalidateQueries({ queryKey: ['my-assigned-comments'] });
       toast.success('Comentário atualizado!');
     },
     onError: (error: Error) => {
