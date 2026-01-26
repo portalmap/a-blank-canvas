@@ -1,135 +1,33 @@
 
-## Plano: Botão de Duplicar Automação do Template
+## Plano: Corrigir Resolução de Mensagens do Chat
 
-### Objetivo
-Adicionar um botão de duplicar que cria um clone idêntico da automação com:
-- Nome/descrição com prefixo "CLONE - " para fácil identificação
-- Estado desativado (`enabled: false`) para evitar execuções duplicadas
+### Problema Identificado
+A política RLS atual para UPDATE na tabela `chat_messages` permite apenas que o **remetente (sender)** atualize suas mensagens:
+```sql
+qual:(sender_id = auth.uid())
+```
+
+Quando uma mensagem é **atribuída a outro usuário** e esse usuário tenta clicar em "Resolver", a operação falha silenciosamente porque a RLS bloqueia a atualização.
 
 ---
 
-### Mudanças Necessárias
+### Solução
 
-#### 1. Criar Hook `useDuplicateTemplateAutomation` em `useTemplateAutomations.ts`
+Adicionar uma nova política RLS que permita ao **assignee** resolver mensagens atribuídas a ele.
 
-```typescript
-export const useDuplicateTemplateAutomation = () => {
-  const queryClient = useQueryClient();
+#### Nova Política RLS
 
-  return useMutation({
-    mutationFn: async ({ automation }: { automation: TemplateAutomation }) => {
-      // Criar descrição com prefixo CLONE
-      const cloneDescription = automation.description 
-        ? `CLONE - ${automation.description}` 
-        : 'CLONE';
-
-      const { data, error } = await supabase
-        .from('space_template_automations')
-        .insert({
-          template_id: automation.template_id,
-          description: cloneDescription,
-          trigger: automation.trigger,
-          action_type: automation.action_type,
-          action_config: automation.action_config,
-          scope_type: automation.scope_type,
-          folder_ref_id: automation.folder_ref_id,
-          list_ref_id: automation.list_ref_id,
-          enabled: false, // SEMPRE desativado
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return { data, templateId: automation.template_id };
-    },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ['template-automations', result.templateId] 
-      });
-      toast.success('Automação duplicada! (desativada)');
-    },
-    onError: (error) => {
-      toast.error('Erro ao duplicar automação');
-      console.error(error);
-    },
-  });
-};
+```sql
+CREATE POLICY "Assignees can resolve messages assigned to them"
+ON chat_messages
+FOR UPDATE
+USING (assignee_id = auth.uid())
+WITH CHECK (assignee_id = auth.uid());
 ```
 
----
-
-#### 2. Adicionar Botão de Duplicar em `TemplateAutomationsSection.tsx`
-
-**Importar ícone e hook:**
-```typescript
-import { Copy } from 'lucide-react';
-import { 
-  useDuplicateTemplateAutomation,
-  // ... outros hooks existentes
-} from '@/hooks/useTemplateAutomations';
-```
-
-**Usar o hook:**
-```typescript
-const duplicateAutomation = useDuplicateTemplateAutomation();
-
-const handleDuplicate = (automation: TemplateAutomation) => {
-  duplicateAutomation.mutate({ automation });
-};
-```
-
-**Adicionar botão na linha de ações (entre Edit e Delete):**
-```tsx
-<div className="flex items-center gap-1">
-  <Button 
-    variant="ghost" 
-    size="icon" 
-    className="h-8 w-8"
-    onClick={() => handleEdit(automation)}
-  >
-    <Edit className="h-4 w-4" />
-  </Button>
-  {/* NOVO BOTÃO */}
-  <Button 
-    variant="ghost" 
-    size="icon" 
-    className="h-8 w-8"
-    onClick={() => handleDuplicate(automation)}
-    disabled={duplicateAutomation.isPending}
-  >
-    <Copy className="h-4 w-4" />
-  </Button>
-  <Button 
-    variant="ghost" 
-    size="icon" 
-    className="h-8 w-8 text-destructive hover:text-destructive"
-    onClick={() => setDeleteConfirmId(automation.id)}
-  >
-    <Trash2 className="h-4 w-4" />
-  </Button>
-</div>
-```
-
----
-
-### Visualização na Interface
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│ 🔘 Automação de transferência do Tráfego Pago > Designer                            │
-│    [Alterações de status] → [Mover tarefa] | ☰ Tráfego Pago                        │
-│                                                              [✏️] [📋] [🗑️]        │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                                                                 ↑
-                                                          Novo botão
-
-Após clicar em duplicar:
-
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│ ⚪ CLONE - Automação de transferência do Tráfego Pago > Designer    (desativado)   │
-│    [Alterações de status] → [Mover tarefa] | ☰ Tráfego Pago                        │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-```
+Esta política permite que:
+- O usuário atribuído (assignee) pode atualizar a mensagem
+- Especificamente para definir `resolved_at` e `resolved_by`
 
 ---
 
@@ -137,17 +35,40 @@ Após clicar em duplicar:
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/hooks/useTemplateAutomations.ts` | Adicionar hook `useDuplicateTemplateAutomation` |
-| `src/components/settings/TemplateAutomationsSection.tsx` | Adicionar botão de duplicar e handler |
+| Nova migration SQL | Criar política RLS permitindo assignee resolver mensagens |
 
 ---
 
-### Comportamento
+### Fluxo Corrigido
 
-1. Usuário clica no botão de duplicar (ícone de cópia)
-2. Sistema cria nova automação com:
-   - Descrição: `CLONE - [descrição original]`
-   - Mesmas configurações (trigger, action, scope, etc.)
-   - `enabled: false` (desativada)
-3. Toast de confirmação: "Automação duplicada! (desativada)"
-4. Lista atualiza automaticamente mostrando o clone com visual esmaecido (desativado)
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│  ANTES                                                           │
+│  ────────                                                        │
+│  User A envia mensagem atribuída a User B                        │
+│  User B clica em "Resolver"                                      │
+│  RLS bloqueia: sender_id != auth.uid() ❌                        │
+│  Operação falha silenciosamente                                  │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  DEPOIS                                                          │
+│  ────────                                                        │
+│  User A envia mensagem atribuída a User B                        │
+│  User B clica em "Resolver"                                      │
+│  RLS permite: assignee_id = auth.uid() ✅                        │
+│  Mensagem marcada como resolvida                                 │
+│  Toast: "Atribuição resolvida!"                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Resultado Esperado
+
+1. Usuário atribuído (assignee) pode resolver mensagens tanto:
+   - No chat diretamente (ChatMessageItem)
+   - No card "Comentários atribuídos" da Home (AssignedCommentsCard)
+2. Toast de sucesso exibido após resolução
+3. Mensagem desaparece da lista de comentários atribuídos
+4. Indicador "(resolvido)" aparece na mensagem do chat
