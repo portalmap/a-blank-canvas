@@ -1,70 +1,95 @@
 
+## Plano: Buscar Status Corretos para Lista de Template em Automações
 
-## Plano: Corrigir Escopo de Status para Ações de Automação em Templates
+### Problema Raiz
+Quando estamos editando automações de template e há uma ação "Mover tarefa" seguida de "Alterar status":
 
-### Problema Identificado
+1. O `scopeId` passado é o ID de referência da lista de template (`space_template_lists.id`)
+2. O hook `useStatusesForScope` tenta buscar na tabela `lists` com esse ID
+3. Como não encontra (é um ID de template, não de lista real), faz fallback para status do workspace
+4. Resultado: mostra status errados (do workspace em vez da lista de destino)
 
-Ao investigar o código, descobri que o `TemplateAutomationDialog` **não passa o escopo do gatilho** para o `MultiActionSelector`:
+### Causa Técnica
+O `ActionConfigForm` recebe `isTemplateContext=true` mas não tem acesso ao `status_template_id` da lista de template selecionada. Atualmente passamos apenas:
 
 ```tsx
-// Linha 506-513 - FALTA scopeType e scopeId
-<MultiActionSelector
-  workspaceId={workspaceId}
-  actions={actions}
-  onActionsChange={setActions}
-  isTemplateContext={true}
-  templateLists={...}
-  templateFolders={...}
-  // ❌ NÃO PASSA: scopeType, scopeId
-/>
+templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
 ```
 
-Portanto, quando `getEffectiveScopeForAction` não encontra uma ação `move_task` anterior, ela retorna `{ scopeType: undefined, scopeId: undefined }`, fazendo o hook `useStatusesForScope` buscar os status do workspace inteiro.
+Faltou incluir `status_template_id`!
 
 ---
 
-### Solução
+### Solução em 3 Partes
 
-Passar o escopo do gatilho (`scopeType`, `listRefId`) do `TemplateAutomationDialog` para o `MultiActionSelector`, garantindo que:
+#### Parte 1: Expandir interface `TemplateList` para incluir `status_template_id`
 
-1. **Se houver ação `move_task` anterior** → usa o `target_list_id` dessa ação
-2. **Se não houver** → usa o escopo do gatilho (lista selecionada no escopo do template)
+Modificar a interface em ambos os arquivos:
+- `MultiActionSelector.tsx`
+- `ActionConfigForm.tsx`
 
----
-
-### Mudanças Necessárias
-
-#### 1. Modificar `TemplateAutomationDialog.tsx`
-
-Passar as props de escopo para o `MultiActionSelector`:
-
-```tsx
-<MultiActionSelector
-  workspaceId={workspaceId}
-  actions={actions}
-  onActionsChange={setActions}
-  scopeType={scopeType}                    // ← ADICIONAR
-  scopeId={listRefId || folderRefId}       // ← ADICIONAR
-  isTemplateContext={true}
-  templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
-  templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
-/>
+```typescript
+interface TemplateList {
+  id: string;
+  name: string;
+  folder_ref_id?: string | null;
+  status_template_id?: string | null; // ← ADICIONAR
+}
 ```
 
-E também para o `ActionConfigForm` no modo de ação única (linhas 552-560):
+#### Parte 2: Passar `status_template_id` nas props
+
+Em `TemplateAutomationDialog.tsx`, incluir o campo:
 
 ```tsx
-<ActionConfigForm
-  actionId={selectedAction}
-  workspaceId={workspaceId}
-  config={actionConfig}
-  onConfigChange={setActionConfig}
-  scopeType={scopeType}                    // ← ADICIONAR
-  scopeId={listRefId || folderRefId}       // ← ADICIONAR
-  isTemplateContext={true}
-  templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
-  templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
-/>
+templateLists={lists.map(l => ({ 
+  id: l.id, 
+  name: l.name, 
+  folder_ref_id: l.folder_ref_id,
+  status_template_id: l.status_template_id  // ← ADICIONAR
+}))}
+```
+
+#### Parte 3: Buscar status do template quando em contexto de template
+
+No `ActionConfigForm.tsx`, adicionar lógica para buscar `status_template_items` quando:
+- `isTemplateContext=true`
+- `scopeType='list'`
+- Existe uma lista de template com `status_template_id`
+
+```typescript
+// Buscar lista de template selecionada
+const selectedTemplateList = isTemplateContext && scopeType === 'list' && scopeId
+  ? templateLists.find(l => l.id === scopeId)
+  : null;
+
+// Buscar status do template quando em contexto de template
+const { data: templateStatuses = [] } = useQuery({
+  queryKey: ['template-status-items', selectedTemplateList?.status_template_id],
+  queryFn: async () => {
+    if (!selectedTemplateList?.status_template_id) return [];
+    
+    const { data, error } = await supabase
+      .from('status_template_items')
+      .select('*')
+      .eq('template_id', selectedTemplateList.status_template_id)
+      .order('order_index');
+
+    if (error) throw error;
+    return data.map(s => ({
+      id: s.id,
+      name: s.name,
+      color: s.color,
+      is_default: s.is_default,
+      order_index: s.order_index,
+      category: s.category,
+    }));
+  },
+  enabled: !!selectedTemplateList?.status_template_id,
+});
+
+// Usar templateStatuses quando disponível, senão usar statuses
+const effectiveStatuses = templateStatuses.length > 0 ? templateStatuses : statuses;
 ```
 
 ---
@@ -73,7 +98,9 @@ E também para o `ActionConfigForm` no modo de ação única (linhas 552-560):
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/settings/TemplateAutomationDialog.tsx` | Passar `scopeType` e `scopeId` para `MultiActionSelector` e `ActionConfigForm` |
+| `src/components/automations/advanced/MultiActionSelector.tsx` | Adicionar `status_template_id` à interface `TemplateList` |
+| `src/components/automations/advanced/ActionConfigForm.tsx` | Adicionar `status_template_id` à interface e lógica de busca de status de template |
+| `src/components/settings/TemplateAutomationDialog.tsx` | Incluir `status_template_id` ao mapear `templateLists` |
 
 ---
 
@@ -81,36 +108,24 @@ E também para o `ActionConfigForm` no modo de ação única (linhas 552-560):
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  ANTES                                                           │
+│  ANTES (Falha)                                                   │
 │  ────────                                                        │
-│  Escopo do template: Lista "Tráfego Pago"                        │
-│  Ação 1: Mover tarefa → Plan. de Criativos                       │
-│  Ação 5: Alterar status → scopeType=undefined, scopeId=undefined │
-│                                                                  │
-│  Status listados: status do workspace inteiro ❌                  │
+│  1. Ação "Mover tarefa" seleciona "Plan. de Criativos"           │
+│  2. scopeId = ID de referência do template (não lista real)      │
+│  3. useStatusesForScope busca em `lists` table → não encontra    │
+│  4. Fallback: retorna status do workspace                        │
+│  5. "Alterar status" mostra: Aguardando, A Fazer, Em Progresso...│
 └──────────────────────────────────────────────────────────────────┘
                               ↓
 ┌──────────────────────────────────────────────────────────────────┐
-│  DEPOIS                                                          │
+│  DEPOIS (Sucesso)                                                │
 │  ────────                                                        │
-│  Escopo do template: Lista "Tráfego Pago"                        │
-│  Ação 1: Mover tarefa → Plan. de Criativos                       │
-│  Ação 5: Alterar status → scopeType='list', scopeId='plan...'    │
-│                                                                  │
-│  Status listados: status de "Plan. de Criativos" ✅               │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-Se não houver ação "Mover tarefa":
-
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│  SEM MOVE_TASK                                                   │
-│  ────────                                                        │
-│  Escopo do template: Lista "Tráfego Pago"                        │
-│  Ação 1: Alterar status → scopeType='list', scopeId='trafego...' │
-│                                                                  │
-│  Status listados: status de "Tráfego Pago" (escopo gatilho) ✅    │
+│  1. Ação "Mover tarefa" seleciona "Plan. de Criativos"           │
+│  2. scopeId = ID de referência do template                       │
+│  3. ActionConfigForm detecta isTemplateContext=true              │
+│  4. Encontra templateList com status_template_id                 │
+│  5. Busca status_template_items para esse template               │
+│  6. "Alterar status" mostra: status da lista "Plan. de Criativos"│
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -118,7 +133,7 @@ Se não houver ação "Mover tarefa":
 
 ### Resultado Esperado
 
-1. Quando há ação "Mover tarefa" antes, "Alterar status" mostra os status da lista de **destino**
-2. Quando não há "Mover tarefa", "Alterar status" mostra os status do **escopo do gatilho**
-3. Se mudar a lista de destino em "Mover tarefa", os status em "Alterar status" atualizam automaticamente
-
+1. Ao adicionar ação "Mover tarefa" e selecionar lista de destino
+2. A ação "Alterar status" abaixo mostrará os status configurados para essa lista de template
+3. Se a lista de destino não tiver `status_template_id`, usará fallback para status do workspace
+4. Funciona tanto para múltiplas ações quanto para ação única
