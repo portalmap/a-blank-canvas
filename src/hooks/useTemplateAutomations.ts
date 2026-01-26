@@ -174,3 +174,44 @@ export const useToggleTemplateAutomation = () => {
     },
   });
 };
+
+export const useDuplicateTemplateAutomation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ automation }: { automation: TemplateAutomation }) => {
+      const cloneDescription = automation.description 
+        ? `CLONE - ${automation.description}` 
+        : 'CLONE';
+
+      const { data, error } = await supabase
+        .from('space_template_automations')
+        .insert({
+          template_id: automation.template_id,
+          description: cloneDescription,
+          trigger: automation.trigger,
+          action_type: automation.action_type,
+          action_config: automation.action_config,
+          scope_type: automation.scope_type,
+          folder_ref_id: automation.folder_ref_id,
+          list_ref_id: automation.list_ref_id,
+          enabled: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, templateId: automation.template_id };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['template-automations', result.templateId] 
+      });
+      toast.success('Automação duplicada! (desativada)');
+    },
+    onError: (error) => {
+      toast.error('Erro ao duplicar automação');
+      console.error(error);
+    },
+  });
+};

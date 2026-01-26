@@ -8,6 +8,7 @@ import {
   Zap, 
   Trash2, 
   Edit,
+  Copy,
   LayoutGrid,
   Folder,
   List as ListIcon
@@ -16,6 +17,7 @@ import {
   useTemplateAutomations, 
   useDeleteTemplateAutomation, 
   useToggleTemplateAutomation,
+  useDuplicateTemplateAutomation,
   type TemplateAutomation 
 } from '@/hooks/useTemplateAutomations';
 import { getTriggerById } from '@/components/automations/advanced/triggerCategories';
@@ -49,6 +51,7 @@ export function TemplateAutomationsSection({
   const { data: automations = [], isLoading } = useTemplateAutomations(templateId);
   const deleteAutomation = useDeleteTemplateAutomation();
   const toggleAutomation = useToggleTemplateAutomation();
+  const duplicateAutomation = useDuplicateTemplateAutomation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAutomation, setEditingAutomation] = useState<TemplateAutomation | null>(null);
@@ -75,6 +78,10 @@ export function TemplateAutomationsSection({
       templateId, 
       enabled: !automation.enabled 
     });
+  };
+
+  const handleDuplicate = (automation: TemplateAutomation) => {
+    duplicateAutomation.mutate({ automation });
   };
 
   const getScopeLabel = (automation: TemplateAutomation) => {
@@ -186,6 +193,15 @@ export function TemplateAutomationsSection({
                         onClick={() => handleEdit(automation)}
                       >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleDuplicate(automation)}
+                        disabled={duplicateAutomation.isPending}
+                      >
+                        <Copy className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="ghost" 
