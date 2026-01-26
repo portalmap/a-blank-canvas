@@ -1,71 +1,79 @@
 
-## Plano: Status da Ação Baseado na Lista de Destino do "Mover Tarefa"
 
-### Problema Atual
-Quando há múltiplas ações em sequência:
-1. **Mover tarefa** → seleciona "Plan. de Criativos" como destino
-2. **Alterar status** → mostra status do escopo original, não da lista de destino
+## Plano: Corrigir Escopo de Status para Ações de Automação em Templates
 
-O campo de status na ação "Alterar status" deveria mostrar os status da lista selecionada na ação "Mover tarefa" acima, pois a tarefa já terá sido movida quando essa ação for executada.
+### Problema Identificado
+
+Ao investigar o código, descobri que o `TemplateAutomationDialog` **não passa o escopo do gatilho** para o `MultiActionSelector`:
+
+```tsx
+// Linha 506-513 - FALTA scopeType e scopeId
+<MultiActionSelector
+  workspaceId={workspaceId}
+  actions={actions}
+  onActionsChange={setActions}
+  isTemplateContext={true}
+  templateLists={...}
+  templateFolders={...}
+  // ❌ NÃO PASSA: scopeType, scopeId
+/>
+```
+
+Portanto, quando `getEffectiveScopeForAction` não encontra uma ação `move_task` anterior, ela retorna `{ scopeType: undefined, scopeId: undefined }`, fazendo o hook `useStatusesForScope` buscar os status do workspace inteiro.
 
 ---
 
 ### Solução
 
-Modificar o `MultiActionSelector` para detectar se existe uma ação `move_task` anterior e passar o `target_list_id` como escopo para as ações subsequentes.
+Passar o escopo do gatilho (`scopeType`, `listRefId`) do `TemplateAutomationDialog` para o `MultiActionSelector`, garantindo que:
+
+1. **Se houver ação `move_task` anterior** → usa o `target_list_id` dessa ação
+2. **Se não houver** → usa o escopo do gatilho (lista selecionada no escopo do template)
 
 ---
 
 ### Mudanças Necessárias
 
-#### 1. Modificar `MultiActionSelector.tsx`
+#### 1. Modificar `TemplateAutomationDialog.tsx`
 
-Adicionar lógica para determinar o escopo efetivo de cada ação baseado nas ações anteriores:
-
-```typescript
-// Função para encontrar o escopo efetivo de uma ação
-const getEffectiveScopeForAction = (actionIndex: number) => {
-  // Procurar ação "move_task" anterior com lista configurada
-  for (let i = actionIndex - 1; i >= 0; i--) {
-    const prevAction = actions[i];
-    if (prevAction.type === 'move_task' && prevAction.config?.target_list_id) {
-      return {
-        scopeType: 'list' as const,
-        scopeId: prevAction.config.target_list_id,
-      };
-    }
-  }
-  // Se não encontrar, usar o escopo original
-  return { scopeType, scopeId };
-};
-```
-
-No render do `ActionConfigForm`, passar o escopo efetivo:
+Passar as props de escopo para o `MultiActionSelector`:
 
 ```tsx
-{actions.map((action, index) => {
-  const effectiveScope = getEffectiveScopeForAction(index);
-  
-  return (
-    <Card key={action.id} className="p-3">
-      {/* ... */}
-      {action.type && (
-        <ActionConfigForm
-          actionId={action.type}
-          workspaceId={workspaceId}
-          config={action.config}
-          onConfigChange={(config) => handleUpdateActionConfig(action.id, config)}
-          scopeType={effectiveScope.scopeType}
-          scopeId={effectiveScope.scopeId}
-          isTemplateContext={isTemplateContext}
-          templateLists={templateLists}
-          templateFolders={templateFolders}
-        />
-      )}
-    </Card>
-  );
-})}
+<MultiActionSelector
+  workspaceId={workspaceId}
+  actions={actions}
+  onActionsChange={setActions}
+  scopeType={scopeType}                    // ← ADICIONAR
+  scopeId={listRefId || folderRefId}       // ← ADICIONAR
+  isTemplateContext={true}
+  templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
+  templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
+/>
 ```
+
+E também para o `ActionConfigForm` no modo de ação única (linhas 552-560):
+
+```tsx
+<ActionConfigForm
+  actionId={selectedAction}
+  workspaceId={workspaceId}
+  config={actionConfig}
+  onConfigChange={setActionConfig}
+  scopeType={scopeType}                    // ← ADICIONAR
+  scopeId={listRefId || folderRefId}       // ← ADICIONAR
+  isTemplateContext={true}
+  templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
+  templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
+/>
+```
+
+---
+
+### Arquivos a Modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/settings/TemplateAutomationDialog.tsx` | Passar `scopeType` e `scopeId` para `MultiActionSelector` e `ActionConfigForm` |
 
 ---
 
@@ -75,46 +83,42 @@ No render do `ActionConfigForm`, passar o escopo efetivo:
 ┌──────────────────────────────────────────────────────────────────┐
 │  ANTES                                                           │
 │  ────────                                                        │
+│  Escopo do template: Lista "Tráfego Pago"                        │
 │  Ação 1: Mover tarefa → Plan. de Criativos                       │
-│  Ação 5: Alterar status → Mostra status do escopo ORIGINAL       │
+│  Ação 5: Alterar status → scopeType=undefined, scopeId=undefined │
 │                                                                  │
-│  Status listados: status da lista/space de origem ❌              │
+│  Status listados: status do workspace inteiro ❌                  │
 └──────────────────────────────────────────────────────────────────┘
                               ↓
 ┌──────────────────────────────────────────────────────────────────┐
 │  DEPOIS                                                          │
 │  ────────                                                        │
+│  Escopo do template: Lista "Tráfego Pago"                        │
 │  Ação 1: Mover tarefa → Plan. de Criativos                       │
-│  Ação 5: Alterar status → Mostra status de "Plan. de Criativos"  │
+│  Ação 5: Alterar status → scopeType='list', scopeId='plan...'    │
 │                                                                  │
-│  Status listados: status da lista de DESTINO ✅                   │
+│  Status listados: status de "Plan. de Criativos" ✅               │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Se não houver ação "Mover tarefa":
+
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│  SEM MOVE_TASK                                                   │
+│  ────────                                                        │
+│  Escopo do template: Lista "Tráfego Pago"                        │
+│  Ação 1: Alterar status → scopeType='list', scopeId='trafego...' │
+│                                                                  │
+│  Status listados: status de "Tráfego Pago" (escopo gatilho) ✅    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### Arquivos a Modificar
+### Resultado Esperado
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/automations/advanced/MultiActionSelector.tsx` | Adicionar função `getEffectiveScopeForAction` e usar no render de cada ação |
+1. Quando há ação "Mover tarefa" antes, "Alterar status" mostra os status da lista de **destino**
+2. Quando não há "Mover tarefa", "Alterar status" mostra os status do **escopo do gatilho**
+3. Se mudar a lista de destino em "Mover tarefa", os status em "Alterar status" atualizam automaticamente
 
----
-
-### Comportamento Esperado
-
-1. Usuário adiciona ação "Mover tarefa" e seleciona lista de destino
-2. Usuário adiciona ação "Alterar status" abaixo
-3. O seletor de status mostra automaticamente os status da lista de destino
-4. Se o usuário mudar a lista de destino no "Mover tarefa", o seletor de status atualiza automaticamente
-5. Se não houver ação "Mover tarefa" anterior, usa o escopo original da automação
-
----
-
-### Detalhes Técnicos
-
-O hook `useStatusesForScope` já suporta buscar status por lista, então basta passar:
-- `scopeType: 'list'`
-- `scopeId: target_list_id` (da ação move_task anterior)
-
-Para contexto de **template**, a lógica também funciona pois os `templateLists` passam os IDs de referência que serão mapeados quando o template for aplicado.
