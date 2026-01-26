@@ -84,6 +84,22 @@ export const ActionConfigForm = ({
     enabled: !!workspaceId,
   });
 
+  // Fetch workspace tags
+  const { data: tags = [] } = useQuery({
+    queryKey: ['workspace-tags', workspaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('task_tags')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId,
+  });
+
   // Fetch spaces for the workspace
   const { data: spaces = [] } = useQuery({
     queryKey: ['spaces', workspaceId],
@@ -231,6 +247,39 @@ export const ActionConfigForm = ({
                     </div>
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+
+      case 'tag':
+        return (
+          <div key={field.name} className="space-y-2">
+            <Label>{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+            <Select
+              value={config[field.name] || ''}
+              onValueChange={(value) => handleFieldChange(field.name, value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma etiqueta..." />
+              </SelectTrigger>
+              <SelectContent>
+                {tags.map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: tag.color || '#94a3b8' }}
+                      />
+                      <span>{tag.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                {tags.length === 0 && (
+                  <div className="p-2 text-sm text-muted-foreground text-center">
+                    Nenhuma etiqueta encontrada
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </div>

@@ -26,7 +26,7 @@ export interface ActionOption {
 export interface ActionConfigField {
   name: string;
   label: string;
-  type: 'select' | 'text' | 'user' | 'status' | 'priority' | 'date' | 'number' | 'list';
+  type: 'select' | 'text' | 'user' | 'status' | 'priority' | 'date' | 'number' | 'list' | 'tag';
   required?: boolean;
   options?: { value: string; label: string }[];
 }
@@ -112,7 +112,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
     description: 'Adicionar uma tag à tarefa',
     icon: Tag,
     configFields: [
-      { name: 'tag_name', label: 'Nome da tag', type: 'text', required: true }
+      { name: 'tag_id', label: 'Etiqueta', type: 'tag', required: true }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
     description: 'Remover uma tag da tarefa',
     icon: Tag,
     configFields: [
-      { name: 'tag_name', label: 'Nome da tag', type: 'text', required: true }
+      { name: 'tag_id', label: 'Etiqueta', type: 'tag', required: true }
     ]
   },
   {
