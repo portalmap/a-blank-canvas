@@ -82,6 +82,12 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
         if (!assignError) {
           result.assigneesAdded++;
         }
+      } else if (automation.action_type === 'remove_all_assignees') {
+        // Remove all assignees from task
+        await supabase
+          .from('task_assignees')
+          .delete()
+          .eq('task_id', task.id);
       } else if (automation.action_type === 'auto_add_follower') {
         // Add follower with source tracking
         const { error: followError } = await supabase
