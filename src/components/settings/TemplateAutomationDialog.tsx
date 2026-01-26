@@ -23,7 +23,7 @@ import { ArrowRight, Zap, Target, X, LayoutGrid, Folder, List, Filter } from 'lu
 import { TriggerSelector } from '@/components/automations/advanced/TriggerSelector';
 import { ActionSelector } from '@/components/automations/advanced/ActionSelector';
 import { ActionConfigForm } from '@/components/automations/advanced/ActionConfigForm';
-import { TriggerConfigForm } from '@/components/automations/advanced/TriggerConfigForm';
+// TriggerConfigForm is now inline in TriggerSelector
 import { ConditionsBuilder } from '@/components/automations/advanced/ConditionsBuilder';
 import { MultiActionSelector, type AutomationAction } from '@/components/automations/advanced/MultiActionSelector';
 import { getTriggerById, getCategoryByTriggerId } from '@/components/automations/advanced/triggerCategories';
@@ -400,7 +400,7 @@ export function TemplateAutomationDialog({
                 </p>
               )}
 
-              {activeStep === 'trigger' && (
+              {activeStep === 'trigger' && workspaceId && (
                 <div className="mt-4 border-t pt-4">
                   <TriggerSelector
                     selectedTrigger={selectedTrigger}
@@ -408,19 +408,12 @@ export function TemplateAutomationDialog({
                       setSelectedTrigger(id);
                       setActiveStep('action');
                     }}
+                    workspaceId={workspaceId}
+                    scopeType="workspace"
+                    config={actionConfig}
+                    onConfigChange={setActionConfig}
                   />
                 </div>
-              )}
-
-              {/* Trigger Config Form (e.g., status from/to selection) */}
-              {selectedTrigger && workspaceId && (
-                <TriggerConfigForm
-                  triggerId={selectedTrigger}
-                  workspaceId={workspaceId}
-                  scopeType="workspace"
-                  config={actionConfig}
-                  onConfigChange={setActionConfig}
-                />
               )}
             </Card>
 
