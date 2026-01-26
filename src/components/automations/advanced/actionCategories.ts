@@ -89,6 +89,13 @@ export const ACTION_OPTIONS: ActionOption[] = [
     ]
   },
   {
+    id: 'remove_all_assignees',
+    label: 'Remover todos os responsáveis',
+    description: 'Remove todos os responsáveis da tarefa',
+    icon: UserMinus,
+    configFields: []
+  },
+  {
     id: 'auto_add_follower',
     label: 'Adicionar seguidor',
     description: 'Adicionar um seguidor à tarefa',
