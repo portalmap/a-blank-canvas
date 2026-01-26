@@ -49,6 +49,22 @@ export const MultiActionSelector = ({
   templateLists = [],
   templateFolders = [],
 }: MultiActionSelectorProps) => {
+  // Função para encontrar o escopo efetivo de uma ação baseado nas ações anteriores
+  const getEffectiveScopeForAction = (actionIndex: number) => {
+    // Procurar ação "move_task" anterior com lista configurada
+    for (let i = actionIndex - 1; i >= 0; i--) {
+      const prevAction = actions[i];
+      if (prevAction.type === 'move_task' && prevAction.config?.target_list_id) {
+        return {
+          scopeType: 'list' as const,
+          scopeId: prevAction.config.target_list_id,
+        };
+      }
+    }
+    // Se não encontrar, usar o escopo original
+    return { scopeType, scopeId };
+  };
+
   const handleAddAction = () => {
     const newAction: AutomationAction = {
       id: generateId(),
@@ -88,6 +104,7 @@ export const MultiActionSelector = ({
         <div className="space-y-3">
           {actions.map((action, index) => {
             const actionData = action.type ? getActionById(action.type) : null;
+            const effectiveScope = getEffectiveScopeForAction(index);
             
             return (
               <Card key={action.id} className="p-3">
@@ -126,8 +143,8 @@ export const MultiActionSelector = ({
                         workspaceId={workspaceId}
                         config={action.config}
                         onConfigChange={(config) => handleUpdateActionConfig(action.id, config)}
-                        scopeType={scopeType}
-                        scopeId={scopeId}
+                        scopeType={effectiveScope.scopeType}
+                        scopeId={effectiveScope.scopeId}
                         isTemplateContext={isTemplateContext}
                         templateLists={templateLists}
                         templateFolders={templateFolders}
