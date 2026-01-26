@@ -400,6 +400,8 @@ export const AdvancedAutomationBuilder = ({
                   workspaceId={workspaceId}
                   actions={actions}
                   onActionsChange={setActions}
+                  scopeType={scope.scopeType}
+                  scopeId={scope.scopeId}
                 />
               ) : (
                 <>
@@ -444,6 +446,8 @@ export const AdvancedAutomationBuilder = ({
                       workspaceId={workspaceId}
                       config={actionConfig}
                       onConfigChange={setActionConfig}
+                      scopeType={scope.scopeType}
+                      scopeId={scope.scopeId}
                     />
                   )}
                 </>

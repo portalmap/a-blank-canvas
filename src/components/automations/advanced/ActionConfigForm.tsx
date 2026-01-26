@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getActionById, ActionConfigField } from './actionCategories';
 import { List, Folder } from 'lucide-react';
+import { useStatusesForScope } from '@/hooks/useStatuses';
 
 interface TemplateList {
   id: string;
@@ -24,6 +25,9 @@ interface ActionConfigFormProps {
   workspaceId: string;
   config: Record<string, any>;
   onConfigChange: (config: Record<string, any>) => void;
+  // Props for scope context
+  scopeType?: 'workspace' | 'space' | 'folder' | 'list';
+  scopeId?: string;
   // Props for template context
   isTemplateContext?: boolean;
   templateLists?: TemplateList[];
@@ -35,6 +39,8 @@ export const ActionConfigForm = ({
   workspaceId, 
   config, 
   onConfigChange,
+  scopeType = 'workspace',
+  scopeId,
   isTemplateContext = false,
   templateLists = [],
   templateFolders = [],
@@ -68,21 +74,12 @@ export const ActionConfigForm = ({
     enabled: !!workspaceId && !isTemplateContext,
   });
 
-  // Fetch statuses
-  const { data: statuses } = useQuery({
-    queryKey: ['workspace-statuses', workspaceId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('statuses')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('order_index');
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!workspaceId,
-  });
+  // Fetch statuses for scope (using the proper scope-aware hook)
+  const { data: statuses = [] } = useStatusesForScope(
+    scopeType === 'workspace' ? 'workspace' : scopeType as 'list' | 'folder' | 'space',
+    scopeId,
+    workspaceId
+  );
 
   // Fetch workspace tags
   const { data: tags = [] } = useQuery({

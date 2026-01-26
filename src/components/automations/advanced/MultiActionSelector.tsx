@@ -27,6 +27,9 @@ interface MultiActionSelectorProps {
   workspaceId: string;
   actions: AutomationAction[];
   onActionsChange: (actions: AutomationAction[]) => void;
+  // Props for scope context
+  scopeType?: 'workspace' | 'space' | 'folder' | 'list';
+  scopeId?: string;
   // Props for template context
   isTemplateContext?: boolean;
   templateLists?: TemplateList[];
@@ -40,6 +43,8 @@ export const MultiActionSelector = ({
   workspaceId,
   actions,
   onActionsChange,
+  scopeType,
+  scopeId,
   isTemplateContext = false,
   templateLists = [],
   templateFolders = [],
@@ -121,6 +126,8 @@ export const MultiActionSelector = ({
                         workspaceId={workspaceId}
                         config={action.config}
                         onConfigChange={(config) => handleUpdateActionConfig(action.id, config)}
+                        scopeType={scopeType}
+                        scopeId={scopeId}
                         isTemplateContext={isTemplateContext}
                         templateLists={templateLists}
                         templateFolders={templateFolders}
