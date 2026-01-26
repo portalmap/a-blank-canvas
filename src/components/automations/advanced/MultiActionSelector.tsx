@@ -12,10 +12,25 @@ export interface AutomationAction {
   config: Record<string, any>;
 }
 
+interface TemplateList {
+  id: string;
+  name: string;
+  folder_ref_id?: string | null;
+}
+
+interface TemplateFolder {
+  id: string;
+  name: string;
+}
+
 interface MultiActionSelectorProps {
   workspaceId: string;
   actions: AutomationAction[];
   onActionsChange: (actions: AutomationAction[]) => void;
+  // Props for template context
+  isTemplateContext?: boolean;
+  templateLists?: TemplateList[];
+  templateFolders?: TemplateFolder[];
 }
 
 // Generate a simple unique ID
@@ -25,6 +40,9 @@ export const MultiActionSelector = ({
   workspaceId,
   actions,
   onActionsChange,
+  isTemplateContext = false,
+  templateLists = [],
+  templateFolders = [],
 }: MultiActionSelectorProps) => {
   const handleAddAction = () => {
     const newAction: AutomationAction = {
@@ -103,6 +121,9 @@ export const MultiActionSelector = ({
                         workspaceId={workspaceId}
                         config={action.config}
                         onConfigChange={(config) => handleUpdateActionConfig(action.id, config)}
+                        isTemplateContext={isTemplateContext}
+                        templateLists={templateLists}
+                        templateFolders={templateFolders}
                       />
                     )}
                   </div>

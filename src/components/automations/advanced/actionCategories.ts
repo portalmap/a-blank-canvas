@@ -26,7 +26,7 @@ export interface ActionOption {
 export interface ActionConfigField {
   name: string;
   label: string;
-  type: 'select' | 'text' | 'user' | 'status' | 'priority' | 'date' | 'number';
+  type: 'select' | 'text' | 'user' | 'status' | 'priority' | 'date' | 'number' | 'list';
   required?: boolean;
   options?: { value: string; label: string }[];
 }
@@ -167,7 +167,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
     description: 'Mover para outra lista',
     icon: ArrowRight,
     configFields: [
-      { name: 'target_list_id', label: 'Lista de destino', type: 'select', required: true }
+      { name: 'target_list_id', label: 'Lista de destino', type: 'list', required: true }
     ]
   },
   {

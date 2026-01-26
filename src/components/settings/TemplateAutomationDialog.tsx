@@ -507,6 +507,9 @@ export function TemplateAutomationDialog({
                   workspaceId={workspaceId}
                   actions={actions}
                   onActionsChange={setActions}
+                  isTemplateContext={true}
+                  templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
+                  templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
                 />
               ) : (
                 <>
@@ -551,6 +554,9 @@ export function TemplateAutomationDialog({
                       workspaceId={workspaceId}
                       config={actionConfig}
                       onConfigChange={setActionConfig}
+                      isTemplateContext={true}
+                      templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
+                      templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
                     />
                   )}
                 </>

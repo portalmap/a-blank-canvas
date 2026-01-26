@@ -1,23 +1,43 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getActionById, ActionConfigField } from './actionCategories';
+import { List, Folder } from 'lucide-react';
+
+interface TemplateList {
+  id: string;
+  name: string;
+  folder_ref_id?: string | null;
+}
+
+interface TemplateFolder {
+  id: string;
+  name: string;
+}
 
 interface ActionConfigFormProps {
   actionId: string;
   workspaceId: string;
   config: Record<string, any>;
   onConfigChange: (config: Record<string, any>) => void;
+  // Props for template context
+  isTemplateContext?: boolean;
+  templateLists?: TemplateList[];
+  templateFolders?: TemplateFolder[];
 }
 
 export const ActionConfigForm = ({ 
   actionId, 
   workspaceId, 
   config, 
-  onConfigChange 
+  onConfigChange,
+  isTemplateContext = false,
+  templateLists = [],
+  templateFolders = [],
 }: ActionConfigFormProps) => {
   const action = getActionById(actionId);
 
@@ -45,7 +65,7 @@ export const ActionConfigForm = ({
         profile: profiles?.find(p => p.id === member.user_id) || null
       }));
     },
-    enabled: !!workspaceId,
+    enabled: !!workspaceId && !isTemplateContext,
   });
 
   // Fetch statuses
@@ -63,6 +83,90 @@ export const ActionConfigForm = ({
     },
     enabled: !!workspaceId,
   });
+
+  // Fetch spaces for the workspace
+  const { data: spaces = [] } = useQuery({
+    queryKey: ['spaces', workspaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('spaces')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId && !isTemplateContext,
+  });
+
+  // Fetch folders for the workspace
+  const { data: folders = [] } = useQuery({
+    queryKey: ['folders', 'workspace', workspaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('folders')
+        .select('*, spaces!inner(workspace_id)')
+        .eq('spaces.workspace_id', workspaceId)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId && !isTemplateContext,
+  });
+
+  // Fetch lists for the workspace
+  const { data: lists = [] } = useQuery({
+    queryKey: ['lists', 'workspace', workspaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId && !isTemplateContext,
+  });
+
+  // Organize lists by Space > Folder hierarchy
+  const groupedLists = useMemo(() => {
+    if (isTemplateContext) {
+      // For templates, group by folder
+      const withFolder = templateLists.filter(l => l.folder_ref_id);
+      const withoutFolder = templateLists.filter(l => !l.folder_ref_id);
+      
+      const folderGroups = templateFolders.map(folder => ({
+        folder,
+        lists: withFolder.filter(l => l.folder_ref_id === folder.id)
+      })).filter(g => g.lists.length > 0);
+
+      return {
+        folderGroups,
+        directLists: withoutFolder
+      };
+    }
+
+    // For regular automations, organize by Space > Folder
+    return spaces.map(space => {
+      const spaceFolders = folders.filter((f: any) => f.space_id === space.id);
+      const folderGroups = spaceFolders.map(folder => ({
+        folder,
+        lists: lists.filter(l => l.folder_id === folder.id)
+      })).filter(g => g.lists.length > 0);
+
+      const directLists = lists.filter(l => l.space_id === space.id && !l.folder_id);
+
+      return {
+        space,
+        folderGroups,
+        directLists
+      };
+    }).filter(g => g.folderGroups.length > 0 || g.directLists.length > 0);
+  }, [spaces, folders, lists, isTemplateContext, templateLists, templateFolders]);
 
   if (!action || !action.configFields?.length) {
     return null;
@@ -127,6 +231,110 @@ export const ActionConfigForm = ({
                     </div>
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+
+      case 'list':
+        return (
+          <div key={field.name} className="space-y-2">
+            <Label>{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+            <Select
+              value={config[field.name] || ''}
+              onValueChange={(value) => handleFieldChange(field.name, value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma lista..." />
+              </SelectTrigger>
+              <SelectContent>
+                {isTemplateContext ? (
+                  // Template context: show template lists
+                  <>
+                    {(groupedLists as { folderGroups: any[]; directLists: TemplateList[] }).folderGroups.map((fg) => (
+                      <SelectGroup key={fg.folder.id}>
+                        <SelectLabel className="flex items-center gap-1.5">
+                          <Folder className="h-3.5 w-3.5" />
+                          {fg.folder.name}
+                        </SelectLabel>
+                        {fg.lists.map((list: TemplateList) => (
+                          <SelectItem key={list.id} value={list.id}>
+                            <div className="flex items-center gap-2 pl-2">
+                              <List className="h-4 w-4 text-muted-foreground" />
+                              <span>{list.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                    {(groupedLists as { folderGroups: any[]; directLists: TemplateList[] }).directLists.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-xs text-muted-foreground">Listas diretas</SelectLabel>
+                        {(groupedLists as { folderGroups: any[]; directLists: TemplateList[] }).directLists.map((list) => (
+                          <SelectItem key={list.id} value={list.id}>
+                            <div className="flex items-center gap-2">
+                              <List className="h-4 w-4 text-muted-foreground" />
+                              <span>{list.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {templateLists.length === 0 && (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Nenhuma lista no template
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Normal context: show workspace lists organized by Space > Folder
+                  <>
+                    {(groupedLists as { space: any; folderGroups: any[]; directLists: any[] }[]).map((spaceGroup) => (
+                      <SelectGroup key={spaceGroup.space.id}>
+                        <SelectLabel className="font-semibold flex items-center gap-1.5">
+                          <div 
+                            className="w-2.5 h-2.5 rounded-sm" 
+                            style={{ backgroundColor: spaceGroup.space.color || '#6366f1' }}
+                          />
+                          {spaceGroup.space.name}
+                        </SelectLabel>
+                        
+                        {/* Direct lists in space */}
+                        {spaceGroup.directLists.map((list) => (
+                          <SelectItem key={list.id} value={list.id}>
+                            <div className="flex items-center gap-2 pl-2">
+                              <List className="h-4 w-4 text-muted-foreground" />
+                              <span>{list.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                        
+                        {/* Lists in folders */}
+                        {spaceGroup.folderGroups.map((fg) => (
+                          <div key={fg.folder.id}>
+                            <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
+                              <Folder className="h-3 w-3" />
+                              {fg.folder.name}
+                            </div>
+                            {fg.lists.map((list: any) => (
+                              <SelectItem key={list.id} value={list.id}>
+                                <div className="flex items-center gap-2 pl-4">
+                                  <List className="h-4 w-4 text-muted-foreground" />
+                                  <span>{list.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                    {lists.length === 0 && (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Nenhuma lista encontrada
+                      </div>
+                    )}
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
