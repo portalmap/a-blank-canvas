@@ -1,41 +1,71 @@
 
-## Plano: Corrigir Resolução de Mensagens do Chat
+## Plano: Status da Ação Baseado na Lista de Destino do "Mover Tarefa"
 
-### Problema Identificado
-A política RLS atual para UPDATE na tabela `chat_messages` permite apenas que o **remetente (sender)** atualize suas mensagens:
-```sql
-qual:(sender_id = auth.uid())
-```
+### Problema Atual
+Quando há múltiplas ações em sequência:
+1. **Mover tarefa** → seleciona "Plan. de Criativos" como destino
+2. **Alterar status** → mostra status do escopo original, não da lista de destino
 
-Quando uma mensagem é **atribuída a outro usuário** e esse usuário tenta clicar em "Resolver", a operação falha silenciosamente porque a RLS bloqueia a atualização.
+O campo de status na ação "Alterar status" deveria mostrar os status da lista selecionada na ação "Mover tarefa" acima, pois a tarefa já terá sido movida quando essa ação for executada.
 
 ---
 
 ### Solução
 
-Adicionar uma nova política RLS que permita ao **assignee** resolver mensagens atribuídas a ele.
-
-#### Nova Política RLS
-
-```sql
-CREATE POLICY "Assignees can resolve messages assigned to them"
-ON chat_messages
-FOR UPDATE
-USING (assignee_id = auth.uid())
-WITH CHECK (assignee_id = auth.uid());
-```
-
-Esta política permite que:
-- O usuário atribuído (assignee) pode atualizar a mensagem
-- Especificamente para definir `resolved_at` e `resolved_by`
+Modificar o `MultiActionSelector` para detectar se existe uma ação `move_task` anterior e passar o `target_list_id` como escopo para as ações subsequentes.
 
 ---
 
-### Arquivos a Modificar
+### Mudanças Necessárias
 
-| Arquivo | Mudança |
-|---------|---------|
-| Nova migration SQL | Criar política RLS permitindo assignee resolver mensagens |
+#### 1. Modificar `MultiActionSelector.tsx`
+
+Adicionar lógica para determinar o escopo efetivo de cada ação baseado nas ações anteriores:
+
+```typescript
+// Função para encontrar o escopo efetivo de uma ação
+const getEffectiveScopeForAction = (actionIndex: number) => {
+  // Procurar ação "move_task" anterior com lista configurada
+  for (let i = actionIndex - 1; i >= 0; i--) {
+    const prevAction = actions[i];
+    if (prevAction.type === 'move_task' && prevAction.config?.target_list_id) {
+      return {
+        scopeType: 'list' as const,
+        scopeId: prevAction.config.target_list_id,
+      };
+    }
+  }
+  // Se não encontrar, usar o escopo original
+  return { scopeType, scopeId };
+};
+```
+
+No render do `ActionConfigForm`, passar o escopo efetivo:
+
+```tsx
+{actions.map((action, index) => {
+  const effectiveScope = getEffectiveScopeForAction(index);
+  
+  return (
+    <Card key={action.id} className="p-3">
+      {/* ... */}
+      {action.type && (
+        <ActionConfigForm
+          actionId={action.type}
+          workspaceId={workspaceId}
+          config={action.config}
+          onConfigChange={(config) => handleUpdateActionConfig(action.id, config)}
+          scopeType={effectiveScope.scopeType}
+          scopeId={effectiveScope.scopeId}
+          isTemplateContext={isTemplateContext}
+          templateLists={templateLists}
+          templateFolders={templateFolders}
+        />
+      )}
+    </Card>
+  );
+})}
+```
 
 ---
 
@@ -45,30 +75,46 @@ Esta política permite que:
 ┌──────────────────────────────────────────────────────────────────┐
 │  ANTES                                                           │
 │  ────────                                                        │
-│  User A envia mensagem atribuída a User B                        │
-│  User B clica em "Resolver"                                      │
-│  RLS bloqueia: sender_id != auth.uid() ❌                        │
-│  Operação falha silenciosamente                                  │
+│  Ação 1: Mover tarefa → Plan. de Criativos                       │
+│  Ação 5: Alterar status → Mostra status do escopo ORIGINAL       │
+│                                                                  │
+│  Status listados: status da lista/space de origem ❌              │
 └──────────────────────────────────────────────────────────────────┘
                               ↓
 ┌──────────────────────────────────────────────────────────────────┐
 │  DEPOIS                                                          │
 │  ────────                                                        │
-│  User A envia mensagem atribuída a User B                        │
-│  User B clica em "Resolver"                                      │
-│  RLS permite: assignee_id = auth.uid() ✅                        │
-│  Mensagem marcada como resolvida                                 │
-│  Toast: "Atribuição resolvida!"                                  │
+│  Ação 1: Mover tarefa → Plan. de Criativos                       │
+│  Ação 5: Alterar status → Mostra status de "Plan. de Criativos"  │
+│                                                                  │
+│  Status listados: status da lista de DESTINO ✅                   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### Resultado Esperado
+### Arquivos a Modificar
 
-1. Usuário atribuído (assignee) pode resolver mensagens tanto:
-   - No chat diretamente (ChatMessageItem)
-   - No card "Comentários atribuídos" da Home (AssignedCommentsCard)
-2. Toast de sucesso exibido após resolução
-3. Mensagem desaparece da lista de comentários atribuídos
-4. Indicador "(resolvido)" aparece na mensagem do chat
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/automations/advanced/MultiActionSelector.tsx` | Adicionar função `getEffectiveScopeForAction` e usar no render de cada ação |
+
+---
+
+### Comportamento Esperado
+
+1. Usuário adiciona ação "Mover tarefa" e seleciona lista de destino
+2. Usuário adiciona ação "Alterar status" abaixo
+3. O seletor de status mostra automaticamente os status da lista de destino
+4. Se o usuário mudar a lista de destino no "Mover tarefa", o seletor de status atualiza automaticamente
+5. Se não houver ação "Mover tarefa" anterior, usa o escopo original da automação
+
+---
+
+### Detalhes Técnicos
+
+O hook `useStatusesForScope` já suporta buscar status por lista, então basta passar:
+- `scopeType: 'list'`
+- `scopeId: target_list_id` (da ação move_task anterior)
+
+Para contexto de **template**, a lógica também funciona pois os `templateLists` passam os IDs de referência que serão mapeados quando o template for aplicado.
