@@ -16,6 +16,7 @@ interface TemplateList {
   id: string;
   name: string;
   folder_ref_id?: string | null;
+  status_template_id?: string | null;
 }
 
 interface TemplateFolder {

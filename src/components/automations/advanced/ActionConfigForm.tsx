@@ -13,6 +13,7 @@ interface TemplateList {
   id: string;
   name: string;
   folder_ref_id?: string | null;
+  status_template_id?: string | null;
 }
 
 interface TemplateFolder {
@@ -74,12 +75,45 @@ export const ActionConfigForm = ({
     enabled: !!workspaceId && !isTemplateContext,
   });
 
-  // Fetch statuses for scope (using the proper scope-aware hook)
+  // For template context, find the selected template list to get its status_template_id
+  const selectedTemplateList = isTemplateContext && scopeType === 'list' && scopeId
+    ? templateLists.find(l => l.id === scopeId)
+    : null;
+
+  // Fetch statuses from status_template_items when in template context
+  const { data: templateStatuses = [] } = useQuery({
+    queryKey: ['template-status-items', selectedTemplateList?.status_template_id],
+    queryFn: async () => {
+      if (!selectedTemplateList?.status_template_id) return [];
+      
+      const { data, error } = await supabase
+        .from('status_template_items')
+        .select('*')
+        .eq('template_id', selectedTemplateList.status_template_id)
+        .order('order_index');
+
+      if (error) throw error;
+      return data.map(s => ({
+        id: s.id,
+        name: s.name,
+        color: s.color,
+        is_default: s.is_default,
+        order_index: s.order_index,
+        category: s.category,
+      }));
+    },
+    enabled: !!selectedTemplateList?.status_template_id,
+  });
+
+  // Fetch statuses for scope (using the proper scope-aware hook) - only when NOT in template context
   const { data: statuses = [] } = useStatusesForScope(
     scopeType === 'workspace' ? 'workspace' : scopeType as 'list' | 'folder' | 'space',
     scopeId,
     workspaceId
   );
+
+  // Use template statuses when available in template context, otherwise use regular statuses
+  const effectiveStatuses = isTemplateContext && templateStatuses.length > 0 ? templateStatuses : statuses;
 
   // Fetch workspace tags
   const { data: tags = [] } = useQuery({
@@ -233,7 +267,7 @@ export const ActionConfigForm = ({
                 <SelectValue placeholder="Selecione um status..." />
               </SelectTrigger>
               <SelectContent>
-                {statuses?.map((status) => (
+                {effectiveStatuses?.map((status) => (
                   <SelectItem key={status.id} value={status.id}>
                     <div className="flex items-center gap-2">
                       <div 

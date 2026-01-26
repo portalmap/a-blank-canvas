@@ -510,7 +510,7 @@ export function TemplateAutomationDialog({
                   scopeType={scopeType}
                   scopeId={listRefId || folderRefId}
                   isTemplateContext={true}
-                  templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
+                  templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id, status_template_id: l.status_template_id }))}
                   templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
                 />
               ) : (
@@ -559,7 +559,7 @@ export function TemplateAutomationDialog({
                       scopeType={scopeType}
                       scopeId={listRefId || folderRefId}
                       isTemplateContext={true}
-                      templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id }))}
+                      templateLists={lists.map(l => ({ id: l.id, name: l.name, folder_ref_id: l.folder_ref_id, status_template_id: l.status_template_id }))}
                       templateFolders={folders.map(f => ({ id: f.id, name: f.name }))}
                     />
                   )}
