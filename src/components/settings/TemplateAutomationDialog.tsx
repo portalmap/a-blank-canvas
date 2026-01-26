@@ -358,64 +358,103 @@ export function TemplateAutomationDialog({
 
           {/* Trigger → Action Flow */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-4 items-start">
-            {/* Trigger Card */}
-            <Card 
-              className={`p-4 cursor-pointer transition-all ${
-                activeStep === 'trigger' ? 'ring-2 ring-primary' : ''
-              }`}
-              onClick={() => setActiveStep('trigger')}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Target className="h-4 w-4 text-primary" />
-                <span className="font-medium text-sm">Gatilho</span>
-                {selectedTriggerCategory && (
-                  <Badge variant="secondary" className="ml-auto text-xs">
-                    {selectedTriggerCategory.name}
-                  </Badge>
+            {/* Left Column: Trigger + Conditions */}
+            <div className="space-y-3">
+              {/* Trigger Card */}
+              <Card 
+                className={`p-4 cursor-pointer transition-all ${
+                  activeStep === 'trigger' ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => setActiveStep('trigger')}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-sm">Gatilho</span>
+                  {selectedTriggerCategory && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      {selectedTriggerCategory.name}
+                    </Badge>
+                  )}
+                </div>
+
+                {selectedTriggerData ? (
+                  <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
+                    <selectedTriggerData.icon className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">{selectedTriggerData.label}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 ml-auto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedTrigger(null);
+                        // Clear trigger config
+                        const { trigger_config, ...rest } = actionConfig;
+                        setActionConfig(rest);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Clique para selecionar um gatilho
+                  </p>
                 )}
-              </div>
 
-              {selectedTriggerData ? (
-                <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
-                  <selectedTriggerData.icon className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">{selectedTriggerData.label}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 ml-auto"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedTrigger(null);
-                      // Clear trigger config
-                      const { trigger_config, ...rest } = actionConfig;
-                      setActionConfig(rest);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Clique para selecionar um gatilho
-                </p>
-              )}
+                {activeStep === 'trigger' && workspaceId && (
+                  <div className="mt-4 border-t pt-4">
+                    <TriggerSelector
+                      selectedTrigger={selectedTrigger}
+                      onSelectTrigger={(id) => {
+                        setSelectedTrigger(id);
+                        setActiveStep('action');
+                      }}
+                      workspaceId={workspaceId}
+                      scopeType="workspace"
+                      config={actionConfig}
+                      onConfigChange={setActionConfig}
+                    />
+                  </div>
+                )}
+              </Card>
 
-              {activeStep === 'trigger' && workspaceId && (
-                <div className="mt-4 border-t pt-4">
-                  <TriggerSelector
-                    selectedTrigger={selectedTrigger}
-                    onSelectTrigger={(id) => {
-                      setSelectedTrigger(id);
-                      setActiveStep('action');
-                    }}
-                    workspaceId={workspaceId}
-                    scopeType="workspace"
-                    config={actionConfig}
-                    onConfigChange={setActionConfig}
-                  />
+              {/* Conditions Section - Below Trigger */}
+              <Collapsible open={showConditions} onOpenChange={setShowConditions}>
+                <div className="relative pl-4">
+                  {/* Connection line */}
+                  <div className="absolute left-[7px] top-0 bottom-0 w-px bg-border" />
+                  
+                  <Card className="border-l-2 border-primary/30">
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/50 rounded-t-lg transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">
+                            E se essa condição for verdadeira:
+                          </span>
+                          {conditions.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {conditions.length}
+                            </Badge>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-6 text-xs">
+                          {showConditions ? 'Ocultar' : 'Mostrar'}
+                        </Button>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="px-3 pb-3">
+                      <ConditionsBuilder
+                        workspaceId={workspaceId}
+                        conditions={conditions}
+                        onConditionsChange={setConditions}
+                      />
+                    </CollapsibleContent>
+                  </Card>
                 </div>
-              )}
-            </Card>
+              </Collapsible>
+            </div>
 
             {/* Arrow */}
             <div className="hidden md:flex items-center justify-center h-full pt-12">
@@ -518,35 +557,6 @@ export function TemplateAutomationDialog({
               )}
             </Card>
           </div>
-
-          {/* Conditions Section */}
-          <Collapsible open={showConditions} onOpenChange={setShowConditions}>
-            <Card className="p-4">
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center justify-between cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">Condições</span>
-                    {conditions.length > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {conditions.length}
-                      </Badge>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-7">
-                    {showConditions ? 'Ocultar' : 'Adicionar'}
-                  </Button>
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <ConditionsBuilder
-                  workspaceId={workspaceId}
-                  conditions={conditions}
-                  onConditionsChange={setConditions}
-                />
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
         </div>
 
         {/* Footer */}
