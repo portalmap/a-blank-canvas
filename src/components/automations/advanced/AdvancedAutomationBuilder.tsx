@@ -12,7 +12,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TriggerSelector } from './TriggerSelector';
 import { ActionSelector } from './ActionSelector';
 import { ActionConfigForm } from './ActionConfigForm';
-import { TriggerConfigForm } from './TriggerConfigForm';
+// TriggerConfigForm is now inline in TriggerSelector
 import { ConditionsBuilder } from './ConditionsBuilder';
 import { MultiActionSelector, type AutomationAction } from './MultiActionSelector';
 import { getTriggerById, getCategoryByTriggerId } from './triggerCategories';
@@ -300,20 +300,13 @@ export const AdvancedAutomationBuilder = ({
                       setSelectedTrigger(id);
                       setActiveStep('action');
                     }}
+                    workspaceId={workspaceId}
+                    scopeType={scope.scopeType}
+                    scopeId={scope.scopeId}
+                    config={actionConfig}
+                    onConfigChange={setActionConfig}
                   />
                 </div>
-              )}
-
-              {/* Trigger Config Form (e.g., status from/to selection) */}
-              {selectedTrigger && (
-                <TriggerConfigForm
-                  triggerId={selectedTrigger}
-                  workspaceId={workspaceId}
-                  scopeType={scope.scopeType}
-                  scopeId={scope.scopeId}
-                  config={actionConfig}
-                  onConfigChange={setActionConfig}
-                />
               )}
             </Card>
 

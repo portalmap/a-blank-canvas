@@ -3,13 +3,30 @@ import { ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TRIGGER_CATEGORIES, TriggerOption } from './triggerCategories';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TriggerInlineConfig } from './TriggerInlineConfig';
 
 interface TriggerSelectorProps {
   selectedTrigger: string | null;
   onSelectTrigger: (triggerId: string) => void;
+  workspaceId: string;
+  scopeType: 'workspace' | 'space' | 'folder' | 'list';
+  scopeId?: string;
+  config: Record<string, any>;
+  onConfigChange: (config: Record<string, any>) => void;
 }
 
-export const TriggerSelector = ({ selectedTrigger, onSelectTrigger }: TriggerSelectorProps) => {
+// List of triggers that have inline configuration
+const TRIGGERS_WITH_CONFIG = ['on_status_changed'];
+
+export const TriggerSelector = ({ 
+  selectedTrigger, 
+  onSelectTrigger,
+  workspaceId,
+  scopeType,
+  scopeId,
+  config,
+  onConfigChange,
+}: TriggerSelectorProps) => {
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['Popular']);
 
   const toggleCategory = (categoryName: string) => {
@@ -23,6 +40,8 @@ export const TriggerSelector = ({ selectedTrigger, onSelectTrigger }: TriggerSel
   const handleSelectTrigger = (trigger: TriggerOption) => {
     onSelectTrigger(trigger.id);
   };
+
+  const hasInlineConfig = (triggerId: string) => TRIGGERS_WITH_CONFIG.includes(triggerId);
 
   return (
     <ScrollArea className="h-[400px] pr-4">
@@ -61,38 +80,54 @@ export const TriggerSelector = ({ selectedTrigger, onSelectTrigger }: TriggerSel
                   {category.triggers.map((trigger) => {
                     const TriggerIcon = trigger.icon;
                     const isSelected = selectedTrigger === trigger.id;
+                    const showConfig = isSelected && hasInlineConfig(trigger.id);
 
                     return (
-                      <button
-                        key={trigger.id}
-                        onClick={() => handleSelectTrigger(trigger)}
-                        className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors",
-                          "hover:bg-accent",
-                          isSelected && "bg-primary/10 border border-primary/30"
-                        )}
-                      >
-                        <TriggerIcon className={cn(
-                          "h-4 w-4",
-                          isSelected ? "text-primary" : "text-muted-foreground"
-                        )} />
-                        <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-sm truncate",
-                            isSelected && "font-medium text-primary"
-                          )}>
-                            {trigger.label}
-                          </p>
-                          {trigger.description && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {trigger.description}
-                            </p>
+                      <div key={trigger.id}>
+                        <button
+                          onClick={() => handleSelectTrigger(trigger)}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors",
+                            "hover:bg-accent",
+                            isSelected && "bg-primary/10 border border-primary/30"
                           )}
-                        </div>
-                        {isSelected && (
-                          <Check className="h-4 w-4 text-primary shrink-0" />
+                        >
+                          <TriggerIcon className={cn(
+                            "h-4 w-4",
+                            isSelected ? "text-primary" : "text-muted-foreground"
+                          )} />
+                          <div className="flex-1 min-w-0">
+                            <p className={cn(
+                              "text-sm truncate",
+                              isSelected && "font-medium text-primary"
+                            )}>
+                              {trigger.label}
+                            </p>
+                            {trigger.description && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {trigger.description}
+                              </p>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-primary shrink-0" />
+                          )}
+                        </button>
+
+                        {/* Inline Configuration */}
+                        {showConfig && (
+                          <div className="ml-7 mt-2 mb-2 p-3 bg-accent/30 rounded-lg border border-border/50">
+                            <TriggerInlineConfig
+                              triggerId={trigger.id}
+                              workspaceId={workspaceId}
+                              scopeType={scopeType}
+                              scopeId={scopeId}
+                              config={config}
+                              onConfigChange={onConfigChange}
+                            />
+                          </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
