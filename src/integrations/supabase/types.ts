@@ -2800,6 +2800,7 @@ export type Database = {
         | "move_task"
         | "archive_task"
         | "send_webhook"
+        | "remove_all_assignees"
       automation_scope: "workspace" | "space" | "folder" | "list"
       automation_trigger:
         | "on_task_created"
@@ -2988,6 +2989,7 @@ export const Constants = {
         "move_task",
         "archive_task",
         "send_webhook",
+        "remove_all_assignees",
       ],
       automation_scope: ["workspace", "space", "folder", "list"],
       automation_trigger: [
