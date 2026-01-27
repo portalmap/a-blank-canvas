@@ -1,309 +1,236 @@
 
 
-## Plano: Dialog Completo para Configurar Tarefa no Template
+## Plano: Tarefa Completa no Template de Space
 
 ### Situação Atual
 
-Ao clicar em "Adicionar Tarefa" no editor de template, uma nova tarefa é criada diretamente com valores padrão e só permite edição inline de:
-- **Título** (via input)
-- **Prioridade** (via select)
+A tabela `space_template_tasks` só possui 3 campos configuráveis:
+- **Título** 
+- **Descrição**
+- **Prioridade**
 
-O campo **descrição** já existe no modelo de dados mas não está acessível na interface.
+Uma tarefa real no sistema (`tasks`) possui muitos mais campos:
+- Data de início
+- Data de entrega
+- Status inicial
+- Responsável padrão
+- Etiquetas (tags)
+- Tempo estimado
+- É marco (milestone)
 
 ---
 
 ### Solução Proposta
 
-Criar um dialog modal que abre ao clicar em "Adicionar Tarefa" (e também ao clicar em uma tarefa existente para editar), permitindo configurar todos os campos disponíveis:
-- Título
-- Descrição
-- Prioridade
+Expandir a tabela `space_template_tasks` para suportar os campos adicionais e atualizar o dialog para permitir sua configuração.
 
 ---
 
-### Funcionamento
+### Novos Campos no Banco de Dados
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `start_date_offset` | INTEGER | Dias após criação do space para data de início |
+| `due_date_offset` | INTEGER | Dias após criação do space para data de entrega |
+| `status_template_item_id` | UUID | Status inicial (do template de status) |
+| `estimated_time` | INTEGER | Tempo estimado em minutos |
+| `is_milestone` | BOOLEAN | Marcar como marco |
+| `tag_names` | TEXT[] | Array com nomes das tags a serem aplicadas |
+
+Nota: Usamos **offsets de data** (ex: +5 dias) ao invés de datas fixas, pois cada space criado terá datas relativas à sua data de criação.
+
+---
+
+### Fluxo de Mapeamento
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  FLUXO DE CRIAÇÃO/EDIÇÃO DE TAREFA                              │
+│  TEMPLATE TASK                        TASK REAL                 │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Usuário clica em "+ Adicionar Tarefa"                          │
-│     │                                                           │
-│     ▼                                                           │
-│  ┌──────────────────────────────────────┐                       │
-│  │  Dialog: Configurar Tarefa           │                       │
-│  ├──────────────────────────────────────┤                       │
-│  │  Título *                            │                       │
-│  │  ┌────────────────────────────────┐  │                       │
-│  │  │ Ex: Revisar briefing           │  │                       │
-│  │  └────────────────────────────────┘  │                       │
-│  │                                      │                       │
-│  │  Descrição                           │                       │
-│  │  ┌────────────────────────────────┐  │                       │
-│  │  │                                │  │                       │
-│  │  │ Instruções detalhadas...       │  │                       │
-│  │  │                                │  │                       │
-│  │  └────────────────────────────────┘  │                       │
-│  │                                      │                       │
-│  │  Prioridade                          │                       │
-│  │  ┌────────────────────────────────┐  │                       │
-│  │  │ ● Média               ▼        │  │                       │
-│  │  └────────────────────────────────┘  │                       │
-│  │                                      │                       │
-│  │         [Cancelar]  [Salvar]         │                       │
-│  └──────────────────────────────────────┘                       │
-│     │                                                           │
-│     ▼                                                           │
-│  Tarefa adicionada à lista com todas as informações             │
-│                                                                 │
+│  start_date_offset: 0          →   start_date: 2025-01-27      │
+│  due_date_offset: 7            →   due_date: 2025-02-03        │
+│  status_template_item_id: X    →   status_id: (mapeado)        │
+│  tag_names: ["urgente"]        →   task_tag_relations criadas  │
+│  estimated_time: 120           →   estimated_time: 120         │
+│  is_milestone: true            →   is_milestone: true          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### Mudanças Técnicas
+### Interface do Dialog Atualizada
 
-#### 1. Novo componente: `TemplateTaskDialog.tsx`
+```text
+┌──────────────────────────────────────────────────┐
+│  Configurar Tarefa                          [×]  │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  Título *                                        │
+│  ┌────────────────────────────────────────────┐  │
+│  │ Otimização de Público                      │  │
+│  └────────────────────────────────────────────┘  │
+│                                                  │
+│  Descrição                                       │
+│  ┌────────────────────────────────────────────┐  │
+│  │                                            │  │
+│  │ Instruções detalhadas...                   │  │
+│  │                                            │  │
+│  └────────────────────────────────────────────┘  │
+│                                                  │
+│  ┌─────────────────┐  ┌─────────────────────┐    │
+│  │ Prioridade      │  │ Status Inicial      │    │
+│  │ ● Média      ▼  │  │ 📋 A fazer      ▼   │    │
+│  └─────────────────┘  └─────────────────────┘    │
+│                                                  │
+│  ┌─────────────────┐  ┌─────────────────────┐    │
+│  │ Início (dias)   │  │ Entrega (dias)      │    │
+│  │ +0              │  │ +7                  │    │
+│  └─────────────────┘  └─────────────────────┘    │
+│  (após criação)       (após criação)             │
+│                                                  │
+│  ┌─────────────────┐  ┌─────────────────────┐    │
+│  │ Tempo estimado  │  │ ☐ É um marco        │    │
+│  │ 2h              │  │                     │    │
+│  └─────────────────┘  └─────────────────────┘    │
+│                                                  │
+│  Etiquetas                                       │
+│  ┌────────────────────────────────────────────┐  │
+│  │ [urgente ×] [revisar ×]  + Adicionar       │  │
+│  └────────────────────────────────────────────┘  │
+│                                                  │
+│                    [Cancelar]  [Salvar]          │
+└──────────────────────────────────────────────────┘
+```
 
+---
+
+### Migration SQL
+
+```sql
+-- Adicionar novos campos à tabela space_template_tasks
+ALTER TABLE public.space_template_tasks
+ADD COLUMN start_date_offset INTEGER,
+ADD COLUMN due_date_offset INTEGER,
+ADD COLUMN status_template_item_id UUID REFERENCES public.status_template_items(id) ON DELETE SET NULL,
+ADD COLUMN estimated_time INTEGER,
+ADD COLUMN is_milestone BOOLEAN DEFAULT false,
+ADD COLUMN tag_names TEXT[];
+```
+
+---
+
+### Arquivos a Modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| **Migration** | Adicionar novos campos à tabela |
+| `src/components/settings/TemplateTaskDialog.tsx` | Expandir formulário com novos campos |
+| `src/components/settings/SpaceTemplateEditor.tsx` | Atualizar interface de TaskItem |
+| `src/hooks/useSpaceTemplates.ts` | Incluir novos campos no save/load |
+
+---
+
+### Detalhes de Implementação
+
+#### 1. TemplateTaskDialog Expandido
+
+Novos estados:
+```typescript
+const [startDateOffset, setStartDateOffset] = useState<number | null>(null);
+const [dueDateOffset, setDueDateOffset] = useState<number | null>(null);
+const [statusTemplateItemId, setStatusTemplateItemId] = useState<string | null>(null);
+const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
+const [isMilestone, setIsMilestone] = useState(false);
+const [tagNames, setTagNames] = useState<string[]>([]);
+```
+
+Props adicionais:
 ```typescript
 interface TemplateTaskDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  task?: TaskItem | null; // null = criar nova
-  onSave: (task: { title: string; description: string; priority: string }) => void;
+  // ... existentes
+  statusTemplateItems?: StatusTemplateItem[]; // Para popular o select de status
+  availableTags?: string[]; // Nomes de tags do workspace
 }
-
-export const TemplateTaskDialog = ({ open, onOpenChange, task, onSave }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('medium');
-
-  useEffect(() => {
-    if (task) {
-      setTitle(task.title);
-      setDescription(task.description);
-      setPriority(task.priority);
-    } else {
-      setTitle('');
-      setDescription('');
-      setPriority('medium');
-    }
-  }, [task, open]);
-
-  const handleSave = () => {
-    if (!title.trim()) return;
-    onSave({ title, description, priority });
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {task ? 'Editar Tarefa' : 'Nova Tarefa'}
-          </DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Título *</Label>
-            <Input 
-              value={title} 
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Revisar briefing do cliente"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Descrição</Label>
-            <Textarea 
-              value={description} 
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Instruções ou detalhes da tarefa..."
-              rows={4}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Prioridade</Label>
-            <Select value={priority} onValueChange={setPriority}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORITY_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />
-                      {opt.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={!title.trim()}>
-            {task ? 'Salvar' : 'Adicionar'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
 ```
 
-#### 2. Modificar `SpaceTemplateEditor.tsx`
-
-Adicionar estado para controlar o dialog:
+#### 2. TaskItem Atualizado
 
 ```typescript
-const [taskDialogOpen, setTaskDialogOpen] = useState(false);
-const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
-const [pendingListTempId, setPendingListTempId] = useState<string | null>(null);
+interface TaskItem {
+  tempId: string;
+  listTempId: string;
+  title: string;
+  description: string;
+  priority: string;
+  // Novos campos
+  startDateOffset: number | null;
+  dueDateOffset: number | null;
+  statusTemplateItemId: string | null;
+  estimatedTime: number | null;
+  isMilestone: boolean;
+  tagNames: string[];
+}
 ```
 
-Modificar a função `addTask`:
+#### 3. Renderização na Lista
 
-```typescript
-const openAddTaskDialog = (listTempId: string) => {
-  setPendingListTempId(listTempId);
-  setEditingTask(null);
-  setTaskDialogOpen(true);
-};
-
-const openEditTaskDialog = (task: TaskItem) => {
-  setEditingTask(task);
-  setPendingListTempId(null);
-  setTaskDialogOpen(true);
-};
-
-const handleTaskSave = (taskData: { title: string; description: string; priority: string }) => {
-  if (editingTask) {
-    // Atualizar tarefa existente
-    setTasks(tasks.map(t => 
-      t.tempId === editingTask.tempId 
-        ? { ...t, ...taskData } 
-        : t
-    ));
-  } else if (pendingListTempId) {
-    // Criar nova tarefa
-    setTasks([...tasks, {
-      tempId: generateTempId('task'),
-      listTempId: pendingListTempId,
-      ...taskData,
-    }]);
-  }
-};
-```
-
-Modificar `renderTask` para permitir edição ao clicar:
-
+Mostrar indicadores visuais:
 ```typescript
 const renderTask = (task: TaskItem) => {
   return (
-    <div 
-      key={task.tempId} 
-      className="flex items-center gap-2 pl-10 py-1 cursor-pointer hover:bg-muted/50 rounded"
-      onClick={() => openEditTaskDialog(task)}
-    >
-      <CheckSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-      <span className="text-sm flex-1 truncate">{task.title}</span>
-      <Badge variant="outline" className="text-xs">
-        {PRIORITY_OPTIONS.find(p => p.value === task.priority)?.label}
-      </Badge>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-6 w-6"
-        onClick={(e) => {
-          e.stopPropagation();
-          removeTask(task.tempId);
-        }}
-      >
-        <X className="h-3 w-3" />
-      </Button>
+    <div className="flex items-center gap-2 ...">
+      <CheckSquare className="h-4 w-4" />
+      <span>{task.title}</span>
+      
+      {task.dueDateOffset !== null && (
+        <Badge variant="outline" className="text-xs">
+          +{task.dueDateOffset}d
+        </Badge>
+      )}
+      
+      {task.isMilestone && (
+        <Flag className="h-3 w-3 text-amber-500" />
+      )}
+      
+      {task.tagNames.length > 0 && (
+        <Badge className="text-xs">{task.tagNames.length} tags</Badge>
+      )}
+      
+      <PriorityBadge priority={task.priority} />
     </div>
   );
 };
 ```
 
-Modificar o botão "Adicionar Tarefa":
+---
 
+### Comportamento das Datas
+
+As datas são **offsets relativos** à data de criação do space:
+
+| Offset | Significado |
+|--------|-------------|
+| `0` | No dia da criação |
+| `7` | 7 dias após criação |
+| `-3` | 3 dias antes (já vencido) |
+| `null` | Sem data definida |
+
+Quando o space é criado:
 ```typescript
-<Button
-  variant="ghost"
-  size="sm"
-  className="ml-10 text-muted-foreground"
-  onClick={() => openAddTaskDialog(list.tempId)}
->
-  <Plus className="h-3 w-3 mr-1" />
-  Adicionar Tarefa
-</Button>
-```
-
-Adicionar o dialog no JSX:
-
-```typescript
-<TemplateTaskDialog
-  open={taskDialogOpen}
-  onOpenChange={setTaskDialogOpen}
-  task={editingTask}
-  onSave={handleTaskSave}
-/>
+const startDate = startDateOffset !== null 
+  ? addDays(new Date(), startDateOffset).toISOString().split('T')[0]
+  : null;
 ```
 
 ---
 
-### Arquivos a Modificar/Criar
+### Resultado Esperado
 
-| Arquivo | Ação | Mudança |
-|---------|------|---------|
-| `src/components/settings/TemplateTaskDialog.tsx` | **CRIAR** | Dialog para criar/editar tarefas |
-| `src/components/settings/SpaceTemplateEditor.tsx` | Modificar | Integrar o dialog e ajustar renderização |
-
----
-
-### Comportamento Final
-
-1. **Criar tarefa**: Clique em "+ Adicionar Tarefa" abre o dialog vazio
-2. **Editar tarefa**: Clique em uma tarefa existente abre o dialog preenchido
-3. **Salvar**: Valida que o título não está vazio e adiciona/atualiza a tarefa
-4. **Cancelar**: Fecha o dialog sem alterações
-5. **Excluir**: O botão X continua funcionando para remover tarefas rapidamente
-
----
-
-### Visualização da Lista de Tarefas (após mudança)
-
-```text
-ANTES (inline editing)
-─────────────────────────────────────
-☐ [___________Input__________] [Média ▼] [×]
-
-DEPOIS (click to edit)
-─────────────────────────────────────
-☐ Otimização de Público          ○ Média  [×]
-    └── Click abre dialog para edição completa
-```
-
----
-
-### Extensibilidade Futura
-
-O dialog pode ser expandido futuramente para incluir:
-- Etiquetas (tags)
-- Data de início/vencimento
-- Checklist inicial
-- Atribuição padrão
-- Subtarefas
-
-Mas no momento, focamos nos 3 campos já suportados pelo banco: **título**, **descrição** e **prioridade**.
+1. Dialog de tarefa com TODOS os campos configuráveis
+2. Offsets de data para datas relativas
+3. Seleção de status inicial do template
+4. Seleção de tags por nome
+5. Configuração de tempo estimado e marco
+6. Visualização compacta na lista de tarefas do template
+7. Criação de tarefas completas quando o space é gerado
 
