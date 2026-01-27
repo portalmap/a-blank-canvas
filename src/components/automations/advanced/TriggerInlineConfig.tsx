@@ -1,5 +1,7 @@
 import { useStatusesForScope } from '@/hooks/useStatuses';
+import { useTaskTags } from '@/hooks/useTaskTags';
 import { StatusMultiSelect } from './StatusMultiSelect';
+import { TagMultiSelect } from './TagMultiSelect';
 
 interface TriggerInlineConfigProps {
   triggerId: string;
@@ -24,6 +26,9 @@ export const TriggerInlineConfig = ({
     scopeId,
     workspaceId
   );
+
+  // Fetch tags for the workspace
+  const { data: tags = [] } = useTaskTags(workspaceId);
 
   const triggerConfig = config.trigger_config || {};
 
@@ -73,11 +78,30 @@ export const TriggerInlineConfig = ({
       );
     }
 
-    // Future triggers can be added here
-    // case 'on_priority_changed':
-    //   return <PriorityConfig ... />;
-    // case 'on_schedule':
-    //   return <ScheduleConfig ... />;
+    case 'on_tag_added':
+    case 'on_tag_removed': {
+      const tagIds: string[] = triggerConfig.tag_ids || [];
+
+      const handleTagChange = (ids: string[]) => {
+        onConfigChange({
+          ...config,
+          trigger_config: {
+            ...triggerConfig,
+            tag_ids: ids.length > 0 ? ids : null,
+          },
+        });
+      };
+
+      return (
+        <TagMultiSelect
+          label={triggerId === 'on_tag_added' ? 'Etiquetas' : 'Etiquetas removidas'}
+          placeholder="Qualquer etiqueta"
+          tags={tags}
+          selectedIds={tagIds}
+          onSelectionChange={handleTagChange}
+        />
+      );
+    }
 
     default:
       return null;
