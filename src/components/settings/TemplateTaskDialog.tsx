@@ -29,12 +29,21 @@ import {
   Plus
 } from 'lucide-react';
 
+interface DateRecurrence {
+  type: 'weekly' | 'biweekly' | 'monthly';
+  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+  monthlyMode?: 'first_day' | 'last_day' | 'specific_day';
+  dayOfMonth?: number;
+}
+
 export interface TaskData {
   title: string;
   description: string;
   priority: string;
   startDateOffset: number | null;
   dueDateOffset: number | null;
+  startDateRecurrence?: DateRecurrence | null;
+  dueDateRecurrence?: DateRecurrence | null;
   statusTemplateItemId: string | null;
   estimatedTime: number | null;
   isMilestone: boolean;
@@ -67,8 +76,18 @@ export const TemplateTaskDialog = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [startDateMode, setStartDateMode] = useState<'offset' | 'recurring'>('offset');
   const [startDateOffset, setStartDateOffset] = useState<string>('');
+  const [startRecurrenceType, setStartRecurrenceType] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [startDayOfWeek, setStartDayOfWeek] = useState<string>('monday');
+  const [startMonthlyMode, setStartMonthlyMode] = useState<string>('first_day');
+  const [startDayOfMonth, setStartDayOfMonth] = useState<string>('');
+  const [dueDateMode, setDueDateMode] = useState<'offset' | 'recurring'>('offset');
   const [dueDateOffset, setDueDateOffset] = useState<string>('');
+  const [dueRecurrenceType, setDueRecurrenceType] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [dueDayOfWeek, setDueDayOfWeek] = useState<string>('monday');
+  const [dueMonthlyMode, setDueMonthlyMode] = useState<string>('first_day');
+  const [dueDayOfMonth, setDueDayOfMonth] = useState<string>('');
   const [statusTemplateItemId, setStatusTemplateItemId] = useState<string>('');
   const [estimatedHours, setEstimatedHours] = useState<string>('');
   const [estimatedMinutes, setEstimatedMinutes] = useState<string>('');
@@ -78,6 +97,14 @@ export const TemplateTaskDialog = ({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSubtasksOpen, setIsSubtasksOpen] = useState(false);
 
+  const WEEKDAYS = [
+    { value: 'monday', label: 'Seg' },
+    { value: 'tuesday', label: 'Ter' },
+    { value: 'wednesday', label: 'Qua' },
+    { value: 'thursday', label: 'Qui' },
+    { value: 'friday', label: 'Sex' },
+  ] as const;
+
   const selectedStatus = statusTemplateItems.find(s => s.id === statusTemplateItemId);
 
   useEffect(() => {
@@ -86,8 +113,41 @@ export const TemplateTaskDialog = ({
         setTitle(task.title);
         setDescription(task.description || '');
         setPriority(task.priority || 'medium');
-        setStartDateOffset(task.startDateOffset !== null ? String(task.startDateOffset) : '');
-        setDueDateOffset(task.dueDateOffset !== null ? String(task.dueDateOffset) : '');
+        
+        // Start date
+        if (task.startDateRecurrence) {
+          setStartDateMode('recurring');
+          setStartRecurrenceType(task.startDateRecurrence.type);
+          setStartDayOfWeek(task.startDateRecurrence.dayOfWeek || 'monday');
+          setStartMonthlyMode(task.startDateRecurrence.monthlyMode || 'first_day');
+          setStartDayOfMonth(task.startDateRecurrence.dayOfMonth ? String(task.startDateRecurrence.dayOfMonth) : '');
+          setStartDateOffset('');
+        } else {
+          setStartDateMode('offset');
+          setStartDateOffset(task.startDateOffset !== null ? String(task.startDateOffset) : '');
+          setStartRecurrenceType('weekly');
+          setStartDayOfWeek('monday');
+          setStartMonthlyMode('first_day');
+          setStartDayOfMonth('');
+        }
+        
+        // Due date
+        if (task.dueDateRecurrence) {
+          setDueDateMode('recurring');
+          setDueRecurrenceType(task.dueDateRecurrence.type);
+          setDueDayOfWeek(task.dueDateRecurrence.dayOfWeek || 'monday');
+          setDueMonthlyMode(task.dueDateRecurrence.monthlyMode || 'first_day');
+          setDueDayOfMonth(task.dueDateRecurrence.dayOfMonth ? String(task.dueDateRecurrence.dayOfMonth) : '');
+          setDueDateOffset('');
+        } else {
+          setDueDateMode('offset');
+          setDueDateOffset(task.dueDateOffset !== null ? String(task.dueDateOffset) : '');
+          setDueRecurrenceType('weekly');
+          setDueDayOfWeek('monday');
+          setDueMonthlyMode('first_day');
+          setDueDayOfMonth('');
+        }
+        
         setStatusTemplateItemId(task.statusTemplateItemId || '');
         
         if (task.estimatedTime !== null) {
@@ -106,8 +166,18 @@ export const TemplateTaskDialog = ({
         setTitle('');
         setDescription('');
         setPriority('medium');
+        setStartDateMode('offset');
         setStartDateOffset('');
+        setStartRecurrenceType('weekly');
+        setStartDayOfWeek('monday');
+        setStartMonthlyMode('first_day');
+        setStartDayOfMonth('');
+        setDueDateMode('offset');
         setDueDateOffset('');
+        setDueRecurrenceType('weekly');
+        setDueDayOfWeek('monday');
+        setDueMonthlyMode('first_day');
+        setDueDayOfMonth('');
         setStatusTemplateItemId('');
         setEstimatedHours('');
         setEstimatedMinutes('');
@@ -124,13 +194,41 @@ export const TemplateTaskDialog = ({
     const hours = parseInt(estimatedHours) || 0;
     const minutes = parseInt(estimatedMinutes) || 0;
     const totalMinutes = hours * 60 + minutes;
+
+    // Build start date recurrence
+    let startDateRecurrence: DateRecurrence | null = null;
+    if (startDateMode === 'recurring') {
+      startDateRecurrence = {
+        type: startRecurrenceType,
+        ...(startRecurrenceType !== 'monthly' && { dayOfWeek: startDayOfWeek as DateRecurrence['dayOfWeek'] }),
+        ...(startRecurrenceType === 'monthly' && { 
+          monthlyMode: startMonthlyMode as DateRecurrence['monthlyMode'],
+          ...(startMonthlyMode === 'specific_day' && startDayOfMonth && { dayOfMonth: parseInt(startDayOfMonth) })
+        }),
+      };
+    }
+
+    // Build due date recurrence
+    let dueDateRecurrence: DateRecurrence | null = null;
+    if (dueDateMode === 'recurring') {
+      dueDateRecurrence = {
+        type: dueRecurrenceType,
+        ...(dueRecurrenceType !== 'monthly' && { dayOfWeek: dueDayOfWeek as DateRecurrence['dayOfWeek'] }),
+        ...(dueRecurrenceType === 'monthly' && { 
+          monthlyMode: dueMonthlyMode as DateRecurrence['monthlyMode'],
+          ...(dueMonthlyMode === 'specific_day' && dueDayOfMonth && { dayOfMonth: parseInt(dueDayOfMonth) })
+        }),
+      };
+    }
     
     onSave({ 
       title: title.trim(), 
       description, 
       priority,
-      startDateOffset: startDateOffset !== '' ? parseInt(startDateOffset) : null,
-      dueDateOffset: dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
+      startDateOffset: startDateMode === 'offset' && startDateOffset !== '' ? parseInt(startDateOffset) : null,
+      dueDateOffset: dueDateMode === 'offset' && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
+      startDateRecurrence,
+      dueDateRecurrence,
       statusTemplateItemId: statusTemplateItemId || null,
       estimatedTime: totalMinutes > 0 ? totalMinutes : null,
       isMilestone,
@@ -235,44 +333,190 @@ export const TemplateTaskDialog = ({
               </div>
             </div>
 
-            {/* Datas - igual TaskMainContent mas com offset */}
+            {/* Datas - com opção de offset ou recorrência */}
             <div className="grid grid-cols-2 gap-4">
+              {/* Data de Início */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Calendar className="h-4 w-4" /> Data de Início
                 </label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={startDateOffset}
-                    onChange={(e) => setStartDateOffset(e.target.value)}
-                    placeholder="Ex: 0"
-                    className="pr-20"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                    dias após
-                  </span>
-                </div>
+                <Select value={startDateMode} onValueChange={(v) => setStartDateMode(v as 'offset' | 'recurring')}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="offset">Dias após criação</SelectItem>
+                    <SelectItem value="recurring">Recorrente</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {startDateMode === 'offset' && (
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={startDateOffset}
+                      onChange={(e) => setStartDateOffset(e.target.value)}
+                      placeholder="Ex: 0"
+                      className="pr-16"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                      dias
+                    </span>
+                  </div>
+                )}
+
+                {startDateMode === 'recurring' && (
+                  <div className="space-y-2 p-2 bg-muted/30 rounded-md">
+                    <Select value={startRecurrenceType} onValueChange={(v) => setStartRecurrenceType(v as 'weekly' | 'biweekly' | 'monthly')}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="biweekly">Quinzenal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {(startRecurrenceType === 'weekly' || startRecurrenceType === 'biweekly') && (
+                      <div className="flex gap-1 flex-wrap">
+                        {WEEKDAYS.map((day) => (
+                          <button
+                            key={day.value}
+                            type="button"
+                            className={`px-2 py-1 text-xs rounded border transition-colors ${
+                              startDayOfWeek === day.value
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-background border-input hover:bg-accent'
+                            }`}
+                            onClick={() => setStartDayOfWeek(day.value)}
+                          >
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {startRecurrenceType === 'monthly' && (
+                      <>
+                        <Select value={startMonthlyMode} onValueChange={setStartMonthlyMode}>
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
+                            <SelectItem value="last_day">Último dia do mês</SelectItem>
+                            <SelectItem value="specific_day">Dia específico</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {startMonthlyMode === 'specific_day' && (
+                          <Input
+                            type="number"
+                            min={1}
+                            max={31}
+                            value={startDayOfMonth}
+                            onChange={(e) => setStartDayOfMonth(e.target.value)}
+                            placeholder="Dia (1-31)"
+                            className="h-8"
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
+              {/* Data de Entrega */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Clock className="h-4 w-4" /> Data de Entrega
                 </label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={dueDateOffset}
-                    onChange={(e) => setDueDateOffset(e.target.value)}
-                    placeholder="Ex: 7"
-                    className="pr-20"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                    dias após
-                  </span>
-                </div>
+                <Select value={dueDateMode} onValueChange={(v) => setDueDateMode(v as 'offset' | 'recurring')}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="offset">Dias após criação</SelectItem>
+                    <SelectItem value="recurring">Recorrente</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {dueDateMode === 'offset' && (
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={dueDateOffset}
+                      onChange={(e) => setDueDateOffset(e.target.value)}
+                      placeholder="Ex: 7"
+                      className="pr-16"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                      dias
+                    </span>
+                  </div>
+                )}
+
+                {dueDateMode === 'recurring' && (
+                  <div className="space-y-2 p-2 bg-muted/30 rounded-md">
+                    <Select value={dueRecurrenceType} onValueChange={(v) => setDueRecurrenceType(v as 'weekly' | 'biweekly' | 'monthly')}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="biweekly">Quinzenal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {(dueRecurrenceType === 'weekly' || dueRecurrenceType === 'biweekly') && (
+                      <div className="flex gap-1 flex-wrap">
+                        {WEEKDAYS.map((day) => (
+                          <button
+                            key={day.value}
+                            type="button"
+                            className={`px-2 py-1 text-xs rounded border transition-colors ${
+                              dueDayOfWeek === day.value
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-background border-input hover:bg-accent'
+                            }`}
+                            onClick={() => setDueDayOfWeek(day.value)}
+                          >
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {dueRecurrenceType === 'monthly' && (
+                      <>
+                        <Select value={dueMonthlyMode} onValueChange={setDueMonthlyMode}>
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
+                            <SelectItem value="last_day">Último dia do mês</SelectItem>
+                            <SelectItem value="specific_day">Dia específico</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {dueMonthlyMode === 'specific_day' && (
+                          <Input
+                            type="number"
+                            min={1}
+                            max={31}
+                            value={dueDayOfMonth}
+                            onChange={(e) => setDueDayOfMonth(e.target.value)}
+                            placeholder="Dia (1-31)"
+                            className="h-8"
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
