@@ -3,6 +3,7 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { 
@@ -20,8 +21,9 @@ import {
   useDeleteSpaceTemplate, 
   useDuplicateSpaceTemplate 
 } from '@/hooks/useSpaceTemplates';
-import { Plus, MoreHorizontal, Pencil, Copy, Trash2, FolderTree, Loader2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Copy, Trash2, FolderTree, Loader2, Zap } from 'lucide-react';
 import { useState } from 'react';
+import { ApplyTemplateAutomationsDialog } from './ApplyTemplateAutomationsDialog';
 
 interface SpaceTemplateListProps {
   onEdit: (templateId: string) => void;
@@ -34,6 +36,7 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
   const duplicateTemplate = useDuplicateSpaceTemplate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+  const [applyAutomationsTemplateId, setApplyAutomationsTemplateId] = useState<string | null>(null);
 
   const handleDelete = (templateId: string) => {
     setTemplateToDelete(templateId);
@@ -117,6 +120,12 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
                     <Copy className="h-4 w-4 mr-2" />
                     Duplicar
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setApplyAutomationsTemplateId(template.id)}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Aplicar automações em Spaces
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={() => handleDelete(template.id)}
                     className="text-destructive focus:text-destructive"
@@ -147,6 +156,16 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {applyAutomationsTemplateId && (
+        <ApplyTemplateAutomationsDialog
+          open={!!applyAutomationsTemplateId}
+          onOpenChange={(open) => {
+            if (!open) setApplyAutomationsTemplateId(null);
+          }}
+          templateId={applyAutomationsTemplateId}
+        />
+      )}
     </div>
   );
 };
