@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { 
   useSpaceTemplate, 
   useCreateSpaceTemplate, 
@@ -11,6 +12,7 @@ import {
 } from '@/hooks/useSpaceTemplates';
 import { useStatusTemplates } from '@/hooks/useStatusTemplates';
 import { TemplateAutomationsSection } from './TemplateAutomationsSection';
+import { TemplateTaskDialog } from './TemplateTaskDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   ArrowLeft, 
@@ -81,6 +83,11 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [lists, setLists] = useState<ListItem[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  
+  // Task dialog state
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
+  const [pendingListTempId, setPendingListTempId] = useState<string | null>(null);
 
   useEffect(() => {
     if (template) {
@@ -157,14 +164,32 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
     ));
   };
 
-  const addTask = (listTempId: string) => {
-    setTasks([...tasks, {
-      tempId: generateTempId('task'),
-      listTempId,
-      title: 'Nova Tarefa',
-      description: '',
-      priority: 'medium',
-    }]);
+  const openAddTaskDialog = (listTempId: string) => {
+    setPendingListTempId(listTempId);
+    setEditingTask(null);
+    setTaskDialogOpen(true);
+  };
+
+  const openEditTaskDialog = (task: TaskItem) => {
+    setEditingTask(task);
+    setPendingListTempId(null);
+    setTaskDialogOpen(true);
+  };
+
+  const handleTaskSave = (taskData: { title: string; description: string; priority: string }) => {
+    if (editingTask) {
+      setTasks(tasks.map(t => 
+        t.tempId === editingTask.tempId 
+          ? { ...t, ...taskData } 
+          : t
+      ));
+    } else if (pendingListTempId) {
+      setTasks([...tasks, {
+        tempId: generateTempId('task'),
+        listTempId: pendingListTempId,
+        ...taskData,
+      }]);
+    }
   };
 
   const removeFolder = (tempId: string) => {
@@ -269,38 +294,35 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
     const priorityOption = PRIORITY_OPTIONS.find(p => p.value === task.priority);
 
     return (
-      <div key={task.tempId} className="flex items-center gap-2 pl-10 py-1">
+      <div 
+        key={task.tempId} 
+        className="flex items-center gap-2 pl-10 py-1.5 cursor-pointer hover:bg-muted/50 rounded group"
+        onClick={() => openEditTaskDialog(task)}
+      >
         <CheckSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <Input
-          value={task.title}
-          onChange={(e) => setTasks(tasks.map(t => 
-            t.tempId === task.tempId ? { ...t, title: e.target.value } : t
-          ))}
-          className="h-8 text-sm flex-1"
-          placeholder="Título da tarefa"
-        />
-        <Select 
-          value={task.priority}
-          onValueChange={(value) => setTasks(tasks.map(t => 
-            t.tempId === task.tempId ? { ...t, priority: value } : t
-          ))}
+        <span className="text-sm flex-1 truncate">{task.title}</span>
+        {task.description && (
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            (com descrição)
+          </span>
+        )}
+        <Badge variant="outline" className="text-xs">
+          <div 
+            className="w-2 h-2 rounded-full mr-1" 
+            style={{ backgroundColor: priorityOption?.color }} 
+          />
+          {priorityOption?.label}
+        </Badge>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" 
+          onClick={(e) => {
+            e.stopPropagation();
+            removeTask(task.tempId);
+          }}
         >
-          <SelectTrigger className="w-24 h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PRIORITY_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />
-                  {opt.label}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeTask(task.tempId)}>
-          <X className="h-4 w-4" />
+          <X className="h-3 w-3" />
         </Button>
       </div>
     );
@@ -368,7 +390,7 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
               variant="ghost"
               size="sm"
               className="ml-10 text-muted-foreground"
-              onClick={() => addTask(list.tempId)}
+              onClick={() => openAddTaskDialog(list.tempId)}
             >
               <Plus className="h-3 w-3 mr-1" />
               Adicionar Tarefa
@@ -527,9 +549,16 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
         </Button>
         <Button onClick={handleSave} disabled={!name.trim() || isSaving}>
           {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {templateId ? 'Salvar Alterações' : 'Criar Template'}
+        {templateId ? 'Salvar Alterações' : 'Criar Template'}
         </Button>
       </div>
+
+      <TemplateTaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        task={editingTask}
+        onSave={handleTaskSave}
+      />
     </div>
   );
 };
