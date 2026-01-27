@@ -453,7 +453,7 @@ export const ActionConfigForm = ({
                 value={config.date_type || ''}
                 onValueChange={(value) => {
                   // Limpar campos relacionados ao mudar o tipo
-                  const { days_count, day_of_month, ...rest } = config;
+                  const { days_count, day_of_month, recurrence_type, day_of_week, monthly_mode, ...rest } = config;
                   onConfigChange({ ...rest, date_type: value });
                 }}
               >
@@ -465,6 +465,7 @@ export const ActionConfigForm = ({
                   <SelectItem value="last_day_of_month">Último dia do mês</SelectItem>
                   <SelectItem value="days_after_trigger">Dias após o gatilho</SelectItem>
                   <SelectItem value="specific_day">Dia específico do mês</SelectItem>
+                  <SelectItem value="recurring">Recorrente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -498,6 +499,103 @@ export const ActionConfigForm = ({
                   }}
                   placeholder="Ex: 17"
                 />
+              </div>
+            )}
+
+            {/* Campo condicional: recorrência */}
+            {config.date_type === 'recurring' && (
+              <div className="space-y-3 p-3 bg-muted/30 rounded-md">
+                {/* Seletor de frequência */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Frequência <span className="text-destructive">*</span></Label>
+                  <Select
+                    value={config.recurrence_type || ''}
+                    onValueChange={(value) => {
+                      const { day_of_week, monthly_mode, day_of_month, ...rest } = config;
+                      onConfigChange({ ...rest, recurrence_type: value });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a frequência..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="biweekly">Quinzenal</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Seletor de dia da semana (para semanal/quinzenal) */}
+                {(config.recurrence_type === 'weekly' || config.recurrence_type === 'biweekly') && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Dia da semana <span className="text-destructive">*</span></Label>
+                    <div className="flex gap-1 flex-wrap">
+                      {[
+                        { value: 'monday', label: 'Seg' },
+                        { value: 'tuesday', label: 'Ter' },
+                        { value: 'wednesday', label: 'Qua' },
+                        { value: 'thursday', label: 'Qui' },
+                        { value: 'friday', label: 'Sex' },
+                      ].map((day) => (
+                        <button
+                          key={day.value}
+                          type="button"
+                          className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
+                            config.day_of_week === day.value
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-background border-input hover:bg-accent'
+                          }`}
+                          onClick={() => handleFieldChange('day_of_week', day.value)}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Seletor de dia do mês (para mensal) */}
+                {config.recurrence_type === 'monthly' && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Dia do mês <span className="text-destructive">*</span></Label>
+                    <Select
+                      value={config.monthly_mode || ''}
+                      onValueChange={(value) => {
+                        if (value !== 'specific_day') {
+                          const { day_of_month, ...rest } = config;
+                          onConfigChange({ ...rest, monthly_mode: value });
+                        } else {
+                          handleFieldChange('monthly_mode', value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
+                        <SelectItem value="last_day">Último dia do mês</SelectItem>
+                        <SelectItem value="specific_day">Dia específico</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {config.monthly_mode === 'specific_day' && (
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={config.day_of_month ?? ''}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          handleFieldChange('day_of_month', Math.min(31, Math.max(1, value || 1)));
+                        }}
+                        placeholder="Ex: 15"
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
