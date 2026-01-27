@@ -34,6 +34,12 @@ export interface SpaceTemplateTask {
   description: string | null;
   priority: string;
   order_index: number;
+  start_date_offset: number | null;
+  due_date_offset: number | null;
+  status_template_item_id: string | null;
+  estimated_time: number | null;
+  is_milestone: boolean;
+  tag_names: string[] | null;
 }
 
 export interface SpaceTemplate {
@@ -126,13 +132,27 @@ export const useSpaceTemplatesWithStructure = () => {
   });
 };
 
+interface TaskInput {
+  listRefIndex: number;
+  title: string;
+  description: string | null;
+  priority: string;
+  order_index: number;
+  start_date_offset?: number | null;
+  due_date_offset?: number | null;
+  status_template_item_id?: string | null;
+  estimated_time?: number | null;
+  is_milestone?: boolean;
+  tag_names?: string[] | null;
+}
+
 interface CreateSpaceTemplateInput {
   name: string;
   description?: string;
   color?: string;
   folders?: { name: string; description: string | null; order_index: number }[];
   lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number; status_template_id?: string | null }[];
-  tasks?: { listRefIndex: number; title: string; description: string | null; priority: string; order_index: number }[];
+  tasks?: TaskInput[];
 }
 
 export const useCreateSpaceTemplate = () => {
@@ -214,6 +234,12 @@ export const useCreateSpaceTemplate = () => {
               description: t.description,
               priority: t.priority,
               order_index: t.order_index,
+              start_date_offset: t.start_date_offset ?? null,
+              due_date_offset: t.due_date_offset ?? null,
+              status_template_item_id: t.status_template_item_id ?? null,
+              estimated_time: t.estimated_time ?? null,
+              is_milestone: t.is_milestone ?? false,
+              tag_names: t.tag_names ?? null,
             }))
           );
 
@@ -241,7 +267,7 @@ interface UpdateSpaceTemplateInput {
   color?: string | null;
   folders?: { name: string; description: string | null; order_index: number }[];
   lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number; status_template_id?: string | null }[];
-  tasks?: { listRefIndex: number; title: string; description: string | null; priority: string; order_index: number }[];
+  tasks?: TaskInput[];
 }
 
 export const useUpdateSpaceTemplate = () => {
@@ -344,6 +370,12 @@ export const useUpdateSpaceTemplate = () => {
                 description: t.description,
                 priority: t.priority,
                 order_index: t.order_index,
+                start_date_offset: t.start_date_offset ?? null,
+                due_date_offset: t.due_date_offset ?? null,
+                status_template_item_id: t.status_template_item_id ?? null,
+                estimated_time: t.estimated_time ?? null,
+                is_milestone: t.is_milestone ?? false,
+                tag_names: t.tag_names ?? null,
               }))
             );
 

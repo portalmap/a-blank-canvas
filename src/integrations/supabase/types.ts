@@ -1491,28 +1491,46 @@ export type Database = {
       space_template_tasks: {
         Row: {
           description: string | null
+          due_date_offset: number | null
+          estimated_time: number | null
           id: string
+          is_milestone: boolean | null
           list_ref_id: string
           order_index: number | null
           priority: string | null
+          start_date_offset: number | null
+          status_template_item_id: string | null
+          tag_names: string[] | null
           template_id: string
           title: string
         }
         Insert: {
           description?: string | null
+          due_date_offset?: number | null
+          estimated_time?: number | null
           id?: string
+          is_milestone?: boolean | null
           list_ref_id: string
           order_index?: number | null
           priority?: string | null
+          start_date_offset?: number | null
+          status_template_item_id?: string | null
+          tag_names?: string[] | null
           template_id: string
           title: string
         }
         Update: {
           description?: string | null
+          due_date_offset?: number | null
+          estimated_time?: number | null
           id?: string
+          is_milestone?: boolean | null
           list_ref_id?: string
           order_index?: number | null
           priority?: string | null
+          start_date_offset?: number | null
+          status_template_item_id?: string | null
+          tag_names?: string[] | null
           template_id?: string
           title?: string
         }
@@ -1522,6 +1540,13 @@ export type Database = {
             columns: ["list_ref_id"]
             isOneToOne: false
             referencedRelation: "space_template_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_template_tasks_status_template_item_id_fkey"
+            columns: ["status_template_item_id"]
+            isOneToOne: false
+            referencedRelation: "status_template_items"
             referencedColumns: ["id"]
           },
           {
