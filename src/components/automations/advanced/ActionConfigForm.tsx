@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getActionById, ActionConfigField } from './actionCategories';
 import { List, Folder } from 'lucide-react';
@@ -519,6 +520,7 @@ export const ActionConfigForm = ({
                       <SelectValue placeholder="Selecione a frequência..." />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="daily">Diariamente</SelectItem>
                       <SelectItem value="weekly">Semanal</SelectItem>
                       <SelectItem value="biweekly">Quinzenal</SelectItem>
                       <SelectItem value="monthly">Mensal</SelectItem>
@@ -596,6 +598,135 @@ export const ActionConfigForm = ({
                     )}
                   </div>
                 )}
+
+                {/* Status que dispara a recorrência */}
+                <div className="space-y-1.5 pt-2 border-t">
+                  <Label className="text-xs">
+                    Ao alterar o status: <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={config.trigger_on_status_id || ''}
+                    onValueChange={(value) => handleFieldChange('trigger_on_status_id', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o status de conclusão..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {effectiveStatuses
+                        .filter((s: any) => s.category === 'done')
+                        .map((status: any) => (
+                          <SelectItem key={status.id} value={status.id}>
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: status.color || '#22c55e' }}
+                              />
+                              <span>{status.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      {effectiveStatuses.filter((s: any) => s.category === 'done').length === 0 && (
+                        <div className="p-2 text-xs text-muted-foreground text-center">
+                          Nenhum status de conclusão encontrado
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sub-opções de recorrência */}
+                <div className="space-y-2.5 pt-2">
+                  {/* Ignorar fins de semana */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="skip_weekends"
+                      checked={config.skip_weekends || false}
+                      onCheckedChange={(checked) => handleFieldChange('skip_weekends', !!checked)}
+                    />
+                    <label htmlFor="skip_weekends" className="text-xs cursor-pointer">
+                      Ignorar fins de semana
+                    </label>
+                  </div>
+
+                  {/* Repetir para sempre */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="repeat_forever"
+                      checked={config.repeat_forever || false}
+                      onCheckedChange={(checked) => handleFieldChange('repeat_forever', !!checked)}
+                    />
+                    <label htmlFor="repeat_forever" className="text-xs cursor-pointer">
+                      Repetir para sempre
+                    </label>
+                  </div>
+
+                  {/* Criar nova tarefa */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="create_new_task"
+                      checked={config.on_complete_action === 'create_new_task'}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          const { reset_status_id, ...rest } = config;
+                          onConfigChange({ ...rest, on_complete_action: 'create_new_task' });
+                        } else {
+                          const { on_complete_action, ...rest } = config;
+                          onConfigChange(rest);
+                        }
+                      }}
+                    />
+                    <label htmlFor="create_new_task" className="text-xs cursor-pointer">
+                      Criar nova tarefa
+                    </label>
+                  </div>
+
+                  {/* Atualizar status para */}
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="update_status"
+                      checked={config.on_complete_action === 'update_status'}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          onConfigChange({ ...config, on_complete_action: 'update_status' });
+                        } else {
+                          const { on_complete_action, reset_status_id, ...rest } = config;
+                          onConfigChange(rest);
+                        }
+                      }}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 space-y-1.5">
+                      <label htmlFor="update_status" className="text-xs cursor-pointer">
+                        Atualizar status para:
+                      </label>
+                      {config.on_complete_action === 'update_status' && (
+                        <Select
+                          value={config.reset_status_id || ''}
+                          onValueChange={(value) => handleFieldChange('reset_status_id', value)}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {effectiveStatuses
+                              .filter((s: any) => s.category !== 'done')
+                              .map((status: any) => (
+                                <SelectItem key={status.id} value={status.id}>
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      className="w-3 h-3 rounded-full" 
+                                      style={{ backgroundColor: status.color || '#94a3b8' }}
+                                    />
+                                    <span>{status.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
