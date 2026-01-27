@@ -225,12 +225,12 @@ export const TemplateTaskDialog = ({
 
             <div className="space-y-2">
               <Label>Status Inicial</Label>
-              <Select value={statusTemplateItemId} onValueChange={setStatusTemplateItemId}>
+              <Select value={statusTemplateItemId || '__default__'} onValueChange={(val) => setStatusTemplateItemId(val === '__default__' ? '' : val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Padrão da lista" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Padrão da lista</SelectItem>
+                  <SelectItem value="__default__">Padrão da lista</SelectItem>
                   {statusTemplateItems.map((status) => (
                     <SelectItem key={status.id} value={status.id}>
                       <div className="flex items-center gap-2">
