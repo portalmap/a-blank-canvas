@@ -443,6 +443,66 @@ export const ActionConfigForm = ({
           </div>
         );
 
+      case 'date_config':
+        return (
+          <div key={field.name} className="space-y-4">
+            {/* Seletor do tipo de data */}
+            <div className="space-y-2">
+              <Label>Tipo de data <span className="text-destructive">*</span></Label>
+              <Select
+                value={config.date_type || ''}
+                onValueChange={(value) => {
+                  // Limpar campos relacionados ao mudar o tipo
+                  const { days_count, day_of_month, ...rest } = config;
+                  onConfigChange({ ...rest, date_type: value });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo de data..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="first_day_of_month">Primeiro dia do mês</SelectItem>
+                  <SelectItem value="last_day_of_month">Último dia do mês</SelectItem>
+                  <SelectItem value="days_after_trigger">Dias após o gatilho</SelectItem>
+                  <SelectItem value="specific_day">Dia específico do mês</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Campo condicional: dias após gatilho */}
+            {config.date_type === 'days_after_trigger' && (
+              <div className="space-y-2">
+                <Label>Quantidade de dias <span className="text-destructive">*</span></Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={config.days_count ?? ''}
+                  onChange={(e) => handleFieldChange('days_count', parseInt(e.target.value) || 0)}
+                  placeholder="Ex: 5"
+                />
+              </div>
+            )}
+            
+            {/* Campo condicional: dia específico */}
+            {config.date_type === 'specific_day' && (
+              <div className="space-y-2">
+                <Label>Dia do mês <span className="text-destructive">*</span></Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={config.day_of_month ?? ''}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    handleFieldChange('day_of_month', Math.min(31, Math.max(1, value || 1)));
+                  }}
+                  placeholder="Ex: 17"
+                />
+              </div>
+            )}
+          </div>
+        );
+
       case 'number':
         return (
           <div key={field.name} className="space-y-2">
