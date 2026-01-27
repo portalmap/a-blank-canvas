@@ -30,10 +30,16 @@ import {
 } from 'lucide-react';
 
 interface DateRecurrence {
-  type: 'weekly' | 'biweekly' | 'monthly';
+  type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
   dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
   monthlyMode?: 'first_day' | 'last_day' | 'specific_day';
   dayOfMonth?: number;
+  // Advanced recurrence options
+  repeatForever?: boolean;
+  skipWeekends?: boolean;
+  onCompleteAction?: 'create_new_task' | 'update_status';
+  resetStatusId?: string;
+  triggerOnStatusId?: string;
 }
 
 export interface TaskData {
@@ -78,16 +84,28 @@ export const TemplateTaskDialog = ({
   const [priority, setPriority] = useState('medium');
   const [startDateMode, setStartDateMode] = useState<'offset' | 'recurring'>('offset');
   const [startDateOffset, setStartDateOffset] = useState<string>('');
-  const [startRecurrenceType, setStartRecurrenceType] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [startRecurrenceType, setStartRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly');
   const [startDayOfWeek, setStartDayOfWeek] = useState<string>('monday');
   const [startMonthlyMode, setStartMonthlyMode] = useState<string>('first_day');
   const [startDayOfMonth, setStartDayOfMonth] = useState<string>('');
+  const [startRepeatForever, setStartRepeatForever] = useState(false);
+  const [startSkipWeekends, setStartSkipWeekends] = useState(false);
+  const [startOnCompleteAction, setStartOnCompleteAction] = useState<'create_new_task' | 'update_status' | ''>('');
+  const [startResetStatusId, setStartResetStatusId] = useState('');
+  const [startTriggerStatusId, setStartTriggerStatusId] = useState('');
+  
   const [dueDateMode, setDueDateMode] = useState<'offset' | 'recurring'>('offset');
   const [dueDateOffset, setDueDateOffset] = useState<string>('');
-  const [dueRecurrenceType, setDueRecurrenceType] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [dueRecurrenceType, setDueRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly');
   const [dueDayOfWeek, setDueDayOfWeek] = useState<string>('monday');
   const [dueMonthlyMode, setDueMonthlyMode] = useState<string>('first_day');
   const [dueDayOfMonth, setDueDayOfMonth] = useState<string>('');
+  const [dueRepeatForever, setDueRepeatForever] = useState(false);
+  const [dueSkipWeekends, setDueSkipWeekends] = useState(false);
+  const [dueOnCompleteAction, setDueOnCompleteAction] = useState<'create_new_task' | 'update_status' | ''>('');
+  const [dueResetStatusId, setDueResetStatusId] = useState('');
+  const [dueTriggerStatusId, setDueTriggerStatusId] = useState('');
+  
   const [statusTemplateItemId, setStatusTemplateItemId] = useState<string>('');
   const [estimatedHours, setEstimatedHours] = useState<string>('');
   const [estimatedMinutes, setEstimatedMinutes] = useState<string>('');
@@ -121,6 +139,11 @@ export const TemplateTaskDialog = ({
           setStartDayOfWeek(task.startDateRecurrence.dayOfWeek || 'monday');
           setStartMonthlyMode(task.startDateRecurrence.monthlyMode || 'first_day');
           setStartDayOfMonth(task.startDateRecurrence.dayOfMonth ? String(task.startDateRecurrence.dayOfMonth) : '');
+          setStartRepeatForever(task.startDateRecurrence.repeatForever || false);
+          setStartSkipWeekends(task.startDateRecurrence.skipWeekends || false);
+          setStartOnCompleteAction(task.startDateRecurrence.onCompleteAction || '');
+          setStartResetStatusId(task.startDateRecurrence.resetStatusId || '');
+          setStartTriggerStatusId(task.startDateRecurrence.triggerOnStatusId || '');
           setStartDateOffset('');
         } else {
           setStartDateMode('offset');
@@ -129,6 +152,11 @@ export const TemplateTaskDialog = ({
           setStartDayOfWeek('monday');
           setStartMonthlyMode('first_day');
           setStartDayOfMonth('');
+          setStartRepeatForever(false);
+          setStartSkipWeekends(false);
+          setStartOnCompleteAction('');
+          setStartResetStatusId('');
+          setStartTriggerStatusId('');
         }
         
         // Due date
@@ -138,6 +166,11 @@ export const TemplateTaskDialog = ({
           setDueDayOfWeek(task.dueDateRecurrence.dayOfWeek || 'monday');
           setDueMonthlyMode(task.dueDateRecurrence.monthlyMode || 'first_day');
           setDueDayOfMonth(task.dueDateRecurrence.dayOfMonth ? String(task.dueDateRecurrence.dayOfMonth) : '');
+          setDueRepeatForever(task.dueDateRecurrence.repeatForever || false);
+          setDueSkipWeekends(task.dueDateRecurrence.skipWeekends || false);
+          setDueOnCompleteAction(task.dueDateRecurrence.onCompleteAction || '');
+          setDueResetStatusId(task.dueDateRecurrence.resetStatusId || '');
+          setDueTriggerStatusId(task.dueDateRecurrence.triggerOnStatusId || '');
           setDueDateOffset('');
         } else {
           setDueDateMode('offset');
@@ -146,6 +179,11 @@ export const TemplateTaskDialog = ({
           setDueDayOfWeek('monday');
           setDueMonthlyMode('first_day');
           setDueDayOfMonth('');
+          setDueRepeatForever(false);
+          setDueSkipWeekends(false);
+          setDueOnCompleteAction('');
+          setDueResetStatusId('');
+          setDueTriggerStatusId('');
         }
         
         setStatusTemplateItemId(task.statusTemplateItemId || '');
@@ -172,12 +210,22 @@ export const TemplateTaskDialog = ({
         setStartDayOfWeek('monday');
         setStartMonthlyMode('first_day');
         setStartDayOfMonth('');
+        setStartRepeatForever(false);
+        setStartSkipWeekends(false);
+        setStartOnCompleteAction('');
+        setStartResetStatusId('');
+        setStartTriggerStatusId('');
         setDueDateMode('offset');
         setDueDateOffset('');
         setDueRecurrenceType('weekly');
         setDueDayOfWeek('monday');
         setDueMonthlyMode('first_day');
         setDueDayOfMonth('');
+        setDueRepeatForever(false);
+        setDueSkipWeekends(false);
+        setDueOnCompleteAction('');
+        setDueResetStatusId('');
+        setDueTriggerStatusId('');
         setStatusTemplateItemId('');
         setEstimatedHours('');
         setEstimatedMinutes('');
@@ -200,11 +248,16 @@ export const TemplateTaskDialog = ({
     if (startDateMode === 'recurring') {
       startDateRecurrence = {
         type: startRecurrenceType,
-        ...(startRecurrenceType !== 'monthly' && { dayOfWeek: startDayOfWeek as DateRecurrence['dayOfWeek'] }),
+        ...(startRecurrenceType !== 'monthly' && startRecurrenceType !== 'daily' && { dayOfWeek: startDayOfWeek as DateRecurrence['dayOfWeek'] }),
         ...(startRecurrenceType === 'monthly' && { 
           monthlyMode: startMonthlyMode as DateRecurrence['monthlyMode'],
           ...(startMonthlyMode === 'specific_day' && startDayOfMonth && { dayOfMonth: parseInt(startDayOfMonth) })
         }),
+        ...(startRepeatForever && { repeatForever: true }),
+        ...(startSkipWeekends && { skipWeekends: true }),
+        ...(startOnCompleteAction && { onCompleteAction: startOnCompleteAction as 'create_new_task' | 'update_status' }),
+        ...(startOnCompleteAction === 'update_status' && startResetStatusId && { resetStatusId: startResetStatusId }),
+        ...(startTriggerStatusId && { triggerOnStatusId: startTriggerStatusId }),
       };
     }
 
@@ -213,11 +266,16 @@ export const TemplateTaskDialog = ({
     if (dueDateMode === 'recurring') {
       dueDateRecurrence = {
         type: dueRecurrenceType,
-        ...(dueRecurrenceType !== 'monthly' && { dayOfWeek: dueDayOfWeek as DateRecurrence['dayOfWeek'] }),
+        ...(dueRecurrenceType !== 'monthly' && dueRecurrenceType !== 'daily' && { dayOfWeek: dueDayOfWeek as DateRecurrence['dayOfWeek'] }),
         ...(dueRecurrenceType === 'monthly' && { 
           monthlyMode: dueMonthlyMode as DateRecurrence['monthlyMode'],
           ...(dueMonthlyMode === 'specific_day' && dueDayOfMonth && { dayOfMonth: parseInt(dueDayOfMonth) })
         }),
+        ...(dueRepeatForever && { repeatForever: true }),
+        ...(dueSkipWeekends && { skipWeekends: true }),
+        ...(dueOnCompleteAction && { onCompleteAction: dueOnCompleteAction as 'create_new_task' | 'update_status' }),
+        ...(dueOnCompleteAction === 'update_status' && dueResetStatusId && { resetStatusId: dueResetStatusId }),
+        ...(dueTriggerStatusId && { triggerOnStatusId: dueTriggerStatusId }),
       };
     }
     
@@ -368,11 +426,12 @@ export const TemplateTaskDialog = ({
 
                 {startDateMode === 'recurring' && (
                   <div className="space-y-2 p-2 bg-muted/30 rounded-md">
-                    <Select value={startRecurrenceType} onValueChange={(v) => setStartRecurrenceType(v as 'weekly' | 'biweekly' | 'monthly')}>
+                    <Select value={startRecurrenceType} onValueChange={(v) => setStartRecurrenceType(v as 'daily' | 'weekly' | 'biweekly' | 'monthly')}>
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="daily">Diariamente</SelectItem>
                         <SelectItem value="weekly">Semanal</SelectItem>
                         <SelectItem value="biweekly">Quinzenal</SelectItem>
                         <SelectItem value="monthly">Mensal</SelectItem>
@@ -423,6 +482,117 @@ export const TemplateTaskDialog = ({
                         )}
                       </>
                     )}
+
+                    {/* Status que dispara a recorrência */}
+                    <div className="pt-2 border-t space-y-1.5">
+                      <label className="text-xs text-muted-foreground">
+                        Ao alterar o status: <span className="text-destructive">*</span>
+                      </label>
+                      <Select value={startTriggerStatusId} onValueChange={setStartTriggerStatusId}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Status de conclusão..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusTemplateItems
+                            .filter(s => s.id) // In template context, show all statuses
+                            .map((status) => (
+                              <SelectItem key={status.id} value={status.id}>
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className="w-2.5 h-2.5 rounded-full" 
+                                    style={{ backgroundColor: status.color || '#22c55e' }}
+                                  />
+                                  <span>{status.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Sub-opções de recorrência */}
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="start_skip_weekends"
+                          checked={startSkipWeekends}
+                          onCheckedChange={(checked) => setStartSkipWeekends(!!checked)}
+                        />
+                        <label htmlFor="start_skip_weekends" className="text-xs cursor-pointer">
+                          Ignorar fins de semana
+                        </label>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="start_repeat_forever"
+                          checked={startRepeatForever}
+                          onCheckedChange={(checked) => setStartRepeatForever(!!checked)}
+                        />
+                        <label htmlFor="start_repeat_forever" className="text-xs cursor-pointer">
+                          Repetir para sempre
+                        </label>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="start_create_new_task"
+                          checked={startOnCompleteAction === 'create_new_task'}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setStartOnCompleteAction('create_new_task');
+                              setStartResetStatusId('');
+                            } else {
+                              setStartOnCompleteAction('');
+                            }
+                          }}
+                        />
+                        <label htmlFor="start_create_new_task" className="text-xs cursor-pointer">
+                          Criar nova tarefa
+                        </label>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id="start_update_status"
+                          checked={startOnCompleteAction === 'update_status'}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setStartOnCompleteAction('update_status');
+                            } else {
+                              setStartOnCompleteAction('');
+                              setStartResetStatusId('');
+                            }
+                          }}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 space-y-1">
+                          <label htmlFor="start_update_status" className="text-xs cursor-pointer">
+                            Atualizar status para:
+                          </label>
+                          {startOnCompleteAction === 'update_status' && (
+                            <Select value={startResetStatusId} onValueChange={setStartResetStatusId}>
+                              <SelectTrigger className="h-7">
+                                <SelectValue placeholder="Selecione..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statusTemplateItems.map((status) => (
+                                  <SelectItem key={status.id} value={status.id}>
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className="w-2.5 h-2.5 rounded-full" 
+                                        style={{ backgroundColor: status.color || '#94a3b8' }}
+                                      />
+                                      <span>{status.name}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -460,11 +630,12 @@ export const TemplateTaskDialog = ({
 
                 {dueDateMode === 'recurring' && (
                   <div className="space-y-2 p-2 bg-muted/30 rounded-md">
-                    <Select value={dueRecurrenceType} onValueChange={(v) => setDueRecurrenceType(v as 'weekly' | 'biweekly' | 'monthly')}>
+                    <Select value={dueRecurrenceType} onValueChange={(v) => setDueRecurrenceType(v as 'daily' | 'weekly' | 'biweekly' | 'monthly')}>
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="daily">Diariamente</SelectItem>
                         <SelectItem value="weekly">Semanal</SelectItem>
                         <SelectItem value="biweekly">Quinzenal</SelectItem>
                         <SelectItem value="monthly">Mensal</SelectItem>
@@ -515,6 +686,117 @@ export const TemplateTaskDialog = ({
                         )}
                       </>
                     )}
+
+                    {/* Status que dispara a recorrência */}
+                    <div className="pt-2 border-t space-y-1.5">
+                      <label className="text-xs text-muted-foreground">
+                        Ao alterar o status: <span className="text-destructive">*</span>
+                      </label>
+                      <Select value={dueTriggerStatusId} onValueChange={setDueTriggerStatusId}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Status de conclusão..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusTemplateItems
+                            .filter(s => s.id)
+                            .map((status) => (
+                              <SelectItem key={status.id} value={status.id}>
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className="w-2.5 h-2.5 rounded-full" 
+                                    style={{ backgroundColor: status.color || '#22c55e' }}
+                                  />
+                                  <span>{status.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Sub-opções de recorrência */}
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="due_skip_weekends"
+                          checked={dueSkipWeekends}
+                          onCheckedChange={(checked) => setDueSkipWeekends(!!checked)}
+                        />
+                        <label htmlFor="due_skip_weekends" className="text-xs cursor-pointer">
+                          Ignorar fins de semana
+                        </label>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="due_repeat_forever"
+                          checked={dueRepeatForever}
+                          onCheckedChange={(checked) => setDueRepeatForever(!!checked)}
+                        />
+                        <label htmlFor="due_repeat_forever" className="text-xs cursor-pointer">
+                          Repetir para sempre
+                        </label>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="due_create_new_task"
+                          checked={dueOnCompleteAction === 'create_new_task'}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setDueOnCompleteAction('create_new_task');
+                              setDueResetStatusId('');
+                            } else {
+                              setDueOnCompleteAction('');
+                            }
+                          }}
+                        />
+                        <label htmlFor="due_create_new_task" className="text-xs cursor-pointer">
+                          Criar nova tarefa
+                        </label>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id="due_update_status"
+                          checked={dueOnCompleteAction === 'update_status'}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setDueOnCompleteAction('update_status');
+                            } else {
+                              setDueOnCompleteAction('');
+                              setDueResetStatusId('');
+                            }
+                          }}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 space-y-1">
+                          <label htmlFor="due_update_status" className="text-xs cursor-pointer">
+                            Atualizar status para:
+                          </label>
+                          {dueOnCompleteAction === 'update_status' && (
+                            <Select value={dueResetStatusId} onValueChange={setDueResetStatusId}>
+                              <SelectTrigger className="h-7">
+                                <SelectValue placeholder="Selecione..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statusTemplateItems.map((status) => (
+                                  <SelectItem key={status.id} value={status.id}>
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className="w-2.5 h-2.5 rounded-full" 
+                                        style={{ backgroundColor: status.color || '#94a3b8' }}
+                                      />
+                                      <span>{status.name}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
