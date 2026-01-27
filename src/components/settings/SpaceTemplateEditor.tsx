@@ -629,7 +629,13 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
         onOpenChange={setTaskDialogOpen}
         task={editingTask}
         onSave={handleTaskSave}
-        statusTemplateItems={allStatusItems}
+        statusTemplateItems={(() => {
+          const targetListTempId = editingTask?.listTempId || pendingListTempId;
+          if (!targetListTempId) return [];
+          const targetList = lists.find(l => l.tempId === targetListTempId);
+          if (!targetList?.status_template_id) return [];
+          return allStatusItems.filter(item => item.template_id === targetList.status_template_id);
+        })()}
         availableTags={workspaceTags}
       />
     </div>
