@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
+
+type AutomationTrigger = Database['public']['Enums']['automation_trigger'];
+type AutomationActionType = Database['public']['Enums']['automation_action'];
+type AutomationScopeType = Database['public']['Enums']['automation_scope'];
 
 export interface SpaceTemplateFolder {
   id: string;
@@ -795,6 +800,218 @@ export const useApplySpaceTemplate = () => {
       } else {
         toast.error('Erro ao aplicar template. Tente novamente.');
       }
+    },
+  });
+};
+
+// Helper functions for mapping template refs to real IDs
+function createFolderMap(
+  templateFolders: { id: string; name: string }[] | null,
+  realFolders: { id: string; name: string }[] | null
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!templateFolders || !realFolders) return map;
+
+  for (const templateFolder of templateFolders) {
+    // Template folder name ends with " | ", real folder name ends with " | ClientName"
+    const basePattern = templateFolder.name;
+    const matchingFolder = realFolders.find(f => f.name.startsWith(basePattern));
+    if (matchingFolder) {
+      map[templateFolder.id] = matchingFolder.id;
+    }
+  }
+  return map;
+}
+
+function createListMap(
+  templateLists: { id: string; name: string }[] | null,
+  realLists: { id: string; name: string }[] | null
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!templateLists || !realLists) return map;
+
+  for (const templateList of templateLists) {
+    // Template list name ends with " | ", real list name ends with " | ClientName"
+    const basePattern = templateList.name;
+    const matchingList = realLists.find(l => l.name.startsWith(basePattern));
+    if (matchingList) {
+      map[templateList.id] = matchingList.id;
+    }
+  }
+  return map;
+}
+
+interface TemplateAutomation {
+  id: string;
+  template_id: string;
+  description: string | null;
+  trigger: string;
+  action_type: string;
+  action_config: Record<string, unknown>;
+  scope_type: string;
+  folder_ref_id: string | null;
+  list_ref_id: string | null;
+  enabled: boolean;
+}
+
+function remapAutomation(
+  automation: TemplateAutomation,
+  folderIdMap: Record<string, string>,
+  listIdMap: Record<string, string>,
+  spaceId: string,
+  workspaceId: string
+): Database['public']['Tables']['automations']['Insert'] | null {
+  // Clone config to avoid mutation
+  const remappedConfig = JSON.parse(JSON.stringify(automation.action_config || {}));
+
+  // Remap target_list_id in "move_task" actions
+  if (remappedConfig.actions && Array.isArray(remappedConfig.actions)) {
+    remappedConfig.actions = remappedConfig.actions.map((action: { type: string; config?: { target_list_id?: string } }) => {
+      if (action.type === 'move_task' && action.config?.target_list_id) {
+        const newListId = listIdMap[action.config.target_list_id];
+        if (newListId) {
+          action.config.target_list_id = newListId;
+        } else {
+          // Can't remap this action - list not found
+          return null;
+        }
+      }
+      return action;
+    }).filter(Boolean);
+  }
+
+  // Determine real scope_id
+  let scopeId: string | null = spaceId;
+  const scopeType = automation.scope_type as AutomationScopeType;
+
+  if (automation.scope_type === 'list' && automation.list_ref_id) {
+    scopeId = listIdMap[automation.list_ref_id] || null;
+    if (!scopeId) return null; // Can't map this automation
+  } else if (automation.scope_type === 'folder' && automation.folder_ref_id) {
+    scopeId = folderIdMap[automation.folder_ref_id] || null;
+    if (!scopeId) return null; // Can't map this automation
+  } else if (automation.scope_type === 'space') {
+    scopeId = spaceId;
+  }
+
+  return {
+    workspace_id: workspaceId,
+    description: automation.description,
+    trigger: automation.trigger as AutomationTrigger,
+    action_type: automation.action_type as AutomationActionType,
+    action_config: remappedConfig,
+    scope_type: scopeType,
+    scope_id: scopeId,
+    enabled: true,
+  };
+}
+
+interface ApplyAutomationsResult {
+  spacesProcessed: number;
+  automationsCreated: number;
+  errors: string[];
+}
+
+export const useApplyTemplateAutomationsToSpaces = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      templateId,
+      workspaceId,
+      spaceIds,
+    }: {
+      templateId: string;
+      workspaceId: string;
+      spaceIds: string[];
+    }): Promise<ApplyAutomationsResult> => {
+      const result: ApplyAutomationsResult = {
+        spacesProcessed: 0,
+        automationsCreated: 0,
+        errors: [],
+      };
+
+      // 1. Fetch template structure
+      const [templateFoldersResult, templateListsResult, templateAutomationsResult] = await Promise.all([
+        supabase.from('space_template_folders').select('id, name').eq('template_id', templateId),
+        supabase.from('space_template_lists').select('id, name, folder_ref_id').eq('template_id', templateId),
+        supabase.from('space_template_automations').select('*').eq('template_id', templateId).eq('enabled', true),
+      ]);
+
+      const templateFolders = templateFoldersResult.data;
+      const templateLists = templateListsResult.data;
+      const templateAutomations = templateAutomationsResult.data as TemplateAutomation[] | null;
+
+      if (!templateAutomations || templateAutomations.length === 0) {
+        throw new Error('Este template não possui automações habilitadas.');
+      }
+
+      // 2. Process each space
+      for (const spaceId of spaceIds) {
+        try {
+          // Fetch real folders and lists for this space
+          const { data: realFolders } = await supabase
+            .from('folders')
+            .select('id, name')
+            .eq('space_id', spaceId);
+
+          // Get all lists in this space (direct or inside folders)
+          const folderIds = realFolders?.map(f => f.id) || [];
+          let realLists: { id: string; name: string; folder_id: string | null }[] = [];
+
+          if (folderIds.length > 0) {
+            const { data: listsInFolders } = await supabase
+              .from('lists')
+              .select('id, name, folder_id')
+              .in('folder_id', folderIds);
+            realLists = listsInFolders || [];
+          }
+
+          const { data: listsDirectInSpace } = await supabase
+            .from('lists')
+            .select('id, name, folder_id')
+            .eq('space_id', spaceId)
+            .is('folder_id', null);
+
+          realLists = [...realLists, ...(listsDirectInSpace || [])];
+
+          // Create ID maps
+          const folderIdMap = createFolderMap(templateFolders, realFolders);
+          const listIdMap = createListMap(templateLists, realLists);
+
+          // 3. Create automations for this space
+          for (const automation of templateAutomations) {
+            const remapped = remapAutomation(automation, folderIdMap, listIdMap, spaceId, workspaceId);
+            if (remapped && remapped.scope_id) {
+              const { error } = await supabase.from('automations').insert([remapped]);
+              if (error) {
+                result.errors.push(`Space ${spaceId}: ${error.message}`);
+              } else {
+                result.automationsCreated++;
+              }
+            }
+          }
+
+          result.spacesProcessed++;
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+          result.errors.push(`Space ${spaceId}: ${errorMessage}`);
+        }
+      }
+
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['automations'] });
+      if (result.errors.length === 0) {
+        toast.success(`${result.automationsCreated} automações criadas em ${result.spacesProcessed} spaces!`);
+      } else {
+        toast.warning(`${result.automationsCreated} automações criadas, mas houve ${result.errors.length} erros.`);
+      }
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Erro ao aplicar automações');
+      console.error(error);
     },
   });
 };
