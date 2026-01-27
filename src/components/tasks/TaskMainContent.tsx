@@ -1,24 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
-import { Calendar, Clock, Flag, X, Maximize2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Calendar, Clock, Flag, X } from 'lucide-react';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
-import { useUploadAttachment } from '@/hooks/useTaskAttachments';
 import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { TaskTagsSelector } from './TaskTagsSelector';
+import { SimpleRichTextEditor } from '@/components/documents/editor';
 import { cn } from '@/lib/utils';
-import { renderTextWithImagesAndLinks } from '@/lib/linkify';
-import { toast } from 'sonner';
 import { startOfDay, isBefore, isEqual } from 'date-fns';
 import { parseLocalDate } from '@/lib/dateUtils';
 interface Task {
@@ -51,39 +47,17 @@ interface TaskMainContentProps {
 
 export const TaskMainContent = ({ task }: TaskMainContentProps) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
+  const [editDescription, setEditDescription] = useState(task.description || '');
 
   const updateTask = useUpdateTask();
   const createActivity = useCreateTaskActivity();
-  const uploadAttachment = useUploadAttachment();
   const { data: statuses } = useStatusesForScope('list', task.list_id, task.workspace_id);
 
-  // Handler para colar imagens
-  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData.items;
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          try {
-            toast.info('Fazendo upload da imagem...');
-            const uploaded = await uploadAttachment.mutateAsync({ taskId: task.id, file });
-            const imageMarkdown = `![${file.name}](${uploaded.file_url})`;
-            setEditDescription(prev => prev + (prev ? '\n' : '') + imageMarkdown);
-            toast.success('Imagem adicionada!');
-          } catch (error) {
-            console.error('Erro ao fazer upload da imagem:', error);
-            toast.error('Erro ao fazer upload da imagem');
-          }
-        }
-        break;
-      }
-    }
-  };
+  // Sincroniza descrição quando a tarefa muda
+  useEffect(() => {
+    setEditDescription(task.description || '');
+  }, [task.id, task.description]);
 
   const handleSaveTitle = async () => {
     setIsEditingTitle(false);
@@ -113,29 +87,26 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
     }
   };
 
-  const handleSaveDescription = async () => {
-    if (editDescription === (task.description || '')) {
-      setIsEditingDescription(false);
-      return;
-    }
+  const handleDescriptionChange = async (newDescription: string) => {
+    setEditDescription(newDescription);
     
-    const taskId = task.id;
+    // Debounce could be added here, but for now save on each change
     const oldDescription = task.description || null;
-    const newDescription = editDescription || null;
+    
+    if (newDescription === oldDescription) return;
     
     try {
-      await updateTask.mutateAsync({ id: taskId, description: newDescription });
+      await updateTask.mutateAsync({ id: task.id, description: newDescription || null });
       await createActivity.mutateAsync({
-        taskId,
+        taskId: task.id,
         activityType: 'description.changed',
         fieldName: 'description',
         oldValue: oldDescription,
-        newValue: newDescription,
+        newValue: newDescription || null,
       });
     } catch (error) {
       console.error('Erro ao atualizar descrição ou registrar atividade:', error);
     }
-    setIsEditingDescription(false);
   };
 
   const handleStatusChange = async (statusId: string) => {
@@ -384,86 +355,14 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
       {/* Descrição */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Descrição</label>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setEditDescription(task.description || '');
-              setIsDescriptionExpanded(true);
-            }}
-            title="Expandir descrição"
-            className="h-7 w-7 p-0"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-        </div>
-        {isEditingDescription ? (
-          <div className="space-y-2">
-            <Textarea
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-              onPaste={handlePaste}
-              placeholder="Adicione uma descrição... (Ctrl+V para colar imagens)"
-              rows={4}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveDescription}>
-                Salvar
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setIsEditingDescription(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div 
-            className="min-h-[80px] p-3 border rounded-md cursor-pointer hover:bg-muted/50 whitespace-pre-wrap"
-            onClick={() => {
-              setEditDescription(task.description || '');
-              setIsEditingDescription(true);
-            }}
-          >
-            {task.description ? (
-              renderTextWithImagesAndLinks(task.description)
-            ) : (
-              <span className="text-muted-foreground">Clique para adicionar uma descrição...</span>
-            )}
-          </div>
-        )}
+        <label className="text-sm font-medium">Descrição</label>
+        <SimpleRichTextEditor
+          content={editDescription}
+          onChange={handleDescriptionChange}
+          placeholder="Adicione uma descrição..."
+          minHeight="100px"
+        />
       </div>
-
-      {/* Modal de descrição expandida */}
-      <Dialog open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Descrição</DialogTitle>
-          </DialogHeader>
-          <div className="overflow-auto max-h-[60vh]">
-            <Textarea
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-              onPaste={handlePaste}
-              placeholder="Adicione uma descrição... (Ctrl+V para colar imagens)"
-              className="min-h-[300px] resize-none"
-              autoFocus
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsDescriptionExpanded(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={() => {
-              handleSaveDescription();
-              setIsDescriptionExpanded(false);
-            }}>
-              Salvar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Separator />
 
