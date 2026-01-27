@@ -26,7 +26,7 @@ export interface ActionOption {
 export interface ActionConfigField {
   name: string;
   label: string;
-  type: 'select' | 'text' | 'user' | 'status' | 'priority' | 'date' | 'number' | 'list' | 'tag';
+  type: 'select' | 'text' | 'user' | 'status' | 'priority' | 'date' | 'number' | 'list' | 'tag' | 'date_config';
   required?: boolean;
   options?: { value: string; label: string }[];
 }
@@ -137,7 +137,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
     description: 'Definir ou alterar a data final',
     icon: Calendar,
     configFields: [
-      { name: 'days_from_now', label: 'Dias a partir de hoje', type: 'number', required: true }
+      { name: 'date_config', label: 'Configuração de data', type: 'date_config', required: true }
     ]
   },
   {
@@ -146,7 +146,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
     description: 'Definir ou alterar a data de início',
     icon: CalendarClock,
     configFields: [
-      { name: 'days_from_now', label: 'Dias a partir de hoje', type: 'number', required: true }
+      { name: 'date_config', label: 'Configuração de data', type: 'date_config', required: true }
     ]
   },
   {
