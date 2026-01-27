@@ -255,13 +255,32 @@ export const useUpdateSpaceTemplate = () => {
       if (templateError) throw templateError;
 
       if (folders !== undefined) {
-        // Delete existing folders (cascades to lists and tasks)
+        // ========== STEP 1: Capture existing automations and structure BEFORE deletion ==========
+        const [automationsResult, existingFoldersResult, existingListsResult] = await Promise.all([
+          supabase.from('space_template_automations').select('*').eq('template_id', id),
+          supabase.from('space_template_folders').select('id, name').eq('template_id', id),
+          supabase.from('space_template_lists').select('id, name, folder_ref_id').eq('template_id', id),
+        ]);
+
+        const existingAutomations = automationsResult.data || [];
+        const existingFolders = existingFoldersResult.data || [];
+        const existingLists = existingListsResult.data || [];
+
+        // Create maps: old ID → name
+        const folderIdToName: Record<string, string> = {};
+        existingFolders.forEach(f => { folderIdToName[f.id] = f.name; });
+
+        const listIdToName: Record<string, string> = {};
+        existingLists.forEach(l => { listIdToName[l.id] = l.name; });
+
+        // ========== STEP 2: Delete existing structure (cascade deletes automations) ==========
         await supabase.from('space_template_folders').delete().eq('template_id', id);
         await supabase.from('space_template_lists').delete().eq('template_id', id).is('folder_ref_id', null);
         await supabase.from('space_template_tasks').delete().eq('template_id', id);
 
-        // Create new folders
+        // ========== STEP 3: Create new folders ==========
         const folderIdMap: Record<number, string> = {};
+        const folderNameToNewId: Record<string, string> = {};
         if (folders.length > 0) {
           const { data: createdFolders, error: foldersError } = await supabase
             .from('space_template_folders')
@@ -276,11 +295,13 @@ export const useUpdateSpaceTemplate = () => {
           if (foldersError) throw foldersError;
           createdFolders?.forEach((f, i) => {
             folderIdMap[i] = f.id;
+            folderNameToNewId[f.name] = f.id;
           });
         }
 
-        // Create new lists
+        // ========== STEP 4: Create new lists ==========
         const listIdMap: Record<number, string> = {};
+        const listNameToNewId: Record<string, string> = {};
         if (lists && lists.length > 0) {
           const { data: createdLists, error: listsError } = await supabase
             .from('space_template_lists')
@@ -302,10 +323,11 @@ export const useUpdateSpaceTemplate = () => {
           if (listsError) throw listsError;
           createdLists?.forEach((l, i) => {
             listIdMap[i] = l.id;
+            listNameToNewId[l.name] = l.id;
           });
         }
 
-        // Create new tasks
+        // ========== STEP 5: Create new tasks ==========
         if (tasks && tasks.length > 0) {
           const { error: tasksError } = await supabase
             .from('space_template_tasks')
@@ -321,6 +343,68 @@ export const useUpdateSpaceTemplate = () => {
             );
 
           if (tasksError) throw tasksError;
+        }
+
+        // ========== STEP 6: Remap and restore automations ==========
+        if (existingAutomations.length > 0) {
+          const remappedAutomations = existingAutomations.map(automation => {
+            // Remap folder_ref_id
+            let newFolderRefId: string | null = null;
+            if (automation.folder_ref_id && folderIdToName[automation.folder_ref_id]) {
+              const folderName = folderIdToName[automation.folder_ref_id];
+              newFolderRefId = folderNameToNewId[folderName] || null;
+            }
+
+            // Remap list_ref_id
+            let newListRefId: string | null = null;
+            if (automation.list_ref_id && listIdToName[automation.list_ref_id]) {
+              const listName = listIdToName[automation.list_ref_id];
+              newListRefId = listNameToNewId[listName] || null;
+            }
+
+            // Deep clone action_config and remap target_list_id inside actions
+            const remappedActionConfig = JSON.parse(JSON.stringify(automation.action_config || {}));
+            if (remappedActionConfig.actions && Array.isArray(remappedActionConfig.actions)) {
+              remappedActionConfig.actions = remappedActionConfig.actions.map((action: { type: string; config?: { target_list_id?: string } }) => {
+                if (action.type === 'move_task' && action.config?.target_list_id) {
+                  const oldListId = action.config.target_list_id;
+                  if (listIdToName[oldListId]) {
+                    const listName = listIdToName[oldListId];
+                    action.config.target_list_id = listNameToNewId[listName] || oldListId;
+                  }
+                }
+                return action;
+              });
+            }
+
+            return {
+              template_id: id,
+              description: automation.description,
+              trigger: automation.trigger,
+              action_type: automation.action_type,
+              action_config: remappedActionConfig,
+              scope_type: automation.scope_type,
+              folder_ref_id: newFolderRefId,
+              list_ref_id: newListRefId,
+              enabled: automation.enabled,
+            };
+          }).filter(a => {
+            // Filter out automations that lost their reference (folder/list was removed)
+            if (a.scope_type === 'list' && !a.list_ref_id) return false;
+            if (a.scope_type === 'folder' && !a.folder_ref_id) return false;
+            return true;
+          });
+
+          if (remappedAutomations.length > 0) {
+            const { error: automationsError } = await supabase
+              .from('space_template_automations')
+              .insert(remappedAutomations);
+
+            if (automationsError) {
+              console.error('Error restoring automations:', automationsError);
+              // Don't throw - automations are secondary, main update succeeded
+            }
+          }
         }
       }
 
