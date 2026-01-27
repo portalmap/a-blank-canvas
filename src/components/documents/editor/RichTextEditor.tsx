@@ -7,17 +7,19 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import BubbleMenu from '@tiptap/extension-bubble-menu';
+import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
 import AutoJoiner from 'tiptap-extension-auto-joiner';
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { EditorToolbar } from './EditorToolbar';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { AddBlockButton } from './AddBlockButton';
+import { EditorBubbleMenu } from './EditorBubbleMenu';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { CollapsibleHeading } from './extensions';
 import './editor-styles.css';
@@ -35,8 +37,6 @@ export const RichTextEditor = ({
   disabled = false,
   placeholder = "Comece a escrever ou digite / para comandos..."
 }: RichTextEditorProps) => {
-  const bubbleMenuRef = useRef<HTMLDivElement>(null);
-
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -59,12 +59,13 @@ export const RichTextEditor = ({
       }),
       TextStyle,
       Color,
+      Underline,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
       TaskList,
       TaskItem.configure({
         nested: true,
-      }),
-      BubbleMenu.configure({
-        element: bubbleMenuRef.current!,
       }),
       AutoJoiner.configure({
         elementsToJoin: ['bulletList', 'orderedList'],
@@ -118,6 +119,7 @@ export const RichTextEditor = ({
       <div className="rich-text-editor">
         <EditorToolbar editor={editor} />
         <SlashCommandMenu editor={editor} />
+        <EditorBubbleMenu editor={editor} />
         <div className="editor-content-wrapper">
           {!disabled && <AddBlockButton editor={editor} />}
           <EditorContent editor={editor} className="prose prose-lg dark:prose-invert max-w-none" />
