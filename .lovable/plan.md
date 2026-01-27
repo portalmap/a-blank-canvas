@@ -1,331 +1,86 @@
 
 
-## Plano: Dialog de Template IDÊNTICO à Visualização de Tarefa
+## Plano: Adicionar Opção de Recorrência nas Datas
 
-### Problema Identificado
+### Contexto
 
-Criei um dialog personalizado com layout diferente, quando já existe uma visualização de tarefa completa e funcional no sistema. O usuário quer o MESMO layout, os MESMOS componentes.
-
----
-
-### Solução: Reutilizar `TaskMainContent` Como Base
-
-Vou copiar a estrutura exata do componente `TaskMainContent.tsx` para o dialog de template, adaptando apenas para trabalhar com estado local em vez de tarefas do banco.
+Atualmente, a configuração de datas (início e vencimento) nas automações e tarefas de template só permite modos básicos como "primeiro/último dia do mês" ou "dias após o gatilho". O usuário precisa de uma opção de **recorrência** com frequências e dias específicos da semana/mês.
 
 ---
 
-### Estrutura Atual da Tarefa (a ser replicada)
+### Requisitos Solicitados
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│  Briefing de Identidade - Executech                     │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  🚩 Status                    🚩 Prioridade              │
-│  ┌──────────────────────┐     ┌──────────────────────┐   │
-│  │ 🟢 Concluído      ▼  │     │ 🟡 Média          ▼  │   │
-│  └──────────────────────┘     └──────────────────────┘   │
-│                                                          │
-│  📅 Data de Início            ⏰ Data de Entrega         │
-│  ┌──────────────────────┐     ┌──────────────────────┐   │
-│  │ dd/mm/aaaa        📅 │     │ dd/mm/aaaa        📅 │   │
-│  └──────────────────────┘     └──────────────────────┘   │
-│                                                          │
-│  👤 Responsáveis                                         │
-│  ┌──────────────────────────────────────────────────────┐│
-│  │ [B] beatrizsantos@assessoriamap.com.br            [×]││
-│  ├──────────────────────────────────────────────────────┤│
-│  │             + Adicionar responsável                  ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│  🏷️ Etiquetas                                            │
-│  ┌──────────────────────────────────────────────────────┐│
-│  │  + Adicionar etiqueta                                ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│  ─────────────────────────────────────────────────────── │
-│                                                          │
-│  Descrição                                        [↗]    │
-│  ┌──────────────────────────────────────────────────────┐│
-│  │ Documento de Briefing para Desenvolvimento...        ││
-│  │ Este documento tem como objetivo coletar...          ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│  ─────────────────────────────────────────────────────── │
-│                                                          │
-│  ∨ Subtarefas                              + Adicionar   │
-│  ┌──────────────────────────────────────────────────────┐│
-│  │              Nenhuma subtarefa                       ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│  ─────────────────────────────────────────────────────── │
-│                                                          │
-│  ☑ Checklists                              + Adicionar   │
-│  ┌──────────────────────────────────────────────────────┐│
-│  │             Nenhuma checklist                        ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│  ─────────────────────────────────────────────────────── │
-│                                                          │
-│  📎 Anexos (2)                             + Adicionar   │
-│  ┌──────────────────────────────────────────────────────┐│
-│  │  [img1]  [Brief... 129.1KB ⬇]                        ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│                            [Cancelar]  [Salvar]          │
-└──────────────────────────────────────────────────────────┘
+| Campo | Opções |
+|-------|--------|
+| **Frequência** | Semanal, Quinzenal, Mensal |
+| **Dias da Semana** | Segunda, Terça, Quarta, Quinta, Sexta |
+| **Dias do Mês** | Primeiro dia do mês, Último dia do mês, Data específica |
+
+---
+
+### Estrutura de Dados Proposta
+
+A configuração ficará armazenada no `action_config` como um objeto JSONB:
+
+```typescript
+// Para recorrência semanal/quinzenal
+{
+  date_type: 'recurring',
+  recurrence_type: 'weekly' | 'biweekly' | 'monthly',
+  day_of_week: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday',
+  // OU para mensal:
+  monthly_mode: 'first_day' | 'last_day' | 'specific_day',
+  day_of_month?: 15, // se monthly_mode = 'specific_day'
+}
 ```
 
 ---
 
-### Diferença Entre Tarefa Real e Template
+### Interface de Usuário Proposta
 
-| Campo | Tarefa Real | Template |
-|-------|-------------|----------|
-| Status | ID do status | ID do status_template_item |
-| Datas | Data fixa (2025-01-27) | Offset relativo (+7 dias) |
-| Responsáveis | IDs de usuários reais | Apenas placeholder visual |
-| Anexos | Arquivos reais | Não suportado (placeholder) |
-| Subtarefas | Tarefas filhas reais | Não suportado no template |
-| Checklists | Checklists reais | Não suportado no template |
-
----
-
-### Implementação
-
-#### 1. Atualizar `TemplateTaskDialog.tsx`
-
-Reescrever completamente para seguir a mesma estrutura de `TaskMainContent.tsx`:
-
-**Campos Funcionais (com suporte no banco):**
-- Título (editável)
-- Status (do template de status)
-- Prioridade (badge colorido)
-- Data de Início (offset em dias)
-- Data de Entrega (offset em dias)
-- Etiquetas (tag_names array)
-- Descrição (textarea expandível)
-- Tempo estimado
-- Marco (milestone)
-
-**Campos Visuais (placeholders para referência):**
-- Responsáveis: "Será atribuído quando a tarefa for criada"
-- Subtarefas: "Adicione subtarefas após criar o space"
-- Checklists: "Adicione checklists após criar o space"
-- Anexos: "Adicione anexos após criar o space"
-
----
-
-### Mudanças Técnicas
-
-#### Layout do Dialog
-
-```typescript
-<DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-  <DialogHeader>
-    {/* Título editável - igual TaskMainContent */}
-    <Input 
-      value={title}
-      onChange={...}
-      className="text-2xl font-bold"
-      placeholder="Título da tarefa..."
-    />
-  </DialogHeader>
-
-  <div className="space-y-6 py-4">
-    {/* Status e Prioridade - grid de 2 colunas */}
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <Flag className="h-4 w-4" /> Status
-        </label>
-        <Select value={statusTemplateItemId} onValueChange={...}>
-          <SelectTrigger>
-            <SelectValue>
-              <StatusBadge status={selectedStatus?.name || 'Padrão'} />
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {statusTemplateItems.map(...)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <label className="...">
-          <Flag className="h-4 w-4" /> Prioridade
-        </label>
-        <Select value={priority} onValueChange={...}>
-          <SelectTrigger>
-            <SelectValue>
-              <PriorityBadge priority={priority} />
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {/* Baixa, Média, Alta, Urgente */}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-
-    {/* Datas - grid de 2 colunas com offset */}
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <label className="...">
-          <Calendar className="h-4 w-4" /> Data de Início
-        </label>
-        <div className="flex items-center gap-2">
-          <Input 
-            type="number"
-            value={startDateOffset}
-            onChange={...}
-            className="w-20"
-          />
-          <span className="text-sm text-muted-foreground">dias após criação</span>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <label className="...">
-          <Clock className="h-4 w-4" /> Data de Entrega
-        </label>
-        <div className="flex items-center gap-2">
-          <Input 
-            type="number"
-            value={dueDateOffset}
-            onChange={...}
-            className="w-20"
-          />
-          <span className="text-sm text-muted-foreground">dias após criação</span>
-        </div>
-      </div>
-    </div>
-
-    {/* Responsáveis - placeholder */}
-    <div className="space-y-2">
-      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-        <User className="h-4 w-4" /> Responsáveis
-      </label>
-      <div className="p-3 border rounded-md bg-muted/30">
-        <p className="text-sm text-muted-foreground">
-          Os responsáveis serão atribuídos quando a tarefa for criada a partir do template.
-        </p>
-      </div>
-    </div>
-
-    {/* Etiquetas - funcional */}
-    <div className="space-y-2">
-      <label className="...">
-        <Tag className="h-4 w-4" /> Etiquetas
-      </label>
-      {/* Tags selecionadas com badges */}
-      {/* Input para adicionar tags */}
-    </div>
-
-    <Separator />
-
-    {/* Descrição - expandível */}
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium">Descrição</label>
-        <Button variant="ghost" size="sm" onClick={expandDescription}>
-          <Maximize2 className="h-4 w-4" />
-        </Button>
-      </div>
-      <Textarea
-        value={description}
-        onChange={...}
-        className="min-h-[100px]"
-        placeholder="Adicione uma descrição..."
-      />
-    </div>
-
-    <Separator />
-
-    {/* Tempo Estimado e Marco */}
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <label className="...">
-          <Clock className="h-4 w-4" /> Tempo Estimado
-        </label>
-        <div className="flex items-center gap-2">
-          <Input type="number" value={hours} className="w-16" />
-          <span className="text-sm">h</span>
-          <Input type="number" value={minutes} className="w-16" />
-          <span className="text-sm">min</span>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <label className="...">
-          <Flag className="h-4 w-4" /> Marco
-        </label>
-        <div className="flex items-center gap-2 h-10">
-          <Checkbox checked={isMilestone} onCheckedChange={...} />
-          <span className="text-sm">É um marco (milestone)</span>
-        </div>
-      </div>
-    </div>
-
-    <Separator />
-
-    {/* Subtarefas - placeholder */}
-    <Collapsible>
-      <CollapsibleTrigger className="flex items-center justify-between w-full">
-        <span className="text-sm font-medium flex items-center gap-2">
-          <ChevronRight className="h-4 w-4" /> Subtarefas
-        </span>
-        <span className="text-xs text-muted-foreground">+ Adicionar</span>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="p-3 mt-2 border rounded-md bg-muted/30">
-          <p className="text-sm text-muted-foreground text-center">
-            Adicione subtarefas após criar o space
-          </p>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-
-    <Separator />
-
-    {/* Checklists - placeholder */}
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium flex items-center gap-2">
-          <CheckSquare className="h-4 w-4" /> Checklists
-        </label>
-        <span className="text-xs text-muted-foreground">+ Adicionar</span>
-      </div>
-      <div className="p-3 border rounded-md bg-muted/30">
-        <p className="text-sm text-muted-foreground text-center">
-          Adicione checklists após criar o space
-        </p>
-      </div>
-    </div>
-
-    <Separator />
-
-    {/* Anexos - placeholder */}
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium flex items-center gap-2">
-          <Paperclip className="h-4 w-4" /> Anexos
-        </label>
-        <span className="text-xs text-muted-foreground">+ Adicionar</span>
-      </div>
-      <div className="p-3 border rounded-md bg-muted/30">
-        <p className="text-sm text-muted-foreground text-center">
-          Adicione anexos após criar o space
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <DialogFooter>
-    <Button variant="outline" onClick={onClose}>Cancelar</Button>
-    <Button onClick={onSave}>Salvar</Button>
-  </DialogFooter>
-</DialogContent>
+```text
+┌─────────────────────────────────────────────────────────┐
+│  Configurar data                                        │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Tipo de data                                           │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ ○ Primeiro dia do mês                             │  │
+│  │ ○ Último dia do mês                               │  │
+│  │ ○ Dias após o gatilho                             │  │
+│  │ ○ Dia específico do mês                           │  │
+│  │ ● Recorrente                               ← NOVO │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Se "Recorrente" selecionado:                           │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  Frequência                                       │  │
+│  │  ┌─────────────────────────────────────────────┐  │  │
+│  │  │ ○ Semanal                                   │  │  │
+│  │  │ ○ Quinzenal                                 │  │  │
+│  │  │ ○ Mensal                                    │  │  │
+│  │  └─────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Se Semanal/Quinzenal:                                  │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  Dia da semana                                    │  │
+│  │  ┌─────────────────────────────────────────────┐  │  │
+│  │  │ [Seg] [Ter] [Qua] [Qui] [Sex]               │  │  │
+│  │  └─────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Se Mensal:                                             │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  Dia do mês                                       │  │
+│  │  ┌─────────────────────────────────────────────┐  │  │
+│  │  │ ○ Primeiro dia do mês                       │  │  │
+│  │  │ ○ Último dia do mês                         │  │  │
+│  │  │ ○ Dia específico: [__15__]                  │  │  │
+│  │  └─────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -334,21 +89,247 @@ Reescrever completamente para seguir a mesma estrutura de `TaskMainContent.tsx`:
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/settings/TemplateTaskDialog.tsx` | **Reescrever** - Layout idêntico à tarefa existente |
+| `src/components/automations/advanced/ActionConfigForm.tsx` | Expandir o `case 'date_config'` para incluir opção de recorrência |
+| `src/components/settings/TemplateTaskDialog.tsx` | Adicionar opção de recorrência nos campos de data de início/entrega |
+
+---
+
+### Implementação: ActionConfigForm.tsx
+
+#### 1. Expandir as opções de `date_type`
+
+```typescript
+<SelectContent>
+  <SelectItem value="first_day_of_month">Primeiro dia do mês</SelectItem>
+  <SelectItem value="last_day_of_month">Último dia do mês</SelectItem>
+  <SelectItem value="days_after_trigger">Dias após o gatilho</SelectItem>
+  <SelectItem value="specific_day">Dia específico do mês</SelectItem>
+  <SelectItem value="recurring">Recorrente</SelectItem>  {/* NOVO */}
+</SelectContent>
+```
+
+#### 2. Campos Condicionais para Recorrência
+
+```typescript
+{config.date_type === 'recurring' && (
+  <>
+    {/* Seletor de frequência */}
+    <div className="space-y-2">
+      <Label>Frequência</Label>
+      <Select
+        value={config.recurrence_type || ''}
+        onValueChange={(value) => {
+          const { day_of_week, monthly_mode, ...rest } = config;
+          onConfigChange({ ...rest, recurrence_type: value });
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a frequência..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="weekly">Semanal</SelectItem>
+          <SelectItem value="biweekly">Quinzenal</SelectItem>
+          <SelectItem value="monthly">Mensal</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    {/* Seletor de dia da semana (para semanal/quinzenal) */}
+    {(config.recurrence_type === 'weekly' || config.recurrence_type === 'biweekly') && (
+      <div className="space-y-2">
+        <Label>Dia da semana</Label>
+        <div className="flex gap-1">
+          {[
+            { value: 'monday', label: 'Seg' },
+            { value: 'tuesday', label: 'Ter' },
+            { value: 'wednesday', label: 'Qua' },
+            { value: 'thursday', label: 'Qui' },
+            { value: 'friday', label: 'Sex' },
+          ].map((day) => (
+            <Button
+              key={day.value}
+              type="button"
+              variant={config.day_of_week === day.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleFieldChange('day_of_week', day.value)}
+            >
+              {day.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* Seletor de dia do mês (para mensal) */}
+    {config.recurrence_type === 'monthly' && (
+      <div className="space-y-2">
+        <Label>Dia do mês</Label>
+        <Select
+          value={config.monthly_mode || ''}
+          onValueChange={(value) => handleFieldChange('monthly_mode', value)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
+            <SelectItem value="last_day">Último dia do mês</SelectItem>
+            <SelectItem value="specific_day">Dia específico</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        {config.monthly_mode === 'specific_day' && (
+          <Input
+            type="number"
+            min={1}
+            max={31}
+            value={config.day_of_month || ''}
+            onChange={(e) => handleFieldChange('day_of_month', parseInt(e.target.value))}
+            placeholder="Ex: 15"
+          />
+        )}
+      </div>
+    )}
+  </>
+)}
+```
+
+---
+
+### Implementação: TemplateTaskDialog.tsx
+
+Substituir os simples campos numéricos de offset por um seletor mais avançado que permite escolher entre:
+- **Offset simples** (dias após criação) - comportamento atual
+- **Recorrente** (com frequência e dia)
+
+```typescript
+<div className="space-y-2">
+  <label className="text-sm font-medium flex items-center gap-2">
+    <Calendar className="h-4 w-4" /> Data de Início
+  </label>
+  
+  <Select
+    value={startDateMode}
+    onValueChange={setStartDateMode}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Selecione o modo..." />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="offset">Dias após criação</SelectItem>
+      <SelectItem value="recurring">Recorrente</SelectItem>
+    </SelectContent>
+  </Select>
+
+  {startDateMode === 'offset' && (
+    <Input
+      type="number"
+      min={0}
+      value={startDateOffset}
+      onChange={(e) => setStartDateOffset(e.target.value)}
+      placeholder="Ex: 0"
+    />
+  )}
+
+  {startDateMode === 'recurring' && (
+    <div className="space-y-2 p-3 bg-muted/30 rounded-md">
+      {/* Frequência */}
+      <Select
+        value={startRecurrenceType}
+        onValueChange={setStartRecurrenceType}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Frequência..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="weekly">Semanal</SelectItem>
+          <SelectItem value="biweekly">Quinzenal</SelectItem>
+          <SelectItem value="monthly">Mensal</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Seletor de dia */}
+      {(startRecurrenceType === 'weekly' || startRecurrenceType === 'biweekly') && (
+        <div className="flex gap-1 flex-wrap">
+          {WEEKDAYS.map((day) => (
+            <Button
+              key={day.value}
+              type="button"
+              size="sm"
+              variant={startDayOfWeek === day.value ? 'default' : 'outline'}
+              onClick={() => setStartDayOfWeek(day.value)}
+            >
+              {day.label}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {startRecurrenceType === 'monthly' && (
+        <Select
+          value={startMonthlyMode}
+          onValueChange={setStartMonthlyMode}
+        >
+          <SelectContent>
+            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
+            <SelectItem value="last_day">Último dia do mês</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  )}
+</div>
+```
+
+---
+
+### Constantes de Dias
+
+```typescript
+const WEEKDAYS = [
+  { value: 'monday', label: 'Seg' },
+  { value: 'tuesday', label: 'Ter' },
+  { value: 'wednesday', label: 'Qua' },
+  { value: 'thursday', label: 'Qui' },
+  { value: 'friday', label: 'Sex' },
+] as const;
+```
+
+---
+
+### Estrutura de Dados no TaskData (TemplateTaskDialog)
+
+Expandir a interface para suportar recorrência:
+
+```typescript
+export interface TaskData {
+  title: string;
+  description: string;
+  priority: string;
+  // Datas com offset (modo atual)
+  startDateOffset: number | null;
+  dueDateOffset: number | null;
+  // Novo: Recorrência
+  startDateRecurrence?: {
+    type: 'weekly' | 'biweekly' | 'monthly';
+    dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+    monthlyMode?: 'first_day' | 'last_day';
+  } | null;
+  dueDateRecurrence?: {
+    type: 'weekly' | 'biweekly' | 'monthly';
+    dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+    monthlyMode?: 'first_day' | 'last_day';
+  } | null;
+  // ... demais campos
+}
+```
 
 ---
 
 ### Resultado Final
 
-O dialog de "Nova Tarefa" no template terá:
-
-1. ✅ Layout IDÊNTICO à visualização de tarefa existente
-2. ✅ Badges coloridos para Status e Prioridade
-3. ✅ Seções de Responsáveis, Subtarefas, Checklists e Anexos (como placeholders)
-4. ✅ Descrição com botão de expandir
-5. ✅ Separadores visuais entre seções
-6. ✅ Campos de offset de data com indicador "dias após criação"
-7. ✅ Tempo estimado e marco funcionais
-
-O usuário terá a mesma experiência visual que já conhece da tarefa real, facilitando o entendimento e uso.
+1. **Automações**: Ações de `set_due_date` e `set_start_date` terão a opção "Recorrente" com configuração de frequência e dia
+2. **Templates de Tarefa**: Os campos de data poderão usar offset simples OU configuração de recorrência
+3. **Flexibilidade**: Permite escolher entre dias da semana (para semanal/quinzenal) ou dias específicos do mês (para mensal)
+4. **Armazenamento**: Toda a configuração fica no JSONB do `action_config` (automações) ou nos campos expandidos do template
 
