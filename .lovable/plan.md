@@ -1,107 +1,154 @@
 
-## Plano: Buscar Status da Lista Selecionada no Gatilho de Template
+## Plano: Preservar Automações ao Atualizar Templates
 
 ### Problema Identificado
 
-Na linha 414 do `TemplateAutomationDialog.tsx`, o `TriggerSelector` está recebendo:
+O hook `useUpdateSpaceTemplate` utiliza uma estratégia de "deletar e recriar" para atualizar a estrutura do template (pastas, listas, tarefas). Como a tabela `space_template_automations` possui chaves estrangeiras com `ON DELETE CASCADE` para `space_template_folders` e `space_template_lists`, todas as automações são **excluídas automaticamente** quando a estrutura é atualizada.
 
-```tsx
-scopeType="workspace"  // ❌ FIXO - sempre workspace
+### Fluxo Atual (Problemático)
+
+```text
+1. Usuário edita template
+2. Hook deleta todas as pastas/listas
+3. CASCADE delete remove todas as automações ❌
+4. Novas pastas/listas são criadas com novos UUIDs
+5. Automações perdidas permanentemente
 ```
 
-Quando deveria receber o escopo dinâmico baseado na seleção do usuário (`scopeType` e `scopeId`). Além disso, como estamos em contexto de template, precisamos buscar os status de `status_template_items` em vez de status reais de listas.
+### Fluxo Corrigido
 
-### Solução em 3 Partes
+```text
+1. Usuário edita template
+2. Hook busca automações existentes
+3. Hook busca estrutura atual (pastas/listas) para criar mapa de nomes
+4. Hook deleta pastas/listas (cascade exclui automações temporariamente)
+5. Novas pastas/listas são criadas com novos UUIDs
+6. Hook remapeia automações: nome antigo → novo UUID
+7. Hook reinsere automações com novos IDs
+8. Automações preservadas ✓
+```
 
-#### Parte 1: Atualizar Interface do `TriggerSelector`
+---
 
-Adicionar props para contexto de template:
+### Mudanças Técnicas
+
+#### 1. Modificar `useUpdateSpaceTemplate` em `src/hooks/useSpaceTemplates.ts`
+
+Antes da exclusão (linha 259), adicionar:
 
 ```typescript
-interface TriggerSelectorProps {
-  // ... props existentes ...
-  isTemplateContext?: boolean;
-  templateLists?: TemplateList[];
-}
+// 1. Buscar automações existentes
+const { data: existingAutomations } = await supabase
+  .from('space_template_automations')
+  .select('*')
+  .eq('template_id', id);
 
-interface TemplateList {
-  id: string;
-  name: string;
-  folder_ref_id?: string | null;
-  status_template_id?: string | null;
-}
+// 2. Buscar estrutura atual para mapear nomes
+const { data: existingFolders } = await supabase
+  .from('space_template_folders')
+  .select('id, name')
+  .eq('template_id', id);
+
+const { data: existingLists } = await supabase
+  .from('space_template_lists')
+  .select('id, name, folder_ref_id')
+  .eq('template_id', id);
+
+// 3. Criar mapa: ID antigo → nome
+const folderIdToName: Record<string, string> = {};
+existingFolders?.forEach(f => { folderIdToName[f.id] = f.name; });
+
+const listIdToName: Record<string, string> = {};
+existingLists?.forEach(l => { listIdToName[l.id] = l.name; });
 ```
 
-#### Parte 2: Atualizar Interface do `TriggerInlineConfig`
-
-Adicionar as mesmas props:
+Após a criação das novas pastas/listas, adicionar:
 
 ```typescript
-interface TriggerInlineConfigProps {
-  // ... props existentes ...
-  isTemplateContext?: boolean;
-  templateLists?: TemplateList[];
+// 4. Criar mapa reverso: nome → novo ID
+const folderNameToNewId: Record<string, string> = {};
+createdFolders?.forEach(f => { folderNameToNewId[f.name] = f.id; });
+
+const listNameToNewId: Record<string, string> = {};
+createdLists?.forEach(l => { listNameToNewId[l.name] = l.id; });
+
+// 5. Remapear e reinserir automações
+if (existingAutomations && existingAutomations.length > 0) {
+  const remappedAutomations = existingAutomations.map(automation => {
+    // Remapear folder_ref_id
+    let newFolderRefId: string | null = null;
+    if (automation.folder_ref_id && folderIdToName[automation.folder_ref_id]) {
+      const folderName = folderIdToName[automation.folder_ref_id];
+      newFolderRefId = folderNameToNewId[folderName] || null;
+    }
+
+    // Remapear list_ref_id
+    let newListRefId: string | null = null;
+    if (automation.list_ref_id && listIdToName[automation.list_ref_id]) {
+      const listName = listIdToName[automation.list_ref_id];
+      newListRefId = listNameToNewId[listName] || null;
+    }
+
+    return {
+      template_id: id,
+      description: automation.description,
+      trigger: automation.trigger,
+      action_type: automation.action_type,
+      action_config: automation.action_config,
+      scope_type: automation.scope_type,
+      folder_ref_id: newFolderRefId,
+      list_ref_id: newListRefId,
+      enabled: automation.enabled,
+    };
+  }).filter(a => {
+    // Filtrar automações que perderam referência
+    // (lista/pasta foi removida do template)
+    if (a.scope_type === 'list' && !a.list_ref_id) return false;
+    if (a.scope_type === 'folder' && !a.folder_ref_id) return false;
+    return true;
+  });
+
+  if (remappedAutomations.length > 0) {
+    await supabase
+      .from('space_template_automations')
+      .insert(remappedAutomations);
+  }
 }
 ```
 
-#### Parte 3: Implementar Lógica de Status de Template
+---
 
-No `TriggerInlineConfig`, adicionar lógica similar ao `ActionConfigForm`:
+### Considerações Especiais
+
+#### Automações com Escopo "Space"
+- Não têm `list_ref_id` nem `folder_ref_id`
+- Devem ser preservadas diretamente sem remapeamento
+
+#### Listas/Pastas Renomeadas
+- Se o nome da lista/pasta foi alterado, a automação não será remapeada
+- Isso é comportamento esperado (a automação era para uma entidade que não existe mais)
+
+#### IDs dentro de `action_config`
+- Algumas automações referenciam listas no `action_config` (ex: "mover para lista X")
+- Esses IDs também precisam ser remapeados
 
 ```typescript
-// Buscar lista de template selecionada
-const selectedTemplateList = isTemplateContext && scopeType === 'list' && scopeId
-  ? templateLists.find(l => l.id === scopeId)
-  : null;
+// Dentro da função de remapeamento:
+const remappedActionConfig = JSON.parse(JSON.stringify(automation.action_config));
 
-// Buscar status do template
-const { data: templateStatuses = [] } = useQuery({
-  queryKey: ['template-status-items', selectedTemplateList?.status_template_id],
-  queryFn: async () => {
-    if (!selectedTemplateList?.status_template_id) return [];
-    
-    const { data, error } = await supabase
-      .from('status_template_items')
-      .select('*')
-      .eq('template_id', selectedTemplateList.status_template_id)
-      .order('order_index');
-
-    if (error) throw error;
-    return data.map(s => ({ id: s.id, name: s.name, color: s.color, category: s.category }));
-  },
-  enabled: !!selectedTemplateList?.status_template_id,
-});
-
-// Usar status do template quando disponível
-const effectiveStatuses = isTemplateContext && templateStatuses.length > 0 
-  ? templateStatuses 
-  : statuses;
-```
-
-#### Parte 4: Atualizar `TemplateAutomationDialog`
-
-Passar o escopo dinâmico e informações de template:
-
-```tsx
-<TriggerSelector
-  selectedTrigger={selectedTrigger}
-  onSelectTrigger={(id) => {
-    setSelectedTrigger(id);
-    setActiveStep('action');
-  }}
-  workspaceId={workspaceId}
-  scopeType={scopeType === 'space' ? 'workspace' : scopeType}  // ✅ Dinâmico
-  scopeId={scopeType === 'list' ? listRefId : scopeType === 'folder' ? folderRefId : undefined}  // ✅ Dinâmico
-  config={actionConfig}
-  onConfigChange={setActionConfig}
-  isTemplateContext={true}  // ✅ NOVO
-  templateLists={lists.map(l => ({  // ✅ NOVO
-    id: l.id, 
-    name: l.name, 
-    folder_ref_id: l.folder_ref_id,
-    status_template_id: l.status_template_id
-  }))}
-/>
+// Remapear target_list_id em ações "move_task"
+if (remappedActionConfig.actions) {
+  remappedActionConfig.actions = remappedActionConfig.actions.map(action => {
+    if (action.type === 'move_task' && action.config?.target_list_id) {
+      const oldListId = action.config.target_list_id;
+      if (listIdToName[oldListId]) {
+        const listName = listIdToName[oldListId];
+        action.config.target_list_id = listNameToNewId[listName] || oldListId;
+      }
+    }
+    return action;
+  });
+}
 ```
 
 ---
@@ -110,42 +157,25 @@ Passar o escopo dinâmico e informações de template:
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/automations/advanced/TriggerSelector.tsx` | Adicionar props `isTemplateContext` e `templateLists` e repassar ao `TriggerInlineConfig` |
-| `src/components/automations/advanced/TriggerInlineConfig.tsx` | Adicionar props de template e lógica para buscar `status_template_items` |
-| `src/components/settings/TemplateAutomationDialog.tsx` | Passar escopo dinâmico e informações de template ao `TriggerSelector` |
-
----
-
-### Fluxo Corrigido
-
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│  ANTES (Problema)                                                │
-│  ────────────────                                                │
-│  1. Usuário seleciona escopo "Lista: Plan. de Criativos"         │
-│  2. TriggerSelector recebe scopeType="workspace" (fixo)          │
-│  3. TriggerInlineConfig busca status do workspace                │
-│  4. Mostra: Aguardando, A Fazer, Em Progresso... (errado!)       │
-└──────────────────────────────────────────────────────────────────┘
-                              ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEPOIS (Solução)                                                │
-│  ────────────────                                                │
-│  1. Usuário seleciona escopo "Lista: Plan. de Criativos"         │
-│  2. TriggerSelector recebe scopeType="list" + scopeId            │
-│  3. TriggerInlineConfig detecta isTemplateContext=true           │
-│  4. Busca lista template → encontra status_template_id           │
-│  5. Busca status_template_items para esse template               │
-│  6. Mostra: status configurados para "Plan. de Criativos" ✓     │
-└──────────────────────────────────────────────────────────────────┘
-```
+| `src/hooks/useSpaceTemplates.ts` | Adicionar lógica de preservação e remapeamento de automações no `useUpdateSpaceTemplate` |
 
 ---
 
 ### Resultado Esperado
 
-1. Ao criar automação de template e selecionar uma lista específica
-2. O gatilho "Alterações de status" mostrará os status dessa lista
-3. Se a lista tiver um `status_template_id`, buscará os status desse template
-4. Se não tiver, usará fallback para status do workspace
-5. Consistência com o comportamento já implementado em `ActionConfigForm`
+1. Usuário edita template e salva
+2. Automações existentes são capturadas antes da exclusão
+3. Novas pastas/listas são criadas
+4. Automações são remapeadas para novos IDs baseado nos nomes
+5. Automações são reinseridas
+6. Toast de sucesso: "Template atualizado com sucesso!"
+7. Automações preservadas e funcionando ✓
+
+---
+
+### Limitações Conhecidas
+
+1. Se uma pasta/lista for **renomeada E** tiver automações, essas automações serão perdidas
+   - Solução futura: usar um campo `ref_key` estável ao invés de depender apenas do nome
+
+2. Automações com escopo "space" que referenciam listas específicas no `action_config` precisam do remapeamento adicional descrito acima
