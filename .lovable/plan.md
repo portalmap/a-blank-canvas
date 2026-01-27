@@ -1,36 +1,47 @@
 
 
-## Plano: Adicionar Opção de Recorrência nas Datas
+## Plano: Recorrência Avançada com "Repetir Para Sempre"
 
 ### Contexto
 
-Atualmente, a configuração de datas (início e vencimento) nas automações e tarefas de template só permite modos básicos como "primeiro/último dia do mês" ou "dias após o gatilho". O usuário precisa de uma opção de **recorrência** com frequências e dias específicos da semana/mês.
+A recorrência atual permite escolher Semanal, Quinzenal ou Mensal com dia específico. O usuário precisa de uma opção "Diariamente" com comportamento de **repetição contínua** e sub-opções para controlar como a tarefa é gerenciada ao completar.
 
 ---
 
-### Requisitos Solicitados
+### Requisitos do Usuário
+
+Baseado na imagem de referência fornecida:
 
 | Campo | Opções |
 |-------|--------|
-| **Frequência** | Semanal, Quinzenal, Mensal |
-| **Dias da Semana** | Segunda, Terça, Quarta, Quinta, Sexta |
-| **Dias do Mês** | Primeiro dia do mês, Último dia do mês, Data específica |
+| **Frequência** | Diariamente, Semanal, Quinzenal, Mensal |
+| **Gatilho de recorrência** | "Ao alterar o status: Complete" (status de conclusão) |
+| **Sub-opções** | Ignorar fins de semana, Criar nova tarefa, Repetir para sempre, Atualizar status para: [status] |
 
 ---
 
-### Estrutura de Dados Proposta
-
-A configuração ficará armazenada no `action_config` como um objeto JSONB:
+### Estrutura de Dados Expandida
 
 ```typescript
-// Para recorrência semanal/quinzenal
 {
   date_type: 'recurring',
-  recurrence_type: 'weekly' | 'biweekly' | 'monthly',
-  day_of_week: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday',
-  // OU para mensal:
-  monthly_mode: 'first_day' | 'last_day' | 'specific_day',
-  day_of_month?: 15, // se monthly_mode = 'specific_day'
+  recurrence_type: 'daily' | 'weekly' | 'biweekly' | 'monthly',
+  
+  // Para semanal/quinzenal
+  day_of_week?: 'monday' | 'tuesday' | ... | 'friday',
+  
+  // Para mensal
+  monthly_mode?: 'first_day' | 'last_day' | 'specific_day',
+  day_of_month?: number,
+  
+  // NOVO: Opções de repetição contínua
+  repeat_forever: boolean,
+  skip_weekends: boolean,
+  on_complete_action: 'create_new_task' | 'update_status',
+  reset_status_id?: string, // status para resetar quando "update_status"
+  
+  // Status que dispara a recorrência (obrigatório)
+  trigger_on_status_id?: string, // o status "concluído" que ativa a próxima recorrência
 }
 ```
 
@@ -39,49 +50,48 @@ A configuração ficará armazenada no `action_config` como um objeto JSONB:
 ### Interface de Usuário Proposta
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  Configurar data                                        │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  Tipo de data                                           │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ ○ Primeiro dia do mês                             │  │
-│  │ ○ Último dia do mês                               │  │
-│  │ ○ Dias após o gatilho                             │  │
-│  │ ○ Dia específico do mês                           │  │
-│  │ ● Recorrente                               ← NOVO │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-│  Se "Recorrente" selecionado:                           │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  Frequência                                       │  │
-│  │  ┌─────────────────────────────────────────────┐  │  │
-│  │  │ ○ Semanal                                   │  │  │
-│  │  │ ○ Quinzenal                                 │  │  │
-│  │  │ ○ Mensal                                    │  │  │
-│  │  └─────────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-│  Se Semanal/Quinzenal:                                  │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  Dia da semana                                    │  │
-│  │  ┌─────────────────────────────────────────────┐  │  │
-│  │  │ [Seg] [Ter] [Qua] [Qui] [Sex]               │  │  │
-│  │  └─────────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-│  Se Mensal:                                             │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  Dia do mês                                       │  │
-│  │  ┌─────────────────────────────────────────────┐  │  │
-│  │  │ ○ Primeiro dia do mês                       │  │  │
-│  │  │ ○ Último dia do mês                         │  │  │
-│  │  │ ○ Dia específico: [__15__]                  │  │  │
-│  │  └─────────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Recorrência                                                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Frequência                                                 │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ ● Diariamente                                   ▼   │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
+│  Ao alterar o status:                                       │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │   Concluído (Done)                              ▼   │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ [✓] Ignorar fins de semana                          │    │
+│  │ [ ] Criar nova tarefa                               │    │
+│  │ [✓] Repetir para sempre                             │    │
+│  │ [✓] Atualizar status para:                          │    │
+│  │     ┌───────────────────────────────────────────┐   │    │
+│  │     │   TO DO                               ▼   │   │    │
+│  │     └───────────────────────────────────────────┘   │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+### Lógica de Comportamento
+
+1. **Frequência "Diariamente"**: A tarefa tem uma data que se repete todo dia (ou a cada dia útil se "Ignorar fins de semana" estiver marcado)
+
+2. **Ao alterar o status (trigger)**: O usuário seleciona qual status de "conclusão" dispara a recorrência (ex: "Concluído", "Done", etc.)
+
+3. **Sub-opções**:
+   - **Ignorar fins de semana**: Pula sábado e domingo no cálculo de próxima data
+   - **Criar nova tarefa**: Ao concluir, cria uma cópia da tarefa com a próxima data
+   - **Repetir para sempre**: A tarefa continua sendo recriada/atualizada indefinidamente
+   - **Atualizar status para**: Ao invés de criar nova, reseta o status para o selecionado (ex: "TO DO")
+
+4. **Mutualmente exclusivo**: "Criar nova tarefa" e "Atualizar status" são opções alternativas - apenas uma pode estar ativa
 
 ---
 
@@ -89,108 +99,154 @@ A configuração ficará armazenada no `action_config` como um objeto JSONB:
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/automations/advanced/ActionConfigForm.tsx` | Expandir o `case 'date_config'` para incluir opção de recorrência |
-| `src/components/settings/TemplateTaskDialog.tsx` | Adicionar opção de recorrência nos campos de data de início/entrega |
+| `src/components/automations/advanced/ActionConfigForm.tsx` | Expandir case `date_config` com frequência "Diariamente" e sub-opções de repetição |
+| `src/components/settings/TemplateTaskDialog.tsx` | Adicionar as mesmas opções de recorrência avançada |
 
 ---
 
 ### Implementação: ActionConfigForm.tsx
 
-#### 1. Expandir as opções de `date_type`
+#### 1. Adicionar "Diariamente" às frequências
 
 ```typescript
 <SelectContent>
-  <SelectItem value="first_day_of_month">Primeiro dia do mês</SelectItem>
-  <SelectItem value="last_day_of_month">Último dia do mês</SelectItem>
-  <SelectItem value="days_after_trigger">Dias após o gatilho</SelectItem>
-  <SelectItem value="specific_day">Dia específico do mês</SelectItem>
-  <SelectItem value="recurring">Recorrente</SelectItem>  {/* NOVO */}
+  <SelectItem value="daily">Diariamente</SelectItem>  {/* NOVO */}
+  <SelectItem value="weekly">Semanal</SelectItem>
+  <SelectItem value="biweekly">Quinzenal</SelectItem>
+  <SelectItem value="monthly">Mensal</SelectItem>
 </SelectContent>
 ```
 
-#### 2. Campos Condicionais para Recorrência
+#### 2. Seletor de status que dispara a recorrência
 
 ```typescript
 {config.date_type === 'recurring' && (
-  <>
-    {/* Seletor de frequência */}
-    <div className="space-y-2">
-      <Label>Frequência</Label>
-      <Select
-        value={config.recurrence_type || ''}
-        onValueChange={(value) => {
-          const { day_of_week, monthly_mode, ...rest } = config;
-          onConfigChange({ ...rest, recurrence_type: value });
-        }}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Selecione a frequência..." />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="weekly">Semanal</SelectItem>
-          <SelectItem value="biweekly">Quinzenal</SelectItem>
-          <SelectItem value="monthly">Mensal</SelectItem>
-        </SelectContent>
-      </Select>
+  <div className="space-y-1.5">
+    <Label className="text-xs">
+      Ao alterar o status: <span className="text-destructive">*</span>
+    </Label>
+    <Select
+      value={config.trigger_on_status_id || ''}
+      onValueChange={(value) => handleFieldChange('trigger_on_status_id', value)}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Selecione o status de conclusão..." />
+      </SelectTrigger>
+      <SelectContent>
+        {effectiveStatuses
+          .filter(s => s.category === 'done')  // apenas status de conclusão
+          .map((status) => (
+            <SelectItem key={status.id} value={status.id}>
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: status.color || '#22c55e' }}
+                />
+                <span>{status.name}</span>
+              </div>
+            </SelectItem>
+          ))}
+      </SelectContent>
+    </Select>
+  </div>
+)}
+```
+
+#### 3. Checkboxes de sub-opções
+
+```typescript
+{config.date_type === 'recurring' && (
+  <div className="space-y-2 pt-2">
+    {/* Ignorar fins de semana */}
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="skip_weekends"
+        checked={config.skip_weekends || false}
+        onCheckedChange={(checked) => handleFieldChange('skip_weekends', checked)}
+      />
+      <label htmlFor="skip_weekends" className="text-sm">
+        Ignorar fins de semana
+      </label>
     </div>
 
-    {/* Seletor de dia da semana (para semanal/quinzenal) */}
-    {(config.recurrence_type === 'weekly' || config.recurrence_type === 'biweekly') && (
-      <div className="space-y-2">
-        <Label>Dia da semana</Label>
-        <div className="flex gap-1">
-          {[
-            { value: 'monday', label: 'Seg' },
-            { value: 'tuesday', label: 'Ter' },
-            { value: 'wednesday', label: 'Qua' },
-            { value: 'thursday', label: 'Qui' },
-            { value: 'friday', label: 'Sex' },
-          ].map((day) => (
-            <Button
-              key={day.value}
-              type="button"
-              variant={config.day_of_week === day.value ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleFieldChange('day_of_week', day.value)}
-            >
-              {day.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-    )}
+    {/* Criar nova tarefa */}
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="create_new_task"
+        checked={config.on_complete_action === 'create_new_task'}
+        onCheckedChange={(checked) => {
+          if (checked) {
+            const { reset_status_id, ...rest } = config;
+            onConfigChange({ ...rest, on_complete_action: 'create_new_task' });
+          } else {
+            const { on_complete_action, ...rest } = config;
+            onConfigChange(rest);
+          }
+        }}
+      />
+      <label htmlFor="create_new_task" className="text-sm">
+        Criar nova tarefa
+      </label>
+    </div>
 
-    {/* Seletor de dia do mês (para mensal) */}
-    {config.recurrence_type === 'monthly' && (
-      <div className="space-y-2">
-        <Label>Dia do mês</Label>
-        <Select
-          value={config.monthly_mode || ''}
-          onValueChange={(value) => handleFieldChange('monthly_mode', value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
-            <SelectItem value="last_day">Último dia do mês</SelectItem>
-            <SelectItem value="specific_day">Dia específico</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        {config.monthly_mode === 'specific_day' && (
-          <Input
-            type="number"
-            min={1}
-            max={31}
-            value={config.day_of_month || ''}
-            onChange={(e) => handleFieldChange('day_of_month', parseInt(e.target.value))}
-            placeholder="Ex: 15"
-          />
+    {/* Repetir para sempre */}
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="repeat_forever"
+        checked={config.repeat_forever || false}
+        onCheckedChange={(checked) => handleFieldChange('repeat_forever', checked)}
+      />
+      <label htmlFor="repeat_forever" className="text-sm">
+        Repetir para sempre
+      </label>
+    </div>
+
+    {/* Atualizar status para */}
+    <div className="flex items-start gap-2">
+      <Checkbox
+        id="update_status"
+        checked={config.on_complete_action === 'update_status'}
+        onCheckedChange={(checked) => {
+          if (checked) {
+            onConfigChange({ ...config, on_complete_action: 'update_status' });
+          } else {
+            const { on_complete_action, reset_status_id, ...rest } = config;
+            onConfigChange(rest);
+          }
+        }}
+      />
+      <div className="flex-1 space-y-1">
+        <label htmlFor="update_status" className="text-sm">
+          Atualizar status para:
+        </label>
+        {config.on_complete_action === 'update_status' && (
+          <Select
+            value={config.reset_status_id || ''}
+            onValueChange={(value) => handleFieldChange('reset_status_id', value)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="Selecione..." />
+            </SelectTrigger>
+            <SelectContent>
+              {effectiveStatuses
+                .filter(s => s.category !== 'done')  // excluir status de conclusão
+                .map((status) => (
+                  <SelectItem key={status.id} value={status.id}>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: status.color || '#94a3b8' }}
+                      />
+                      <span>{status.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         )}
       </div>
-    )}
-  </>
+    </div>
+  </div>
 )}
 ```
 
@@ -198,129 +254,37 @@ A configuração ficará armazenada no `action_config` como um objeto JSONB:
 
 ### Implementação: TemplateTaskDialog.tsx
 
-Substituir os simples campos numéricos de offset por um seletor mais avançado que permite escolher entre:
-- **Offset simples** (dias após criação) - comportamento atual
-- **Recorrente** (com frequência e dia)
+Aplicar a mesma estrutura de UI expandida para os campos de Data de Início e Data de Entrega:
+
+#### 1. Novos estados
 
 ```typescript
-<div className="space-y-2">
-  <label className="text-sm font-medium flex items-center gap-2">
-    <Calendar className="h-4 w-4" /> Data de Início
-  </label>
-  
-  <Select
-    value={startDateMode}
-    onValueChange={setStartDateMode}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Selecione o modo..." />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="offset">Dias após criação</SelectItem>
-      <SelectItem value="recurring">Recorrente</SelectItem>
-    </SelectContent>
-  </Select>
+// Estados adicionais para recorrência avançada
+const [startRepeatForever, setStartRepeatForever] = useState(false);
+const [startSkipWeekends, setStartSkipWeekends] = useState(false);
+const [startOnCompleteAction, setStartOnCompleteAction] = useState<'create_new_task' | 'update_status' | ''>('');
+const [startResetStatusId, setStartResetStatusId] = useState('');
+const [startTriggerStatusId, setStartTriggerStatusId] = useState('');
 
-  {startDateMode === 'offset' && (
-    <Input
-      type="number"
-      min={0}
-      value={startDateOffset}
-      onChange={(e) => setStartDateOffset(e.target.value)}
-      placeholder="Ex: 0"
-    />
-  )}
-
-  {startDateMode === 'recurring' && (
-    <div className="space-y-2 p-3 bg-muted/30 rounded-md">
-      {/* Frequência */}
-      <Select
-        value={startRecurrenceType}
-        onValueChange={setStartRecurrenceType}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Frequência..." />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="weekly">Semanal</SelectItem>
-          <SelectItem value="biweekly">Quinzenal</SelectItem>
-          <SelectItem value="monthly">Mensal</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {/* Seletor de dia */}
-      {(startRecurrenceType === 'weekly' || startRecurrenceType === 'biweekly') && (
-        <div className="flex gap-1 flex-wrap">
-          {WEEKDAYS.map((day) => (
-            <Button
-              key={day.value}
-              type="button"
-              size="sm"
-              variant={startDayOfWeek === day.value ? 'default' : 'outline'}
-              onClick={() => setStartDayOfWeek(day.value)}
-            >
-              {day.label}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {startRecurrenceType === 'monthly' && (
-        <Select
-          value={startMonthlyMode}
-          onValueChange={setStartMonthlyMode}
-        >
-          <SelectContent>
-            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
-            <SelectItem value="last_day">Último dia do mês</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
-    </div>
-  )}
-</div>
+// Mesmos para due date
+const [dueRepeatForever, setDueRepeatForever] = useState(false);
+// ... etc
 ```
 
----
-
-### Constantes de Dias
+#### 2. Expandir a interface DateRecurrence
 
 ```typescript
-const WEEKDAYS = [
-  { value: 'monday', label: 'Seg' },
-  { value: 'tuesday', label: 'Ter' },
-  { value: 'wednesday', label: 'Qua' },
-  { value: 'thursday', label: 'Qui' },
-  { value: 'friday', label: 'Sex' },
-] as const;
-```
-
----
-
-### Estrutura de Dados no TaskData (TemplateTaskDialog)
-
-Expandir a interface para suportar recorrência:
-
-```typescript
-export interface TaskData {
-  title: string;
-  description: string;
-  priority: string;
-  // Datas com offset (modo atual)
-  startDateOffset: number | null;
-  dueDateOffset: number | null;
-  // Novo: Recorrência
-  startDateRecurrence?: {
-    type: 'weekly' | 'biweekly' | 'monthly';
-    dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
-    monthlyMode?: 'first_day' | 'last_day';
-  } | null;
-  dueDateRecurrence?: {
-    type: 'weekly' | 'biweekly' | 'monthly';
-    dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
-    monthlyMode?: 'first_day' | 'last_day';
-  } | null;
-  // ... demais campos
+interface DateRecurrence {
+  type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+  monthlyMode?: 'first_day' | 'last_day' | 'specific_day';
+  dayOfMonth?: number;
+  // NOVO
+  repeatForever?: boolean;
+  skipWeekends?: boolean;
+  onCompleteAction?: 'create_new_task' | 'update_status';
+  resetStatusId?: string;
+  triggerOnStatusId?: string;
 }
 ```
 
@@ -328,8 +292,12 @@ export interface TaskData {
 
 ### Resultado Final
 
-1. **Automações**: Ações de `set_due_date` e `set_start_date` terão a opção "Recorrente" com configuração de frequência e dia
-2. **Templates de Tarefa**: Os campos de data poderão usar offset simples OU configuração de recorrência
-3. **Flexibilidade**: Permite escolher entre dias da semana (para semanal/quinzenal) ou dias específicos do mês (para mensal)
-4. **Armazenamento**: Toda a configuração fica no JSONB do `action_config` (automações) ou nos campos expandidos do template
+1. **Frequência "Diariamente"**: Nova opção para tarefas que se repetem todo dia
+2. **Status de gatilho**: Usuário define qual status de conclusão ativa a recorrência
+3. **Ignorar fins de semana**: Pula sábado/domingo no cálculo de datas
+4. **Criar nova tarefa**: Ao concluir, duplica a tarefa com nova data
+5. **Repetir para sempre**: Continua indefinidamente
+6. **Atualizar status**: Reseta para um status específico ao invés de criar nova tarefa
+
+Essa estrutura permite controle granular sobre como tarefas recorrentes se comportam, mantendo consistência com a imagem de referência fornecida.
 
