@@ -369,3 +369,30 @@
 .rich-text-editor .ProseMirror.resize-cursor {
   cursor: col-resize;
 }
+
+/* Bubble Menu */
+.bubble-menu {
+  z-index: 50;
+}
+
+/* Text alignment */
+.rich-text-editor .ProseMirror p[style*="text-align: center"],
+.rich-text-editor .ProseMirror h1[style*="text-align: center"],
+.rich-text-editor .ProseMirror h2[style*="text-align: center"],
+.rich-text-editor .ProseMirror h3[style*="text-align: center"],
+.rich-text-editor .ProseMirror h4[style*="text-align: center"] {
+  text-align: center;
+}
+
+.rich-text-editor .ProseMirror p[style*="text-align: right"],
+.rich-text-editor .ProseMirror h1[style*="text-align: right"],
+.rich-text-editor .ProseMirror h2[style*="text-align: right"],
+.rich-text-editor .ProseMirror h3[style*="text-align: right"],
+.rich-text-editor .ProseMirror h4[style*="text-align: right"] {
+  text-align: right;
+}
+
+/* Underline */
+.rich-text-editor .ProseMirror u {
+  text-decoration: underline;
+}
