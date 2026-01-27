@@ -5,6 +5,13 @@ import { TRIGGER_CATEGORIES, TriggerOption } from './triggerCategories';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TriggerInlineConfig } from './TriggerInlineConfig';
 
+interface TemplateListInfo {
+  id: string;
+  name: string;
+  folder_ref_id?: string | null;
+  status_template_id?: string | null;
+}
+
 interface TriggerSelectorProps {
   selectedTrigger: string | null;
   onSelectTrigger: (triggerId: string) => void;
@@ -13,10 +20,12 @@ interface TriggerSelectorProps {
   scopeId?: string;
   config: Record<string, any>;
   onConfigChange: (config: Record<string, any>) => void;
+  isTemplateContext?: boolean;
+  templateLists?: TemplateListInfo[];
 }
 
 // List of triggers that have inline configuration
-const TRIGGERS_WITH_CONFIG = ['on_status_changed'];
+const TRIGGERS_WITH_CONFIG = ['on_status_changed', 'on_tag_added', 'on_tag_removed'];
 
 export const TriggerSelector = ({ 
   selectedTrigger, 
@@ -26,6 +35,8 @@ export const TriggerSelector = ({
   scopeId,
   config,
   onConfigChange,
+  isTemplateContext,
+  templateLists,
 }: TriggerSelectorProps) => {
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['Popular']);
 
@@ -124,6 +135,8 @@ export const TriggerSelector = ({
                               scopeId={scopeId}
                               config={config}
                               onConfigChange={onConfigChange}
+                              isTemplateContext={isTemplateContext}
+                              templateLists={templateLists}
                             />
                           </div>
                         )}
