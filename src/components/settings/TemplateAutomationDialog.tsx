@@ -268,10 +268,10 @@ export function TemplateAutomationDialog({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto py-4 space-y-6">
+        <div className="flex-1 overflow-y-auto py-3 space-y-4">
           {/* Name Input */}
-          <div className="space-y-2">
-            <Label>Nome da automação (opcional)</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Nome da automação (opcional)</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -280,8 +280,8 @@ export function TemplateAutomationDialog({
           </div>
 
           {/* Template Scope Selector */}
-          <div className="space-y-4">
-            <Label>Escopo dentro do Template</Label>
+          <div className="space-y-2">
+            <Label className="text-xs">Escopo dentro do Template</Label>
             
             <Select value={scopeType} onValueChange={(v) => {
               setScopeType(v as 'space' | 'folder' | 'list');
@@ -362,14 +362,14 @@ export function TemplateAutomationDialog({
             <div className="space-y-3">
               {/* Trigger Card */}
               <Card 
-                className={`p-4 cursor-pointer transition-all ${
+                className={`p-3 cursor-pointer transition-all ${
                   activeStep === 'trigger' ? 'ring-2 ring-primary' : ''
                 }`}
                 onClick={() => setActiveStep('trigger')}
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <Target className="h-4 w-4 text-primary" />
-                  <span className="font-medium text-sm">Gatilho</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="h-3.5 w-3.5 text-primary" />
+                  <span className="font-medium text-xs">Gatilho</span>
                   {selectedTriggerCategory && (
                     <Badge variant="secondary" className="ml-auto text-xs">
                       {selectedTriggerCategory.name}
@@ -378,9 +378,9 @@ export function TemplateAutomationDialog({
                 </div>
 
                 {selectedTriggerData ? (
-                  <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
-                    <selectedTriggerData.icon className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">{selectedTriggerData.label}</span>
+                  <div className="flex items-center gap-2 p-1.5 bg-accent rounded-md">
+                    <selectedTriggerData.icon className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-medium">{selectedTriggerData.label}</span>
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -403,7 +403,7 @@ export function TemplateAutomationDialog({
                 )}
 
                 {activeStep === 'trigger' && workspaceId && (
-                  <div className="mt-4 border-t pt-4">
+                  <div className="mt-3 border-t pt-3">
                     <TriggerSelector
                       selectedTrigger={selectedTrigger}
                       onSelectTrigger={(id) => {

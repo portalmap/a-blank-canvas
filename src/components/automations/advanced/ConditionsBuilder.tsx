@@ -47,18 +47,18 @@ export const ConditionsBuilder = ({
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-sm font-medium">E se essa condição for verdadeira:</Label>
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+        <Label className="text-xs font-medium">E se essa condição for verdadeira:</Label>
       </div>
 
       {conditions.length === 0 ? (
-        <div className="text-sm text-muted-foreground py-2 px-3 bg-muted/50 rounded-md">
+        <div className="text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded-md">
           Sem condições. A automação será executada sempre que o gatilho disparar.
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {conditions.map((condition, index) => (
             <div key={condition.id}>
               <ConditionRow
@@ -70,11 +70,11 @@ export const ConditionsBuilder = ({
               
               {/* Logic connector between conditions */}
               {index < conditions.length - 1 && (
-                <div className="flex items-center justify-center py-1">
+                <div className="flex items-center justify-center py-0.5">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-6 text-xs px-3 font-medium"
+                    className="h-5 text-[10px] px-2 font-medium"
                     onClick={() => handleToggleLogic(condition.id)}
                   >
                     {condition.logic === 'AND' ? 'E' : 'OU'}
@@ -89,10 +89,10 @@ export const ConditionsBuilder = ({
       <Button
         variant="outline"
         size="sm"
-        className="w-full"
+        className="w-full h-7 text-xs"
         onClick={handleAddCondition}
       >
-        <Plus className="h-4 w-4 mr-1" />
+        <Plus className="h-3.5 w-3.5 mr-1" />
         Adicionar condição
       </Button>
     </div>

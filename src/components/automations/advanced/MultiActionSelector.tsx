@@ -94,37 +94,37 @@ export const MultiActionSelector = ({
   };
 
   return (
-    <div className="space-y-3">
-      <Label className="text-sm font-medium">Ações a executar</Label>
+    <div className="space-y-2">
+      <Label className="text-xs font-medium">Ações a executar</Label>
 
       {actions.length === 0 ? (
-        <div className="text-sm text-muted-foreground py-2 px-3 bg-muted/50 rounded-md">
+        <div className="text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded-md">
           Nenhuma ação configurada. Adicione pelo menos uma ação.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {actions.map((action, index) => {
             const actionData = action.type ? getActionById(action.type) : null;
             const effectiveScope = getEffectiveScopeForAction(index);
             
             return (
-              <Card key={action.id} className="p-3">
-                <div className="flex items-start gap-2">
-                  <div className="flex items-center gap-1 text-muted-foreground pt-1">
-                    <GripVertical className="h-4 w-4" />
-                    <span className="text-xs font-medium w-4">{index + 1}.</span>
+              <Card key={action.id} className="p-2">
+                <div className="flex items-start gap-1.5">
+                  <div className="flex items-center gap-0.5 text-muted-foreground pt-0.5">
+                    <GripVertical className="h-3.5 w-3.5" />
+                    <span className="text-[10px] font-medium w-3">{index + 1}.</span>
                   </div>
                   
-                  <div className="flex-1 space-y-3">
+                  <div className="flex-1 space-y-2">
                     {/* Selected action display or selector */}
                     {actionData ? (
-                      <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
-                        <actionData.icon className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">{actionData.label}</span>
+                      <div className="flex items-center gap-1.5 p-1.5 bg-accent rounded-md">
+                        <actionData.icon className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-xs font-medium">{actionData.label}</span>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 ml-auto text-xs"
+                          className="h-5 ml-auto text-[10px] px-1.5"
                           onClick={() => handleSelectActionType(action.id, '')}
                         >
                           Alterar
@@ -157,10 +157,10 @@ export const MultiActionSelector = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
                     onClick={() => handleDeleteAction(action.id)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </Card>
@@ -172,10 +172,10 @@ export const MultiActionSelector = ({
       <Button
         variant="outline"
         size="sm"
-        className="w-full"
+        className="w-full h-7 text-xs"
         onClick={handleAddAction}
       >
-        <Plus className="h-4 w-4 mr-1" />
+        <Plus className="h-3.5 w-3.5 mr-1" />
         Adicionar ação
       </Button>
     </div>
