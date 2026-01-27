@@ -227,8 +227,8 @@ export const ActionConfigForm = ({
     switch (field.type) {
       case 'user':
         return (
-          <div key={field.name} className="space-y-2">
-            <Label>{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+          <div key={field.name} className="space-y-1.5">
+            <Label className="text-xs">{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
             <Select
               value={config[field.name] || ''}
               onValueChange={(value) => handleFieldChange(field.name, value)}
@@ -257,8 +257,8 @@ export const ActionConfigForm = ({
 
       case 'status':
         return (
-          <div key={field.name} className="space-y-2">
-            <Label>{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+          <div key={field.name} className="space-y-1.5">
+            <Label className="text-xs">{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
             <Select
               value={config[field.name] || ''}
               onValueChange={(value) => handleFieldChange(field.name, value)}
@@ -285,8 +285,8 @@ export const ActionConfigForm = ({
 
       case 'tag':
         return (
-          <div key={field.name} className="space-y-2">
-            <Label>{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+          <div key={field.name} className="space-y-1.5">
+            <Label className="text-xs">{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
             <Select
               value={config[field.name] || ''}
               onValueChange={(value) => handleFieldChange(field.name, value)}
@@ -318,8 +318,8 @@ export const ActionConfigForm = ({
 
       case 'list':
         return (
-          <div key={field.name} className="space-y-2">
-            <Label>{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+          <div key={field.name} className="space-y-1.5">
+            <Label className="text-xs">{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
             <Select
               value={config[field.name] || ''}
               onValueChange={(value) => handleFieldChange(field.name, value)}
@@ -423,8 +423,8 @@ export const ActionConfigForm = ({
       case 'priority':
       case 'select':
         return (
-          <div key={field.name} className="space-y-2">
-            <Label>{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+          <div key={field.name} className="space-y-1.5">
+            <Label className="text-xs">{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
             <Select
               value={config[field.name] || ''}
               onValueChange={(value) => handleFieldChange(field.name, value)}
@@ -445,10 +445,10 @@ export const ActionConfigForm = ({
 
       case 'date_config':
         return (
-          <div key={field.name} className="space-y-4">
+          <div key={field.name} className="space-y-3">
             {/* Seletor do tipo de data */}
-            <div className="space-y-2">
-              <Label>Tipo de data <span className="text-destructive">*</span></Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tipo de data <span className="text-destructive">*</span></Label>
               <Select
                 value={config.date_type || ''}
                 onValueChange={(value) => {

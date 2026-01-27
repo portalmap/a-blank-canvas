@@ -247,12 +247,12 @@ export const ConditionRow = ({
   };
 
   return (
-    <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border">
-      <div className="flex-1 space-y-2">
-        <div className="flex items-center gap-2">
+    <div className="flex items-start gap-1.5 p-2 bg-muted/30 rounded-md border">
+      <div className="flex-1 space-y-1.5">
+        <div className="flex items-center gap-1.5">
           {/* Field selector */}
           <Select value={condition.field} onValueChange={handleFieldChange}>
-            <SelectTrigger className="h-8 w-[140px]">
+            <SelectTrigger className="h-7 w-[120px] text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -266,7 +266,7 @@ export const ConditionRow = ({
 
           {/* Operator selector */}
           <Select value={condition.operator} onValueChange={handleOperatorChange}>
-            <SelectTrigger className="h-8 w-[180px]">
+            <SelectTrigger className="h-7 w-[150px] text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -287,10 +287,10 @@ export const ConditionRow = ({
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+        className="h-6 w-6 text-muted-foreground hover:text-destructive"
         onClick={onDelete}
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </div>
   );
