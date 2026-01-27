@@ -8,20 +8,19 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
+import { SimpleRichTextEditor } from '@/components/documents/editor';
 import { 
   Flag, 
   Calendar, 
   Clock, 
   User, 
   Tag as TagIcon, 
-  Maximize2,
   ChevronRight,
   CheckSquare,
   Paperclip,
@@ -112,7 +111,6 @@ export const TemplateTaskDialog = ({
   const [isMilestone, setIsMilestone] = useState(false);
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSubtasksOpen, setIsSubtasksOpen] = useState(false);
 
   const WEEKDAYS = [
@@ -887,25 +885,14 @@ export const TemplateTaskDialog = ({
 
             <Separator />
 
-            {/* Descrição - igual TaskMainContent */}
+            {/* Descrição - com editor rico */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Descrição</label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsDescriptionExpanded(true)}
-                  title="Expandir descrição"
-                  className="h-7 w-7 p-0"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+              <label className="text-sm font-medium">Descrição</label>
+              <SimpleRichTextEditor
+                content={description}
+                onChange={setDescription}
                 placeholder="Adicione uma descrição..."
-                className="min-h-[80px]"
+                minHeight="80px"
               />
             </div>
 
@@ -1023,28 +1010,6 @@ export const TemplateTaskDialog = ({
         </DialogContent>
       </Dialog>
 
-      {/* Modal de descrição expandida - igual TaskMainContent */}
-      <Dialog open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Descrição</DialogTitle>
-          </DialogHeader>
-          <div className="overflow-auto max-h-[60vh]">
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Adicione uma descrição..."
-              className="min-h-[300px] resize-none"
-              autoFocus
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsDescriptionExpanded(false)}>
-              Fechar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
