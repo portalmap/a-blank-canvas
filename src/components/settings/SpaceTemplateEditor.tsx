@@ -23,8 +23,14 @@ import {
   X, 
   Loader2,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Flag,
+  Clock,
+  Tag
 } from 'lucide-react';
+import { useTaskTags } from '@/hooks/useTaskTags';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const PRESET_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', 
@@ -63,6 +69,12 @@ interface TaskItem {
   title: string;
   description: string;
   priority: string;
+  startDateOffset: number | null;
+  dueDateOffset: number | null;
+  statusTemplateItemId: string | null;
+  estimatedTime: number | null;
+  isMilestone: boolean;
+  tagNames: string[];
 }
 
 interface SpaceTemplateEditorProps {
@@ -74,8 +86,25 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
   const { activeWorkspace } = useWorkspace();
   const { data: template, isLoading } = useSpaceTemplate(templateId);
   const { data: statusTemplates = [] } = useStatusTemplates(activeWorkspace?.id);
+  const { data: workspaceTags = [] } = useTaskTags(activeWorkspace?.id);
   const createTemplate = useCreateSpaceTemplate();
   const updateTemplate = useUpdateSpaceTemplate();
+
+  // Fetch status template items for the dialog
+  const { data: allStatusItems = [] } = useQuery({
+    queryKey: ['all-status-template-items', statusTemplates.map(st => st.id)],
+    queryFn: async () => {
+      if (statusTemplates.length === 0) return [];
+      const { data, error } = await supabase
+        .from('status_template_items')
+        .select('*')
+        .in('template_id', statusTemplates.map(st => st.id))
+        .order('order_index');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: statusTemplates.length > 0,
+  });
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -130,6 +159,12 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
         title: t.title,
         description: t.description || '',
         priority: t.priority,
+        startDateOffset: t.start_date_offset ?? null,
+        dueDateOffset: t.due_date_offset ?? null,
+        statusTemplateItemId: t.status_template_item_id ?? null,
+        estimatedTime: t.estimated_time ?? null,
+        isMilestone: t.is_milestone ?? false,
+        tagNames: t.tag_names ?? [],
       }));
       setTasks(loadedTasks);
     }
@@ -176,7 +211,17 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
     setTaskDialogOpen(true);
   };
 
-  const handleTaskSave = (taskData: { title: string; description: string; priority: string }) => {
+  const handleTaskSave = (taskData: { 
+    title: string; 
+    description: string; 
+    priority: string;
+    startDateOffset: number | null;
+    dueDateOffset: number | null;
+    statusTemplateItemId: string | null;
+    estimatedTime: number | null;
+    isMilestone: boolean;
+    tagNames: string[];
+  }) => {
     if (editingTask) {
       setTasks(tasks.map(t => 
         t.tempId === editingTask.tempId 
@@ -250,6 +295,12 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
       description: t.description || null,
       priority: t.priority,
       order_index: i,
+      start_date_offset: t.startDateOffset,
+      due_date_offset: t.dueDateOffset,
+      status_template_item_id: t.statusTemplateItemId,
+      estimated_time: t.estimatedTime,
+      is_milestone: t.isMilestone,
+      tag_names: t.tagNames.length > 0 ? t.tagNames : null,
     }));
 
     if (templateId) {
@@ -301,11 +352,31 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
       >
         <CheckSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         <span className="text-sm flex-1 truncate">{task.title}</span>
-        {task.description && (
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            (com descrição)
+        
+        {task.isMilestone && (
+          <Flag className="h-3 w-3 text-amber-500 flex-shrink-0" />
+        )}
+        
+        {task.dueDateOffset !== null && (
+          <Badge variant="outline" className="text-xs">
+            +{task.dueDateOffset}d
+          </Badge>
+        )}
+        
+        {task.estimatedTime !== null && (
+          <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+            <Clock className="h-3 w-3" />
+            {Math.floor(task.estimatedTime / 60)}h{task.estimatedTime % 60 > 0 ? `${task.estimatedTime % 60}m` : ''}
           </span>
         )}
+        
+        {task.tagNames.length > 0 && (
+          <Badge variant="secondary" className="text-xs flex items-center gap-0.5">
+            <Tag className="h-3 w-3" />
+            {task.tagNames.length}
+          </Badge>
+        )}
+        
         <Badge variant="outline" className="text-xs">
           <div 
             className="w-2 h-2 rounded-full mr-1" 
@@ -558,6 +629,8 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
         onOpenChange={setTaskDialogOpen}
         task={editingTask}
         onSave={handleTaskSave}
+        statusTemplateItems={allStatusItems}
+        availableTags={workspaceTags}
       />
     </div>
   );
