@@ -411,9 +411,17 @@ export function TemplateAutomationDialog({
                         setActiveStep('action');
                       }}
                       workspaceId={workspaceId}
-                      scopeType="workspace"
+                      scopeType={scopeType === 'space' ? 'workspace' : scopeType}
+                      scopeId={scopeType === 'list' ? listRefId : scopeType === 'folder' ? folderRefId : undefined}
                       config={actionConfig}
                       onConfigChange={setActionConfig}
+                      isTemplateContext={true}
+                      templateLists={lists.map(l => ({
+                        id: l.id,
+                        name: l.name,
+                        folder_ref_id: l.folder_ref_id,
+                        status_template_id: l.status_template_id
+                      }))}
                     />
                   </div>
                 )}
