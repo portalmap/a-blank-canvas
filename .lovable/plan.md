@@ -1,140 +1,151 @@
 
+## Plano: Buscar Status da Lista Selecionada no Gatilho de Template
 
-## Plano: Adicionar Seletor de Etiquetas nos Gatilhos de Tag
+### Problema Identificado
 
-### Situação Atual
-Os gatilhos "Etiqueta adicionada" (`on_tag_added`) e "Tag removida" (`on_tag_removed`) não têm configuração inline. Quando selecionados, o gatilho é configurado sem especificar qual etiqueta deve ativar a automação.
+Na linha 414 do `TemplateAutomationDialog.tsx`, o `TriggerSelector` está recebendo:
 
-### Solução Proposta
-
-Criar um seletor de etiquetas similar ao `StatusMultiSelect`, permitindo ao usuário selecionar quais etiquetas específicas devem disparar a automação.
-
-### UI Proposta
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  Gatilho                                             │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐│
-│  │ 🏷️ Etiqueta adicionada                       ✓ ││
-│  └─────────────────────────────────────────────────┘│
-│                                                      │
-│  Etiquetas                                          │
-│  ┌─────────────────────────────────────────────────┐│
-│  │ Qualquer etiqueta                            ▼ ││
-│  └─────────────────────────────────────────────────┘│
-│                                                      │
-│  (ou com seleção):                                  │
-│  ┌─────────────────────────────────────────────────┐│
-│  │ 🔴 Urgente  🔵 Revisão                       ▼ ││
-│  └─────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────┘
+```tsx
+scopeType="workspace"  // ❌ FIXO - sempre workspace
 ```
 
----
+Quando deveria receber o escopo dinâmico baseado na seleção do usuário (`scopeType` e `scopeId`). Além disso, como estamos em contexto de template, precisamos buscar os status de `status_template_items` em vez de status reais de listas.
 
-### Mudanças Necessárias
+### Solução em 3 Partes
 
-#### 1. Criar `TagMultiSelect.tsx`
+#### Parte 1: Atualizar Interface do `TriggerSelector`
 
-Novo componente inspirado no `StatusMultiSelect`, com as seguintes características:
-- Popover com lista de tags do workspace
-- Checkbox para seleção múltipla
-- Busca/filtro por nome
-- Botão "Marcar tudo" / "Limpar"
-- Badge com cor da tag para itens selecionados
+Adicionar props para contexto de template:
 
 ```typescript
-// TagMultiSelect.tsx
-interface TagItem {
+interface TriggerSelectorProps {
+  // ... props existentes ...
+  isTemplateContext?: boolean;
+  templateLists?: TemplateList[];
+}
+
+interface TemplateList {
   id: string;
   name: string;
-  color: string | null;
-}
-
-interface TagMultiSelectProps {
-  label: string;
-  placeholder?: string;
-  tags: TagItem[];
-  selectedIds: string[];
-  onSelectionChange: (ids: string[]) => void;
+  folder_ref_id?: string | null;
+  status_template_id?: string | null;
 }
 ```
 
-#### 2. Atualizar `TriggerInlineConfig.tsx`
+#### Parte 2: Atualizar Interface do `TriggerInlineConfig`
 
-Adicionar casos para `on_tag_added` e `on_tag_removed`:
+Adicionar as mesmas props:
 
 ```typescript
-import { useTaskTags } from '@/hooks/useTaskTags';
-import { TagMultiSelect } from './TagMultiSelect';
-
-// Dentro do componente:
-const { data: tags = [] } = useTaskTags(workspaceId);
-
-// No switch:
-case 'on_tag_added':
-case 'on_tag_removed': {
-  const tagIds: string[] = triggerConfig.tag_ids || [];
-
-  const handleTagChange = (ids: string[]) => {
-    onConfigChange({
-      ...config,
-      trigger_config: {
-        ...triggerConfig,
-        tag_ids: ids.length > 0 ? ids : null,
-      },
-    });
-  };
-
-  return (
-    <TagMultiSelect
-      label={triggerId === 'on_tag_added' ? 'Etiquetas' : 'Etiquetas removidas'}
-      placeholder="Qualquer etiqueta"
-      tags={tags}
-      selectedIds={tagIds}
-      onSelectionChange={handleTagChange}
-    />
-  );
+interface TriggerInlineConfigProps {
+  // ... props existentes ...
+  isTemplateContext?: boolean;
+  templateLists?: TemplateList[];
 }
+```
+
+#### Parte 3: Implementar Lógica de Status de Template
+
+No `TriggerInlineConfig`, adicionar lógica similar ao `ActionConfigForm`:
+
+```typescript
+// Buscar lista de template selecionada
+const selectedTemplateList = isTemplateContext && scopeType === 'list' && scopeId
+  ? templateLists.find(l => l.id === scopeId)
+  : null;
+
+// Buscar status do template
+const { data: templateStatuses = [] } = useQuery({
+  queryKey: ['template-status-items', selectedTemplateList?.status_template_id],
+  queryFn: async () => {
+    if (!selectedTemplateList?.status_template_id) return [];
+    
+    const { data, error } = await supabase
+      .from('status_template_items')
+      .select('*')
+      .eq('template_id', selectedTemplateList.status_template_id)
+      .order('order_index');
+
+    if (error) throw error;
+    return data.map(s => ({ id: s.id, name: s.name, color: s.color, category: s.category }));
+  },
+  enabled: !!selectedTemplateList?.status_template_id,
+});
+
+// Usar status do template quando disponível
+const effectiveStatuses = isTemplateContext && templateStatuses.length > 0 
+  ? templateStatuses 
+  : statuses;
+```
+
+#### Parte 4: Atualizar `TemplateAutomationDialog`
+
+Passar o escopo dinâmico e informações de template:
+
+```tsx
+<TriggerSelector
+  selectedTrigger={selectedTrigger}
+  onSelectTrigger={(id) => {
+    setSelectedTrigger(id);
+    setActiveStep('action');
+  }}
+  workspaceId={workspaceId}
+  scopeType={scopeType === 'space' ? 'workspace' : scopeType}  // ✅ Dinâmico
+  scopeId={scopeType === 'list' ? listRefId : scopeType === 'folder' ? folderRefId : undefined}  // ✅ Dinâmico
+  config={actionConfig}
+  onConfigChange={setActionConfig}
+  isTemplateContext={true}  // ✅ NOVO
+  templateLists={lists.map(l => ({  // ✅ NOVO
+    id: l.id, 
+    name: l.name, 
+    folder_ref_id: l.folder_ref_id,
+    status_template_id: l.status_template_id
+  }))}
+/>
 ```
 
 ---
 
-### Arquivos a Criar/Modificar
+### Arquivos a Modificar
 
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `src/components/automations/advanced/TagMultiSelect.tsx` | Criar | Componente de seleção múltipla de tags |
-| `src/components/automations/advanced/TriggerInlineConfig.tsx` | Modificar | Adicionar cases para `on_tag_added` e `on_tag_removed` |
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/automations/advanced/TriggerSelector.tsx` | Adicionar props `isTemplateContext` e `templateLists` e repassar ao `TriggerInlineConfig` |
+| `src/components/automations/advanced/TriggerInlineConfig.tsx` | Adicionar props de template e lógica para buscar `status_template_items` |
+| `src/components/settings/TemplateAutomationDialog.tsx` | Passar escopo dinâmico e informações de template ao `TriggerSelector` |
 
 ---
 
-### Estrutura de Dados Salva
+### Fluxo Corrigido
 
-O `trigger_config` será salvo assim:
-
-**Qualquer etiqueta (nenhuma selecionada):**
-```json
-{ "trigger_config": {} }
-```
-
-**Etiquetas específicas:**
-```json
-{ 
-  "trigger_config": { 
-    "tag_ids": ["uuid-tag-1", "uuid-tag-2"] 
-  } 
-}
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│  ANTES (Problema)                                                │
+│  ────────────────                                                │
+│  1. Usuário seleciona escopo "Lista: Plan. de Criativos"         │
+│  2. TriggerSelector recebe scopeType="workspace" (fixo)          │
+│  3. TriggerInlineConfig busca status do workspace                │
+│  4. Mostra: Aguardando, A Fazer, Em Progresso... (errado!)       │
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  DEPOIS (Solução)                                                │
+│  ────────────────                                                │
+│  1. Usuário seleciona escopo "Lista: Plan. de Criativos"         │
+│  2. TriggerSelector recebe scopeType="list" + scopeId            │
+│  3. TriggerInlineConfig detecta isTemplateContext=true           │
+│  4. Busca lista template → encontra status_template_id           │
+│  5. Busca status_template_items para esse template               │
+│  6. Mostra: status configurados para "Plan. de Criativos" ✓     │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ### Resultado Esperado
 
-1. Usuário seleciona gatilho "Etiqueta adicionada"
-2. Aparece seletor de etiquetas abaixo do gatilho selecionado
-3. Se nenhuma etiqueta for selecionada: dispara para qualquer etiqueta
-4. Se etiquetas específicas forem selecionadas: dispara apenas quando uma delas for adicionada
-5. Mesmo comportamento para "Tag removida"
-
+1. Ao criar automação de template e selecionar uma lista específica
+2. O gatilho "Alterações de status" mostrará os status dessa lista
+3. Se a lista tiver um `status_template_id`, buscará os status desse template
+4. Se não tiver, usará fallback para status do workspace
+5. Consistência com o comportamento já implementado em `ActionConfigForm`
