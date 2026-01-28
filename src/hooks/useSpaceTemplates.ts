@@ -36,6 +36,10 @@ export interface SpaceTemplateTask {
   order_index: number;
   start_date_offset: number | null;
   due_date_offset: number | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  start_date_recurrence?: Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  due_date_recurrence?: Record<string, any> | null;
   status_template_item_id: string | null;
   estimated_time: number | null;
   is_milestone: boolean;
@@ -91,7 +95,11 @@ export const useSpaceTemplate = (templateId?: string) => {
         ...templateResult.data,
         folders: foldersResult.data || [],
         lists: listsResult.data || [],
-        tasks: tasksResult.data || [],
+        tasks: (tasksResult.data || []).map(t => ({
+          ...t,
+          start_date_recurrence: t.start_date_recurrence as Record<string, unknown> | null,
+          due_date_recurrence: t.due_date_recurrence as Record<string, unknown> | null,
+        })),
       } as SpaceTemplate;
     },
     enabled: !!templateId,
@@ -140,6 +148,10 @@ interface TaskInput {
   order_index: number;
   start_date_offset?: number | null;
   due_date_offset?: number | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  start_date_recurrence?: Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  due_date_recurrence?: Record<string, any> | null;
   status_template_item_id?: string | null;
   estimated_time?: number | null;
   is_milestone?: boolean;
@@ -236,6 +248,8 @@ export const useCreateSpaceTemplate = () => {
               order_index: t.order_index,
               start_date_offset: t.start_date_offset ?? null,
               due_date_offset: t.due_date_offset ?? null,
+              start_date_recurrence: t.start_date_recurrence ?? null,
+              due_date_recurrence: t.due_date_recurrence ?? null,
               status_template_item_id: t.status_template_item_id ?? null,
               estimated_time: t.estimated_time ?? null,
               is_milestone: t.is_milestone ?? false,
@@ -372,6 +386,8 @@ export const useUpdateSpaceTemplate = () => {
                 order_index: t.order_index,
                 start_date_offset: t.start_date_offset ?? null,
                 due_date_offset: t.due_date_offset ?? null,
+                start_date_recurrence: t.start_date_recurrence ?? null,
+                due_date_recurrence: t.due_date_recurrence ?? null,
                 status_template_item_id: t.status_template_item_id ?? null,
                 estimated_time: t.estimated_time ?? null,
                 is_milestone: t.is_milestone ?? false,

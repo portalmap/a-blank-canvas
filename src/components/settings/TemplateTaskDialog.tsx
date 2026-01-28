@@ -28,15 +28,15 @@ import {
   Plus
 } from 'lucide-react';
 
-interface DateRecurrence {
+export interface DateRecurrence {
   type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
-  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
-  monthlyMode?: 'first_day' | 'last_day' | 'specific_day';
+  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | string;
+  monthlyMode?: 'first_day' | 'last_day' | 'specific_day' | string;
   dayOfMonth?: number;
   // Advanced recurrence options
   repeatForever?: boolean;
   skipWeekends?: boolean;
-  onCompleteAction?: 'create_new_task' | 'update_status';
+  onCompleteAction?: 'create_new_task' | 'update_status' | string;
   resetStatusId?: string;
   triggerOnStatusId?: string;
 }
@@ -47,8 +47,10 @@ export interface TaskData {
   priority: string;
   startDateOffset: number | null;
   dueDateOffset: number | null;
-  startDateRecurrence?: DateRecurrence | null;
-  dueDateRecurrence?: DateRecurrence | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  startDateRecurrence?: DateRecurrence | Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dueDateRecurrence?: DateRecurrence | Record<string, any> | null;
   statusTemplateItemId: string | null;
   estimatedTime: number | null;
   isMilestone: boolean;

@@ -1492,6 +1492,7 @@ export type Database = {
         Row: {
           description: string | null
           due_date_offset: number | null
+          due_date_recurrence: Json | null
           estimated_time: number | null
           id: string
           is_milestone: boolean | null
@@ -1499,6 +1500,7 @@ export type Database = {
           order_index: number | null
           priority: string | null
           start_date_offset: number | null
+          start_date_recurrence: Json | null
           status_template_item_id: string | null
           tag_names: string[] | null
           template_id: string
@@ -1507,6 +1509,7 @@ export type Database = {
         Insert: {
           description?: string | null
           due_date_offset?: number | null
+          due_date_recurrence?: Json | null
           estimated_time?: number | null
           id?: string
           is_milestone?: boolean | null
@@ -1514,6 +1517,7 @@ export type Database = {
           order_index?: number | null
           priority?: string | null
           start_date_offset?: number | null
+          start_date_recurrence?: Json | null
           status_template_item_id?: string | null
           tag_names?: string[] | null
           template_id: string
@@ -1522,6 +1526,7 @@ export type Database = {
         Update: {
           description?: string | null
           due_date_offset?: number | null
+          due_date_recurrence?: Json | null
           estimated_time?: number | null
           id?: string
           is_milestone?: boolean | null
@@ -1529,6 +1534,7 @@ export type Database = {
           order_index?: number | null
           priority?: string | null
           start_date_offset?: number | null
+          start_date_recurrence?: Json | null
           status_template_item_id?: string | null
           tag_names?: string[] | null
           template_id?: string

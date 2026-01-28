@@ -63,6 +63,9 @@ interface ListItem {
   status_template_id: string | null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DateRecurrenceConfig = Record<string, any>;
+
 interface TaskItem {
   tempId: string;
   listTempId: string;
@@ -71,6 +74,8 @@ interface TaskItem {
   priority: string;
   startDateOffset: number | null;
   dueDateOffset: number | null;
+  startDateRecurrence?: DateRecurrenceConfig | null;
+  dueDateRecurrence?: DateRecurrenceConfig | null;
   statusTemplateItemId: string | null;
   estimatedTime: number | null;
   isMilestone: boolean;
@@ -161,6 +166,8 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
         priority: t.priority,
         startDateOffset: t.start_date_offset ?? null,
         dueDateOffset: t.due_date_offset ?? null,
+        startDateRecurrence: t.start_date_recurrence ?? null,
+        dueDateRecurrence: t.due_date_recurrence ?? null,
         statusTemplateItemId: t.status_template_item_id ?? null,
         estimatedTime: t.estimated_time ?? null,
         isMilestone: t.is_milestone ?? false,
@@ -217,6 +224,8 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
     priority: string;
     startDateOffset: number | null;
     dueDateOffset: number | null;
+    startDateRecurrence?: DateRecurrenceConfig | null;
+    dueDateRecurrence?: DateRecurrenceConfig | null;
     statusTemplateItemId: string | null;
     estimatedTime: number | null;
     isMilestone: boolean;
@@ -297,6 +306,8 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
       order_index: i,
       start_date_offset: t.startDateOffset,
       due_date_offset: t.dueDateOffset,
+      start_date_recurrence: t.startDateRecurrence || null,
+      due_date_recurrence: t.dueDateRecurrence || null,
       status_template_item_id: t.statusTemplateItemId,
       estimated_time: t.estimatedTime,
       is_milestone: t.isMilestone,
