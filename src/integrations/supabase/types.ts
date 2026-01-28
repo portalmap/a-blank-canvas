@@ -1271,6 +1271,7 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          default_workspace_id: string | null
           full_name: string | null
           id: string
           must_change_password: boolean | null
@@ -1281,6 +1282,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          default_workspace_id?: string | null
           full_name?: string | null
           id: string
           must_change_password?: boolean | null
@@ -1291,13 +1293,22 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          default_workspace_id?: string | null
           full_name?: string | null
           id?: string
           must_change_password?: boolean | null
           phone?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_default_workspace_id_fkey"
+            columns: ["default_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       space_permissions: {
         Row: {

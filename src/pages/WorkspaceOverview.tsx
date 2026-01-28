@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useWorkspaces, useCreateWorkspace } from '@/hooks/useWorkspaces';
+import { useWorkspaces, useCreateWorkspace, useDefaultWorkspace, useSetDefaultWorkspace } from '@/hooks/useWorkspaces';
 import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Home, Pencil } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Home, Pencil, Star } from 'lucide-react';
 import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
 
 const WorkspaceOverview = () => {
@@ -16,6 +17,8 @@ const WorkspaceOverview = () => {
   const { data: workspaces, isLoading } = useWorkspaces();
   const createWorkspace = useCreateWorkspace();
   const { data: canCreate } = useCanCreateWorkspace();
+  const { data: defaultWorkspaceId } = useDefaultWorkspace();
+  const setDefaultWorkspace = useSetDefaultWorkspace();
   const { activeWorkspace, setActiveWorkspace } = useWorkspace();
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -25,6 +28,12 @@ const WorkspaceOverview = () => {
     name: string;
     description: string | null;
   } | null>(null);
+
+  const handleToggleDefault = (workspaceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newDefault = defaultWorkspaceId === workspaceId ? null : workspaceId;
+    setDefaultWorkspace.mutate(newDefault);
+  };
 
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,7 +135,30 @@ const WorkspaceOverview = () => {
                     <CardTitle className="flex items-center gap-2">
                       <Home className="h-5 w-5 text-primary" />
                       {workspace.name}
+                      {defaultWorkspaceId === workspace.id && (
+                        <Badge variant="secondary" className="text-xs">Padrão</Badge>
+                      )}
                     </CardTitle>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`transition-opacity ${
+                          defaultWorkspaceId === workspace.id 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        onClick={(e) => handleToggleDefault(workspace.id, e)}
+                        title={defaultWorkspaceId === workspace.id ? 'Remover como padrão' : 'Definir como padrão'}
+                      >
+                        <Star 
+                          className={`h-4 w-4 ${
+                            defaultWorkspaceId === workspace.id 
+                              ? 'fill-yellow-400 text-yellow-400' 
+                              : 'text-muted-foreground'
+                          }`} 
+                        />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -145,10 +177,11 @@ const WorkspaceOverview = () => {
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </div>
-                    <CardDescription>
-                      {workspace.description || 'Sem descrição'}
-                    </CardDescription>
-                  </CardHeader>
+                  </div>
+                  <CardDescription>
+                    {workspace.description || 'Sem descrição'}
+                  </CardDescription>
+                </CardHeader>
                   <CardContent>
                     <div className="text-sm text-muted-foreground">
                       Criado em {new Date(workspace.created_at).toLocaleDateString('pt-BR')}
