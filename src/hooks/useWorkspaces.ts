@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const useWorkspaces = () => {
   const queryClient = useQueryClient();
@@ -102,6 +103,52 @@ export const useUpdateWorkspace = () => {
     onError: (error: Error) => {
       console.error('Erro ao atualizar workspace:', error);
       toast.error(`Erro ao atualizar workspace: ${error.message}`);
+    },
+  });
+};
+
+export const useDefaultWorkspace = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['default-workspace', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_workspace_id')
+        .eq('id', user.id)
+        .single();
+      
+      if (error || !data?.default_workspace_id) return null;
+      return data.default_workspace_id;
+    },
+    enabled: !!user,
+  });
+};
+
+export const useSetDefaultWorkspace = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (workspaceId: string | null) => {
+      if (!user) throw new Error('Usuário não autenticado');
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_workspace_id: workspaceId })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['default-workspace'] });
+      toast.success('Workspace padrão atualizado!');
+    },
+    onError: (error: Error) => {
+      toast.error(`Erro ao definir workspace padrão: ${error.message}`);
     },
   });
 };

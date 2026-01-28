@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Workspace {
   id: string;
@@ -25,6 +26,7 @@ const STORAGE_KEY = 'active-workspace';
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [isValidatingWorkspace, setIsValidatingWorkspace] = useState(true);
+  const [hasCheckedDefault, setHasCheckedDefault] = useState(false);
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -57,6 +59,50 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       clearActiveWorkspace();
     }
   }, [user]);
+
+  // Auto-load default workspace if no workspace is active
+  useEffect(() => {
+    const loadDefaultWorkspace = async () => {
+      // Wait for auth to finish loading
+      if (authLoading || !user || activeWorkspace || hasCheckedDefault) {
+        return;
+      }
+
+      setHasCheckedDefault(true);
+
+      // Fetch default workspace from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('default_workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.default_workspace_id) {
+        // Fetch full workspace data
+        const { data: workspace } = await supabase
+          .from('workspaces')
+          .select('*')
+          .eq('id', profile.default_workspace_id)
+          .single();
+
+        if (workspace) {
+          // Verify membership before auto-selecting
+          const { data: membership } = await supabase
+            .from('workspace_members')
+            .select('role')
+            .eq('workspace_id', workspace.id)
+            .eq('user_id', user.id)
+            .single();
+
+          if (membership && ['admin', 'member'].includes(membership.role)) {
+            setActiveWorkspace(workspace);
+          }
+        }
+      }
+    };
+
+    loadDefaultWorkspace();
+  }, [authLoading, user?.id, activeWorkspace, hasCheckedDefault]);
 
   // Validate workspace membership when loading from localStorage
   useEffect(() => {
