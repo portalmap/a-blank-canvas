@@ -1,139 +1,261 @@
 
-## Plano: Adicionar Menu Flutuante de Edição na Descrição de Tarefas
+
+## Plano: Corrigir Salvamento da Data de Início no Template de Tarefas
 
 ### Problema Identificado
 
-O menu flutuante de edição de texto (Bubble Menu) foi implementado apenas no `RichTextEditor`, que é usado exclusivamente na página de **Documentos**. Os campos de descrição de tarefas utilizam o componente `Textarea` padrão, que não suporta formatação de texto ou menus flutuantes.
+O campo "Data de Início" não está sendo salvo quando o usuário altera porque há uma **desconexão de tipos** entre os componentes:
 
-### Locais Afetados
+1. **`TemplateTaskDialog`** exporta `TaskData` com campos de recorrência (`startDateRecurrence`, `dueDateRecurrence`)
+2. **`SpaceTemplateEditor`** usa a interface `TaskItem` que **não possui** esses campos
+3. **`handleTaskSave`** não aceita os campos de recorrência na assinatura
+4. O banco de dados (`space_template_tasks`) **não possui** colunas para recorrência
 
-| Componente | Uso Atual | Local |
-|------------|-----------|-------|
-| `TaskMainContent.tsx` | `Textarea` | Descrição de tarefas (drawer lateral) |
-| `TemplateTaskDialog.tsx` | `Textarea` | Descrição de tarefas em templates |
+### Fluxo Atual (Quebrado)
+
+```text
+TemplateTaskDialog.onSave({
+  startDateOffset: 5,
+  startDateRecurrence: { type: 'weekly', dayOfWeek: 'monday' },  ← IGNORADO!
+  dueDateOffset: 10,
+  dueDateRecurrence: null,
+  ...
+})
+    ↓
+SpaceTemplateEditor.handleTaskSave({
+  startDateOffset,
+  dueDateOffset,
+  // startDateRecurrence NÃO É CAPTURADO!
+})
+    ↓
+setTasks([...tasks, { ...taskData }])  ← Dados incompletos
+    ↓
+Banco de dados: start_date_offset = null (perdido!)
+```
 
 ### Solução Proposta
 
-Substituir o `Textarea` pelo `RichTextEditor` nos campos de descrição, permitindo que o menu flutuante apareça ao selecionar texto.
+#### Opção A: Adicionar Suporte Completo a Recorrência (Complexo)
+- Adicionar colunas no banco: `start_date_recurrence JSONB`, `due_date_recurrence JSONB`
+- Atualizar todas as interfaces
+- Modificar hooks de criação/atualização
 
----
+#### Opção B: Corrigir Apenas o Offset (Simples e Imediato)
+- O problema pode ser que os dados de offset estão sendo corretamente passados mas não salvos
+- Verificar se há algum bug no fluxo de salvamento
+
+### Diagnóstico Detalhado
+
+Após análise, o código **parece correto** para o modo "offset":
+- Linha 284 do dialog: `startDateOffset: startDateMode === 'offset' && startDateOffset !== '' ? parseInt(startDateOffset) : null`
+- Linha 228 do editor: `{ ...t, ...taskData }` deveria mesclar corretamente
+- Linha 298 do hook: `start_date_offset: t.startDateOffset` deveria salvar
+
+O problema provavelmente está em um dos seguintes pontos:
+1. O campo `startDateOffset` está vindo como `undefined` em vez de `null`
+2. Há um problema de tipagem que causa perda de dados
 
 ### Arquivos a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/tasks/TaskMainContent.tsx` | Substituir `Textarea` por `RichTextEditor` no campo de descrição |
-| `src/components/settings/TemplateTaskDialog.tsx` | Substituir `Textarea` por `RichTextEditor` no campo de descrição |
+| `src/components/settings/SpaceTemplateEditor.tsx` | Atualizar interface `TaskItem` e `handleTaskSave` para incluir campos de recorrência |
+| `src/hooks/useSpaceTemplates.ts` | Adicionar campos de recorrência ao `TaskInput` e persistência |
 
 ---
 
 ### Implementação
 
-#### 1. TaskMainContent.tsx
-
-**Mudanças:**
-- Importar `RichTextEditor` do módulo de editor
-- Substituir o `Textarea` pelo `RichTextEditor`
-- Ajustar a lógica de edição para trabalhar com conteúdo JSON do TipTap
+#### 1. SpaceTemplateEditor.tsx - Atualizar Interface TaskItem
 
 ```typescript
-// Adicionar import
-import { RichTextEditor } from '@/components/documents/editor';
+interface DateRecurrence {
+  type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+  monthlyMode?: 'first_day' | 'last_day' | 'specific_day';
+  dayOfMonth?: number;
+  repeatForever?: boolean;
+  skipWeekends?: boolean;
+  onCompleteAction?: 'create_new_task' | 'update_status';
+  resetStatusId?: string;
+  triggerOnStatusId?: string;
+}
 
-// No estado de edição de descrição (isEditingDescription === true):
-<RichTextEditor
-  content={editDescription}
-  onChange={setEditDescription}
-  placeholder="Adicione uma descrição..."
-/>
-
-// Na visualização (isEditingDescription === false):
-// Manter o RichTextEditor mas com disabled={true} para exibir o conteúdo formatado
+interface TaskItem {
+  tempId: string;
+  listTempId: string;
+  title: string;
+  description: string;
+  priority: string;
+  startDateOffset: number | null;
+  dueDateOffset: number | null;
+  startDateRecurrence?: DateRecurrence | null;  // ADICIONAR
+  dueDateRecurrence?: DateRecurrence | null;    // ADICIONAR
+  statusTemplateItemId: string | null;
+  estimatedTime: number | null;
+  isMilestone: boolean;
+  tagNames: string[];
+}
 ```
 
-**Considerações:**
-- O `RichTextEditor` já inclui o `EditorBubbleMenu` automaticamente
-- O conteúdo será salvo em formato JSON do TipTap (não mais texto plano)
-- A função `renderTextWithImagesAndLinks` pode precisar de ajuste para renderizar conteúdo TipTap
-
-#### 2. TemplateTaskDialog.tsx
-
-**Mudanças:**
-- Importar `RichTextEditor`
-- Substituir os dois `Textarea` (inline e expandido) por `RichTextEditor`
-- Remover o diálogo de expansão separado (o RichTextEditor já tem boa UX)
+#### 2. SpaceTemplateEditor.tsx - Atualizar handleTaskSave
 
 ```typescript
-// Adicionar import
-import { RichTextEditor } from '@/components/documents/editor';
-
-// Substituir o Textarea:
-<RichTextEditor
-  content={description}
-  onChange={setDescription}
-  placeholder="Adicione uma descrição..."
-/>
-```
-
----
-
-### Migração de Dados
-
-**Importante:** O `RichTextEditor` usa formato JSON do TipTap, enquanto as descrições atuais são texto plano.
-
-O `RichTextEditor` já possui a função `parseContent()` que:
-1. Detecta se o conteúdo é JSON do TipTap
-2. Converte texto plano para formato TipTap automaticamente
-3. Mantém compatibilidade com dados antigos
-
-Isso significa que descrições existentes continuarão funcionando sem necessidade de migração de banco de dados.
-
----
-
-### Ajustes de UI
-
-Para manter consistência visual:
-
-1. **Remover toolbar duplicada**: O `RichTextEditor` tem uma toolbar no topo, mas para descrições de tarefas podemos simplificar e manter apenas o Bubble Menu
-
-2. **Criar versão simplificada**: Criar um componente `SimpleRichTextEditor` que:
-   - Não mostra a toolbar superior
-   - Não mostra o botão de adicionar bloco
-   - Mostra apenas o Bubble Menu ao selecionar texto
-   - Mantém o placeholder
-
-```typescript
-// Nova versão simplificada para descrições
-export const SimpleRichTextEditor = ({ content, onChange, placeholder, disabled }) => {
-  // Mesma lógica do RichTextEditor mas sem:
-  // - EditorToolbar
-  // - AddBlockButton
-  // - SlashCommandMenu (opcional, pode manter)
-  
-  return (
-    <div className="simple-rich-text-editor">
-      <EditorBubbleMenu editor={editor} />
-      <EditorContent editor={editor} />
-    </div>
-  );
+const handleTaskSave = (taskData: { 
+  title: string; 
+  description: string; 
+  priority: string;
+  startDateOffset: number | null;
+  dueDateOffset: number | null;
+  startDateRecurrence?: DateRecurrence | null;  // ADICIONAR
+  dueDateRecurrence?: DateRecurrence | null;    // ADICIONAR
+  statusTemplateItemId: string | null;
+  estimatedTime: number | null;
+  isMilestone: boolean;
+  tagNames: string[];
+}) => {
+  // ... resto do código permanece igual
 };
+```
+
+#### 3. SpaceTemplateEditor.tsx - Atualizar handleSave (persistência)
+
+```typescript
+const tasksData = tasks.map((t, i) => ({
+  listRefIndex: listIndexMap[t.listTempId],
+  title: t.title,
+  description: t.description || null,
+  priority: t.priority,
+  order_index: i,
+  start_date_offset: t.startDateOffset,
+  due_date_offset: t.dueDateOffset,
+  start_date_recurrence: t.startDateRecurrence || null,  // ADICIONAR
+  due_date_recurrence: t.dueDateRecurrence || null,      // ADICIONAR
+  status_template_item_id: t.statusTemplateItemId,
+  estimated_time: t.estimatedTime,
+  is_milestone: t.isMilestone,
+  tag_names: t.tagNames.length > 0 ? t.tagNames : null,
+}));
+```
+
+#### 4. SpaceTemplateEditor.tsx - Atualizar carregamento de tarefas
+
+```typescript
+const loadedTasks = (template.tasks || []).map((t, i) => ({
+  tempId: `task-${i}`,
+  listTempId: listMap[t.list_ref_id],
+  title: t.title,
+  description: t.description || '',
+  priority: t.priority,
+  startDateOffset: t.start_date_offset ?? null,
+  dueDateOffset: t.due_date_offset ?? null,
+  startDateRecurrence: t.start_date_recurrence ?? null,  // ADICIONAR
+  dueDateRecurrence: t.due_date_recurrence ?? null,      // ADICIONAR
+  statusTemplateItemId: t.status_template_item_id ?? null,
+  estimatedTime: t.estimated_time ?? null,
+  isMilestone: t.is_milestone ?? false,
+  tagNames: t.tag_names ?? [],
+}));
+```
+
+#### 5. useSpaceTemplates.ts - Atualizar TaskInput
+
+```typescript
+interface DateRecurrence {
+  type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  dayOfWeek?: string;
+  monthlyMode?: string;
+  dayOfMonth?: number;
+  repeatForever?: boolean;
+  skipWeekends?: boolean;
+  onCompleteAction?: string;
+  resetStatusId?: string;
+  triggerOnStatusId?: string;
+}
+
+interface TaskInput {
+  listRefIndex: number;
+  title: string;
+  description: string | null;
+  priority: string;
+  order_index: number;
+  start_date_offset?: number | null;
+  due_date_offset?: number | null;
+  start_date_recurrence?: DateRecurrence | null;  // ADICIONAR
+  due_date_recurrence?: DateRecurrence | null;    // ADICIONAR
+  status_template_item_id?: string | null;
+  estimated_time?: number | null;
+  is_milestone?: boolean;
+  tag_names?: string[] | null;
+}
+```
+
+#### 6. useSpaceTemplates.ts - Atualizar SpaceTemplateTask
+
+```typescript
+export interface SpaceTemplateTask {
+  id: string;
+  template_id: string;
+  list_ref_id: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  order_index: number;
+  start_date_offset: number | null;
+  due_date_offset: number | null;
+  start_date_recurrence?: Record<string, unknown> | null;  // ADICIONAR
+  due_date_recurrence?: Record<string, unknown> | null;    // ADICIONAR
+  status_template_item_id: string | null;
+  estimated_time: number | null;
+  is_milestone: boolean;
+  tag_names: string[] | null;
+}
+```
+
+#### 7. useSpaceTemplates.ts - Atualizar criação/atualização de tasks
+
+Nas funções `useCreateSpaceTemplate` e `useUpdateSpaceTemplate`, adicionar os campos de recorrência:
+
+```typescript
+tasks.map((t) => ({
+  template_id: template.id,
+  list_ref_id: listIdMap[t.listRefIndex],
+  title: t.title,
+  description: t.description,
+  priority: t.priority,
+  order_index: t.order_index,
+  start_date_offset: t.start_date_offset ?? null,
+  due_date_offset: t.due_date_offset ?? null,
+  start_date_recurrence: t.start_date_recurrence ?? null,  // ADICIONAR
+  due_date_recurrence: t.due_date_recurrence ?? null,      // ADICIONAR
+  status_template_item_id: t.status_template_item_id ?? null,
+  estimated_time: t.estimated_time ?? null,
+  is_milestone: t.is_milestone ?? false,
+  tag_names: t.tag_names ?? null,
+}))
+```
+
+---
+
+### Pré-requisito: Migração de Banco de Dados
+
+Antes de implementar, é necessário adicionar as colunas JSONB na tabela `space_template_tasks`:
+
+```sql
+ALTER TABLE space_template_tasks 
+ADD COLUMN IF NOT EXISTS start_date_recurrence JSONB DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS due_date_recurrence JSONB DEFAULT NULL;
 ```
 
 ---
 
 ### Resultado Esperado
 
-1. Ao selecionar texto na descrição de qualquer tarefa, o menu flutuante aparecerá
-2. O usuário poderá formatar texto com negrito, itálico, sublinhado, cores, etc.
-3. Compatibilidade total com descrições existentes (texto plano)
-4. Interface limpa sem elementos desnecessários
+1. O usuário poderá configurar "Data de Início" como:
+   - **Dias após criação** (offset numérico)
+   - **Recorrente** (semanal, quinzenal, mensal)
 
----
+2. Ambos os modos serão salvos corretamente no banco de dados
 
-### Passos de Implementação
+3. Ao editar uma tarefa existente, os valores serão carregados corretamente
 
-1. **Criar `SimpleRichTextEditor`**: Versão enxuta do editor apenas com Bubble Menu
-2. **Atualizar `TaskMainContent`**: Usar o novo editor para descrições
-3. **Atualizar `TemplateTaskDialog`**: Usar o novo editor para descrições
-4. **Testar compatibilidade**: Verificar que descrições antigas aparecem corretamente
-5. **Ajustar estilos**: Garantir que o editor se integre visualmente aos dialogs
