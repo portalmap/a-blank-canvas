@@ -231,17 +231,24 @@ export const SpaceTemplateEditor = ({ templateId, onClose }: SpaceTemplateEditor
     isMilestone: boolean;
     tagNames: string[];
   }) => {
+    // Garantir que campos opcionais sejam normalizados (null em vez de undefined)
+    const normalizedData = {
+      ...taskData,
+      startDateRecurrence: taskData.startDateRecurrence ?? null,
+      dueDateRecurrence: taskData.dueDateRecurrence ?? null,
+    };
+
     if (editingTask) {
       setTasks(tasks.map(t => 
         t.tempId === editingTask.tempId 
-          ? { ...t, ...taskData } 
+          ? { ...t, ...normalizedData } 
           : t
       ));
     } else if (pendingListTempId) {
       setTasks([...tasks, {
         tempId: generateTempId('task'),
         listTempId: pendingListTempId,
-        ...taskData,
+        ...normalizedData,
       }]);
     }
   };
