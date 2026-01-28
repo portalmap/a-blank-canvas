@@ -1,104 +1,125 @@
 
+## Plano: Corrigir Salvamento da Data de Início Recorrente
 
-## Plano: Corrigir Salvamento da Data de Início no Template de Tarefas
+### Diagnóstico Confirmado
 
-### Problema Identificado
+Após análise profunda do banco de dados e do código:
 
-O campo "Data de Início" não está sendo salvo quando o usuário altera porque há uma **desconexão de tipos** entre os componentes:
-
-1. **`TemplateTaskDialog`** exporta `TaskData` com campos de recorrência (`startDateRecurrence`, `dueDateRecurrence`)
-2. **`SpaceTemplateEditor`** usa a interface `TaskItem` que **não possui** esses campos
-3. **`handleTaskSave`** não aceita os campos de recorrência na assinatura
-4. O banco de dados (`space_template_tasks`) **não possui** colunas para recorrência
-
-### Fluxo Atual (Quebrado)
-
-```text
-TemplateTaskDialog.onSave({
-  startDateOffset: 5,
-  startDateRecurrence: { type: 'weekly', dayOfWeek: 'monday' },  ← IGNORADO!
-  dueDateOffset: 10,
-  dueDateRecurrence: null,
-  ...
-})
-    ↓
-SpaceTemplateEditor.handleTaskSave({
-  startDateOffset,
-  dueDateOffset,
-  // startDateRecurrence NÃO É CAPTURADO!
-})
-    ↓
-setTasks([...tasks, { ...taskData }])  ← Dados incompletos
-    ↓
-Banco de dados: start_date_offset = null (perdido!)
+**Estado no Banco:**
+```
+title: "Análise Diária de KPIs"
+start_date_offset: NULL
+start_date_recurrence: NULL  ← DEVERIA ter { type: "daily", ... }
+due_date_offset: 1           ← Salvo corretamente
+due_date_recurrence: NULL
 ```
 
-### Solução Proposta
+O usuário configurou "Data de Início" como "Recorrente" → "Diariamente", mas o dado não foi persistido.
 
-#### Opção A: Adicionar Suporte Completo a Recorrência (Complexo)
-- Adicionar colunas no banco: `start_date_recurrence JSONB`, `due_date_recurrence JSONB`
-- Atualizar todas as interfaces
-- Modificar hooks de criação/atualização
+### Causa Raiz Identificada
 
-#### Opção B: Corrigir Apenas o Offset (Simples e Imediato)
-- O problema pode ser que os dados de offset estão sendo corretamente passados mas não salvos
-- Verificar se há algum bug no fluxo de salvamento
+O fluxo de dados está correto em teoria, mas há um problema de **timing/referência**:
 
-### Diagnóstico Detalhado
+1. O `handleTaskSave` no `SpaceTemplateEditor` recebe `taskData` com `startDateRecurrence` corretamente
+2. O estado `tasks` é atualizado via `setTasks()`
+3. Mas quando `handleSave` é chamado, pode haver um delay ou problema de referência
 
-Após análise, o código **parece correto** para o modo "offset":
-- Linha 284 do dialog: `startDateOffset: startDateMode === 'offset' && startDateOffset !== '' ? parseInt(startDateOffset) : null`
-- Linha 228 do editor: `{ ...t, ...taskData }` deveria mesclar corretamente
-- Linha 298 do hook: `start_date_offset: t.startDateOffset` deveria salvar
+**Bug Específico Encontrado:**
 
-O problema provavelmente está em um dos seguintes pontos:
-1. O campo `startDateOffset` está vindo como `undefined` em vez de `null`
-2. Há um problema de tipagem que causa perda de dados
+No `SpaceTemplateEditor`, a função `handleSave` (linha 309):
+```typescript
+start_date_recurrence: t.startDateRecurrence || null,
+```
+
+O operador `||` pode causar problemas se `t.startDateRecurrence` for um **objeto vazio `{}`** (truthy, mas sem dados úteis).
+
+Mas o principal problema é que o `tasksData` mapeia `tasks` que é o **estado React atualizado assincronamente**, e pode haver uma condição de corrida.
+
+### Correção Proposta
+
+Adicionar **logging de diagnóstico** e garantir que os dados sejam passados corretamente:
+
+#### 1. Adicionar console.log temporário no handleTaskSave
+
+Para confirmar que os dados chegam corretamente do dialog:
+
+```typescript
+const handleTaskSave = (taskData: { ... }) => {
+  console.log('handleTaskSave received:', {
+    startDateRecurrence: taskData.startDateRecurrence,
+    dueDateRecurrence: taskData.dueDateRecurrence,
+  });
+  // resto do código
+};
+```
+
+#### 2. Adicionar console.log no handleSave
+
+Para confirmar que o estado tasks contém os dados antes de salvar:
+
+```typescript
+const handleSave = async () => {
+  console.log('handleSave tasks state:', tasks.map(t => ({
+    title: t.title,
+    startDateRecurrence: t.startDateRecurrence,
+    dueDateRecurrence: t.dueDateRecurrence,
+  })));
+  // resto do código
+};
+```
+
+#### 3. Corrigir a condição de salvamento
+
+Garantir que `undefined` seja tratado corretamente:
+
+```typescript
+const tasksData = tasks.map((t, i) => ({
+  // ...
+  start_date_recurrence: t.startDateRecurrence !== undefined ? t.startDateRecurrence : null,
+  due_date_recurrence: t.dueDateRecurrence !== undefined ? t.dueDateRecurrence : null,
+  // ...
+}));
+```
+
+#### 4. Verificar o spread no handleTaskSave
+
+Garantir que propriedades opcionais sejam incluídas explicitamente:
+
+```typescript
+const handleTaskSave = (taskData: { ... }) => {
+  if (editingTask) {
+    setTasks(tasks.map(t => 
+      t.tempId === editingTask.tempId 
+        ? { 
+            ...t, 
+            ...taskData,
+            // Garantir que os campos de recorrência sejam explícitos
+            startDateRecurrence: taskData.startDateRecurrence ?? null,
+            dueDateRecurrence: taskData.dueDateRecurrence ?? null,
+          } 
+        : t
+    ));
+  } else if (pendingListTempId) {
+    setTasks([...tasks, {
+      tempId: generateTempId('task'),
+      listTempId: pendingListTempId,
+      ...taskData,
+      startDateRecurrence: taskData.startDateRecurrence ?? null,
+      dueDateRecurrence: taskData.dueDateRecurrence ?? null,
+    }]);
+  }
+};
+```
 
 ### Arquivos a Modificar
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/settings/SpaceTemplateEditor.tsx` | Atualizar interface `TaskItem` e `handleTaskSave` para incluir campos de recorrência |
-| `src/hooks/useSpaceTemplates.ts` | Adicionar campos de recorrência ao `TaskInput` e persistência |
-
----
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/settings/SpaceTemplateEditor.tsx` | Corrigir handleTaskSave para garantir campos de recorrência |
 
 ### Implementação
 
-#### 1. SpaceTemplateEditor.tsx - Atualizar Interface TaskItem
-
-```typescript
-interface DateRecurrence {
-  type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
-  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
-  monthlyMode?: 'first_day' | 'last_day' | 'specific_day';
-  dayOfMonth?: number;
-  repeatForever?: boolean;
-  skipWeekends?: boolean;
-  onCompleteAction?: 'create_new_task' | 'update_status';
-  resetStatusId?: string;
-  triggerOnStatusId?: string;
-}
-
-interface TaskItem {
-  tempId: string;
-  listTempId: string;
-  title: string;
-  description: string;
-  priority: string;
-  startDateOffset: number | null;
-  dueDateOffset: number | null;
-  startDateRecurrence?: DateRecurrence | null;  // ADICIONAR
-  dueDateRecurrence?: DateRecurrence | null;    // ADICIONAR
-  statusTemplateItemId: string | null;
-  estimatedTime: number | null;
-  isMilestone: boolean;
-  tagNames: string[];
-}
-```
-
-#### 2. SpaceTemplateEditor.tsx - Atualizar handleTaskSave
+Modificar o `handleTaskSave` para garantir que os campos de recorrência sejam sempre definidos explicitamente, evitando problemas com `undefined` no spread:
 
 ```typescript
 const handleTaskSave = (taskData: { 
@@ -107,155 +128,58 @@ const handleTaskSave = (taskData: {
   priority: string;
   startDateOffset: number | null;
   dueDateOffset: number | null;
-  startDateRecurrence?: DateRecurrence | null;  // ADICIONAR
-  dueDateRecurrence?: DateRecurrence | null;    // ADICIONAR
+  startDateRecurrence?: DateRecurrenceConfig | null;
+  dueDateRecurrence?: DateRecurrenceConfig | null;
   statusTemplateItemId: string | null;
   estimatedTime: number | null;
   isMilestone: boolean;
   tagNames: string[];
 }) => {
-  // ... resto do código permanece igual
+  // Garantir que campos opcionais sejam normalizados
+  const normalizedData = {
+    ...taskData,
+    startDateRecurrence: taskData.startDateRecurrence ?? null,
+    dueDateRecurrence: taskData.dueDateRecurrence ?? null,
+  };
+
+  if (editingTask) {
+    setTasks(tasks.map(t => 
+      t.tempId === editingTask.tempId 
+        ? { ...t, ...normalizedData } 
+        : t
+    ));
+  } else if (pendingListTempId) {
+    setTasks([...tasks, {
+      tempId: generateTempId('task'),
+      listTempId: pendingListTempId,
+      ...normalizedData,
+    }]);
+  }
 };
 ```
 
-#### 3. SpaceTemplateEditor.tsx - Atualizar handleSave (persistência)
-
-```typescript
-const tasksData = tasks.map((t, i) => ({
-  listRefIndex: listIndexMap[t.listTempId],
-  title: t.title,
-  description: t.description || null,
-  priority: t.priority,
-  order_index: i,
-  start_date_offset: t.startDateOffset,
-  due_date_offset: t.dueDateOffset,
-  start_date_recurrence: t.startDateRecurrence || null,  // ADICIONAR
-  due_date_recurrence: t.dueDateRecurrence || null,      // ADICIONAR
-  status_template_item_id: t.statusTemplateItemId,
-  estimated_time: t.estimatedTime,
-  is_milestone: t.isMilestone,
-  tag_names: t.tagNames.length > 0 ? t.tagNames : null,
-}));
-```
-
-#### 4. SpaceTemplateEditor.tsx - Atualizar carregamento de tarefas
-
-```typescript
-const loadedTasks = (template.tasks || []).map((t, i) => ({
-  tempId: `task-${i}`,
-  listTempId: listMap[t.list_ref_id],
-  title: t.title,
-  description: t.description || '',
-  priority: t.priority,
-  startDateOffset: t.start_date_offset ?? null,
-  dueDateOffset: t.due_date_offset ?? null,
-  startDateRecurrence: t.start_date_recurrence ?? null,  // ADICIONAR
-  dueDateRecurrence: t.due_date_recurrence ?? null,      // ADICIONAR
-  statusTemplateItemId: t.status_template_item_id ?? null,
-  estimatedTime: t.estimated_time ?? null,
-  isMilestone: t.is_milestone ?? false,
-  tagNames: t.tag_names ?? [],
-}));
-```
-
-#### 5. useSpaceTemplates.ts - Atualizar TaskInput
-
-```typescript
-interface DateRecurrence {
-  type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
-  dayOfWeek?: string;
-  monthlyMode?: string;
-  dayOfMonth?: number;
-  repeatForever?: boolean;
-  skipWeekends?: boolean;
-  onCompleteAction?: string;
-  resetStatusId?: string;
-  triggerOnStatusId?: string;
-}
-
-interface TaskInput {
-  listRefIndex: number;
-  title: string;
-  description: string | null;
-  priority: string;
-  order_index: number;
-  start_date_offset?: number | null;
-  due_date_offset?: number | null;
-  start_date_recurrence?: DateRecurrence | null;  // ADICIONAR
-  due_date_recurrence?: DateRecurrence | null;    // ADICIONAR
-  status_template_item_id?: string | null;
-  estimated_time?: number | null;
-  is_milestone?: boolean;
-  tag_names?: string[] | null;
-}
-```
-
-#### 6. useSpaceTemplates.ts - Atualizar SpaceTemplateTask
-
-```typescript
-export interface SpaceTemplateTask {
-  id: string;
-  template_id: string;
-  list_ref_id: string;
-  title: string;
-  description: string | null;
-  priority: string;
-  order_index: number;
-  start_date_offset: number | null;
-  due_date_offset: number | null;
-  start_date_recurrence?: Record<string, unknown> | null;  // ADICIONAR
-  due_date_recurrence?: Record<string, unknown> | null;    // ADICIONAR
-  status_template_item_id: string | null;
-  estimated_time: number | null;
-  is_milestone: boolean;
-  tag_names: string[] | null;
-}
-```
-
-#### 7. useSpaceTemplates.ts - Atualizar criação/atualização de tasks
-
-Nas funções `useCreateSpaceTemplate` e `useUpdateSpaceTemplate`, adicionar os campos de recorrência:
-
-```typescript
-tasks.map((t) => ({
-  template_id: template.id,
-  list_ref_id: listIdMap[t.listRefIndex],
-  title: t.title,
-  description: t.description,
-  priority: t.priority,
-  order_index: t.order_index,
-  start_date_offset: t.start_date_offset ?? null,
-  due_date_offset: t.due_date_offset ?? null,
-  start_date_recurrence: t.start_date_recurrence ?? null,  // ADICIONAR
-  due_date_recurrence: t.due_date_recurrence ?? null,      // ADICIONAR
-  status_template_item_id: t.status_template_item_id ?? null,
-  estimated_time: t.estimated_time ?? null,
-  is_milestone: t.is_milestone ?? false,
-  tag_names: t.tag_names ?? null,
-}))
-```
-
----
-
-### Pré-requisito: Migração de Banco de Dados
-
-Antes de implementar, é necessário adicionar as colunas JSONB na tabela `space_template_tasks`:
-
-```sql
-ALTER TABLE space_template_tasks 
-ADD COLUMN IF NOT EXISTS start_date_recurrence JSONB DEFAULT NULL,
-ADD COLUMN IF NOT EXISTS due_date_recurrence JSONB DEFAULT NULL;
-```
-
----
-
 ### Resultado Esperado
 
-1. O usuário poderá configurar "Data de Início" como:
-   - **Dias após criação** (offset numérico)
-   - **Recorrente** (semanal, quinzenal, mensal)
+Após esta correção:
+1. Campos de recorrência serão sempre `null` ou um objeto válido (nunca `undefined`)
+2. O spread operator não terá problemas com propriedades indefinidas
+3. Os dados serão corretamente persistidos no banco
 
-2. Ambos os modos serão salvos corretamente no banco de dados
+### Seção Técnica
 
-3. Ao editar uma tarefa existente, os valores serão carregados corretamente
+**O problema do JavaScript com spread e undefined:**
 
+```javascript
+const obj1 = { a: 1, b: undefined };
+const obj2 = { ...obj1 };
+// obj2 = { a: 1, b: undefined }  ← `b` existe mas é undefined
+
+const obj3 = { a: 1, ...{ b: undefined } };
+// obj3 = { a: 1, b: undefined }  ← mesmo resultado
+```
+
+Quando enviado ao Supabase:
+- `undefined` pode ser ignorado ou causar problemas
+- `null` é explicitamente "sem valor" e funciona corretamente com JSONB
+
+A correção garante que sempre enviamos `null` em vez de `undefined`.
