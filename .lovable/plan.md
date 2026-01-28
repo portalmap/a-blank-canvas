@@ -1,185 +1,213 @@
 
-## Plano: Corrigir Salvamento da Data de Início Recorrente
 
-### Diagnóstico Confirmado
+## Plano: Adicionar Workspace Padrão para Abertura Automática
 
-Após análise profunda do banco de dados e do código:
+### Resumo
 
-**Estado no Banco:**
-```
-title: "Análise Diária de KPIs"
-start_date_offset: NULL
-start_date_recurrence: NULL  ← DEVERIA ter { type: "daily", ... }
-due_date_offset: 1           ← Salvo corretamente
-due_date_recurrence: NULL
-```
+Para usuários com mais de um workspace, será adicionada uma opção para definir qual workspace abre automaticamente ao entrar no sistema. Isso evita a necessidade de selecionar manualmente o workspace toda vez que atualizar a página.
 
-O usuário configurou "Data de Início" como "Recorrente" → "Diariamente", mas o dado não foi persistido.
+---
 
-### Causa Raiz Identificada
+### O que será implementado
 
-O fluxo de dados está correto em teoria, mas há um problema de **timing/referência**:
+1. **Indicador visual** no card do workspace padrão (ícone de estrela)
+2. **Botão para definir como padrão** no hover de cada workspace
+3. **Seleção automática** do workspace padrão ao carregar o sistema
+4. **Persistência** da preferência no banco de dados (tabela `profiles`)
 
-1. O `handleTaskSave` no `SpaceTemplateEditor` recebe `taskData` com `startDateRecurrence` corretamente
-2. O estado `tasks` é atualizado via `setTasks()`
-3. Mas quando `handleSave` é chamado, pode haver um delay ou problema de referência
+---
 
-**Bug Específico Encontrado:**
+### Interface do Usuário
 
-No `SpaceTemplateEditor`, a função `handleSave` (linha 309):
-```typescript
-start_date_recurrence: t.startDateRecurrence || null,
-```
+Na tela de "Meus Workspaces":
+- Cada workspace terá um botão de "estrela" que aparece no hover
+- O workspace padrão mostrará uma estrela preenchida amarela
+- Clicar na estrela define/remove o workspace como padrão
+- O workspace padrão terá um badge "Padrão" visível
 
-O operador `||` pode causar problemas se `t.startDateRecurrence` for um **objeto vazio `{}`** (truthy, mas sem dados úteis).
+---
 
-Mas o principal problema é que o `tasksData` mapeia `tasks` que é o **estado React atualizado assincronamente**, e pode haver uma condição de corrida.
+### Fluxo do Sistema
 
-### Correção Proposta
+1. Usuário faz login
+2. Sistema verifica se há `default_workspace_id` no perfil
+3. Se existir e o usuário tiver acesso → ativa automaticamente e navega para `/spaces`
+4. Se não existir → mostra tela de seleção de workspaces normalmente
 
-Adicionar **logging de diagnóstico** e garantir que os dados sejam passados corretamente:
-
-#### 1. Adicionar console.log temporário no handleTaskSave
-
-Para confirmar que os dados chegam corretamente do dialog:
-
-```typescript
-const handleTaskSave = (taskData: { ... }) => {
-  console.log('handleTaskSave received:', {
-    startDateRecurrence: taskData.startDateRecurrence,
-    dueDateRecurrence: taskData.dueDateRecurrence,
-  });
-  // resto do código
-};
-```
-
-#### 2. Adicionar console.log no handleSave
-
-Para confirmar que o estado tasks contém os dados antes de salvar:
-
-```typescript
-const handleSave = async () => {
-  console.log('handleSave tasks state:', tasks.map(t => ({
-    title: t.title,
-    startDateRecurrence: t.startDateRecurrence,
-    dueDateRecurrence: t.dueDateRecurrence,
-  })));
-  // resto do código
-};
-```
-
-#### 3. Corrigir a condição de salvamento
-
-Garantir que `undefined` seja tratado corretamente:
-
-```typescript
-const tasksData = tasks.map((t, i) => ({
-  // ...
-  start_date_recurrence: t.startDateRecurrence !== undefined ? t.startDateRecurrence : null,
-  due_date_recurrence: t.dueDateRecurrence !== undefined ? t.dueDateRecurrence : null,
-  // ...
-}));
-```
-
-#### 4. Verificar o spread no handleTaskSave
-
-Garantir que propriedades opcionais sejam incluídas explicitamente:
-
-```typescript
-const handleTaskSave = (taskData: { ... }) => {
-  if (editingTask) {
-    setTasks(tasks.map(t => 
-      t.tempId === editingTask.tempId 
-        ? { 
-            ...t, 
-            ...taskData,
-            // Garantir que os campos de recorrência sejam explícitos
-            startDateRecurrence: taskData.startDateRecurrence ?? null,
-            dueDateRecurrence: taskData.dueDateRecurrence ?? null,
-          } 
-        : t
-    ));
-  } else if (pendingListTempId) {
-    setTasks([...tasks, {
-      tempId: generateTempId('task'),
-      listTempId: pendingListTempId,
-      ...taskData,
-      startDateRecurrence: taskData.startDateRecurrence ?? null,
-      dueDateRecurrence: taskData.dueDateRecurrence ?? null,
-    }]);
-  }
-};
-```
+---
 
 ### Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/settings/SpaceTemplateEditor.tsx` | Corrigir handleTaskSave para garantir campos de recorrência |
+| **Banco de Dados** | Adicionar coluna `default_workspace_id` na tabela `profiles` |
+| `src/contexts/WorkspaceContext.tsx` | Buscar e aplicar workspace padrão automaticamente |
+| `src/pages/WorkspaceOverview.tsx` | Adicionar botão de estrela para definir padrão |
+| `src/hooks/useWorkspaces.ts` | Adicionar hooks para gerenciar workspace padrão |
+| `src/components/settings/UserProfile.tsx` | Adicionar seletor de workspace padrão |
 
-### Implementação
-
-Modificar o `handleTaskSave` para garantir que os campos de recorrência sejam sempre definidos explicitamente, evitando problemas com `undefined` no spread:
-
-```typescript
-const handleTaskSave = (taskData: { 
-  title: string; 
-  description: string; 
-  priority: string;
-  startDateOffset: number | null;
-  dueDateOffset: number | null;
-  startDateRecurrence?: DateRecurrenceConfig | null;
-  dueDateRecurrence?: DateRecurrenceConfig | null;
-  statusTemplateItemId: string | null;
-  estimatedTime: number | null;
-  isMilestone: boolean;
-  tagNames: string[];
-}) => {
-  // Garantir que campos opcionais sejam normalizados
-  const normalizedData = {
-    ...taskData,
-    startDateRecurrence: taskData.startDateRecurrence ?? null,
-    dueDateRecurrence: taskData.dueDateRecurrence ?? null,
-  };
-
-  if (editingTask) {
-    setTasks(tasks.map(t => 
-      t.tempId === editingTask.tempId 
-        ? { ...t, ...normalizedData } 
-        : t
-    ));
-  } else if (pendingListTempId) {
-    setTasks([...tasks, {
-      tempId: generateTempId('task'),
-      listTempId: pendingListTempId,
-      ...normalizedData,
-    }]);
-  }
-};
-```
-
-### Resultado Esperado
-
-Após esta correção:
-1. Campos de recorrência serão sempre `null` ou um objeto válido (nunca `undefined`)
-2. O spread operator não terá problemas com propriedades indefinidas
-3. Os dados serão corretamente persistidos no banco
+---
 
 ### Seção Técnica
 
-**O problema do JavaScript com spread e undefined:**
+#### 1. Migração do Banco de Dados
 
-```javascript
-const obj1 = { a: 1, b: undefined };
-const obj2 = { ...obj1 };
-// obj2 = { a: 1, b: undefined }  ← `b` existe mas é undefined
-
-const obj3 = { a: 1, ...{ b: undefined } };
-// obj3 = { a: 1, b: undefined }  ← mesmo resultado
+```sql
+ALTER TABLE profiles 
+ADD COLUMN default_workspace_id uuid REFERENCES workspaces(id) ON DELETE SET NULL;
 ```
 
-Quando enviado ao Supabase:
-- `undefined` pode ser ignorado ou causar problemas
-- `null` é explicitamente "sem valor" e funciona corretamente com JSONB
+#### 2. Hook para gerenciar workspace padrão
 
-A correção garante que sempre enviamos `null` em vez de `undefined`.
+Adicionar em `useWorkspaces.ts`:
+
+```typescript
+export const useDefaultWorkspace = () => {
+  return useQuery({
+    queryKey: ['default-workspace'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_workspace_id')
+        .eq('id', user.id)
+        .single();
+      
+      if (error || !data?.default_workspace_id) return null;
+      return data.default_workspace_id;
+    },
+  });
+};
+
+export const useSetDefaultWorkspace = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (workspaceId: string | null) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_workspace_id: workspaceId })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['default-workspace'] });
+      toast.success('Workspace padrão atualizado!');
+    },
+  });
+};
+```
+
+#### 3. WorkspaceContext - Auto-seleção
+
+Modificar o `WorkspaceProvider` para buscar e aplicar o workspace padrão:
+
+```typescript
+// Após validar que não há workspace ativo e o usuário tem mais de 1 workspace
+useEffect(() => {
+  const loadDefaultWorkspace = async () => {
+    if (activeWorkspace || !user) return;
+    
+    // Buscar workspace padrão do perfil
+    const { data } = await supabase
+      .from('profiles')
+      .select('default_workspace_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (data?.default_workspace_id) {
+      // Buscar dados completos do workspace
+      const { data: workspace } = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('id', data.default_workspace_id)
+        .single();
+      
+      if (workspace) {
+        setActiveWorkspace(workspace);
+      }
+    }
+  };
+  
+  loadDefaultWorkspace();
+}, [user, activeWorkspace]);
+```
+
+#### 4. WorkspaceOverview - UI de Seleção
+
+```tsx
+import { Star } from 'lucide-react';
+import { useDefaultWorkspace, useSetDefaultWorkspace } from '@/hooks/useWorkspaces';
+
+// No componente
+const { data: defaultWorkspaceId } = useDefaultWorkspace();
+const setDefaultWorkspace = useSetDefaultWorkspace();
+
+const handleToggleDefault = (workspaceId: string, e: React.MouseEvent) => {
+  e.stopPropagation();
+  const newDefault = defaultWorkspaceId === workspaceId ? null : workspaceId;
+  setDefaultWorkspace.mutate(newDefault);
+};
+
+// No card do workspace
+<Button
+  variant="ghost"
+  size="icon"
+  onClick={(e) => handleToggleDefault(workspace.id, e)}
+>
+  <Star 
+    className={`h-4 w-4 ${
+      defaultWorkspaceId === workspace.id 
+        ? 'fill-yellow-400 text-yellow-400' 
+        : 'text-muted-foreground'
+    }`} 
+  />
+</Button>
+{defaultWorkspaceId === workspace.id && (
+  <Badge variant="secondary" className="text-xs">Padrão</Badge>
+)}
+```
+
+#### 5. UserProfile - Seletor Alternativo
+
+Adicionar um seletor no perfil do usuário para escolher o workspace padrão:
+
+```tsx
+<div className="space-y-2">
+  <Label>Workspace Padrão</Label>
+  <Select 
+    value={defaultWorkspaceId || ''} 
+    onValueChange={(value) => setDefaultWorkspace.mutate(value || null)}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Nenhum (mostrar seleção)" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="">Nenhum (mostrar seleção)</SelectItem>
+      {workspaces?.map(w => (
+        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+  <p className="text-sm text-muted-foreground">
+    Este workspace será selecionado automaticamente ao abrir o sistema
+  </p>
+</div>
+```
+
+---
+
+### Resultado Esperado
+
+1. Usuários com múltiplos workspaces podem marcar um como "padrão"
+2. Ao abrir o sistema, o workspace padrão é selecionado automaticamente
+3. Usuário é redirecionado diretamente para `/spaces` sem passar por `/workspaces`
+4. A preferência persiste entre sessões no banco de dados
+5. A configuração pode ser alterada na tela de workspaces ou nas configurações de perfil
+
