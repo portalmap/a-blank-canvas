@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 export interface DateRecurrence {
-  type: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
   dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | string;
   monthlyMode?: 'first_day' | 'last_day' | 'specific_day' | string;
   dayOfMonth?: number;
@@ -85,7 +85,7 @@ export const TemplateTaskDialog = ({
   const [priority, setPriority] = useState('medium');
   const [startDateMode, setStartDateMode] = useState<'offset' | 'recurring'>('offset');
   const [startDateOffset, setStartDateOffset] = useState<string>('');
-  const [startRecurrenceType, setStartRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [startRecurrenceType, setStartRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('weekly');
   const [startDayOfWeek, setStartDayOfWeek] = useState<string>('monday');
   const [startMonthlyMode, setStartMonthlyMode] = useState<string>('first_day');
   const [startDayOfMonth, setStartDayOfMonth] = useState<string>('');
@@ -97,7 +97,7 @@ export const TemplateTaskDialog = ({
   
   const [dueDateMode, setDueDateMode] = useState<'offset' | 'recurring'>('offset');
   const [dueDateOffset, setDueDateOffset] = useState<string>('');
-  const [dueRecurrenceType, setDueRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [dueRecurrenceType, setDueRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('weekly');
   const [dueDayOfWeek, setDueDayOfWeek] = useState<string>('monday');
   const [dueMonthlyMode, setDueMonthlyMode] = useState<string>('first_day');
   const [dueDayOfMonth, setDueDayOfMonth] = useState<string>('');
@@ -248,8 +248,8 @@ export const TemplateTaskDialog = ({
     if (startDateMode === 'recurring') {
       startDateRecurrence = {
         type: startRecurrenceType,
-        ...(startRecurrenceType !== 'monthly' && startRecurrenceType !== 'daily' && { dayOfWeek: startDayOfWeek as DateRecurrence['dayOfWeek'] }),
-        ...(startRecurrenceType === 'monthly' && { 
+        ...(startRecurrenceType !== 'monthly' && startRecurrenceType !== 'quarterly' && startRecurrenceType !== 'daily' && { dayOfWeek: startDayOfWeek as DateRecurrence['dayOfWeek'] }),
+        ...((startRecurrenceType === 'monthly' || startRecurrenceType === 'quarterly') && { 
           monthlyMode: startMonthlyMode as DateRecurrence['monthlyMode'],
           ...(startMonthlyMode === 'specific_day' && startDayOfMonth && { dayOfMonth: parseInt(startDayOfMonth) })
         }),
@@ -266,8 +266,8 @@ export const TemplateTaskDialog = ({
     if (dueDateMode === 'recurring') {
       dueDateRecurrence = {
         type: dueRecurrenceType,
-        ...(dueRecurrenceType !== 'monthly' && dueRecurrenceType !== 'daily' && { dayOfWeek: dueDayOfWeek as DateRecurrence['dayOfWeek'] }),
-        ...(dueRecurrenceType === 'monthly' && { 
+        ...(dueRecurrenceType !== 'monthly' && dueRecurrenceType !== 'quarterly' && dueRecurrenceType !== 'daily' && { dayOfWeek: dueDayOfWeek as DateRecurrence['dayOfWeek'] }),
+        ...((dueRecurrenceType === 'monthly' || dueRecurrenceType === 'quarterly') && { 
           monthlyMode: dueMonthlyMode as DateRecurrence['monthlyMode'],
           ...(dueMonthlyMode === 'specific_day' && dueDayOfMonth && { dayOfMonth: parseInt(dueDayOfMonth) })
         }),
@@ -426,7 +426,7 @@ export const TemplateTaskDialog = ({
 
                 {startDateMode === 'recurring' && (
                   <div className="space-y-2 p-2 bg-muted/30 rounded-md">
-                    <Select value={startRecurrenceType} onValueChange={(v) => setStartRecurrenceType(v as 'daily' | 'weekly' | 'biweekly' | 'monthly')}>
+                    <Select value={startRecurrenceType} onValueChange={(v) => setStartRecurrenceType(v as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly')}>
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
@@ -435,6 +435,7 @@ export const TemplateTaskDialog = ({
                         <SelectItem value="weekly">Semanal</SelectItem>
                         <SelectItem value="biweekly">Quinzenal</SelectItem>
                         <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="quarterly">Trimestral</SelectItem>
                       </SelectContent>
                     </Select>
 
@@ -457,15 +458,15 @@ export const TemplateTaskDialog = ({
                       </div>
                     )}
 
-                    {startRecurrenceType === 'monthly' && (
+                    {(startRecurrenceType === 'monthly' || startRecurrenceType === 'quarterly') && (
                       <>
                         <Select value={startMonthlyMode} onValueChange={setStartMonthlyMode}>
                           <SelectTrigger className="h-8">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
-                            <SelectItem value="last_day">Último dia do mês</SelectItem>
+                            <SelectItem value="first_day">Primeiro dia do período</SelectItem>
+                            <SelectItem value="last_day">Último dia do período</SelectItem>
                             <SelectItem value="specific_day">Dia específico</SelectItem>
                           </SelectContent>
                         </Select>
@@ -630,7 +631,7 @@ export const TemplateTaskDialog = ({
 
                 {dueDateMode === 'recurring' && (
                   <div className="space-y-2 p-2 bg-muted/30 rounded-md">
-                    <Select value={dueRecurrenceType} onValueChange={(v) => setDueRecurrenceType(v as 'daily' | 'weekly' | 'biweekly' | 'monthly')}>
+                    <Select value={dueRecurrenceType} onValueChange={(v) => setDueRecurrenceType(v as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly')}>
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
@@ -639,6 +640,7 @@ export const TemplateTaskDialog = ({
                         <SelectItem value="weekly">Semanal</SelectItem>
                         <SelectItem value="biweekly">Quinzenal</SelectItem>
                         <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="quarterly">Trimestral</SelectItem>
                       </SelectContent>
                     </Select>
 
@@ -661,15 +663,15 @@ export const TemplateTaskDialog = ({
                       </div>
                     )}
 
-                    {dueRecurrenceType === 'monthly' && (
+                    {(dueRecurrenceType === 'monthly' || dueRecurrenceType === 'quarterly') && (
                       <>
                         <Select value={dueMonthlyMode} onValueChange={setDueMonthlyMode}>
                           <SelectTrigger className="h-8">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
-                            <SelectItem value="last_day">Último dia do mês</SelectItem>
+                            <SelectItem value="first_day">Primeiro dia do período</SelectItem>
+                            <SelectItem value="last_day">Último dia do período</SelectItem>
                             <SelectItem value="specific_day">Dia específico</SelectItem>
                           </SelectContent>
                         </Select>
