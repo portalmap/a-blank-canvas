@@ -1,168 +1,96 @@
 
 
-## Plano: Filtro Hierárquico de Automações
+## Plano: Corrigir Automação de Atribuição Automática de Responsáveis
 
 ### Problema Identificado
 
-O filtro atual verifica apenas `automation.scope_type === filters.scopeType`, mas:
+A automação de "Atribuir responsável" ao criar uma tarefa não está funcionando porque o código tenta inserir colunas que **não existem** na tabela `task_assignees`.
 
-1. **Todas as automações existentes** têm `scope_type: list`
-2. **Nenhuma automação** tem `scope_type: space` ou `scope_type: folder`
-3. Quando o usuário filtra por "Spaces", o sistema procura automações onde `scope_type === 'space'` → **não encontra nada**
+**Análise do erro:**
+- A tarefa foi criada corretamente na lista "Designer/Edição de Vídeo | Empresa Teste"
+- A automação existe e está ativa com trigger `on_task_created`
+- O código em `useApplyAutomations.ts` tenta inserir `source_type` e `source_id` na tabela `task_assignees`
+- A tabela `task_assignees` só tem: `id`, `task_id`, `user_id`, `created_at` - **não tem** `source_type` nem `source_id`
+- O erro é silenciado pelo uso de `as any`, mas o banco de dados rejeita o insert
 
-As automações estão vinculadas às **listas**, mas as listas pertencem a Spaces e Pastas. O filtro precisa ser **hierárquico**.
+**Comparação das tabelas:**
+| Tabela | Colunas |
+|--------|---------|
+| `task_followers` | id, task_id, user_id, created_at, **source_type**, **source_id** |
+| `task_assignees` | id, task_id, user_id, created_at |
 
 ---
 
 ### Solução
 
-Modificar a lógica de filtragem para:
+Há duas opções:
 
-1. **Filtrar por Space**: Mostrar automações de listas/pastas que **pertencem** a esse Space
-2. **Filtrar por Pasta**: Mostrar automações de listas que **pertencem** a essa Pasta
-3. **Filtrar por Lista**: Mostrar automações diretamente dessa Lista
+#### Opção 1: Adicionar colunas faltantes no banco (Recomendada)
+Adicionar as colunas `source_type` e `source_id` na tabela `task_assignees` para manter consistência com `task_followers`.
+
+#### Opção 2: Remover campos do código
+Remover `source_type` e `source_id` do insert no `useApplyAutomations.ts`.
+
+**Recomendo a Opção 1** pois mantém o rastreamento de origem (qual automação atribuiu o responsável).
 
 ---
 
 ### Arquivos a Modificar
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/automations/AutomationsFilters.tsx` | Extrair Spaces/Pastas que **contêm** automações (via hierarquia) |
-| `src/components/automations/AutomationsList.tsx` | Filtro hierárquico (verificar se lista/pasta pertence ao Space/Pasta selecionado) |
+| Tipo | Arquivo/Recurso | Mudança |
+|------|-----------------|---------|
+| Banco de Dados | `task_assignees` | Adicionar colunas `source_type` e `source_id` |
+| Código | `src/hooks/useApplyAutomations.ts` | Pequena correção no tipo do upsert |
 
 ---
 
 ### Seção Técnica
 
-#### Lógica no AutomationsFilters
+#### Migration SQL
 
-Ao invés de extrair IDs diretamente de `scope_type`, precisamos:
+```sql
+-- Adicionar colunas de rastreamento de origem na tabela task_assignees
+ALTER TABLE task_assignees 
+ADD COLUMN IF NOT EXISTS source_type text,
+ADD COLUMN IF NOT EXISTS source_id uuid;
 
-```typescript
-// Extrair Spaces que CONTÊM listas com automações
-const spacesWithAutomations = useMemo(() => {
-  const spaceIds = new Set<string>();
-  
-  automations.forEach(auto => {
-    if (auto.scope_type === 'list' && auto.scope_id) {
-      const list = lists.find(l => l.id === auto.scope_id);
-      if (list?.space_id) spaceIds.add(list.space_id);
-    }
-    if (auto.scope_type === 'folder' && auto.scope_id) {
-      const folder = folders.find(f => f.id === auto.scope_id);
-      if (folder?.space_id) spaceIds.add(folder.space_id);
-    }
-    if (auto.scope_type === 'space' && auto.scope_id) {
-      spaceIds.add(auto.scope_id);
-    }
-  });
-  
-  return Array.from(spaceIds);
-}, [automations, lists, folders]);
-
-// Similar para Pastas
-const foldersWithAutomations = useMemo(() => {
-  const folderIds = new Set<string>();
-  
-  automations.forEach(auto => {
-    if (auto.scope_type === 'list' && auto.scope_id) {
-      const list = lists.find(l => l.id === auto.scope_id);
-      if (list?.folder_id) folderIds.add(list.folder_id);
-    }
-    if (auto.scope_type === 'folder' && auto.scope_id) {
-      folderIds.add(auto.scope_id);
-    }
-  });
-  
-  return Array.from(folderIds);
-}, [automations, lists]);
+-- Comentário para documentação
+COMMENT ON COLUMN task_assignees.source_type IS 'Tipo do escopo de origem da automação (workspace, space, folder, list)';
+COMMENT ON COLUMN task_assignees.source_id IS 'ID do escopo de origem da automação';
 ```
 
-#### Lógica no AutomationsList
+#### Correção no useApplyAutomations.ts
+
+Remover o `as any` e ajustar o insert para trabalhar corretamente:
 
 ```typescript
-const filteredAutomations = useMemo(() => {
-  if (!automations) return [];
+// Antes (com erro silenciado):
+const { error: assignError } = await supabase
+  .from('task_assignees')
+  .upsert({
+    task_id: task.id,
+    user_id: userId,
+    source_type: automation.scope_type,
+    source_id: automation.scope_id || automation.workspace_id,
+  } as any, { onConflict: 'task_id,user_id' });
 
-  return automations.filter((automation) => {
-    // Filtro hierárquico por Space
-    if (filters?.scopeType === 'space') {
-      // Verificar se a automação pertence (direta ou indiretamente) ao Space
-      if (!filters.scopeId) {
-        // "Todos os Spaces" - mostrar todas
-        return true;
-      }
-      
-      // Verificar hierarquia: automação de lista → lista.space_id === filtro
-      if (automation.scope_type === 'list') {
-        const list = lists.find(l => l.id === automation.scope_id);
-        if (list?.space_id !== filters.scopeId) return false;
-      } else if (automation.scope_type === 'folder') {
-        const folder = folders.find(f => f.id === automation.scope_id);
-        if (folder?.space_id !== filters.scopeId) return false;
-      } else if (automation.scope_type === 'space') {
-        if (automation.scope_id !== filters.scopeId) return false;
-      }
-    }
-
-    // Filtro hierárquico por Pasta
-    if (filters?.scopeType === 'folder') {
-      if (!filters.scopeId) return true;
-      
-      if (automation.scope_type === 'list') {
-        const list = lists.find(l => l.id === automation.scope_id);
-        if (list?.folder_id !== filters.scopeId) return false;
-      } else if (automation.scope_type === 'folder') {
-        if (automation.scope_id !== filters.scopeId) return false;
-      } else {
-        return false; // Automação de Space não pertence a pasta
-      }
-    }
-
-    // Filtro direto por Lista
-    if (filters?.scopeType === 'list') {
-      if (!filters.scopeId) return automation.scope_type === 'list';
-      if (automation.scope_id !== filters.scopeId) return false;
-    }
-
-    // Filtro por busca
-    if (filters?.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
-      if (!automation.description?.toLowerCase().includes(searchLower)) return false;
-    }
-
-    return true;
-  });
-}, [automations, filters, lists, folders]);
-```
-
----
-
-### Fluxo de Dados Atualizado
-
-```text
-AutomationsFilters
-├── Recebe: automations, lists, folders
-├── Calcula: spacesWithAutomations (via hierarquia)
-├── Calcula: foldersWithAutomations (via hierarquia)
-└── Dropdown mostra apenas itens que CONTÊM automações
-
-AutomationsList
-├── Recebe: filters, lists, folders
-├── Filtra por hierarquia:
-│   ├── Space → automações de listas/pastas DENTRO do Space
-│   ├── Pasta → automações de listas DENTRO da Pasta
-│   └── Lista → automações diretamente da Lista
-└── Exibe resultado filtrado
+// Depois (funcionando corretamente):
+const { error: assignError } = await supabase
+  .from('task_assignees')
+  .upsert({
+    task_id: task.id,
+    user_id: userId,
+    source_type: automation.scope_type,
+    source_id: automation.scope_id || automation.workspace_id,
+  }, { onConflict: 'task_id,user_id' });
 ```
 
 ---
 
 ### Resultado Esperado
 
-1. **Filtrar por "Spaces"**: Mostra "MAP | Empresa Teste" no dropdown (porque tem listas com automações)
-2. **Selecionar "MAP | Empresa Teste"**: Mostra as 7 automações que são de listas dentro desse Space
-3. **Filtrar por "Pastas"**: Mostra a pasta que contém as listas com automações
-4. **Filtrar por "Listas"**: Mostra as 4 listas específicas que têm automações
+Após a implementação:
+1. A tabela `task_assignees` terá as mesmas colunas de rastreamento que `task_followers`
+2. Ao criar uma tarefa na lista "Designer/Edição de Vídeo | Empresa Teste", os 3 responsáveis serão atribuídos automaticamente
+3. O sistema saberá qual automação/escopo originou cada atribuição
 
