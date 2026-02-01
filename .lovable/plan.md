@@ -1,123 +1,136 @@
 
 
-## Plano: Corrigir ScopeSelector para Resolver Hierarquia ao Editar Automação
+## Plano: Adicionar Filtros na Página de Automações
 
-### Problema Identificado
+### Objetivo
 
-O `ScopeSelector.tsx` usa estados locais (`selectedSpaceId`, `selectedFolderId`) para controlar os selects em cascata. Quando uma automação é **criada**, funciona normalmente porque o usuário seleciona de cima para baixo.
-
-**Porém, ao editar**, o componente recebe apenas `value.scopeId` (ex: ID da lista), mas não sabe qual é o Space e Pasta correspondentes. Os selects aparecem vazios porque `selectedSpaceId` nunca é preenchido.
-
-### Evidência do Banco de Dados
-
-As automações estão salvas corretamente:
-- `scope_type: list`
-- `scope_id: 5e59fcb6-f533-485b-9f68-c0b02382cff9` (Lista: "Tráfego Pago | Empresa Teste")
-- Essa lista pertence ao Space: "MAP | Empresa Teste"
-- Ela está na Pasta: `d80a9002-cb7f-4da2-b9bf-bc9b869bc568`
+Implementar um sistema de filtros na página de Automações que permita ao usuário filtrar por:
+- **Escopo**: Todas as Automações, Spaces, Pastas ou Listas
+- **Seleção específica**: Ao selecionar um tipo de escopo, poder escolher um item específico ou "todos"
+- **Nome da Automação**: Busca textual pelo nome/descrição
 
 ---
 
-### Solução
+### Componentes a Criar/Modificar
 
-Adicionar lógica no `ScopeSelector` para resolver a hierarquia reversa quando o componente é montado em modo de edição:
-
-1. **Se `scopeType === 'list'`**: Buscar a lista pelo ID → obter `space_id` e `folder_id`
-2. **Se `scopeType === 'folder'`**: Buscar a pasta pelo ID → obter `space_id`
-3. **Se `scopeType === 'space'`**: Usar o `scopeId` como `selectedSpaceId`
+| Arquivo | Ação |
+|---------|------|
+| `src/components/automations/AutomationsFilters.tsx` | **CRIAR** - Novo componente de filtros |
+| `src/pages/Automations.tsx` | **MODIFICAR** - Adicionar estado de filtros e passar para a lista |
+| `src/components/automations/AutomationsList.tsx` | **MODIFICAR** - Receber filtros e aplicar filtragem |
 
 ---
 
-### Arquivo a Modificar
+### Design da Interface
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/automations/ScopeSelector.tsx` | Adicionar resolução reversa da hierarquia |
+A barra de filtros ficará acima da lista de automações com:
+
+1. **Select de Escopo**: Dropdown com opções:
+   - Todos (padrão)
+   - Spaces
+   - Pastas
+   - Listas
+
+2. **Select Condicional de Item**: Aparece quando um escopo específico é selecionado:
+   - Se "Spaces" → mostra lista de Spaces do workspace
+   - Se "Pastas" → mostra lista de Pastas do workspace
+   - Se "Listas" → mostra lista de Listas do workspace
+   - Cada um tem opção "Todos" para ver todos daquele tipo
+
+3. **Campo de Busca por Nome**: Input de texto para filtrar pelo nome/descrição da automação
 
 ---
 
 ### Seção Técnica
 
-#### Mudanças no ScopeSelector.tsx
+#### Interface de Filtros
 
 ```typescript
-import { useList } from '@/hooks/useLists';
-import { useFolderById } from '@/hooks/useFolders'; // Precisamos criar ou verificar se existe
-
-// Dentro do componente
-const { data: spaces = [] } = useSpaces(workspaceId);
-
-// Resolver hierarquia reversa baseado no scope atual
-const listIdToResolve = value.scopeType === 'list' ? value.scopeId : undefined;
-const folderIdToResolve = value.scopeType === 'folder' ? value.scopeId : undefined;
-
-// Buscar dados da lista se necessário
-const { data: resolvedList } = useList(listIdToResolve);
-
-// Buscar dados da pasta se necessário (ou se a lista tiver folder_id)
-const folderToFetch = folderIdToResolve || resolvedList?.folder_id;
-const { data: resolvedFolder } = useFolderById(folderToFetch);
-
-// Efeito para preencher os estados locais quando os dados são carregados
-useEffect(() => {
-  if (value.scopeType === 'space' && value.scopeId) {
-    setSelectedSpaceId(value.scopeId);
-    setSelectedFolderId(undefined);
-  } else if (value.scopeType === 'folder' && resolvedFolder) {
-    setSelectedSpaceId(resolvedFolder.space_id);
-    setSelectedFolderId(resolvedFolder.id);
-  } else if (value.scopeType === 'list' && resolvedList) {
-    setSelectedSpaceId(resolvedList.space_id);
-    setSelectedFolderId(resolvedList.folder_id || undefined);
-  }
-}, [value.scopeType, value.scopeId, resolvedList, resolvedFolder]);
+interface AutomationsFilterState {
+  scopeType: 'all' | 'space' | 'folder' | 'list';
+  scopeId: string | null;   // null = todos do tipo
+  searchTerm: string;
+}
 ```
 
-#### Verificar/Criar hook useFolderById
-
-Verificar se existe um hook para buscar pasta por ID. Se não existir:
+#### Componente AutomationsFilters
 
 ```typescript
-// Em useFolders.ts
-export const useFolderById = (folderId?: string) => {
-  return useQuery({
-    queryKey: ['folder', folderId],
-    queryFn: async () => {
-      if (!folderId) return null;
-      
-      const { data, error } = await supabase
-        .from('folders')
-        .select('*')
-        .eq('id', folderId)
-        .single();
+// src/components/automations/AutomationsFilters.tsx
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { useSpaces } from '@/hooks/useSpaces';
+import { useFoldersForWorkspace } from '@/hooks/useFolders';
+import { useListsForWorkspace } from '@/hooks/useLists';
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!folderId,
+interface AutomationsFiltersProps {
+  workspaceId: string;
+  filters: AutomationsFilterState;
+  onChange: (filters: AutomationsFilterState) => void;
+}
+
+export function AutomationsFilters({ workspaceId, filters, onChange }: AutomationsFiltersProps) {
+  const { data: spaces = [] } = useSpaces(workspaceId);
+  const { data: folders = [] } = useFoldersForWorkspace(workspaceId);
+  const { data: lists = [] } = useListsForWorkspace(workspaceId);
+  
+  // Lógica para mostrar select condicional de item
+  // ...
+}
+```
+
+#### Lógica de Filtragem no AutomationsList
+
+```typescript
+const filteredAutomations = useMemo(() => {
+  if (!automations) return [];
+  
+  return automations.filter(automation => {
+    // Filtro por tipo de escopo
+    if (filters.scopeType !== 'all') {
+      if (automation.scope_type !== filters.scopeType) return false;
+      
+      // Filtro por item específico
+      if (filters.scopeId && automation.scope_id !== filters.scopeId) return false;
+    }
+    
+    // Filtro por nome/descrição
+    if (filters.searchTerm) {
+      const searchLower = filters.searchTerm.toLowerCase();
+      const description = automation.description?.toLowerCase() || '';
+      if (!description.includes(searchLower)) return false;
+    }
+    
+    return true;
   });
-};
+}, [automations, filters]);
 ```
 
 ---
 
-### Comportamento Após Correção
+### Fluxo de Dados
 
-1. **Ao abrir uma automação para edição**:
-   - Se o escopo é "lista", o sistema busca a lista → preenche Space e Pasta automaticamente
-   - Se o escopo é "pasta", o sistema busca a pasta → preenche o Space
-   - Se o escopo é "space", usa diretamente o ID
-
-2. **Os selects aparecem corretamente preenchidos**
-3. **As ações que dependem de listas/status também funcionam** pois o contexto está correto
+```text
+Automations.tsx
+├── Estado: filters (scopeType, scopeId, searchTerm)
+├── AutomationsFilters (workspaceId, filters, onChange)
+│   ├── Busca Spaces, Folders, Lists do workspace
+│   └── Atualiza estado ao selecionar filtros
+└── AutomationsList (workspaceId, filters)
+    └── Filtra automations localmente baseado nos filtros
+```
 
 ---
 
 ### Resultado Esperado
 
-- Ao abrir a automação "Automação de transferência do Tráfego Pago > Designer" para edição:
-  - O select "Space" mostra "MAP | Empresa Teste"
-  - O select "Pasta" mostra a pasta correta
-  - O select "Lista" mostra "Tráfego Pago | Empresa Teste"
-  - A ação "Lista de destino" mostra "Designer/Edição de Vídeo | Empresa Teste"
+1. **Por padrão**: Mostra "Todas as Automações" sem filtros
+2. **Ao selecionar "Spaces"**: 
+   - Mostra segundo select com todos os Spaces + opção "Todos os Spaces"
+   - Filtra para mostrar apenas automações com `scope_type === 'space'`
+3. **Ao selecionar um Space específico**:
+   - Filtra para mostrar apenas automações daquele Space específico
+4. **Busca por nome**:
+   - Filtra em tempo real pelo texto da descrição da automação
+5. **Contador atualizado**: "Todas as Automações (X)" mostra o total filtrado
 
