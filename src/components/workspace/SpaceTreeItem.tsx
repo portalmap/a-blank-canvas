@@ -4,6 +4,7 @@ import { useFolders, useCreateFolder } from "@/hooks/useFolders";
 import { useLists, useCreateList } from "@/hooks/useLists";
 import { useSpace, useDeleteSpace, useUpdateSpace } from "@/hooks/useSpaces";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import {
   Collapsible,
@@ -58,6 +59,9 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   const { data: currentSpace } = useSpace(space.id);
   const { data: folders } = useFolders(space.id);
   const { data: allLists } = useLists({ spaceId: space.id });
+  const { data: userRole } = useUserRole();
+  
+  const canDelete = userRole?.isAdmin;
   
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
@@ -184,14 +188,18 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
                 <Archive className="mr-2 h-4 w-4" />
                 Arquivar
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => setIsDeleteDialogOpen(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Excluir Space
-              </DropdownMenuItem>
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir Space
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
