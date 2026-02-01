@@ -3,11 +3,17 @@ import { Button } from '@/components/ui/button';
 import { Plus, Zap, UserPlus, Eye } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { AutomationsList } from '@/components/automations/AutomationsList';
+import { AutomationsFilters, AutomationsFilterState } from '@/components/automations/AutomationsFilters';
 import { AdvancedAutomationBuilder } from '@/components/automations/advanced/AdvancedAutomationBuilder';
 
 const Automations = () => {
   const { activeWorkspace } = useWorkspace();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [filters, setFilters] = useState<AutomationsFilterState>({
+    scopeType: 'all',
+    scopeId: null,
+    searchTerm: '',
+  });
 
   if (!activeWorkspace) {
     return (
@@ -73,8 +79,15 @@ const Automations = () => {
         </div>
       </div>
 
+      {/* Filters */}
+      <AutomationsFilters
+        workspaceId={activeWorkspace.id}
+        filters={filters}
+        onChange={setFilters}
+      />
+
       {/* Automations List */}
-      <AutomationsList workspaceId={activeWorkspace.id} />
+      <AutomationsList workspaceId={activeWorkspace.id} filters={filters} />
 
       {/* Create Dialog */}
       <AdvancedAutomationBuilder
