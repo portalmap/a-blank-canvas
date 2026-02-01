@@ -795,6 +795,44 @@ export const useApplySpaceTemplate = () => {
         .eq('enabled', true);
 
       if (templateAutomations && templateAutomations.length > 0) {
+        // Build status ID map: status_template_item_id → real_status_id
+        const statusIdMap: Record<string, string> = {};
+        
+        // For each list with a status template, fetch template items and real statuses
+        for (const [templateListId, realListId] of Object.entries(listIdMap)) {
+          const templateList = listsResult.data?.find(l => l.id === templateListId);
+          if (templateList?.status_template_id) {
+            // Fetch status template items
+            const { data: templateStatusItems } = await supabase
+              .from('status_template_items')
+              .select('id, name')
+              .eq('template_id', templateList.status_template_id);
+
+            // Fetch real statuses created for this list
+            const { data: realStatuses } = await supabase
+              .from('statuses')
+              .select('id, name, template_item_id')
+              .eq('scope_type', 'list')
+              .eq('scope_id', realListId);
+
+            // Map by template_item_id first (more reliable), fallback to name matching
+            templateStatusItems?.forEach(templateStatus => {
+              // Try to find by template_item_id reference
+              const byTemplateItemId = realStatuses?.find(s => s.template_item_id === templateStatus.id);
+              if (byTemplateItemId) {
+                statusIdMap[templateStatus.id] = byTemplateItemId.id;
+              } else {
+                // Fallback: match by name
+                const byName = realStatuses?.find(s => s.name === templateStatus.name);
+                if (byName) {
+                  statusIdMap[templateStatus.id] = byName.id;
+                }
+              }
+            });
+          }
+        }
+
+        // Create automations with remapped IDs
         for (const automation of templateAutomations) {
           let scopeType: 'workspace' | 'space' | 'folder' | 'list';
           let scopeId: string;
@@ -816,16 +854,23 @@ export const useApplySpaceTemplate = () => {
 
           // Only create if we have a valid scopeId
           if (scopeId) {
-            await supabase.from('automations').insert({
+            // Remap all IDs in action_config
+            const remappedConfig = remapTemplateAutomationConfig(
+              automation.action_config as Record<string, unknown> || {},
+              listIdMap,
+              statusIdMap
+            ) as Database['public']['Tables']['automations']['Insert']['action_config'];
+
+            await supabase.from('automations').insert([{
               workspace_id: workspaceId,
               description: automation.description,
               trigger: automation.trigger,
               action_type: automation.action_type,
-              action_config: automation.action_config,
+              action_config: remappedConfig,
               scope_type: scopeType,
               scope_id: scopeId,
               enabled: true,
-            });
+            }]);
           }
         }
       }
@@ -851,6 +896,63 @@ export const useApplySpaceTemplate = () => {
     },
   });
 };
+
+// Helper function to remap all IDs in template automation config
+function remapTemplateAutomationConfig(
+  actionConfig: Record<string, unknown>,
+  listIdMap: Record<string, string>,
+  statusIdMap: Record<string, string>
+): Record<string, unknown> {
+  // Deep clone to avoid mutation
+  const remapped = JSON.parse(JSON.stringify(actionConfig));
+
+  // 1. Remap trigger_config status IDs
+  if (remapped.trigger_config) {
+    if (Array.isArray(remapped.trigger_config.from_status_ids)) {
+      remapped.trigger_config.from_status_ids = remapped.trigger_config.from_status_ids
+        .map((id: string) => statusIdMap[id] || id)
+        .filter(Boolean);
+    }
+    if (Array.isArray(remapped.trigger_config.to_status_ids)) {
+      remapped.trigger_config.to_status_ids = remapped.trigger_config.to_status_ids
+        .map((id: string) => statusIdMap[id] || id)
+        .filter(Boolean);
+    }
+  }
+
+  // 2. Remap actions
+  if (remapped.actions && Array.isArray(remapped.actions)) {
+    remapped.actions = remapped.actions.map((action: { type?: string; config?: { target_list_id?: string; status_id?: string } }) => {
+      if (action.config) {
+        // Remap target_list_id (for move_task actions)
+        if (action.config.target_list_id && listIdMap[action.config.target_list_id]) {
+          action.config.target_list_id = listIdMap[action.config.target_list_id];
+        }
+        // Remap status_id (for change_status actions)
+        if (action.config.status_id && statusIdMap[action.config.status_id]) {
+          action.config.status_id = statusIdMap[action.config.status_id];
+        }
+      }
+      return action;
+    });
+  }
+
+  // 3. Remap conditions (if they reference status IDs)
+  if (remapped.conditions && Array.isArray(remapped.conditions)) {
+    remapped.conditions = remapped.conditions.map((condition: { field?: string; value?: string | string[] }) => {
+      if (condition.field === 'status_id' && condition.value) {
+        if (Array.isArray(condition.value)) {
+          condition.value = condition.value.map((id: string) => statusIdMap[id] || id);
+        } else if (typeof condition.value === 'string' && statusIdMap[condition.value]) {
+          condition.value = statusIdMap[condition.value];
+        }
+      }
+      return condition;
+    });
+  }
+
+  return remapped;
+}
 
 // Helper functions for mapping template refs to real IDs
 function createFolderMap(
