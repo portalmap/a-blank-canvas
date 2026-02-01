@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useSpaces } from '@/hooks/useSpaces';
-import { useFolders } from '@/hooks/useFolders';
-import { useLists } from '@/hooks/useLists';
+import { useFolders, useFolder } from '@/hooks/useFolders';
+import { useLists, useList } from '@/hooks/useLists';
 import { Building2, LayoutGrid, Folder, List } from 'lucide-react';
 import type { AutomationScope } from '@/hooks/useAutomations';
 
@@ -16,12 +16,40 @@ interface ScopeSelectorProps {
 export function ScopeSelector({ workspaceId, value, onChange }: ScopeSelectorProps) {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | undefined>();
   const [selectedFolderId, setSelectedFolderId] = useState<string | undefined>();
+  const initializedRef = useRef(false);
   
   const { data: spaces = [] } = useSpaces(workspaceId);
   const { data: folders = [] } = useFolders(selectedSpaceId);
   const { data: lists = [] } = useLists({ spaceId: selectedSpaceId, folderId: selectedFolderId });
 
-  // Reset dependent selections when parent changes
+  // Resolve hierarchy for editing mode
+  const listIdToResolve = value.scopeType === 'list' ? value.scopeId : undefined;
+  const folderIdToResolve = value.scopeType === 'folder' ? value.scopeId : undefined;
+  
+  const { data: resolvedList } = useList(listIdToResolve);
+  const folderToFetch = folderIdToResolve || resolvedList?.folder_id;
+  const { data: resolvedFolder } = useFolder(folderToFetch);
+
+  // Initialize local state from resolved hierarchy (only once on mount/edit)
+  useEffect(() => {
+    if (initializedRef.current) return;
+    
+    if (value.scopeType === 'space' && value.scopeId) {
+      setSelectedSpaceId(value.scopeId);
+      setSelectedFolderId(undefined);
+      initializedRef.current = true;
+    } else if (value.scopeType === 'folder' && resolvedFolder) {
+      setSelectedSpaceId(resolvedFolder.space_id);
+      setSelectedFolderId(resolvedFolder.id);
+      initializedRef.current = true;
+    } else if (value.scopeType === 'list' && resolvedList) {
+      setSelectedSpaceId(resolvedList.space_id);
+      setSelectedFolderId(resolvedList.folder_id || undefined);
+      initializedRef.current = true;
+    }
+  }, [value.scopeType, value.scopeId, resolvedList, resolvedFolder]);
+
+  // Reset dependent selections when scope type changes to workspace
   useEffect(() => {
     if (value.scopeType === 'workspace') {
       setSelectedSpaceId(undefined);
