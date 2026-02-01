@@ -1,119 +1,123 @@
 
 
-## Plano: Corrigir Exclusão de Space com Cascade para Tarefas
+## Plano: Corrigir ScopeSelector para Resolver Hierarquia ao Editar Automação
 
-### Problemas Identificados
+### Problema Identificado
 
-1. **Constraint bloqueadora**: A tabela `tasks` tem `ON DELETE RESTRICT` na FK `list_id`, impedindo exclusão de listas com tarefas
-2. **Política muito permissiva**: A RLS atual permite exclusão por `admin` e `member`, mas deveria ser **apenas admin** (proprietário do workspace)
+O `ScopeSelector.tsx` usa estados locais (`selectedSpaceId`, `selectedFolderId`) para controlar os selects em cascata. Quando uma automação é **criada**, funciona normalmente porque o usuário seleciona de cima para baixo.
+
+**Porém, ao editar**, o componente recebe apenas `value.scopeId` (ex: ID da lista), mas não sabe qual é o Space e Pasta correspondentes. Os selects aparecem vazios porque `selectedSpaceId` nunca é preenchido.
+
+### Evidência do Banco de Dados
+
+As automações estão salvas corretamente:
+- `scope_type: list`
+- `scope_id: 5e59fcb6-f533-485b-9f68-c0b02382cff9` (Lista: "Tráfego Pago | Empresa Teste")
+- Essa lista pertence ao Space: "MAP | Empresa Teste"
+- Ela está na Pasta: `d80a9002-cb7f-4da2-b9bf-bc9b869bc568`
 
 ---
 
-### O que será corrigido
+### Solução
 
-| Problema | Correção |
-|----------|----------|
-| Tarefas bloqueiam exclusão de lista | Alterar constraint para `ON DELETE CASCADE` |
-| Qualquer membro pode excluir | Restringir para apenas `admin` |
+Adicionar lógica no `ScopeSelector` para resolver a hierarquia reversa quando o componente é montado em modo de edição:
+
+1. **Se `scopeType === 'list'`**: Buscar a lista pelo ID → obter `space_id` e `folder_id`
+2. **Se `scopeType === 'folder'`**: Buscar a pasta pelo ID → obter `space_id`
+3. **Se `scopeType === 'space'`**: Usar o `scopeId` como `selectedSpaceId`
 
 ---
 
-### Arquivos a Modificar
+### Arquivo a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| Nova migração SQL | Alterar FK e policy de exclusão |
-| `src/hooks/useSpaces.ts` | Melhorar mensagem de erro |
-| `src/components/workspace/SpaceTreeItem.tsx` | Adicionar verificação de permissão (ocultar botão para não-admin) |
+| `src/components/automations/ScopeSelector.tsx` | Adicionar resolução reversa da hierarquia |
 
 ---
 
 ### Seção Técnica
 
-#### 1. Migração de Banco de Dados
-
-```sql
--- 1. Alterar constraint para permitir exclusão em cascata
-ALTER TABLE public.tasks
-  DROP CONSTRAINT IF EXISTS tasks_list_id_fkey,
-  ADD CONSTRAINT tasks_list_id_fkey 
-    FOREIGN KEY (list_id) 
-    REFERENCES public.lists(id) 
-    ON DELETE CASCADE;
-
--- 2. Restringir exclusão de space para apenas admin
-DROP POLICY IF EXISTS "Only privileged members can delete spaces" ON public.spaces;
-CREATE POLICY "Only admins can delete spaces"
-ON public.spaces
-FOR DELETE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM workspace_members
-    WHERE workspace_id = spaces.workspace_id
-      AND user_id = auth.uid()
-      AND role = 'admin'
-  )
-  OR is_system_admin(auth.uid())
-);
-```
-
-#### 2. Atualizar `useSpaces.ts`
-
-Melhorar tratamento de erro para informar o motivo:
+#### Mudanças no ScopeSelector.tsx
 
 ```typescript
-onError: (error: any) => {
-  console.error('Erro ao excluir space:', error);
-  
-  if (error.code === '23503') {
-    toast.error('Não é possível excluir: existem tarefas vinculadas');
-  } else if (error.code === '42501') {
-    toast.error('Você não tem permissão para excluir este space');
-  } else {
-    toast.error('Erro ao excluir space');
+import { useList } from '@/hooks/useLists';
+import { useFolderById } from '@/hooks/useFolders'; // Precisamos criar ou verificar se existe
+
+// Dentro do componente
+const { data: spaces = [] } = useSpaces(workspaceId);
+
+// Resolver hierarquia reversa baseado no scope atual
+const listIdToResolve = value.scopeType === 'list' ? value.scopeId : undefined;
+const folderIdToResolve = value.scopeType === 'folder' ? value.scopeId : undefined;
+
+// Buscar dados da lista se necessário
+const { data: resolvedList } = useList(listIdToResolve);
+
+// Buscar dados da pasta se necessário (ou se a lista tiver folder_id)
+const folderToFetch = folderIdToResolve || resolvedList?.folder_id;
+const { data: resolvedFolder } = useFolderById(folderToFetch);
+
+// Efeito para preencher os estados locais quando os dados são carregados
+useEffect(() => {
+  if (value.scopeType === 'space' && value.scopeId) {
+    setSelectedSpaceId(value.scopeId);
+    setSelectedFolderId(undefined);
+  } else if (value.scopeType === 'folder' && resolvedFolder) {
+    setSelectedSpaceId(resolvedFolder.space_id);
+    setSelectedFolderId(resolvedFolder.id);
+  } else if (value.scopeType === 'list' && resolvedList) {
+    setSelectedSpaceId(resolvedList.space_id);
+    setSelectedFolderId(resolvedList.folder_id || undefined);
   }
-},
+}, [value.scopeType, value.scopeId, resolvedList, resolvedFolder]);
 ```
 
-#### 3. Atualizar `SpaceTreeItem.tsx`
+#### Verificar/Criar hook useFolderById
 
-Ocultar opção de excluir para não-administradores:
+Verificar se existe um hook para buscar pasta por ID. Se não existir:
 
-```tsx
-// Adicionar verificação de permissão
-const { data: userRole } = useUserRole();
-const canDelete = userRole?.isAdmin;
+```typescript
+// Em useFolders.ts
+export const useFolderById = (folderId?: string) => {
+  return useQuery({
+    queryKey: ['folder', folderId],
+    queryFn: async () => {
+      if (!folderId) return null;
+      
+      const { data, error } = await supabase
+        .from('folders')
+        .select('*')
+        .eq('id', folderId)
+        .single();
 
-// No menu dropdown
-{canDelete && (
-  <>
-    <DropdownMenuSeparator />
-    <DropdownMenuItem
-      onClick={() => setIsDeleteDialogOpen(true)}
-      className="text-destructive"
-    >
-      <Trash2 className="mr-2 h-4 w-4" />
-      Excluir Space
-    </DropdownMenuItem>
-  </>
-)}
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!folderId,
+  });
+};
 ```
 
 ---
 
 ### Comportamento Após Correção
 
-1. **Exclusão funcional**: Ao excluir um Space, todas as pastas, listas e tarefas serão excluídas em cascata
-2. **Permissão restrita**: Apenas administradores do workspace (role = 'admin') ou administradores globais podem excluir
-3. **UI correta**: Botão de excluir só aparece para usuários com permissão
-4. **Mensagens claras**: Erros específicos quando algo impede a exclusão
+1. **Ao abrir uma automação para edição**:
+   - Se o escopo é "lista", o sistema busca a lista → preenche Space e Pasta automaticamente
+   - Se o escopo é "pasta", o sistema busca a pasta → preenche o Space
+   - Se o escopo é "space", usa diretamente o ID
+
+2. **Os selects aparecem corretamente preenchidos**
+3. **As ações que dependem de listas/status também funcionam** pois o contexto está correto
 
 ---
 
 ### Resultado Esperado
 
-- Administradores podem excluir Spaces (e todo seu conteúdo)
-- Membros comuns não veem a opção de excluir
-- Não há mais erro de foreign key ao excluir
+- Ao abrir a automação "Automação de transferência do Tráfego Pago > Designer" para edição:
+  - O select "Space" mostra "MAP | Empresa Teste"
+  - O select "Pasta" mostra a pasta correta
+  - O select "Lista" mostra "Tráfego Pago | Empresa Teste"
+  - A ação "Lista de destino" mostra "Designer/Edição de Vídeo | Empresa Teste"
 
