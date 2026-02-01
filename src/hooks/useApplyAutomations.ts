@@ -67,21 +67,24 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
       const actionConfig = automation.action_config as Record<string, any> | null;
 
       if (automation.action_type === 'auto_assign_user') {
-        const userId = actionConfig?.user_id;
-        if (!userId) continue;
+        // Support both user_ids (array) and legacy user_id (string)
+        const userIds = actionConfig?.user_ids || (actionConfig?.user_id ? [actionConfig.user_id] : []);
+        if (!userIds.length) continue;
         
-        // Add assignee with source tracking
-        const { error: assignError } = await supabase
-          .from('task_assignees')
-          .upsert({
-            task_id: task.id,
-            user_id: userId,
-            source_type: automation.scope_type,
-            source_id: automation.scope_id || automation.workspace_id,
-          } as any, { onConflict: 'task_id,user_id' });
+        // Add each assignee with source tracking
+        for (const userId of userIds) {
+          const { error: assignError } = await supabase
+            .from('task_assignees')
+            .upsert({
+              task_id: task.id,
+              user_id: userId,
+              source_type: automation.scope_type,
+              source_id: automation.scope_id || automation.workspace_id,
+            } as any, { onConflict: 'task_id,user_id' });
 
-        if (!assignError) {
-          result.assigneesAdded++;
+          if (!assignError) {
+            result.assigneesAdded++;
+          }
         }
       } else if (automation.action_type === 'remove_all_assignees') {
         // Remove all assignees from task

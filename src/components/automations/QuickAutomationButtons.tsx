@@ -4,11 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCreateAutomation } from '@/hooks/useAutomations';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { UserMultiSelect } from './advanced/UserMultiSelect';
 
 interface QuickAutomationButtonsProps {
   workspaceId: string;
@@ -20,7 +18,7 @@ interface QuickAutomationButtonsProps {
 const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: QuickAutomationButtonsProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'auto_assign_user' | 'auto_add_follower'>('auto_assign_user');
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   const createAutomation = useCreateAutomation();
 
@@ -55,31 +53,34 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
 
   const handleOpenDialog = (type: 'auto_assign_user' | 'auto_add_follower') => {
     setActionType(type);
-    setSelectedUserId('');
+    setSelectedUserIds([]);
     setDialogOpen(true);
   };
 
   const handleSubmit = async () => {
-    if (!selectedUserId) {
-      toast.error('Selecione um usuário');
+    if (selectedUserIds.length === 0) {
+      toast.error('Selecione pelo menos um usuário');
       return;
     }
 
-    const selectedMember = members?.find(m => m.user_id === selectedUserId);
-    const userName = selectedMember?.profile?.full_name || 'Usuário';
+    const selectedNames = selectedUserIds
+      .map(id => members?.find(m => m.user_id === id)?.profile?.full_name || 'Usuário')
+      .slice(0, 2)
+      .join(', ');
+    const suffix = selectedUserIds.length > 2 ? ` +${selectedUserIds.length - 2}` : '';
 
     await createAutomation.mutateAsync({
       workspaceId,
       trigger: 'on_task_created',
       actionType,
-      actionConfig: { user_id: selectedUserId },
+      actionConfig: { user_ids: selectedUserIds },
       scopeType,
       scopeId,
-      description: `${actionType === 'auto_assign_user' ? 'Atribuir' : 'Adicionar como seguidor'} ${userName} em ${scopeName}`,
+      description: `${actionType === 'auto_assign_user' ? 'Atribuir' : 'Adicionar como seguidor'} ${selectedNames}${suffix} em ${scopeName}`,
     });
 
     setDialogOpen(false);
-    setSelectedUserId('');
+    setSelectedUserIds([]);
   };
 
   const getDialogTitle = () => {
@@ -126,29 +127,16 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Selecione o usuário</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Escolha um membro..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {members?.map((member) => (
-                    <SelectItem key={member.user_id} value={member.user_id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={member.profile?.avatar_url} />
-                          <AvatarFallback className="text-xs">
-                            {member.profile?.full_name?.charAt(0) || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{member.profile?.full_name || 'Usuário'}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <UserMultiSelect
+              label="Selecione os usuários"
+              users={members?.map(m => ({
+                id: m.user_id,
+                full_name: m.profile?.full_name || null,
+                avatar_url: m.profile?.avatar_url || null
+              })) || []}
+              selectedIds={selectedUserIds}
+              onSelectionChange={setSelectedUserIds}
+            />
           </div>
 
           <DialogFooter>
@@ -157,7 +145,7 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
             </Button>
             <Button 
               onClick={handleSubmit} 
-              disabled={!selectedUserId || createAutomation.isPending}
+              disabled={selectedUserIds.length === 0 || createAutomation.isPending}
             >
               {createAutomation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Criar Automação

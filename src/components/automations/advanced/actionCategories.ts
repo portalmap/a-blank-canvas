@@ -64,19 +64,19 @@ export const ACTION_OPTIONS: ActionOption[] = [
   {
     id: 'auto_assign_user',
     label: 'Atribuir responsável',
-    description: 'Adicionar um responsável à tarefa',
+    description: 'Adicionar responsáveis à tarefa',
     icon: UserPlus,
     configFields: [
-      { name: 'user_id', label: 'Usuário', type: 'user', required: true }
+      { name: 'user_ids', label: 'Usuários', type: 'users', required: true }
     ]
   },
   {
     id: 'add_assignee',
     label: 'Adicionar responsável',
-    description: 'Adicionar mais um responsável à tarefa',
+    description: 'Adicionar mais responsáveis à tarefa',
     icon: UserPlus,
     configFields: [
-      { name: 'user_id', label: 'Usuário', type: 'user', required: true }
+      { name: 'user_ids', label: 'Usuários', type: 'users', required: true }
     ]
   },
   {

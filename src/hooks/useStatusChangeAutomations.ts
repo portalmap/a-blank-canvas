@@ -500,45 +500,51 @@ const executeSetPriority = async (
 };
 
 /**
- * Add an assignee to the task
+ * Add assignees to the task (supports multiple users)
  */
 const executeAddAssignee = async (
   info: StatusChangeInfo,
   config: Record<string, any> | null,
   automationName: string
 ): Promise<void> => {
-  const userId = config?.user_id;
-  if (!userId) return;
+  // Support both user_ids (array) and legacy user_id (string)
+  const userIds = config?.user_ids || (config?.user_id ? [config.user_id] : []);
+  if (!userIds.length) return;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
-  const { error } = await supabase
-    .from('task_assignees')
-    .upsert(
-      { task_id: info.taskId, user_id: userId },
-      { onConflict: 'task_id,user_id' }
-    );
+  for (const userId of userIds) {
+    const { error } = await supabase
+      .from('task_assignees')
+      .upsert(
+        { task_id: info.taskId, user_id: userId },
+        { onConflict: 'task_id,user_id' }
+      );
 
-  if (error) throw error;
-  
-  // Buscar nome do usuário adicionado
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', userId)
-    .single();
+    if (error) {
+      console.error('Error adding assignee:', error);
+      continue;
+    }
+    
+    // Buscar nome do usuário adicionado
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single();
 
-  // Registrar atividade
-  await logAutomationActivity(info.taskId, user.id, 'assignee.added', {
-    newValue: profile?.full_name || userId,
-    metadata: { 
-      assignee_id: userId,
-      automation_name: automationName,
-    },
-  });
+    // Registrar atividade
+    await logAutomationActivity(info.taskId, user.id, 'assignee.added', {
+      newValue: profile?.full_name || userId,
+      metadata: { 
+        assignee_id: userId,
+        automation_name: automationName,
+      },
+    });
+  }
   
-  console.log(`Assignee ${userId} added to task ${info.taskId}`);
+  console.log(`${userIds.length} assignee(s) added to task ${info.taskId}`);
 };
 
 /**
