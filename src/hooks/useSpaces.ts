@@ -134,9 +134,16 @@ export const useDeleteSpace = () => {
       queryClient.invalidateQueries({ queryKey: ['spaces'] });
       toast.success('Space excluído com sucesso!');
     },
-    onError: (error) => {
-      toast.error('Erro ao excluir space');
-      console.error(error);
+    onError: (error: any) => {
+      console.error('Erro ao excluir space:', error);
+      
+      if (error.code === '23503') {
+        toast.error('Não é possível excluir: existem dados vinculados');
+      } else if (error.code === '42501') {
+        toast.error('Você não tem permissão para excluir este space');
+      } else {
+        toast.error('Erro ao excluir space');
+      }
     },
   });
 };
