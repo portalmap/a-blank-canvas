@@ -1861,18 +1861,24 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          source_id: string | null
+          source_type: string | null
           task_id: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          source_id?: string | null
+          source_type?: string | null
           task_id: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          source_id?: string | null
+          source_type?: string | null
           task_id?: string
           user_id?: string
         }
