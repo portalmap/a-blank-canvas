@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getActionById, ActionConfigField } from './actionCategories';
 import { List, Folder } from 'lucide-react';
 import { useStatusesForScope } from '@/hooks/useStatuses';
+import { UserMultiSelect } from './UserMultiSelect';
 
 interface TemplateList {
   id: string;
@@ -254,6 +255,22 @@ export const ActionConfigForm = ({
               </SelectContent>
             </Select>
           </div>
+        );
+
+      case 'users':
+        return (
+          <UserMultiSelect
+            key={field.name}
+            label={field.label}
+            users={members?.map(m => ({
+              id: m.user_id,
+              full_name: m.profile?.full_name || null,
+              avatar_url: m.profile?.avatar_url || null
+            })) || []}
+            selectedIds={config[field.name] || []}
+            onSelectionChange={(ids) => handleFieldChange(field.name, ids)}
+            required={field.required}
+          />
         );
 
       case 'status':
