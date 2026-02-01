@@ -1,53 +1,20 @@
 
 
-## Plano: Corrigir Automações do Template para Assumir o Novo Space Criado
+## Plano: Corrigir Exclusão de Space com Cascade para Tarefas
 
-### Problema Identificado
+### Problemas Identificados
 
-Quando um Space é criado a partir de um template, as automações são copiadas diretamente **sem remapear os IDs internos** para os novos IDs criados. Isso causa:
-
-1. **`scope_id`** incorreto - A automação fica com referência a um scope (lista/pasta/space) que não corresponde ao novo Space
-2. **`action_config.trigger_config.from_status_ids` e `to_status_ids`** - Referências a IDs de status do template
-3. **`action_config.actions[].config.target_list_id`** - Referências a listas do template
-4. **`action_config.actions[].config.status_id`** - Referências a status do template
-
-### Análise do Código Atual
-
-No arquivo `src/hooks/useSpaceTemplates.ts`:
-
-**Linhas 790-830 (problema):** O `action_config` é copiado diretamente sem remapeamento:
-```typescript
-await supabase.from('automations').insert({
-  // ...
-  action_config: automation.action_config,  // ← IDs não remapeados!
-  // ...
-});
-```
-
-**Linhas 905-955:** Existe uma função `remapAutomation` que faz parte do trabalho, mas:
-- Não é usada no fluxo de criação de Space
-- Não remapeia status IDs (from_status_ids, to_status_ids, status_id nas ações)
-- Só remapeia `target_list_id`
+1. **Constraint bloqueadora**: A tabela `tasks` tem `ON DELETE RESTRICT` na FK `list_id`, impedindo exclusão de listas com tarefas
+2. **Política muito permissiva**: A RLS atual permite exclusão por `admin` e `member`, mas deveria ser **apenas admin** (proprietário do workspace)
 
 ---
 
-### Solução Proposta
+### O que será corrigido
 
-#### 1. Criar um mapeamento de status template → status reais
-
-Quando uma lista é criada com `status_template_id`, o sistema cria status reais. Precisamos criar um mapa de `status_template_item_id` → `real_status_id`.
-
-#### 2. Expandir a função de remapeamento
-
-Criar uma nova função `remapTemplateAutomation` que remapeia:
-- `trigger_config.from_status_ids` e `to_status_ids`
-- `actions[].config.status_id` 
-- `actions[].config.target_list_id`
-- `conditions[].value` (se forem referências de status)
-
-#### 3. Usar a função no fluxo de criação de Space
-
-Substituir a cópia direta pelo remapeamento completo.
+| Problema | Correção |
+|----------|----------|
+| Tarefas bloqueiam exclusão de lista | Alterar constraint para `ON DELETE CASCADE` |
+| Qualquer membro pode excluir | Restringir para apenas `admin` |
 
 ---
 
@@ -55,155 +22,98 @@ Substituir a cópia direta pelo remapeamento completo.
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/hooks/useSpaceTemplates.ts` | Expandir lógica de remapeamento e usá-la na criação de Space |
+| Nova migração SQL | Alterar FK e policy de exclusão |
+| `src/hooks/useSpaces.ts` | Melhorar mensagem de erro |
+| `src/components/workspace/SpaceTreeItem.tsx` | Adicionar verificação de permissão (ocultar botão para não-admin) |
 
 ---
 
 ### Seção Técnica
 
-#### Fluxo de Mapeamento de Status
+#### 1. Migração de Banco de Dados
 
-Quando uma lista é criada com `status_template_id`, os status são criados automaticamente via trigger/lógica do banco. Precisamos:
+```sql
+-- 1. Alterar constraint para permitir exclusão em cascata
+ALTER TABLE public.tasks
+  DROP CONSTRAINT IF EXISTS tasks_list_id_fkey,
+  ADD CONSTRAINT tasks_list_id_fkey 
+    FOREIGN KEY (list_id) 
+    REFERENCES public.lists(id) 
+    ON DELETE CASCADE;
 
-1. Buscar os status criados para cada lista
-2. Criar um mapa `status_template_item_id → real_status_id` baseado no nome do status
-
-#### Nova Função de Remapeamento
-
-```typescript
-function remapTemplateAutomationConfig(
-  actionConfig: Record<string, any>,
-  listIdMap: Record<string, string>,
-  statusIdMap: Record<string, string>
-): Record<string, any> {
-  const remapped = JSON.parse(JSON.stringify(actionConfig));
-
-  // 1. Remap trigger_config status IDs
-  if (remapped.trigger_config) {
-    if (remapped.trigger_config.from_status_ids) {
-      remapped.trigger_config.from_status_ids = remapped.trigger_config.from_status_ids
-        .map((id: string) => statusIdMap[id])
-        .filter(Boolean);
-    }
-    if (remapped.trigger_config.to_status_ids) {
-      remapped.trigger_config.to_status_ids = remapped.trigger_config.to_status_ids
-        .map((id: string) => statusIdMap[id])
-        .filter(Boolean);
-    }
-  }
-
-  // 2. Remap actions
-  if (remapped.actions && Array.isArray(remapped.actions)) {
-    remapped.actions = remapped.actions.map((action: any) => {
-      if (action.config) {
-        // Remap target_list_id
-        if (action.config.target_list_id && listIdMap[action.config.target_list_id]) {
-          action.config.target_list_id = listIdMap[action.config.target_list_id];
-        }
-        // Remap status_id
-        if (action.config.status_id && statusIdMap[action.config.status_id]) {
-          action.config.status_id = statusIdMap[action.config.status_id];
-        }
-      }
-      return action;
-    });
-  }
-
-  return remapped;
-}
+-- 2. Restringir exclusão de space para apenas admin
+DROP POLICY IF EXISTS "Only privileged members can delete spaces" ON public.spaces;
+CREATE POLICY "Only admins can delete spaces"
+ON public.spaces
+FOR DELETE
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM workspace_members
+    WHERE workspace_id = spaces.workspace_id
+      AND user_id = auth.uid()
+      AND role = 'admin'
+  )
+  OR is_system_admin(auth.uid())
+);
 ```
 
-#### Criar Mapa de Status
+#### 2. Atualizar `useSpaces.ts`
+
+Melhorar tratamento de erro para informar o motivo:
 
 ```typescript
-// Após criar todas as listas, buscar os status criados
-const statusIdMap: Record<string, string> = {};
-
-// Buscar status de cada lista criada
-for (const [templateListId, realListId] of Object.entries(listIdMap)) {
-  const templateList = listsResult.data?.find(l => l.id === templateListId);
-  if (templateList?.status_template_id) {
-    // Buscar status items do template
-    const { data: templateStatusItems } = await supabase
-      .from('status_template_items')
-      .select('id, name')
-      .eq('template_id', templateList.status_template_id);
-
-    // Buscar status reais da lista
-    const { data: realStatuses } = await supabase
-      .from('statuses')
-      .select('id, name')
-      .eq('scope_type', 'list')
-      .eq('scope_id', realListId);
-
-    // Mapear por nome
-    templateStatusItems?.forEach(templateStatus => {
-      const realStatus = realStatuses?.find(s => s.name === templateStatus.name);
-      if (realStatus) {
-        statusIdMap[templateStatus.id] = realStatus.id;
-      }
-    });
+onError: (error: any) => {
+  console.error('Erro ao excluir space:', error);
+  
+  if (error.code === '23503') {
+    toast.error('Não é possível excluir: existem tarefas vinculadas');
+  } else if (error.code === '42501') {
+    toast.error('Você não tem permissão para excluir este space');
+  } else {
+    toast.error('Erro ao excluir space');
   }
-}
+},
 ```
 
-#### Atualizar Criação de Automações
+#### 3. Atualizar `SpaceTreeItem.tsx`
 
-```typescript
-// Substituir linhas 797-830
-if (templateAutomations && templateAutomations.length > 0) {
-  for (const automation of templateAutomations) {
-    let scopeType: 'workspace' | 'space' | 'folder' | 'list';
-    let scopeId: string;
+Ocultar opção de excluir para não-administradores:
 
-    if (automation.scope_type === 'space') {
-      scopeType = 'space';
-      scopeId = space.id;
-    } else if (automation.scope_type === 'folder' && automation.folder_ref_id) {
-      scopeType = 'folder';
-      scopeId = folderIdMap[automation.folder_ref_id];
-    } else if (automation.scope_type === 'list' && automation.list_ref_id) {
-      scopeType = 'list';
-      scopeId = listIdMap[automation.list_ref_id];
-    } else {
-      scopeType = 'space';
-      scopeId = space.id;
-    }
+```tsx
+// Adicionar verificação de permissão
+const { data: userRole } = useUserRole();
+const canDelete = userRole?.isAdmin;
 
-    if (!scopeId) continue;
-
-    // REMAP the action_config
-    const remappedConfig = remapTemplateAutomationConfig(
-      automation.action_config || {},
-      listIdMap,
-      statusIdMap
-    );
-
-    await supabase.from('automations').insert({
-      workspace_id: workspaceId,
-      description: automation.description,
-      trigger: automation.trigger,
-      action_type: automation.action_type,
-      action_config: remappedConfig,
-      scope_type: scopeType,
-      scope_id: scopeId,
-      enabled: true,
-    });
-  }
-}
+// No menu dropdown
+{canDelete && (
+  <>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem
+      onClick={() => setIsDeleteDialogOpen(true)}
+      className="text-destructive"
+    >
+      <Trash2 className="mr-2 h-4 w-4" />
+      Excluir Space
+    </DropdownMenuItem>
+  </>
+)}
 ```
+
+---
+
+### Comportamento Após Correção
+
+1. **Exclusão funcional**: Ao excluir um Space, todas as pastas, listas e tarefas serão excluídas em cascata
+2. **Permissão restrita**: Apenas administradores do workspace (role = 'admin') ou administradores globais podem excluir
+3. **UI correta**: Botão de excluir só aparece para usuários com permissão
+4. **Mensagens claras**: Erros específicos quando algo impede a exclusão
 
 ---
 
 ### Resultado Esperado
 
-1. Ao criar um Space a partir de um template:
-   - Automações recebem referências aos IDs reais (Space, Pasta, Lista)
-   - Status IDs no trigger_config são remapeados para os status reais da lista
-   - Ações de "mover tarefa" apontam para as listas corretas do novo Space
-   - Ações de "alterar status" usam os status corretos das listas
-
-2. Ao abrir uma automação para edição:
-   - Todos os campos mostram as opções corretas do escopo atual
-   - Seleções pré-existentes aparecem corretamente
+- Administradores podem excluir Spaces (e todo seu conteúdo)
+- Membros comuns não veem a opção de excluir
+- Não há mais erro de foreign key ao excluir
 
