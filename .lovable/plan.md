@@ -1,174 +1,194 @@
 
 
-## Plano: Seleção Múltipla de Usuários para Ação "Adicionar Seguidor"
+## Plano: Corrigir Multi-Seleção de Usuários para Seguidores e Responsáveis
 
-### Resumo
+### Problemas Identificados
 
-Permitir a seleção de múltiplos usuários nas ações de automação "Adicionar seguidor" e similares. Atualmente, só é possível selecionar um usuário por vez. Com esta alteração, será possível selecionar vários usuários de uma vez, usando uma interface similar à de seleção de tags e status.
-
----
-
-### O que será implementado
-
-1. **Novo componente `UserMultiSelect`** - Interface visual com checkboxes para selecionar múltiplos usuários
-2. **Novo tipo de campo `users`** - Para indicar seleção múltipla de usuários
-3. **Atualização das ações de seguidor** - Usar o novo tipo de campo
-4. **Renderização no formulário** - Suporte ao novo campo no `ActionConfigForm`
-5. **Atualização da lógica de execução** - Processar array de `user_ids` ao aplicar automações
+1. **Diálogo Rápido (QuickAutomationButtons)** - Usa seletor único de usuário
+2. **Categoria de Ações (actionCategories)** - Ações de responsável usam tipo `user` (singular) ao invés de `users`
+3. **Execução de Automações (useApplyAutomations)** - `auto_assign_user` não suporta múltiplos usuários
+4. **Execução por Mudança de Status (useStatusChangeAutomations)** - `executeAddAssignee` não suporta múltiplos usuários
 
 ---
 
-### Interface do Usuário
+### O que será corrigido
 
-Ao configurar uma automação de "Adicionar seguidor":
-- O seletor atual (dropdown único) será substituído por um multi-select
-- Usuários selecionados aparecem como badges
-- Campo de busca para filtrar membros
-- Opção "Marcar tudo" / "Limpar"
-- Checkboxes ao lado de cada usuário
+| Local | Problema | Correção |
+|-------|----------|----------|
+| QuickAutomationButtons.tsx | Seletor único para ambos | Usar `UserMultiSelect` e salvar como array `user_ids` |
+| actionCategories.ts | Ações de responsável usam `user` | Mudar para `users` e `user_ids` |
+| useApplyAutomations.ts | `auto_assign_user` espera único | Suportar array `user_ids` como `auto_add_follower` |
+| useStatusChangeAutomations.ts | `executeAddAssignee` espera único | Loop para processar múltiplos usuários |
 
 ---
 
-### Arquivos a Modificar/Criar
+### Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/automations/advanced/UserMultiSelect.tsx` | **Novo** - Componente de seleção múltipla |
-| `src/components/automations/advanced/actionCategories.ts` | Adicionar tipo `users` e atualizar ações |
-| `src/components/automations/advanced/ActionConfigForm.tsx` | Renderizar novo componente para tipo `users` |
-| `src/hooks/useApplyAutomations.ts` | Processar array de `user_ids` ao invés de único `user_id` |
+| `src/components/automations/QuickAutomationButtons.tsx` | Substituir Select por UserMultiSelect para ambas ações |
+| `src/components/automations/advanced/actionCategories.ts` | Mudar campos de `auto_assign_user` e `add_assignee` para usar `users` |
+| `src/hooks/useApplyAutomations.ts` | Adicionar suporte a array em `auto_assign_user` |
+| `src/hooks/useStatusChangeAutomations.ts` | Modificar `executeAddAssignee` para processar array |
 
 ---
 
 ### Seção Técnica
 
-#### 1. Novo componente `UserMultiSelect.tsx`
+#### 1. Atualizar QuickAutomationButtons.tsx
 
-Baseado no padrão do `StatusMultiSelect`:
+Substituir o estado e o seletor por multi-select:
 
 ```tsx
-interface UserItem {
-  id: string;
-  full_name: string | null;
-  avatar_url: string | null;
+// Estado: mudar de string para array
+const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+// Validação: verificar se há pelo menos 1 selecionado
+if (selectedUserIds.length === 0) {
+  toast.error('Selecione pelo menos um usuário');
+  return;
 }
 
-interface UserMultiSelectProps {
-  label: string;
-  placeholder?: string;
-  users: UserItem[];
-  selectedIds: string[];
-  onSelectionChange: (ids: string[]) => void;
-}
+// Ao criar automação: usar user_ids (array)
+await createAutomation.mutateAsync({
+  // ...
+  actionConfig: { user_ids: selectedUserIds },
+  description: `${actionType === 'auto_assign_user' ? 'Atribuir' : 'Adicionar como seguidor'} ${selectedUserIds.length} usuário(s) em ${scopeName}`,
+});
 
-export const UserMultiSelect = ({
-  label,
-  placeholder = 'Selecione usuários...',
-  users,
-  selectedIds,
-  onSelectionChange,
-}: UserMultiSelectProps) => {
-  // Popover com Command (busca) + lista com checkboxes
-  // Badges mostrando usuários selecionados
-  // Botão "Marcar tudo" / "Limpar"
-};
+// UI: substituir Select por UserMultiSelect
+<UserMultiSelect
+  label="Selecione os usuários"
+  users={members?.map(m => ({
+    id: m.user_id,
+    full_name: m.profile?.full_name || null,
+    avatar_url: m.profile?.avatar_url || null
+  })) || []}
+  selectedIds={selectedUserIds}
+  onSelectionChange={setSelectedUserIds}
+  required
+/>
 ```
 
-#### 2. Atualizar `actionCategories.ts`
+#### 2. Atualizar actionCategories.ts
 
-Adicionar novo tipo e atualizar ações de seguidor:
+Mudar campos de responsável para usar `users`:
 
 ```typescript
-export interface ActionConfigField {
-  name: string;
-  label: string;
-  type: 'select' | 'text' | 'user' | 'users' | 'status' | ...;  // Adicionar 'users'
-  // ...
-}
-
-// Atualizar ações de seguidor
 {
-  id: 'auto_add_follower',
-  label: 'Adicionar seguidor',
-  configFields: [
-    { name: 'user_ids', label: 'Usuários', type: 'users', required: true }  // Mudar de user_id para user_ids
-  ]
-},
-{
-  id: 'add_follower',
-  label: 'Adicionar seguidor',
+  id: 'auto_assign_user',
+  label: 'Atribuir responsável',
+  description: 'Adicionar responsáveis à tarefa',
+  icon: UserPlus,
   configFields: [
     { name: 'user_ids', label: 'Usuários', type: 'users', required: true }
   ]
-}
+},
+{
+  id: 'add_assignee',
+  label: 'Adicionar responsável',
+  description: 'Adicionar mais responsáveis à tarefa',
+  icon: UserPlus,
+  configFields: [
+    { name: 'user_ids', label: 'Usuários', type: 'users', required: true }
+  ]
+},
 ```
 
-#### 3. Atualizar `ActionConfigForm.tsx`
+#### 3. Atualizar useApplyAutomations.ts
 
-Adicionar novo case para renderizar o componente:
-
-```tsx
-case 'users':
-  return (
-    <UserMultiSelect
-      label={field.label}
-      users={members?.map(m => ({
-        id: m.user_id,
-        full_name: m.profile?.full_name || null,
-        avatar_url: m.profile?.avatar_url || null
-      })) || []}
-      selectedIds={config[field.name] || []}
-      onSelectionChange={(ids) => handleFieldChange(field.name, ids)}
-    />
-  );
-```
-
-#### 4. Atualizar `useApplyAutomations.ts`
-
-Processar array de usuários:
+Adicionar suporte a múltiplos usuários em `auto_assign_user`:
 
 ```typescript
-// Antes:
-const userId = actionConfig?.user_id;
-if (!userId) continue;
-
-// Depois:
-const userIds = actionConfig?.user_ids || (actionConfig?.user_id ? [actionConfig.user_id] : []);
-if (!userIds.length) continue;
-
-// Loop para cada usuário selecionado
-for (const userId of userIds) {
-  if (automation.action_type === 'auto_add_follower') {
-    await supabase
-      .from('task_followers')
+if (automation.action_type === 'auto_assign_user') {
+  // Support both user_ids (array) and legacy user_id (string)
+  const userIds = actionConfig?.user_ids || (actionConfig?.user_id ? [actionConfig.user_id] : []);
+  if (!userIds.length) continue;
+  
+  for (const userId of userIds) {
+    const { error: assignError } = await supabase
+      .from('task_assignees')
       .upsert({
         task_id: task.id,
         user_id: userId,
         source_type: automation.scope_type,
         source_id: automation.scope_id || automation.workspace_id,
-      }, { onConflict: 'task_id,user_id' });
-    
-    result.followersAdded++;
+      } as any, { onConflict: 'task_id,user_id' });
+
+    if (!assignError) {
+      result.assigneesAdded++;
+    }
   }
 }
+```
+
+#### 4. Atualizar useStatusChangeAutomations.ts
+
+Modificar `executeAddAssignee` para processar múltiplos:
+
+```typescript
+const executeAddAssignee = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  // Support both user_ids (array) and legacy user_id (string)
+  const userIds = config?.user_ids || (config?.user_id ? [config.user_id] : []);
+  if (!userIds.length) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  for (const userId of userIds) {
+    const { error } = await supabase
+      .from('task_assignees')
+      .upsert(
+        { task_id: info.taskId, user_id: userId },
+        { onConflict: 'task_id,user_id' }
+      );
+
+    if (error) {
+      console.error('Error adding assignee:', error);
+      continue;
+    }
+    
+    // Buscar nome do usuário adicionado
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single();
+
+    // Registrar atividade
+    await logAutomationActivity(info.taskId, user.id, 'assignee.added', {
+      newValue: profile?.full_name || userId,
+      metadata: { 
+        assignee_id: userId,
+        automation_name: automationName,
+      },
+    });
+  }
+  
+  console.log(`${userIds.length} assignee(s) added to task ${info.taskId}`);
+};
 ```
 
 ---
 
 ### Compatibilidade com Automações Existentes
 
-O código manterá compatibilidade com automações já criadas que usam `user_id` (singular):
+Todas as mudanças mantêm compatibilidade retroativa:
 - Se `user_ids` existir (array), usa ele
 - Senão, se `user_id` existir (string), converte para array `[user_id]`
-- Isso garante que automações antigas continuem funcionando
+- Automações antigas continuam funcionando
 
 ---
 
 ### Resultado Esperado
 
-1. Ao criar/editar automação "Adicionar seguidor", aparece multi-select
-2. Usuário pode marcar múltiplos membros
-3. Badges mostram os selecionados (com "+N" se houver muitos)
-4. Ao executar a automação, todos os usuários selecionados são adicionados como seguidores
-5. Automações antigas com único usuário continuam funcionando
+1. Diálogo rápido permite selecionar múltiplos usuários para ambas ações
+2. Builder avançado usa multi-select para responsáveis
+3. Ao salvar, dados são gravados corretamente como `user_ids` (array)
+4. Ao executar automação, todos os usuários selecionados são adicionados
+5. Automações existentes com `user_id` único continuam funcionando
 
