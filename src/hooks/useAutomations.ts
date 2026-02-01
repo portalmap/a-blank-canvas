@@ -190,3 +190,47 @@ export const useToggleAutomation = () => {
     },
   });
 };
+
+interface DuplicateAutomationParams {
+  automation: Automation;
+  targetScopeType: AutomationScopeType;
+  targetScopeId?: string;
+}
+
+export const useDuplicateAutomation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ automation, targetScopeType, targetScopeId }: DuplicateAutomationParams) => {
+      const cloneDescription = automation.description 
+        ? `CLONE - ${automation.description}` 
+        : 'CLONE';
+
+      const { data, error } = await supabase
+        .from('automations')
+        .insert({
+          workspace_id: automation.workspace_id,
+          description: cloneDescription,
+          trigger: automation.trigger,
+          action_type: automation.action_type,
+          action_config: automation.action_config,
+          scope_type: targetScopeType,
+          scope_id: targetScopeId || null,
+          enabled: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automations'] });
+      toast.success('Automação duplicada! (desativada)');
+    },
+    onError: (error) => {
+      toast.error('Erro ao duplicar automação');
+      console.error(error);
+    },
+  });
+};
