@@ -3,11 +3,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Folder, List, LayoutGrid, Building2, ArrowRight, Zap, Pencil } from 'lucide-react';
+import { Trash2, Folder, List, LayoutGrid, Building2, ArrowRight, Zap, Pencil, Copy } from 'lucide-react';
 import { useToggleAutomation, useDeleteAutomation, type Automation, type AutomationScope } from '@/hooks/useAutomations';
 import { getTriggerById } from './advanced/triggerCategories';
 import { getActionById } from './advanced/actionCategories';
 import { AdvancedAutomationBuilder } from './advanced/AdvancedAutomationBuilder';
+import { DuplicateAutomationDialog } from './DuplicateAutomationDialog';
 
 interface AutomationCardProps {
   automation: Automation;
@@ -33,6 +34,7 @@ const getScopeLabel = (scope: AutomationScope) => {
 
 export function AutomationCard({ automation }: AutomationCardProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const toggleAutomation = useToggleAutomation();
   const deleteAutomation = useDeleteAutomation();
 
@@ -97,8 +99,17 @@ export function AutomationCard({ automation }: AutomationCardProps) {
             </div>
           </div>
 
-          {/* Right: Edit, Toggle and Delete */}
+          {/* Right: Duplicate, Edit, Toggle and Delete */}
           <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => setDuplicateDialogOpen(true)}
+              title="Duplicar automação"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -131,6 +142,14 @@ export function AutomationCard({ automation }: AutomationCardProps) {
         onOpenChange={setEditDialogOpen}
         workspaceId={automation.workspace_id}
         automation={automation}
+      />
+
+      {/* Duplicate Dialog */}
+      <DuplicateAutomationDialog
+        open={duplicateDialogOpen}
+        onOpenChange={setDuplicateDialogOpen}
+        automation={automation}
+        workspaceId={automation.workspace_id}
       />
     </Card>
   );
