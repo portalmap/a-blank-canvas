@@ -1,40 +1,42 @@
 
-
-## Plano: Adicionar Opção Trimestral (90 dias) nas Recorrências
+## Plano: Adicionar Duplicação de Automações com Seleção de Destino
 
 ### Resumo
 
-Adicionar a opção "Trimestral" em todos os seletores de frequência de recorrência do sistema, incluindo:
-- Template de tarefas (Data de Início e Data de Entrega)
-- Configuração de ações de automação
-
-O comportamento será similar ao "Mensal", mas com ciclo de 90 dias (3 meses).
+Adicionar funcionalidade para duplicar automações já criadas, permitindo que o usuário escolha o novo escopo (destino) onde a automação duplicada será aplicada. A automação clonada será criada desativada para evitar execuções acidentais.
 
 ---
 
-### O que será alterado
+### O que será implementado
 
-| Local | Mudança |
-|-------|---------|
-| Interface de Templates | Nova opção "Trimestral" no seletor de frequência |
-| Interface de Automações | Nova opção "Trimestral" no seletor de frequência |
-| Tipos TypeScript | Adicionar `quarterly` como tipo válido |
+1. **Botão de duplicar** no card de cada automação (ícone de cópia)
+2. **Diálogo de seleção de destino** onde o usuário escolhe o novo escopo
+3. **Hook de duplicação** no `useAutomations.ts`
+4. **Automação clonada desativada** com prefixo "CLONE -" na descrição
 
 ---
 
 ### Interface do Usuário
 
-O seletor de frequência terá uma nova opção:
-- Diariamente
-- Semanal
-- Quinzenal
-- Mensal
-- **Trimestral (novo)**
+No card de cada automação (`AutomationCard.tsx`):
+- Novo botão com ícone `Copy` ao lado do botão de editar
+- Ao clicar, abre um diálogo para selecionar o destino
+- Usuário pode escolher: Workspace, Space, Pasta ou Lista
+- Após confirmar, a automação é duplicada no destino escolhido
 
-Para "Trimestral", o usuário poderá escolher:
-- Primeiro dia do trimestre
-- Último dia do trimestre
-- Dia específico (ex: dia 15 de cada trimestre)
+---
+
+### Fluxo de Uso
+
+1. Usuário clica no ícone de duplicar em uma automação
+2. Abre diálogo "Duplicar Automação"
+3. Usuário seleciona o novo escopo (destino)
+4. Sistema cria cópia da automação:
+   - Mesmas configurações (trigger, action, action_config)
+   - Novo escopo selecionado
+   - Descrição com prefixo "CLONE - "
+   - Estado: desativada (enabled: false)
+5. Toast de confirmação é exibido
 
 ---
 
@@ -42,103 +44,191 @@ Para "Trimestral", o usuário poderá escolher:
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/settings/TemplateTaskDialog.tsx` | Adicionar opção "Trimestral" nos 2 seletores + atualizar tipos |
-| `src/components/automations/advanced/ActionConfigForm.tsx` | Adicionar opção "Trimestral" no seletor + condicionais |
+| `src/hooks/useAutomations.ts` | Adicionar hook `useDuplicateAutomation` |
+| `src/components/automations/AutomationCard.tsx` | Adicionar botão de duplicar + diálogo de destino |
+| `src/components/automations/DuplicateAutomationDialog.tsx` | **Novo arquivo** - Diálogo para seleção de destino |
 
 ---
 
 ### Seção Técnica
 
-#### 1. Atualizar interface DateRecurrence (TemplateTaskDialog.tsx)
+#### 1. Novo hook `useDuplicateAutomation` (useAutomations.ts)
 
 ```typescript
-export interface DateRecurrence {
-  type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'; // Adicionar quarterly
-  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | string;
-  monthlyMode?: 'first_day' | 'last_day' | 'specific_day' | string;
-  dayOfMonth?: number;
-  // ... resto permanece igual
+interface DuplicateAutomationParams {
+  automation: Automation;
+  targetScopeType: AutomationScopeType;
+  targetScopeId?: string;
+}
+
+export const useDuplicateAutomation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ automation, targetScopeType, targetScopeId }: DuplicateAutomationParams) => {
+      const cloneDescription = automation.description 
+        ? `CLONE - ${automation.description}` 
+        : 'CLONE';
+
+      const { data, error } = await supabase
+        .from('automations')
+        .insert({
+          workspace_id: automation.workspace_id,
+          description: cloneDescription,
+          trigger: automation.trigger,
+          action_type: automation.action_type,
+          action_config: automation.action_config,
+          scope_type: targetScopeType,
+          scope_id: targetScopeId || null,
+          enabled: false, // Sempre criar desativada
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automations'] });
+      toast.success('Automação duplicada! (desativada)');
+    },
+    onError: (error) => {
+      toast.error('Erro ao duplicar automação');
+      console.error(error);
+    },
+  });
+};
+```
+
+#### 2. Novo componente `DuplicateAutomationDialog.tsx`
+
+```tsx
+import { useState } from 'react';
+import { 
+  Dialog, DialogContent, DialogHeader, DialogTitle, 
+  DialogDescription, DialogFooter 
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ScopeSelector } from './ScopeSelector';
+import { useDuplicateAutomation, type Automation, type AutomationScope } from '@/hooks/useAutomations';
+import { Copy } from 'lucide-react';
+
+interface DuplicateAutomationDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  automation: Automation;
+  workspaceId: string;
+}
+
+export function DuplicateAutomationDialog({ 
+  open, 
+  onOpenChange, 
+  automation,
+  workspaceId 
+}: DuplicateAutomationDialogProps) {
+  const [scope, setScope] = useState<{ scopeType: AutomationScope; scopeId?: string }>({ 
+    scopeType: automation.scope_type,
+    scopeId: automation.scope_id || undefined
+  });
+  
+  const duplicateAutomation = useDuplicateAutomation();
+
+  const handleDuplicate = async () => {
+    await duplicateAutomation.mutateAsync({
+      automation,
+      targetScopeType: scope.scopeType,
+      targetScopeId: scope.scopeId,
+    });
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Copy className="h-5 w-5" />
+            Duplicar Automação
+          </DialogTitle>
+          <DialogDescription>
+            Selecione o destino para a cópia de "{automation.description || 'Automação'}"
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="py-4">
+          <ScopeSelector
+            workspaceId={workspaceId}
+            value={scope}
+            onChange={setScope}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleDuplicate}
+            disabled={duplicateAutomation.isPending}
+          >
+            {duplicateAutomation.isPending ? 'Duplicando...' : 'Duplicar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 ```
 
-#### 2. Atualizar estados e tipos (TemplateTaskDialog.tsx)
-
-```typescript
-// Linha ~88
-const [startRecurrenceType, setStartRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('weekly');
-
-// Linha ~100
-const [dueRecurrenceType, setDueRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('weekly');
-```
-
-#### 3. Adicionar opção no Select de Data de Início (TemplateTaskDialog.tsx)
+#### 3. Atualização do `AutomationCard.tsx`
 
 ```tsx
-// Linha ~434-438
-<SelectContent>
-  <SelectItem value="daily">Diariamente</SelectItem>
-  <SelectItem value="weekly">Semanal</SelectItem>
-  <SelectItem value="biweekly">Quinzenal</SelectItem>
-  <SelectItem value="monthly">Mensal</SelectItem>
-  <SelectItem value="quarterly">Trimestral</SelectItem> {/* NOVO */}
-</SelectContent>
+import { Copy } from 'lucide-react';
+import { DuplicateAutomationDialog } from './DuplicateAutomationDialog';
+
+// Dentro do componente:
+const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+
+// No JSX, após o botão de editar:
+<Button
+  variant="ghost"
+  size="icon"
+  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+  onClick={() => setDuplicateDialogOpen(true)}
+  title="Duplicar automação"
+>
+  <Copy className="h-4 w-4" />
+</Button>
+
+// Após o AdvancedAutomationBuilder:
+<DuplicateAutomationDialog
+  open={duplicateDialogOpen}
+  onOpenChange={setDuplicateDialogOpen}
+  automation={automation}
+  workspaceId={automation.workspace_id}
+/>
 ```
 
-#### 4. Adicionar configuração para Trimestral (similar ao mensal)
+---
 
-O comportamento de "quarterly" será idêntico ao "monthly" na UI, pois ambos usam `monthlyMode` e `dayOfMonth`. A diferença está apenas no ciclo (3 meses ao invés de 1).
+### Comportamento da Duplicação
 
-```tsx
-// Expandir condição existente para incluir quarterly
-{(startRecurrenceType === 'monthly' || startRecurrenceType === 'quarterly') && (
-  <>
-    <Select value={startMonthlyMode} onValueChange={setStartMonthlyMode}>
-      <SelectTrigger className="h-8">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="first_day">Primeiro dia do período</SelectItem>
-        <SelectItem value="last_day">Último dia do período</SelectItem>
-        <SelectItem value="specific_day">Dia específico</SelectItem>
-      </SelectContent>
-    </Select>
-    {/* ... resto permanece igual */}
-  </>
-)}
-```
-
-#### 5. Repetir para Data de Entrega (linhas ~638-688)
-
-Mesmas alterações:
-- Adicionar `<SelectItem value="quarterly">Trimestral</SelectItem>`
-- Expandir condição `{(dueRecurrenceType === 'monthly' || dueRecurrenceType === 'quarterly') && (...`
-
-#### 6. Atualizar ActionConfigForm.tsx
-
-```tsx
-// Linha ~522-527
-<SelectContent>
-  <SelectItem value="daily">Diariamente</SelectItem>
-  <SelectItem value="weekly">Semanal</SelectItem>
-  <SelectItem value="biweekly">Quinzenal</SelectItem>
-  <SelectItem value="monthly">Mensal</SelectItem>
-  <SelectItem value="quarterly">Trimestral</SelectItem> {/* NOVO */}
-</SelectContent>
-
-// Linha ~561 - Expandir condição
-{(config.recurrence_type === 'monthly' || config.recurrence_type === 'quarterly') && (
-  // ... configuração de dia do mês/período
-)}
-```
+| Campo | Comportamento |
+|-------|---------------|
+| Descrição | Prefixo "CLONE - " adicionado |
+| Gatilho (trigger) | Copiado integralmente |
+| Ação (action_type) | Copiada integralmente |
+| Configuração (action_config) | Copiada integralmente |
+| Escopo | Definido pelo usuário no diálogo |
+| Status | Sempre desativada (enabled: false) |
 
 ---
 
 ### Resultado Esperado
 
-1. Nova opção "Trimestral" aparece em todos os seletores de frequência
-2. Ao selecionar "Trimestral", usuário pode escolher:
-   - Primeiro dia do trimestre
-   - Último dia do trimestre
-   - Dia específico do mês (repetido a cada 3 meses)
-3. O sistema calculará corretamente o próximo ciclo considerando 90 dias / 3 meses
-
+1. Botão de duplicar visível em cada card de automação
+2. Ao clicar, diálogo abre com seletor de escopo
+3. Escopo inicial = mesmo da automação original
+4. Usuário pode mudar para qualquer escopo desejado
+5. Automação duplicada criada desativada
+6. Toast confirma a operação
