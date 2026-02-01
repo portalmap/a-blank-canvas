@@ -26,7 +26,7 @@ export interface ActionOption {
 export interface ActionConfigField {
   name: string;
   label: string;
-  type: 'select' | 'text' | 'user' | 'status' | 'priority' | 'date' | 'number' | 'list' | 'tag' | 'date_config';
+  type: 'select' | 'text' | 'user' | 'users' | 'status' | 'priority' | 'date' | 'number' | 'list' | 'tag' | 'date_config';
   required?: boolean;
   options?: { value: string; label: string }[];
 }
@@ -98,19 +98,19 @@ export const ACTION_OPTIONS: ActionOption[] = [
   {
     id: 'auto_add_follower',
     label: 'Adicionar seguidor',
-    description: 'Adicionar um seguidor à tarefa',
+    description: 'Adicionar seguidores à tarefa',
     icon: Eye,
     configFields: [
-      { name: 'user_id', label: 'Usuário', type: 'user', required: true }
+      { name: 'user_ids', label: 'Usuários', type: 'users', required: true }
     ]
   },
   {
     id: 'add_follower',
     label: 'Adicionar seguidor',
-    description: 'Adicionar um seguidor à tarefa',
+    description: 'Adicionar seguidores à tarefa',
     icon: Eye,
     configFields: [
-      { name: 'user_id', label: 'Usuário', type: 'user', required: true }
+      { name: 'user_ids', label: 'Usuários', type: 'users', required: true }
     ]
   },
   {

@@ -65,10 +65,11 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
     // 6. Apply each automation
     for (const automation of applicableAutomations) {
       const actionConfig = automation.action_config as Record<string, any> | null;
-      const userId = actionConfig?.user_id;
-      if (!userId) continue;
 
       if (automation.action_type === 'auto_assign_user') {
+        const userId = actionConfig?.user_id;
+        if (!userId) continue;
+        
         // Add assignee with source tracking
         const { error: assignError } = await supabase
           .from('task_assignees')
@@ -89,18 +90,24 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
           .delete()
           .eq('task_id', task.id);
       } else if (automation.action_type === 'auto_add_follower') {
-        // Add follower with source tracking
-        const { error: followError } = await supabase
-          .from('task_followers')
-          .upsert({
-            task_id: task.id,
-            user_id: userId,
-            source_type: automation.scope_type,
-            source_id: automation.scope_id || automation.workspace_id,
-          } as any, { onConflict: 'task_id,user_id' });
+        // Support both user_ids (array) and legacy user_id (string)
+        const userIds = actionConfig?.user_ids || (actionConfig?.user_id ? [actionConfig.user_id] : []);
+        if (!userIds.length) continue;
 
-        if (!followError) {
-          result.followersAdded++;
+        // Add each follower with source tracking
+        for (const userId of userIds) {
+          const { error: followError } = await supabase
+            .from('task_followers')
+            .upsert({
+              task_id: task.id,
+              user_id: userId,
+              source_type: automation.scope_type,
+              source_id: automation.scope_id || automation.workspace_id,
+            } as any, { onConflict: 'task_id,user_id' });
+
+          if (!followError) {
+            result.followersAdded++;
+          }
         }
       }
     }
