@@ -1,234 +1,174 @@
 
-## Plano: Adicionar Duplicação de Automações com Seleção de Destino
+
+## Plano: Seleção Múltipla de Usuários para Ação "Adicionar Seguidor"
 
 ### Resumo
 
-Adicionar funcionalidade para duplicar automações já criadas, permitindo que o usuário escolha o novo escopo (destino) onde a automação duplicada será aplicada. A automação clonada será criada desativada para evitar execuções acidentais.
+Permitir a seleção de múltiplos usuários nas ações de automação "Adicionar seguidor" e similares. Atualmente, só é possível selecionar um usuário por vez. Com esta alteração, será possível selecionar vários usuários de uma vez, usando uma interface similar à de seleção de tags e status.
 
 ---
 
 ### O que será implementado
 
-1. **Botão de duplicar** no card de cada automação (ícone de cópia)
-2. **Diálogo de seleção de destino** onde o usuário escolhe o novo escopo
-3. **Hook de duplicação** no `useAutomations.ts`
-4. **Automação clonada desativada** com prefixo "CLONE -" na descrição
+1. **Novo componente `UserMultiSelect`** - Interface visual com checkboxes para selecionar múltiplos usuários
+2. **Novo tipo de campo `users`** - Para indicar seleção múltipla de usuários
+3. **Atualização das ações de seguidor** - Usar o novo tipo de campo
+4. **Renderização no formulário** - Suporte ao novo campo no `ActionConfigForm`
+5. **Atualização da lógica de execução** - Processar array de `user_ids` ao aplicar automações
 
 ---
 
 ### Interface do Usuário
 
-No card de cada automação (`AutomationCard.tsx`):
-- Novo botão com ícone `Copy` ao lado do botão de editar
-- Ao clicar, abre um diálogo para selecionar o destino
-- Usuário pode escolher: Workspace, Space, Pasta ou Lista
-- Após confirmar, a automação é duplicada no destino escolhido
+Ao configurar uma automação de "Adicionar seguidor":
+- O seletor atual (dropdown único) será substituído por um multi-select
+- Usuários selecionados aparecem como badges
+- Campo de busca para filtrar membros
+- Opção "Marcar tudo" / "Limpar"
+- Checkboxes ao lado de cada usuário
 
 ---
 
-### Fluxo de Uso
-
-1. Usuário clica no ícone de duplicar em uma automação
-2. Abre diálogo "Duplicar Automação"
-3. Usuário seleciona o novo escopo (destino)
-4. Sistema cria cópia da automação:
-   - Mesmas configurações (trigger, action, action_config)
-   - Novo escopo selecionado
-   - Descrição com prefixo "CLONE - "
-   - Estado: desativada (enabled: false)
-5. Toast de confirmação é exibido
-
----
-
-### Arquivos a Modificar
+### Arquivos a Modificar/Criar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/hooks/useAutomations.ts` | Adicionar hook `useDuplicateAutomation` |
-| `src/components/automations/AutomationCard.tsx` | Adicionar botão de duplicar + diálogo de destino |
-| `src/components/automations/DuplicateAutomationDialog.tsx` | **Novo arquivo** - Diálogo para seleção de destino |
+| `src/components/automations/advanced/UserMultiSelect.tsx` | **Novo** - Componente de seleção múltipla |
+| `src/components/automations/advanced/actionCategories.ts` | Adicionar tipo `users` e atualizar ações |
+| `src/components/automations/advanced/ActionConfigForm.tsx` | Renderizar novo componente para tipo `users` |
+| `src/hooks/useApplyAutomations.ts` | Processar array de `user_ids` ao invés de único `user_id` |
 
 ---
 
 ### Seção Técnica
 
-#### 1. Novo hook `useDuplicateAutomation` (useAutomations.ts)
+#### 1. Novo componente `UserMultiSelect.tsx`
 
-```typescript
-interface DuplicateAutomationParams {
-  automation: Automation;
-  targetScopeType: AutomationScopeType;
-  targetScopeId?: string;
+Baseado no padrão do `StatusMultiSelect`:
+
+```tsx
+interface UserItem {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
-export const useDuplicateAutomation = () => {
-  const queryClient = useQueryClient();
+interface UserMultiSelectProps {
+  label: string;
+  placeholder?: string;
+  users: UserItem[];
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
+}
 
-  return useMutation({
-    mutationFn: async ({ automation, targetScopeType, targetScopeId }: DuplicateAutomationParams) => {
-      const cloneDescription = automation.description 
-        ? `CLONE - ${automation.description}` 
-        : 'CLONE';
-
-      const { data, error } = await supabase
-        .from('automations')
-        .insert({
-          workspace_id: automation.workspace_id,
-          description: cloneDescription,
-          trigger: automation.trigger,
-          action_type: automation.action_type,
-          action_config: automation.action_config,
-          scope_type: targetScopeType,
-          scope_id: targetScopeId || null,
-          enabled: false, // Sempre criar desativada
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['automations'] });
-      toast.success('Automação duplicada! (desativada)');
-    },
-    onError: (error) => {
-      toast.error('Erro ao duplicar automação');
-      console.error(error);
-    },
-  });
+export const UserMultiSelect = ({
+  label,
+  placeholder = 'Selecione usuários...',
+  users,
+  selectedIds,
+  onSelectionChange,
+}: UserMultiSelectProps) => {
+  // Popover com Command (busca) + lista com checkboxes
+  // Badges mostrando usuários selecionados
+  // Botão "Marcar tudo" / "Limpar"
 };
 ```
 
-#### 2. Novo componente `DuplicateAutomationDialog.tsx`
+#### 2. Atualizar `actionCategories.ts`
 
-```tsx
-import { useState } from 'react';
-import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, 
-  DialogDescription, DialogFooter 
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ScopeSelector } from './ScopeSelector';
-import { useDuplicateAutomation, type Automation, type AutomationScope } from '@/hooks/useAutomations';
-import { Copy } from 'lucide-react';
+Adicionar novo tipo e atualizar ações de seguidor:
 
-interface DuplicateAutomationDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  automation: Automation;
-  workspaceId: string;
+```typescript
+export interface ActionConfigField {
+  name: string;
+  label: string;
+  type: 'select' | 'text' | 'user' | 'users' | 'status' | ...;  // Adicionar 'users'
+  // ...
 }
 
-export function DuplicateAutomationDialog({ 
-  open, 
-  onOpenChange, 
-  automation,
-  workspaceId 
-}: DuplicateAutomationDialogProps) {
-  const [scope, setScope] = useState<{ scopeType: AutomationScope; scopeId?: string }>({ 
-    scopeType: automation.scope_type,
-    scopeId: automation.scope_id || undefined
-  });
-  
-  const duplicateAutomation = useDuplicateAutomation();
-
-  const handleDuplicate = async () => {
-    await duplicateAutomation.mutateAsync({
-      automation,
-      targetScopeType: scope.scopeType,
-      targetScopeId: scope.scopeId,
-    });
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Copy className="h-5 w-5" />
-            Duplicar Automação
-          </DialogTitle>
-          <DialogDescription>
-            Selecione o destino para a cópia de "{automation.description || 'Automação'}"
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="py-4">
-          <ScopeSelector
-            workspaceId={workspaceId}
-            value={scope}
-            onChange={setScope}
-          />
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleDuplicate}
-            disabled={duplicateAutomation.isPending}
-          >
-            {duplicateAutomation.isPending ? 'Duplicando...' : 'Duplicar'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+// Atualizar ações de seguidor
+{
+  id: 'auto_add_follower',
+  label: 'Adicionar seguidor',
+  configFields: [
+    { name: 'user_ids', label: 'Usuários', type: 'users', required: true }  // Mudar de user_id para user_ids
+  ]
+},
+{
+  id: 'add_follower',
+  label: 'Adicionar seguidor',
+  configFields: [
+    { name: 'user_ids', label: 'Usuários', type: 'users', required: true }
+  ]
 }
 ```
 
-#### 3. Atualização do `AutomationCard.tsx`
+#### 3. Atualizar `ActionConfigForm.tsx`
+
+Adicionar novo case para renderizar o componente:
 
 ```tsx
-import { Copy } from 'lucide-react';
-import { DuplicateAutomationDialog } from './DuplicateAutomationDialog';
+case 'users':
+  return (
+    <UserMultiSelect
+      label={field.label}
+      users={members?.map(m => ({
+        id: m.user_id,
+        full_name: m.profile?.full_name || null,
+        avatar_url: m.profile?.avatar_url || null
+      })) || []}
+      selectedIds={config[field.name] || []}
+      onSelectionChange={(ids) => handleFieldChange(field.name, ids)}
+    />
+  );
+```
 
-// Dentro do componente:
-const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+#### 4. Atualizar `useApplyAutomations.ts`
 
-// No JSX, após o botão de editar:
-<Button
-  variant="ghost"
-  size="icon"
-  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-  onClick={() => setDuplicateDialogOpen(true)}
-  title="Duplicar automação"
->
-  <Copy className="h-4 w-4" />
-</Button>
+Processar array de usuários:
 
-// Após o AdvancedAutomationBuilder:
-<DuplicateAutomationDialog
-  open={duplicateDialogOpen}
-  onOpenChange={setDuplicateDialogOpen}
-  automation={automation}
-  workspaceId={automation.workspace_id}
-/>
+```typescript
+// Antes:
+const userId = actionConfig?.user_id;
+if (!userId) continue;
+
+// Depois:
+const userIds = actionConfig?.user_ids || (actionConfig?.user_id ? [actionConfig.user_id] : []);
+if (!userIds.length) continue;
+
+// Loop para cada usuário selecionado
+for (const userId of userIds) {
+  if (automation.action_type === 'auto_add_follower') {
+    await supabase
+      .from('task_followers')
+      .upsert({
+        task_id: task.id,
+        user_id: userId,
+        source_type: automation.scope_type,
+        source_id: automation.scope_id || automation.workspace_id,
+      }, { onConflict: 'task_id,user_id' });
+    
+    result.followersAdded++;
+  }
+}
 ```
 
 ---
 
-### Comportamento da Duplicação
+### Compatibilidade com Automações Existentes
 
-| Campo | Comportamento |
-|-------|---------------|
-| Descrição | Prefixo "CLONE - " adicionado |
-| Gatilho (trigger) | Copiado integralmente |
-| Ação (action_type) | Copiada integralmente |
-| Configuração (action_config) | Copiada integralmente |
-| Escopo | Definido pelo usuário no diálogo |
-| Status | Sempre desativada (enabled: false) |
+O código manterá compatibilidade com automações já criadas que usam `user_id` (singular):
+- Se `user_ids` existir (array), usa ele
+- Senão, se `user_id` existir (string), converte para array `[user_id]`
+- Isso garante que automações antigas continuem funcionando
 
 ---
 
 ### Resultado Esperado
 
-1. Botão de duplicar visível em cada card de automação
-2. Ao clicar, diálogo abre com seletor de escopo
-3. Escopo inicial = mesmo da automação original
-4. Usuário pode mudar para qualquer escopo desejado
-5. Automação duplicada criada desativada
-6. Toast confirma a operação
+1. Ao criar/editar automação "Adicionar seguidor", aparece multi-select
+2. Usuário pode marcar múltiplos membros
+3. Badges mostram os selecionados (com "+N" se houver muitos)
+4. Ao executar a automação, todos os usuários selecionados são adicionados como seguidores
+5. Automações antigas com único usuário continuam funcionando
+
