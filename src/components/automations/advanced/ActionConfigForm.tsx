@@ -524,6 +524,7 @@ export const ActionConfigForm = ({
                       <SelectItem value="weekly">Semanal</SelectItem>
                       <SelectItem value="biweekly">Quinzenal</SelectItem>
                       <SelectItem value="monthly">Mensal</SelectItem>
+                      <SelectItem value="quarterly">Trimestral</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -558,9 +559,9 @@ export const ActionConfigForm = ({
                 )}
 
                 {/* Seletor de dia do mês (para mensal) */}
-                {config.recurrence_type === 'monthly' && (
+                {(config.recurrence_type === 'monthly' || config.recurrence_type === 'quarterly') && (
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Dia do mês <span className="text-destructive">*</span></Label>
+                    <Label className="text-xs">Dia do período <span className="text-destructive">*</span></Label>
                     <Select
                       value={config.monthly_mode || ''}
                       onValueChange={(value) => {
@@ -576,8 +577,8 @@ export const ActionConfigForm = ({
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="first_day">Primeiro dia do mês</SelectItem>
-                        <SelectItem value="last_day">Último dia do mês</SelectItem>
+                        <SelectItem value="first_day">Primeiro dia do período</SelectItem>
+                        <SelectItem value="last_day">Último dia do período</SelectItem>
                         <SelectItem value="specific_day">Dia específico</SelectItem>
                       </SelectContent>
                     </Select>
