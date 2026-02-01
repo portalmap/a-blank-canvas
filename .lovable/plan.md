@@ -1,38 +1,40 @@
 
 
-## Plano: Adicionar Workspace Padrão para Abertura Automática
+## Plano: Adicionar Opção Trimestral (90 dias) nas Recorrências
 
 ### Resumo
 
-Para usuários com mais de um workspace, será adicionada uma opção para definir qual workspace abre automaticamente ao entrar no sistema. Isso evita a necessidade de selecionar manualmente o workspace toda vez que atualizar a página.
+Adicionar a opção "Trimestral" em todos os seletores de frequência de recorrência do sistema, incluindo:
+- Template de tarefas (Data de Início e Data de Entrega)
+- Configuração de ações de automação
+
+O comportamento será similar ao "Mensal", mas com ciclo de 90 dias (3 meses).
 
 ---
 
-### O que será implementado
+### O que será alterado
 
-1. **Indicador visual** no card do workspace padrão (ícone de estrela)
-2. **Botão para definir como padrão** no hover de cada workspace
-3. **Seleção automática** do workspace padrão ao carregar o sistema
-4. **Persistência** da preferência no banco de dados (tabela `profiles`)
+| Local | Mudança |
+|-------|---------|
+| Interface de Templates | Nova opção "Trimestral" no seletor de frequência |
+| Interface de Automações | Nova opção "Trimestral" no seletor de frequência |
+| Tipos TypeScript | Adicionar `quarterly` como tipo válido |
 
 ---
 
 ### Interface do Usuário
 
-Na tela de "Meus Workspaces":
-- Cada workspace terá um botão de "estrela" que aparece no hover
-- O workspace padrão mostrará uma estrela preenchida amarela
-- Clicar na estrela define/remove o workspace como padrão
-- O workspace padrão terá um badge "Padrão" visível
+O seletor de frequência terá uma nova opção:
+- Diariamente
+- Semanal
+- Quinzenal
+- Mensal
+- **Trimestral (novo)**
 
----
-
-### Fluxo do Sistema
-
-1. Usuário faz login
-2. Sistema verifica se há `default_workspace_id` no perfil
-3. Se existir e o usuário tiver acesso → ativa automaticamente e navega para `/spaces`
-4. Se não existir → mostra tela de seleção de workspaces normalmente
+Para "Trimestral", o usuário poderá escolher:
+- Primeiro dia do trimestre
+- Último dia do trimestre
+- Dia específico (ex: dia 15 de cada trimestre)
 
 ---
 
@@ -40,174 +42,103 @@ Na tela de "Meus Workspaces":
 
 | Arquivo | Mudança |
 |---------|---------|
-| **Banco de Dados** | Adicionar coluna `default_workspace_id` na tabela `profiles` |
-| `src/contexts/WorkspaceContext.tsx` | Buscar e aplicar workspace padrão automaticamente |
-| `src/pages/WorkspaceOverview.tsx` | Adicionar botão de estrela para definir padrão |
-| `src/hooks/useWorkspaces.ts` | Adicionar hooks para gerenciar workspace padrão |
-| `src/components/settings/UserProfile.tsx` | Adicionar seletor de workspace padrão |
+| `src/components/settings/TemplateTaskDialog.tsx` | Adicionar opção "Trimestral" nos 2 seletores + atualizar tipos |
+| `src/components/automations/advanced/ActionConfigForm.tsx` | Adicionar opção "Trimestral" no seletor + condicionais |
 
 ---
 
 ### Seção Técnica
 
-#### 1. Migração do Banco de Dados
-
-```sql
-ALTER TABLE profiles 
-ADD COLUMN default_workspace_id uuid REFERENCES workspaces(id) ON DELETE SET NULL;
-```
-
-#### 2. Hook para gerenciar workspace padrão
-
-Adicionar em `useWorkspaces.ts`:
+#### 1. Atualizar interface DateRecurrence (TemplateTaskDialog.tsx)
 
 ```typescript
-export const useDefaultWorkspace = () => {
-  return useQuery({
-    queryKey: ['default-workspace'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('default_workspace_id')
-        .eq('id', user.id)
-        .single();
-      
-      if (error || !data?.default_workspace_id) return null;
-      return data.default_workspace_id;
-    },
-  });
-};
-
-export const useSetDefaultWorkspace = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (workspaceId: string | null) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({ default_workspace_id: workspaceId })
-        .eq('id', user.id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['default-workspace'] });
-      toast.success('Workspace padrão atualizado!');
-    },
-  });
-};
+export interface DateRecurrence {
+  type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'; // Adicionar quarterly
+  dayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | string;
+  monthlyMode?: 'first_day' | 'last_day' | 'specific_day' | string;
+  dayOfMonth?: number;
+  // ... resto permanece igual
+}
 ```
 
-#### 3. WorkspaceContext - Auto-seleção
-
-Modificar o `WorkspaceProvider` para buscar e aplicar o workspace padrão:
+#### 2. Atualizar estados e tipos (TemplateTaskDialog.tsx)
 
 ```typescript
-// Após validar que não há workspace ativo e o usuário tem mais de 1 workspace
-useEffect(() => {
-  const loadDefaultWorkspace = async () => {
-    if (activeWorkspace || !user) return;
-    
-    // Buscar workspace padrão do perfil
-    const { data } = await supabase
-      .from('profiles')
-      .select('default_workspace_id')
-      .eq('id', user.id)
-      .single();
-    
-    if (data?.default_workspace_id) {
-      // Buscar dados completos do workspace
-      const { data: workspace } = await supabase
-        .from('workspaces')
-        .select('*')
-        .eq('id', data.default_workspace_id)
-        .single();
-      
-      if (workspace) {
-        setActiveWorkspace(workspace);
-      }
-    }
-  };
-  
-  loadDefaultWorkspace();
-}, [user, activeWorkspace]);
+// Linha ~88
+const [startRecurrenceType, setStartRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('weekly');
+
+// Linha ~100
+const [dueRecurrenceType, setDueRecurrenceType] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly'>('weekly');
 ```
 
-#### 4. WorkspaceOverview - UI de Seleção
+#### 3. Adicionar opção no Select de Data de Início (TemplateTaskDialog.tsx)
 
 ```tsx
-import { Star } from 'lucide-react';
-import { useDefaultWorkspace, useSetDefaultWorkspace } from '@/hooks/useWorkspaces';
+// Linha ~434-438
+<SelectContent>
+  <SelectItem value="daily">Diariamente</SelectItem>
+  <SelectItem value="weekly">Semanal</SelectItem>
+  <SelectItem value="biweekly">Quinzenal</SelectItem>
+  <SelectItem value="monthly">Mensal</SelectItem>
+  <SelectItem value="quarterly">Trimestral</SelectItem> {/* NOVO */}
+</SelectContent>
+```
 
-// No componente
-const { data: defaultWorkspaceId } = useDefaultWorkspace();
-const setDefaultWorkspace = useSetDefaultWorkspace();
+#### 4. Adicionar configuração para Trimestral (similar ao mensal)
 
-const handleToggleDefault = (workspaceId: string, e: React.MouseEvent) => {
-  e.stopPropagation();
-  const newDefault = defaultWorkspaceId === workspaceId ? null : workspaceId;
-  setDefaultWorkspace.mutate(newDefault);
-};
+O comportamento de "quarterly" será idêntico ao "monthly" na UI, pois ambos usam `monthlyMode` e `dayOfMonth`. A diferença está apenas no ciclo (3 meses ao invés de 1).
 
-// No card do workspace
-<Button
-  variant="ghost"
-  size="icon"
-  onClick={(e) => handleToggleDefault(workspace.id, e)}
->
-  <Star 
-    className={`h-4 w-4 ${
-      defaultWorkspaceId === workspace.id 
-        ? 'fill-yellow-400 text-yellow-400' 
-        : 'text-muted-foreground'
-    }`} 
-  />
-</Button>
-{defaultWorkspaceId === workspace.id && (
-  <Badge variant="secondary" className="text-xs">Padrão</Badge>
+```tsx
+// Expandir condição existente para incluir quarterly
+{(startRecurrenceType === 'monthly' || startRecurrenceType === 'quarterly') && (
+  <>
+    <Select value={startMonthlyMode} onValueChange={setStartMonthlyMode}>
+      <SelectTrigger className="h-8">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="first_day">Primeiro dia do período</SelectItem>
+        <SelectItem value="last_day">Último dia do período</SelectItem>
+        <SelectItem value="specific_day">Dia específico</SelectItem>
+      </SelectContent>
+    </Select>
+    {/* ... resto permanece igual */}
+  </>
 )}
 ```
 
-#### 5. UserProfile - Seletor Alternativo
+#### 5. Repetir para Data de Entrega (linhas ~638-688)
 
-Adicionar um seletor no perfil do usuário para escolher o workspace padrão:
+Mesmas alterações:
+- Adicionar `<SelectItem value="quarterly">Trimestral</SelectItem>`
+- Expandir condição `{(dueRecurrenceType === 'monthly' || dueRecurrenceType === 'quarterly') && (...`
+
+#### 6. Atualizar ActionConfigForm.tsx
 
 ```tsx
-<div className="space-y-2">
-  <Label>Workspace Padrão</Label>
-  <Select 
-    value={defaultWorkspaceId || ''} 
-    onValueChange={(value) => setDefaultWorkspace.mutate(value || null)}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Nenhum (mostrar seleção)" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="">Nenhum (mostrar seleção)</SelectItem>
-      {workspaces?.map(w => (
-        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-  <p className="text-sm text-muted-foreground">
-    Este workspace será selecionado automaticamente ao abrir o sistema
-  </p>
-</div>
+// Linha ~522-527
+<SelectContent>
+  <SelectItem value="daily">Diariamente</SelectItem>
+  <SelectItem value="weekly">Semanal</SelectItem>
+  <SelectItem value="biweekly">Quinzenal</SelectItem>
+  <SelectItem value="monthly">Mensal</SelectItem>
+  <SelectItem value="quarterly">Trimestral</SelectItem> {/* NOVO */}
+</SelectContent>
+
+// Linha ~561 - Expandir condição
+{(config.recurrence_type === 'monthly' || config.recurrence_type === 'quarterly') && (
+  // ... configuração de dia do mês/período
+)}
 ```
 
 ---
 
 ### Resultado Esperado
 
-1. Usuários com múltiplos workspaces podem marcar um como "padrão"
-2. Ao abrir o sistema, o workspace padrão é selecionado automaticamente
-3. Usuário é redirecionado diretamente para `/spaces` sem passar por `/workspaces`
-4. A preferência persiste entre sessões no banco de dados
-5. A configuração pode ser alterada na tela de workspaces ou nas configurações de perfil
+1. Nova opção "Trimestral" aparece em todos os seletores de frequência
+2. Ao selecionar "Trimestral", usuário pode escolher:
+   - Primeiro dia do trimestre
+   - Último dia do trimestre
+   - Dia específico do mês (repetido a cada 3 meses)
+3. O sistema calculará corretamente o próximo ciclo considerando 90 dias / 3 meses
 
