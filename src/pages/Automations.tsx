@@ -5,6 +5,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { AutomationsList } from '@/components/automations/AutomationsList';
 import { AutomationsFilters, AutomationsFilterState } from '@/components/automations/AutomationsFilters';
 import { AdvancedAutomationBuilder } from '@/components/automations/advanced/AdvancedAutomationBuilder';
+import { useAutomations } from '@/hooks/useAutomations';
 
 const Automations = () => {
   const { activeWorkspace } = useWorkspace();
@@ -14,6 +15,7 @@ const Automations = () => {
     scopeId: null,
     searchTerm: '',
   });
+  const { data: automations = [] } = useAutomations(activeWorkspace?.id);
 
   if (!activeWorkspace) {
     return (
@@ -84,6 +86,7 @@ const Automations = () => {
         workspaceId={activeWorkspace.id}
         filters={filters}
         onChange={setFilters}
+        automations={automations}
       />
 
       {/* Automations List */}

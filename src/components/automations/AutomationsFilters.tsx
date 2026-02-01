@@ -1,9 +1,11 @@
+import { useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useFoldersForWorkspace } from '@/hooks/useFolders';
 import { useListsForWorkspace } from '@/hooks/useLists';
+import type { Automation } from '@/hooks/useAutomations';
 
 export interface AutomationsFilterState {
   scopeType: 'all' | 'space' | 'folder' | 'list';
@@ -15,12 +17,34 @@ interface AutomationsFiltersProps {
   workspaceId: string;
   filters: AutomationsFilterState;
   onChange: (filters: AutomationsFilterState) => void;
+  automations?: Automation[];
 }
 
-export function AutomationsFilters({ workspaceId, filters, onChange }: AutomationsFiltersProps) {
+export function AutomationsFilters({ workspaceId, filters, onChange, automations = [] }: AutomationsFiltersProps) {
   const { data: spaces = [] } = useSpaces(workspaceId);
   const { data: folders = [] } = useFoldersForWorkspace(workspaceId);
   const { data: lists = [] } = useListsForWorkspace(workspaceId);
+
+  // Extract unique scope IDs from automations by type
+  const automationScopeIds = useMemo(() => {
+    const spaceIds = new Set<string>();
+    const folderIds = new Set<string>();
+    const listIds = new Set<string>();
+
+    automations.forEach(auto => {
+      if (auto.scope_id) {
+        if (auto.scope_type === 'space') spaceIds.add(auto.scope_id);
+        if (auto.scope_type === 'folder') folderIds.add(auto.scope_id);
+        if (auto.scope_type === 'list') listIds.add(auto.scope_id);
+      }
+    });
+
+    return {
+      spaces: Array.from(spaceIds),
+      folders: Array.from(folderIds),
+      lists: Array.from(listIds),
+    };
+  }, [automations]);
 
   const handleScopeTypeChange = (value: string) => {
     onChange({
@@ -47,11 +71,17 @@ export function AutomationsFilters({ workspaceId, filters, onChange }: Automatio
   const getItemsForScope = () => {
     switch (filters.scopeType) {
       case 'space':
-        return spaces.map(s => ({ id: s.id, name: s.name }));
+        return spaces
+          .filter(s => automationScopeIds.spaces.includes(s.id))
+          .map(s => ({ id: s.id, name: s.name }));
       case 'folder':
-        return folders.map(f => ({ id: f.id, name: f.name }));
+        return folders
+          .filter(f => automationScopeIds.folders.includes(f.id))
+          .map(f => ({ id: f.id, name: f.name }));
       case 'list':
-        return lists.map(l => ({ id: l.id, name: l.name }));
+        return lists
+          .filter(l => automationScopeIds.lists.includes(l.id))
+          .map(l => ({ id: l.id, name: l.name }));
       default:
         return [];
     }
