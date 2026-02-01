@@ -3,6 +3,8 @@ import { AutomationCard } from './AutomationCard';
 import { useAutomations } from '@/hooks/useAutomations';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Zap } from 'lucide-react';
+import { useListsForWorkspace } from '@/hooks/useLists';
+import { useFoldersForWorkspace } from '@/hooks/useFolders';
 import type { AutomationsFilterState } from './AutomationsFilters';
 
 interface AutomationsListProps {
@@ -12,17 +14,63 @@ interface AutomationsListProps {
 
 export function AutomationsList({ workspaceId, filters }: AutomationsListProps) {
   const { data: automations, isLoading } = useAutomations(workspaceId);
+  const { data: lists = [] } = useListsForWorkspace(workspaceId);
+  const { data: folders = [] } = useFoldersForWorkspace(workspaceId);
 
   const filteredAutomations = useMemo(() => {
     if (!automations) return [];
 
     return automations.filter((automation) => {
-      // Filter by scope type
-      if (filters?.scopeType && filters.scopeType !== 'all') {
-        if (automation.scope_type !== filters.scopeType) return false;
+      // Hierarchical filter by Space
+      if (filters?.scopeType === 'space') {
+        if (!filters.scopeId) {
+          // "All Spaces" - show all automations
+          return true;
+        }
 
-        // Filter by specific item
-        if (filters.scopeId && automation.scope_id !== filters.scopeId) return false;
+        // Check hierarchy: automation belongs to list/folder/space within selected Space
+        if (automation.scope_type === 'list') {
+          const list = lists.find(l => l.id === automation.scope_id);
+          if (list?.space_id !== filters.scopeId) return false;
+        } else if (automation.scope_type === 'folder') {
+          const folder = folders.find(f => f.id === automation.scope_id);
+          if (folder?.space_id !== filters.scopeId) return false;
+        } else if (automation.scope_type === 'space') {
+          if (automation.scope_id !== filters.scopeId) return false;
+        }
+      }
+
+      // Hierarchical filter by Folder
+      if (filters?.scopeType === 'folder') {
+        if (!filters.scopeId) {
+          // "All Folders" - show automations that belong to any folder
+          if (automation.scope_type === 'list') {
+            const list = lists.find(l => l.id === automation.scope_id);
+            if (!list?.folder_id) return false;
+          } else if (automation.scope_type !== 'folder') {
+            return false;
+          }
+          return true;
+        }
+
+        // Check hierarchy: automation belongs to list within selected Folder
+        if (automation.scope_type === 'list') {
+          const list = lists.find(l => l.id === automation.scope_id);
+          if (list?.folder_id !== filters.scopeId) return false;
+        } else if (automation.scope_type === 'folder') {
+          if (automation.scope_id !== filters.scopeId) return false;
+        } else {
+          return false; // Space automations don't belong to folders
+        }
+      }
+
+      // Direct filter by List
+      if (filters?.scopeType === 'list') {
+        if (!filters.scopeId) {
+          // "All Lists" - show only list automations
+          return automation.scope_type === 'list';
+        }
+        if (automation.scope_id !== filters.scopeId) return false;
       }
 
       // Filter by search term
@@ -34,7 +82,7 @@ export function AutomationsList({ workspaceId, filters }: AutomationsListProps) 
 
       return true;
     });
-  }, [automations, filters]);
+  }, [automations, filters, lists, folders]);
 
   if (isLoading) {
     return (

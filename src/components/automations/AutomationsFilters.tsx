@@ -25,25 +25,55 @@ export function AutomationsFilters({ workspaceId, filters, onChange, automations
   const { data: folders = [] } = useFoldersForWorkspace(workspaceId);
   const { data: lists = [] } = useListsForWorkspace(workspaceId);
 
-  // Extract unique scope IDs from automations by type
-  const automationScopeIds = useMemo(() => {
+  // Extract Spaces that CONTAIN automations (via hierarchy)
+  const spacesWithAutomations = useMemo(() => {
     const spaceIds = new Set<string>();
-    const folderIds = new Set<string>();
-    const listIds = new Set<string>();
 
     automations.forEach(auto => {
-      if (auto.scope_id) {
-        if (auto.scope_type === 'space') spaceIds.add(auto.scope_id);
-        if (auto.scope_type === 'folder') folderIds.add(auto.scope_id);
-        if (auto.scope_type === 'list') listIds.add(auto.scope_id);
+      if (auto.scope_type === 'list' && auto.scope_id) {
+        const list = lists.find(l => l.id === auto.scope_id);
+        if (list?.space_id) spaceIds.add(list.space_id);
+      }
+      if (auto.scope_type === 'folder' && auto.scope_id) {
+        const folder = folders.find(f => f.id === auto.scope_id);
+        if (folder?.space_id) spaceIds.add(folder.space_id);
+      }
+      if (auto.scope_type === 'space' && auto.scope_id) {
+        spaceIds.add(auto.scope_id);
       }
     });
 
-    return {
-      spaces: Array.from(spaceIds),
-      folders: Array.from(folderIds),
-      lists: Array.from(listIds),
-    };
+    return Array.from(spaceIds);
+  }, [automations, lists, folders]);
+
+  // Extract Folders that CONTAIN automations (via hierarchy)
+  const foldersWithAutomations = useMemo(() => {
+    const folderIds = new Set<string>();
+
+    automations.forEach(auto => {
+      if (auto.scope_type === 'list' && auto.scope_id) {
+        const list = lists.find(l => l.id === auto.scope_id);
+        if (list?.folder_id) folderIds.add(list.folder_id);
+      }
+      if (auto.scope_type === 'folder' && auto.scope_id) {
+        folderIds.add(auto.scope_id);
+      }
+    });
+
+    return Array.from(folderIds);
+  }, [automations, lists]);
+
+  // Extract Lists that have automations directly
+  const listsWithAutomations = useMemo(() => {
+    const listIds = new Set<string>();
+
+    automations.forEach(auto => {
+      if (auto.scope_type === 'list' && auto.scope_id) {
+        listIds.add(auto.scope_id);
+      }
+    });
+
+    return Array.from(listIds);
   }, [automations]);
 
   const handleScopeTypeChange = (value: string) => {
@@ -72,15 +102,15 @@ export function AutomationsFilters({ workspaceId, filters, onChange, automations
     switch (filters.scopeType) {
       case 'space':
         return spaces
-          .filter(s => automationScopeIds.spaces.includes(s.id))
+          .filter(s => spacesWithAutomations.includes(s.id))
           .map(s => ({ id: s.id, name: s.name }));
       case 'folder':
         return folders
-          .filter(f => automationScopeIds.folders.includes(f.id))
+          .filter(f => foldersWithAutomations.includes(f.id))
           .map(f => ({ id: f.id, name: f.name }));
       case 'list':
         return lists
-          .filter(l => automationScopeIds.lists.includes(l.id))
+          .filter(l => listsWithAutomations.includes(l.id))
           .map(l => ({ id: l.id, name: l.name }));
       default:
         return [];
