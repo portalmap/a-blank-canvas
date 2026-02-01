@@ -258,6 +258,14 @@ export const ActionConfigForm = ({
         );
 
       case 'users':
+        // Backward compatibility: convert legacy user_id (string) to user_ids (array)
+        const legacyFieldName = field.name === 'user_ids' ? 'user_id' : undefined;
+        const currentValue = config[field.name];
+        const legacyValue = legacyFieldName ? config[legacyFieldName] : undefined;
+        
+        // Use new array field if available, otherwise convert legacy single value to array
+        const selectedUserIds = currentValue || (legacyValue ? [legacyValue] : []);
+        
         return (
           <UserMultiSelect
             key={field.name}
@@ -267,7 +275,7 @@ export const ActionConfigForm = ({
               full_name: m.profile?.full_name || null,
               avatar_url: m.profile?.avatar_url || null
             })) || []}
-            selectedIds={config[field.name] || []}
+            selectedIds={selectedUserIds}
             onSelectionChange={(ids) => handleFieldChange(field.name, ids)}
             required={field.required}
           />
