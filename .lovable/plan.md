@@ -1,136 +1,120 @@
 
 
-## Plano: Adicionar Filtros na Página de Automações
+## Plano: Filtrar por Itens que Possuem Automações
 
-### Objetivo
+### Problema Identificado
 
-Implementar um sistema de filtros na página de Automações que permita ao usuário filtrar por:
-- **Escopo**: Todas as Automações, Spaces, Pastas ou Listas
-- **Seleção específica**: Ao selecionar um tipo de escopo, poder escolher um item específico ou "todos"
-- **Nome da Automação**: Busca textual pelo nome/descrição
+O filtro atual busca **todos** os Spaces, Pastas e Listas do workspace usando os hooks `useSpaces`, `useFoldersForWorkspace` e `useListsForWorkspace`. 
 
----
-
-### Componentes a Criar/Modificar
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/automations/AutomationsFilters.tsx` | **CRIAR** - Novo componente de filtros |
-| `src/pages/Automations.tsx` | **MODIFICAR** - Adicionar estado de filtros e passar para a lista |
-| `src/components/automations/AutomationsList.tsx` | **MODIFICAR** - Receber filtros e aplicar filtragem |
+O correto é mostrar **apenas** os itens que já possuem automações associadas, extraindo esses dados diretamente da lista de automações.
 
 ---
 
-### Design da Interface
+### Solução
 
-A barra de filtros ficará acima da lista de automações com:
+Modificar o `AutomationsFilters.tsx` para:
+1. Receber a lista de automações como prop
+2. Extrair os IDs únicos de `scope_id` agrupados por `scope_type`
+3. Buscar os nomes apenas dos itens que possuem automações
+4. Exibir no dropdown apenas esses itens
 
-1. **Select de Escopo**: Dropdown com opções:
-   - Todos (padrão)
-   - Spaces
-   - Pastas
-   - Listas
+---
 
-2. **Select Condicional de Item**: Aparece quando um escopo específico é selecionado:
-   - Se "Spaces" → mostra lista de Spaces do workspace
-   - Se "Pastas" → mostra lista de Pastas do workspace
-   - Se "Listas" → mostra lista de Listas do workspace
-   - Cada um tem opção "Todos" para ver todos daquele tipo
+### Arquivos a Modificar
 
-3. **Campo de Busca por Nome**: Input de texto para filtrar pelo nome/descrição da automação
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/automations/AutomationsFilters.tsx` | Receber automations e filtrar itens |
+| `src/pages/Automations.tsx` | Passar automations para o filtro |
 
 ---
 
 ### Seção Técnica
 
-#### Interface de Filtros
+#### Lógica de Extração
 
 ```typescript
-interface AutomationsFilterState {
-  scopeType: 'all' | 'space' | 'folder' | 'list';
-  scopeId: string | null;   // null = todos do tipo
-  searchTerm: string;
-}
+// Extrair IDs únicos de automações por tipo de escopo
+const automationScopeIds = useMemo(() => {
+  if (!automations) return { spaces: [], folders: [], lists: [] };
+  
+  const spaces = new Set<string>();
+  const folders = new Set<string>();
+  const lists = new Set<string>();
+  
+  automations.forEach(auto => {
+    if (auto.scope_id) {
+      if (auto.scope_type === 'space') spaces.add(auto.scope_id);
+      if (auto.scope_type === 'folder') folders.add(auto.scope_id);
+      if (auto.scope_type === 'list') lists.add(auto.scope_id);
+    }
+  });
+  
+  return {
+    spaces: Array.from(spaces),
+    folders: Array.from(folders),
+    lists: Array.from(lists),
+  };
+}, [automations]);
 ```
 
-#### Componente AutomationsFilters
+#### Filtragem dos Itens
 
 ```typescript
-// src/components/automations/AutomationsFilters.tsx
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { useSpaces } from '@/hooks/useSpaces';
-import { useFoldersForWorkspace } from '@/hooks/useFolders';
-import { useListsForWorkspace } from '@/hooks/useLists';
+// Filtrar apenas itens que possuem automações
+const getItemsForScope = () => {
+  switch (filters.scopeType) {
+    case 'space':
+      return spaces
+        .filter(s => automationScopeIds.spaces.includes(s.id))
+        .map(s => ({ id: s.id, name: s.name }));
+    case 'folder':
+      return folders
+        .filter(f => automationScopeIds.folders.includes(f.id))
+        .map(f => ({ id: f.id, name: f.name }));
+    case 'list':
+      return lists
+        .filter(l => automationScopeIds.lists.includes(l.id))
+        .map(l => ({ id: l.id, name: l.name }));
+    default:
+      return [];
+  }
+};
+```
 
+#### Interface Atualizada
+
+```typescript
 interface AutomationsFiltersProps {
   workspaceId: string;
   filters: AutomationsFilterState;
   onChange: (filters: AutomationsFilterState) => void;
+  automations?: Automation[];  // Nova prop
 }
-
-export function AutomationsFilters({ workspaceId, filters, onChange }: AutomationsFiltersProps) {
-  const { data: spaces = [] } = useSpaces(workspaceId);
-  const { data: folders = [] } = useFoldersForWorkspace(workspaceId);
-  const { data: lists = [] } = useListsForWorkspace(workspaceId);
-  
-  // Lógica para mostrar select condicional de item
-  // ...
-}
-```
-
-#### Lógica de Filtragem no AutomationsList
-
-```typescript
-const filteredAutomations = useMemo(() => {
-  if (!automations) return [];
-  
-  return automations.filter(automation => {
-    // Filtro por tipo de escopo
-    if (filters.scopeType !== 'all') {
-      if (automation.scope_type !== filters.scopeType) return false;
-      
-      // Filtro por item específico
-      if (filters.scopeId && automation.scope_id !== filters.scopeId) return false;
-    }
-    
-    // Filtro por nome/descrição
-    if (filters.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
-      const description = automation.description?.toLowerCase() || '';
-      if (!description.includes(searchLower)) return false;
-    }
-    
-    return true;
-  });
-}, [automations, filters]);
 ```
 
 ---
 
-### Fluxo de Dados
+### Fluxo Atualizado
 
 ```text
 Automations.tsx
-├── Estado: filters (scopeType, scopeId, searchTerm)
-├── AutomationsFilters (workspaceId, filters, onChange)
-│   ├── Busca Spaces, Folders, Lists do workspace
-│   └── Atualiza estado ao selecionar filtros
-└── AutomationsList (workspaceId, filters)
-    └── Filtra automations localmente baseado nos filtros
+├── useAutomations(workspaceId) → automations
+├── AutomationsFilters
+│   ├── Recebe: automations
+│   ├── Extrai scope_ids únicos por tipo
+│   ├── Busca nomes dos itens (spaces, folders, lists)
+│   └── Filtra dropdown para mostrar apenas itens com automações
+└── AutomationsList
+    └── Aplica filtros na lista
 ```
 
 ---
 
 ### Resultado Esperado
 
-1. **Por padrão**: Mostra "Todas as Automações" sem filtros
-2. **Ao selecionar "Spaces"**: 
-   - Mostra segundo select com todos os Spaces + opção "Todos os Spaces"
-   - Filtra para mostrar apenas automações com `scope_type === 'space'`
-3. **Ao selecionar um Space específico**:
-   - Filtra para mostrar apenas automações daquele Space específico
-4. **Busca por nome**:
-   - Filtra em tempo real pelo texto da descrição da automação
-5. **Contador atualizado**: "Todas as Automações (X)" mostra o total filtrado
+1. **Ao selecionar "Spaces"**: Mostra apenas Spaces que possuem automações
+2. **Ao selecionar "Pastas"**: Mostra apenas Pastas que possuem automações
+3. **Ao selecionar "Listas"**: Mostra apenas Listas que possuem automações
+4. **Se não houver automações de um tipo**: Não mostra itens no dropdown (ou mostra mensagem)
 
