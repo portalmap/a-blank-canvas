@@ -99,12 +99,9 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
     locale: ptBR 
   });
 
-  // Find the related comment for assignment activities
+  // Find the related comment for assignment activities using comment_id
   const relatedComment = activity.activity_type === 'assignment.created' && comments
-    ? comments.find(c => 
-        c.assignee_id === activity.metadata?.assignee_id &&
-        c.content === activity.metadata?.content
-      )
+    ? comments.find(c => c.id === activity.metadata?.comment_id)
     : null;
 
   const isResolved = relatedComment?.resolved_at != null;
