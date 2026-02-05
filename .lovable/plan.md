@@ -1,65 +1,71 @@
 
-# Correção: Resolver Atribuição pela Atividade da Tarefa
+# Correção: Filtro "Mostrar tarefas concluídas" não funciona
 
 ## Problema Identificado
 
-Quando você clica em "Resolver" na atividade dentro de uma tarefa, o sistema busca o comentário por **conteúdo** (`content`) e **assignee_id**. Se o comentário foi editado, essa busca falha e a resolução não acontece.
+O filtro "Mostrar tarefas concluídas" existe na interface, mas **não está sendo aplicado** na filtragem de tarefas no card "Atribuídas a mim".
 
-O card "Comentários atribuídos" na Home não é atualizado porque a resolução nunca acontece de verdade.
+O `filteredTasks` em `MyTasksCard.tsx` aplica filtros de:
+- Busca (searchTerm)
+- Status (filters.statuses)
+- Prioridade (filters.priorities)
 
-## Causa Raiz
+Mas **ignora** o `filters.showCompleted`.
 
-```typescript
-// Busca frágil - falha se conteúdo foi editado
-const relatedComment = comments.find(c => 
-  c.assignee_id === activity.metadata?.assignee_id &&
-  c.content === activity.metadata?.content  // ❌ Pode não bater
-)
-```
+## Lógica Esperada
+
+- `showCompleted = false` (padrão): Ocultar tarefas concluídas
+- `showCompleted = true`: Mostrar todas as tarefas
 
 ## Solução
 
-Usar o `comment_id` que já está salvo nos metadados da atividade:
+Adicionar verificação do `showCompleted` no `filteredTasks` em `MyTasksCard.tsx`:
 
 ```typescript
-// Busca robusta - usa o ID direto
-const relatedComment = comments.find(c => 
-  c.id === activity.metadata?.comment_id  // ✅ Sempre funciona
-)
+const filteredTasks = useMemo(() => {
+  return tasks.filter((task) => {
+    // Filtro de tarefas concluídas
+    if (!filters.showCompleted && task.status?.category === 'done') {
+      return false;
+    }
+    
+    // Search filter
+    if (searchTerm && !task.title.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
+    }
+    
+    // Status filter
+    if (filters.statuses.length > 0 && task.status) {
+      if (!filters.statuses.includes(task.status.id)) return false;
+    }
+    
+    // Priority filter
+    if (filters.priorities.length > 0) {
+      if (!filters.priorities.includes(task.priority)) return false;
+    }
+    
+    return true;
+  });
+}, [tasks, searchTerm, filters]);
 ```
 
-## Alterações
+## Detalhes Técnicos
 
-### Arquivo: `src/components/tasks/TaskActivityItem.tsx`
+### Problema: O hook não retorna `category` do status
 
-Atualizar a lógica de busca do comentário relacionado (linhas 102-108):
+O `useMyAssignedTasks` busca apenas `id`, `name`, `color` do status. Preciso adicionar `category` para identificar tarefas concluídas.
 
-**Antes:**
-```typescript
-const relatedComment = activity.activity_type === 'assignment.created' && comments
-  ? comments.find(c => 
-      c.assignee_id === activity.metadata?.assignee_id &&
-      c.content === activity.metadata?.content
-    )
-  : null;
-```
+### Alterações Necessárias
 
-**Depois:**
-```typescript
-const relatedComment = activity.activity_type === 'assignment.created' && comments
-  ? comments.find(c => c.id === activity.metadata?.comment_id)
-  : null;
-```
+1. **`src/hooks/useMyAssignedTasks.ts`**
+   - Incluir `category` na query do status
+   - Atualizar interface `MyAssignedTask` para incluir `category`
+
+2. **`src/components/home/MyTasksCard.tsx`**
+   - Adicionar filtro `showCompleted` no `filteredTasks`
+   - Verificar `task.status?.category === 'done'` para identificar concluídas
 
 ## Resultado Esperado
 
-1. Clicar em "Resolver" na atividade da tarefa atualiza o banco corretamente
-2. O card "Comentários atribuídos" na Home é atualizado automaticamente (a invalidação já existe no hook)
-3. Funciona mesmo se o comentário foi editado
-
-## Escopo Técnico
-
-- **1 arquivo modificado**: `TaskActivityItem.tsx`
-- **1 linha alterada**: a busca do `relatedComment`
-- **Sem mudanças no banco de dados**
-- **Sem novos componentes**
+- Com "Mostrar tarefas concluídas" desmarcado: tarefas com status categoria "done" são ocultadas
+- Com "Mostrar tarefas concluídas" marcado: todas as tarefas aparecem
