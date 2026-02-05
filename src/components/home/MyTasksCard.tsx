@@ -72,6 +72,11 @@ export function MyTasksCard() {
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
+      // Filtro de tarefas concluídas
+      if (!filters.showCompleted && task.status?.category === 'done') {
+        return false;
+      }
+      
       // Search filter
       if (searchTerm && !task.title.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false;
