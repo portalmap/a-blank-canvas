@@ -13,6 +13,7 @@ export interface MyAssignedTask {
     id: string;
     name: string;
     color: string;
+    category: string | null;
   } | null;
   list: {
     id: string;
@@ -53,7 +54,8 @@ export const useMyAssignedTasks = () => {
           statuses:status_id (
             id,
             name,
-            color
+            color,
+            category
           ),
           lists:list_id (
             id,
