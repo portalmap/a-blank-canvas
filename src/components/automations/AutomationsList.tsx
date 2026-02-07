@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Zap } from 'lucide-react';
 import { useListsForWorkspace } from '@/hooks/useLists';
 import { useFoldersForWorkspace } from '@/hooks/useFolders';
+import { useSpaces } from '@/hooks/useSpaces';
 import type { AutomationsFilterState } from './AutomationsFilters';
 
 interface AutomationsListProps {
@@ -16,6 +17,7 @@ export function AutomationsList({ workspaceId, filters }: AutomationsListProps) 
   const { data: automations, isLoading } = useAutomations(workspaceId);
   const { data: lists = [] } = useListsForWorkspace(workspaceId);
   const { data: folders = [] } = useFoldersForWorkspace(workspaceId);
+  const { data: spaces = [] } = useSpaces(workspaceId);
 
   const filteredAutomations = useMemo(() => {
     if (!automations) return [];
@@ -132,7 +134,7 @@ export function AutomationsList({ workspaceId, filters }: AutomationsListProps) 
       </h3>
       <div className="space-y-2">
         {filteredAutomations.map((automation) => (
-          <AutomationCard key={automation.id} automation={automation} />
+          <AutomationCard key={automation.id} automation={automation} spaces={spaces} lists={lists} folders={folders} />
         ))}
       </div>
     </div>
