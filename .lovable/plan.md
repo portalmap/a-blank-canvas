@@ -1,60 +1,88 @@
 
 
-# Remover criacao de conta e adicionar logo MAP na pagina de login
+# Adicionar "Esqueci minha senha" na tela de login
 
-## Resumo
+## Objetivo
 
-Duas alteracoes na pagina de autenticacao (`/auth`):
+Adicionar um link "Esqueci minha senha" na tela de login que permite ao usuario solicitar um e-mail de redefinicao de senha.
 
-1. **Remover a aba "Criar conta"** -- somente o formulario de login ficara disponivel
-2. **Substituir o icone "M" pela logo da MAP** enviada pelo usuario
+## Como vai funcionar
+
+1. O usuario clica em "Esqueci minha senha" abaixo do campo de senha
+2. Aparece um formulario simples pedindo apenas o e-mail
+3. Ao enviar, o sistema dispara um e-mail de reset via autenticacao integrada (`supabase.auth.resetPasswordForEmail`)
+4. O usuario recebe um link no e-mail que o redireciona para uma pagina de redefinicao de senha
+5. Na pagina de redefinicao, o usuario digita a nova senha e confirma
 
 ## Alteracoes
 
-### 1. Copiar a logo para o projeto
+### 1. `src/contexts/AuthContext.tsx`
 
-- Copiar o arquivo `user-uploads://logo_sem_fundo_cortado.png` para `src/assets/map-logo.png`
+- Adicionar a funcao `resetPassword(email: string)` ao contexto de autenticacao
+- Usar `supabase.auth.resetPasswordForEmail(email, { redirectTo })` para enviar o e-mail
+- O `redirectTo` vai apontar para `/auth/reset-password` (nova rota)
+- Atualizar a interface `AuthContextType` para incluir `resetPassword`
 
 ### 2. `src/pages/Auth.tsx`
 
-**Remover a criacao de conta:**
-- Remover o componente `Tabs`, `TabsList`, `TabsTrigger` e `TabsContent`
-- Manter apenas o formulario de login (email + senha + botao "Entrar")
-- Remover a funcao `handleSignUp` e a referencia a `signUp` do `useAuth`
-- Atualizar a descricao do card de "Entre ou crie uma conta para comecar" para "Entre com sua conta para continuar"
+- Adicionar um estado `forgotPassword` para alternar entre o formulario de login e o de recuperacao
+- No modo "Esqueci minha senha":
+  - Exibir apenas o campo de e-mail e botao "Enviar link de redefinicao"
+  - Botao "Voltar ao login" para retornar ao formulario normal
+- Adicionar o link "Esqueci minha senha" logo abaixo do campo de senha, alinhado a direita
 
-**Substituir a logo:**
-- Remover o bloco `<div className="bg-primary rounded-lg p-3">` com a letra "M"
-- Importar a imagem da logo: `import mapLogo from "@/assets/map-logo.png"`
-- Renderizar `<img src={mapLogo} alt="MAP Flow" className="h-16 w-16" />` no lugar
+### 3. Nova pagina: `src/pages/ResetPassword.tsx`
 
-**Resultado visual esperado:**
+- Pagina acessada via link do e-mail de reset
+- Formulario com:
+  - Campo "Nova senha"
+  - Campo "Confirmar nova senha"
+  - Botao de mostrar/ocultar senha
+  - Botao "Redefinir senha"
+- Usa `supabase.auth.updateUser({ password })` para atualizar a senha
+- Apos sucesso, redireciona para `/auth` com mensagem de sucesso
 
+### 4. `src/App.tsx`
+
+- Adicionar a rota `/auth/reset-password` apontando para `ResetPassword`
+- Essa rota fica fora do `ProtectedRoute` (usuario nao esta logado)
+
+## Fluxo do usuario
+
+```text
+Tela de Login                E-mail                    Redefinir Senha
++-------------------+       +-----------------+       +-------------------+
+| Email             |       | Ola!            |       | Nova senha        |
+| [___________]     |       |                 |       | [___________]     |
+| Senha             |       | Clique aqui     |       | Confirmar senha   |
+| [___________]     |       | para redefinir  |       | [___________]     |
+| Esqueci minha     |       | sua senha.      |       |                   |
+|    senha  <--click-+-----> |                 +-----> | [Redefinir Senha] |
+|                   |       +-----------------+       +-------------------+
+| [   Entrar   ]    |                                        |
++-------------------+                                        v
+                                                      Redireciona para
+                                                      tela de login
 ```
-     [Logo MAP - circulo preto + seta laranja]
-              MAP Flow
-     Gerencie projetos com eficiencia
 
-     +-----------------------------+
-     | Bem-vindo                   |
-     | Entre com sua conta         |
-     |                             |
-     | Email                       |
-     | [________________]          |
-     |                             |
-     | Senha                       |
-     | [________________]          |
-     |                             |
-     | [      Entrar      ]        |
-     +-----------------------------+
+## Detalhes tecnicos
+
+### Funcao de reset no AuthContext:
+```typescript
+const resetPassword = async (email: string) => {
+  const redirectUrl = `${window.location.origin}/auth/reset-password`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectUrl,
+  });
+  // tratamento de erro e toast de sucesso
+};
 ```
 
-### Importacoes removidas
+### Pagina ResetPassword:
+- Detecta a sessao via `onAuthStateChange` com evento `PASSWORD_RECOVERY`
+- Usa `supabase.auth.updateUser({ password })` para salvar a nova senha
 
-- `Tabs`, `TabsContent`, `TabsList`, `TabsTrigger` de `@/components/ui/tabs`
-- `CheckSquare` de `lucide-react` (ja nao era usada no JSX)
+### Nenhuma alteracao de banco de dados necessaria
 
-### Nenhuma alteracao de banco de dados
-
-A funcionalidade de signup continua existindo no `AuthContext` (via `signUp`), pois pode ser utilizada em outros fluxos (ex: convites). Apenas a interface publica de criacao de conta e removida.
+O fluxo de reset de senha e nativo da autenticacao integrada, nao requer tabelas ou funcoes adicionais.
 
