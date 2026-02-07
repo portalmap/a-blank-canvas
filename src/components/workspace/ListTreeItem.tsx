@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { List, Plus, MoreHorizontal, Trash2, Pencil, Link, Move, Copy, Archive } from "lucide-react";
+import { List, Plus, MoreHorizontal, Trash2, Pencil, Link, Move, Copy, Archive, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useStatuses } from "@/hooks/useStatuses";
@@ -125,6 +125,10 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
             <DropdownMenuItem onClick={() => setIsTaskDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Tarefa
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/automations?scopeType=list&scopeId=${list.id}`)}>
+              <Zap className="mr-2 h-4 w-4" />
+              Ver Automações
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => {

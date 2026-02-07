@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronRight, Folder, MoreHorizontal, List, Trash2, Pencil, Link, Move, Copy, Archive, ListPlus } from "lucide-react";
+import { ChevronRight, Folder, MoreHorizontal, List, Trash2, Pencil, Link, Move, Copy, Archive, ListPlus, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useLists, useCreateList } from "@/hooks/useLists";
 import { useDeleteFolder, useUpdateFolder } from "@/hooks/useFolders";
 import { useDuplicateFolder } from "@/hooks/useDuplicate";
@@ -53,6 +54,7 @@ interface FolderTreeItemProps {
 }
 
 export function FolderTreeItem({ folder }: FolderTreeItemProps) {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const { activeWorkspace } = useWorkspace();
   const { data: lists } = useLists({ folderId: folder.id });
@@ -131,6 +133,10 @@ export function FolderTreeItem({ folder }: FolderTreeItemProps) {
               <DropdownMenuItem onClick={() => setIsListDialogOpen(true)}>
                 <ListPlus className="mr-2 h-4 w-4" />
                 Nova Lista
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/automations?scopeType=folder&scopeId=${folder.id}`)}>
+                <Zap className="mr-2 h-4 w-4" />
+                Ver Automações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => {
