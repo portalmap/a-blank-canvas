@@ -1,79 +1,60 @@
 
 
-# Adicionar "Ver Automacoes" no menu de contexto do Space, Pasta e Lista
+# Remover criacao de conta e adicionar logo MAP na pagina de login
 
-## Objetivo
+## Resumo
 
-Permitir acessar rapidamente a pagina de Automacoes ja filtrada pelo item selecionado (Space, Pasta ou Lista) diretamente pelo menu de contexto na sidebar.
+Duas alteracoes na pagina de autenticacao (`/auth`):
 
-## Como vai funcionar
-
-1. Ao clicar com botao direito (ou no icone "...") em um Space, Pasta ou Lista, aparece uma nova opcao **"Ver Automacoes"** com icone de raio (Zap)
-2. Ao clicar, o usuario e redirecionado para `/automations?scopeType=space&scopeId=abc123`
-3. A pagina de Automacoes le os parametros da URL e ja inicia com os filtros aplicados
+1. **Remover a aba "Criar conta"** -- somente o formulario de login ficara disponivel
+2. **Substituir o icone "M" pela logo da MAP** enviada pelo usuario
 
 ## Alteracoes
 
-### 1. `src/pages/Automations.tsx`
+### 1. Copiar a logo para o projeto
 
-- Importar `useSearchParams` do `react-router-dom`
-- Na inicializacao do state `filters`, verificar se existem query params `scopeType` e `scopeId` na URL
-- Se existirem, usar esses valores como estado inicial dos filtros em vez do padrao `{ scopeType: 'all', scopeId: null }`
+- Copiar o arquivo `user-uploads://logo_sem_fundo_cortado.png` para `src/assets/map-logo.png`
 
-### 2. `src/components/workspace/SpaceTreeItem.tsx`
+### 2. `src/pages/Auth.tsx`
 
-- Importar `useNavigate` e o icone `Zap`
-- Adicionar um novo `DropdownMenuItem` chamado **"Ver Automacoes"** no menu de contexto
-- Ao clicar, navegar para `/automations?scopeType=space&scopeId={space.id}`
-- Posicionar o item apos "Nova Lista" e antes do separador
+**Remover a criacao de conta:**
+- Remover o componente `Tabs`, `TabsList`, `TabsTrigger` e `TabsContent`
+- Manter apenas o formulario de login (email + senha + botao "Entrar")
+- Remover a funcao `handleSignUp` e a referencia a `signUp` do `useAuth`
+- Atualizar a descricao do card de "Entre ou crie uma conta para comecar" para "Entre com sua conta para continuar"
 
-### 3. `src/components/workspace/FolderTreeItem.tsx`
+**Substituir a logo:**
+- Remover o bloco `<div className="bg-primary rounded-lg p-3">` com a letra "M"
+- Importar a imagem da logo: `import mapLogo from "@/assets/map-logo.png"`
+- Renderizar `<img src={mapLogo} alt="MAP Flow" className="h-16 w-16" />` no lugar
 
-- Importar `useNavigate` e o icone `Zap`
-- Adicionar um novo `DropdownMenuItem` chamado **"Ver Automacoes"** no menu de contexto
-- Ao clicar, navegar para `/automations?scopeType=folder&scopeId={folder.id}`
-- Posicionar o item apos "Nova Lista" e antes do separador
+**Resultado visual esperado:**
 
-### 4. `src/components/workspace/ListTreeItem.tsx`
+```
+     [Logo MAP - circulo preto + seta laranja]
+              MAP Flow
+     Gerencie projetos com eficiencia
 
-- Importar o icone `Zap` (ja tem `useNavigate`)
-- Adicionar um novo `DropdownMenuItem` chamado **"Ver Automacoes"** no menu de contexto
-- Ao clicar, navegar para `/automations?scopeType=list&scopeId={list.id}`
-- Posicionar o item apos "Nova Tarefa" e antes do separador
-
-## Fluxo do usuario
-
-```text
-Sidebar                          Pagina de Automacoes
-+------------------+             +-------------------------+
-| MAP | Accerth    |             |                         |
-|   [...]          |             | Filtro: [Spaces v]      |
-|   > Ver Autom.   | -- click -> | Item:  [Accerth v]      |
-|   > Renomear     |             | Automacoes filtradas... |
-+------------------+             +-------------------------+
+     +-----------------------------+
+     | Bem-vindo                   |
+     | Entre com sua conta         |
+     |                             |
+     | Email                       |
+     | [________________]          |
+     |                             |
+     | Senha                       |
+     | [________________]          |
+     |                             |
+     | [      Entrar      ]        |
+     +-----------------------------+
 ```
 
-## Detalhes tecnicos
+### Importacoes removidas
 
-A pagina de Automacoes passara a ler `searchParams` na inicializacao:
+- `Tabs`, `TabsContent`, `TabsList`, `TabsTrigger` de `@/components/ui/tabs`
+- `CheckSquare` de `lucide-react` (ja nao era usada no JSX)
 
-```typescript
-const [searchParams] = useSearchParams();
-const initialScopeType = searchParams.get('scopeType') || 'all';
-const initialScopeId = searchParams.get('scopeId') || null;
+### Nenhuma alteracao de banco de dados
 
-const [filters, setFilters] = useState<AutomationsFilterState>({
-  scopeType: initialScopeType as AutomationsFilterState['scopeType'],
-  scopeId: initialScopeId,
-  searchTerm: '',
-});
-```
-
-Nos tree items, a navegacao sera simples:
-
-```typescript
-navigate(`/automations?scopeType=space&scopeId=${space.id}`);
-```
-
-Nenhuma alteracao de banco de dados e necessaria.
+A funcionalidade de signup continua existindo no `AuthContext` (via `signUp`), pois pode ser utilizada em outros fluxos (ex: convites). Apenas a interface publica de criacao de conta e removida.
 
