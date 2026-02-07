@@ -1,4 +1,5 @@
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose, Layers, Sun, Moon } from 'lucide-react';
+import { useState } from 'react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useTheme } from 'next-themes';
 import mapLogoLight from '@/assets/map-logo-light.png';
@@ -22,6 +23,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { SpaceTreeItem } from '@/components/workspace/SpaceTreeItem';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUnreadChannels } from '@/hooks/useChatUnread';
 
 const homeNavItem = { title: 'Início', url: '/', icon: Home };
@@ -38,6 +40,7 @@ const modulesNavItems = [
 
 export function AppSidebar() {
   const { state, sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();
+  const [workspaceOpen, setWorkspaceOpen] = useState(true);
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const { signOut } = useAuth();
@@ -209,16 +212,19 @@ export function AppSidebar() {
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             {activeWorkspace ? (
-              <div className="space-y-1">
+              <Collapsible open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
                 <div className="flex items-center justify-between px-2 py-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Home className="h-4 w-4 flex-shrink-0" />
-                    {!isCollapsed && (
-                      <span className="font-medium text-sm truncate">
-                        {activeWorkspace.name}
-                      </span>
-                    )}
-                  </div>
+                  <CollapsibleTrigger asChild>
+                    <button className="flex items-center gap-2 min-w-0 hover:bg-sidebar-accent rounded p-1 flex-1">
+                      <ChevronRight className={`h-3 w-3 flex-shrink-0 transition-transform duration-200 ${workspaceOpen ? 'rotate-90' : ''}`} />
+                      <Home className="h-4 w-4 flex-shrink-0" />
+                      {!isCollapsed && (
+                        <span className="font-medium text-sm truncate">
+                          {activeWorkspace.name}
+                        </span>
+                      )}
+                    </button>
+                  </CollapsibleTrigger>
                   {!isCollapsed && (
                     <button
                       onClick={clearActiveWorkspace}
@@ -230,17 +236,19 @@ export function AppSidebar() {
                   )}
                 </div>
                 
-                {/* Spaces hierarchy */}
-                <div className="space-y-0.5">
-                  {spaces?.map(space => (
-                    <SpaceTreeItem 
-                      key={space.id} 
-                      space={space}
-                      isCollapsed={isCollapsed}
-                    />
-                  ))}
-                </div>
-              </div>
+                {/* Spaces hierarchy - collapsible */}
+                <CollapsibleContent>
+                  <div className="space-y-0.5">
+                    {spaces?.map(space => (
+                      <SpaceTreeItem 
+                        key={space.id} 
+                        space={space}
+                        isCollapsed={isCollapsed}
+                      />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             ) : (
               <SidebarMenu>
                 <SidebarMenuItem>
