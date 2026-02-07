@@ -1,71 +1,69 @@
 
-# Correção: Filtro "Mostrar tarefas concluídas" não funciona
+# Correção: Excluir automações ao deletar Space
 
-## Problema Identificado
+## Problema
 
-O filtro "Mostrar tarefas concluídas" existe na interface, mas **não está sendo aplicado** na filtragem de tarefas no card "Atribuídas a mim".
+A tabela `automations` usa um campo polimórfico `scope_id` que referencia Spaces, Folders ou Lists, mas **nao possui foreign key** para essas tabelas. Apenas tem FK para `workspaces` (com CASCADE).
 
-O `filteredTasks` em `MyTasksCard.tsx` aplica filtros de:
-- Busca (searchTerm)
-- Status (filters.statuses)
-- Prioridade (filters.priorities)
+Quando um Space e excluido:
+- Folders sao deletados (CASCADE via `folders_space_id_fkey`)
+- Lists sao deletadas (CASCADE via `lists_space_id_fkey`)
+- Automacoes **permanecem orfas** porque nao ha vinculo de CASCADE
 
-Mas **ignora** o `filters.showCompleted`.
+## Solucao
 
-## Lógica Esperada
+Criar **triggers de banco de dados** que limpam automaticamente as automacoes quando um Space, Folder ou List e excluido.
 
-- `showCompleted = false` (padrão): Ocultar tarefas concluídas
-- `showCompleted = true`: Mostrar todas as tarefas
+## Detalhes Tecnicos
 
-## Solução
+### Migracao SQL
 
-Adicionar verificação do `showCompleted` no `filteredTasks` em `MyTasksCard.tsx`:
+Criar uma funcao e tres triggers:
 
-```typescript
-const filteredTasks = useMemo(() => {
-  return tasks.filter((task) => {
-    // Filtro de tarefas concluídas
-    if (!filters.showCompleted && task.status?.category === 'done') {
-      return false;
-    }
-    
-    // Search filter
-    if (searchTerm && !task.title.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
-    
-    // Status filter
-    if (filters.statuses.length > 0 && task.status) {
-      if (!filters.statuses.includes(task.status.id)) return false;
-    }
-    
-    // Priority filter
-    if (filters.priorities.length > 0) {
-      if (!filters.priorities.includes(task.priority)) return false;
-    }
-    
-    return true;
-  });
-}, [tasks, searchTerm, filters]);
+```sql
+-- Funcao que deleta automacoes vinculadas ao registro excluido
+CREATE OR REPLACE FUNCTION delete_related_automations()
+RETURNS TRIGGER AS $$
+BEGIN
+  DELETE FROM automations
+  WHERE scope_id = OLD.id;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger na tabela spaces
+CREATE TRIGGER trigger_delete_space_automations
+  BEFORE DELETE ON spaces
+  FOR EACH ROW
+  EXECUTE FUNCTION delete_related_automations();
+
+-- Trigger na tabela folders
+CREATE TRIGGER trigger_delete_folder_automations
+  BEFORE DELETE ON folders
+  FOR EACH ROW
+  EXECUTE FUNCTION delete_related_automations();
+
+-- Trigger na tabela lists
+CREATE TRIGGER trigger_delete_list_automations
+  BEFORE DELETE ON lists
+  FOR EACH ROW
+  EXECUTE FUNCTION delete_related_automations();
 ```
 
-## Detalhes Técnicos
+### Por que triggers em vez de FK?
 
-### Problema: O hook não retorna `category` do status
+O campo `scope_id` e **polimorfico** -- pode apontar para `spaces`, `folders` ou `lists` dependendo do `scope_type`. Nao e possivel criar uma FK normal para multiplas tabelas. Triggers resolvem isso de forma limpa.
 
-O `useMyAssignedTasks` busca apenas `id`, `name`, `color` do status. Preciso adicionar `category` para identificar tarefas concluídas.
+### Fluxo ao excluir um Space
 
-### Alterações Necessárias
+1. Trigger no Space: deleta automacoes com `scope_id = space_id`
+2. CASCADE deleta Folders do Space
+3. Trigger em cada Folder: deleta automacoes com `scope_id = folder_id`
+4. CASCADE deleta Lists do Space
+5. Trigger em cada List: deleta automacoes com `scope_id = list_id`
 
-1. **`src/hooks/useMyAssignedTasks.ts`**
-   - Incluir `category` na query do status
-   - Atualizar interface `MyAssignedTask` para incluir `category`
+### Alteracoes
 
-2. **`src/components/home/MyTasksCard.tsx`**
-   - Adicionar filtro `showCompleted` no `filteredTasks`
-   - Verificar `task.status?.category === 'done'` para identificar concluídas
-
-## Resultado Esperado
-
-- Com "Mostrar tarefas concluídas" desmarcado: tarefas com status categoria "done" são ocultadas
-- Com "Mostrar tarefas concluídas" marcado: todas as tarefas aparecem
+- **1 migracao SQL**: criar funcao + 3 triggers
+- **0 arquivos de codigo modificados**: a logica e toda no banco de dados
+- O codigo do frontend (`useDeleteSpace`, `useAutomations`) nao precisa de nenhuma alteracao
