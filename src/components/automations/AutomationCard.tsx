@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,9 @@ import { DuplicateAutomationDialog } from './DuplicateAutomationDialog';
 
 interface AutomationCardProps {
   automation: Automation;
+  spaces?: Array<{ id: string; name: string; color?: string | null }>;
+  lists?: Array<{ id: string; space_id: string }>;
+  folders?: Array<{ id: string; space_id: string }>;
 }
 
 const getScopeIcon = (scope: AutomationScope) => {
@@ -32,9 +35,25 @@ const getScopeLabel = (scope: AutomationScope) => {
   }
 };
 
-export function AutomationCard({ automation }: AutomationCardProps) {
+export function AutomationCard({ automation, spaces = [], lists = [], folders = [] }: AutomationCardProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+
+  const resolvedSpace = useMemo(() => {
+    if (automation.scope_type === 'workspace') return null;
+    if (automation.scope_type === 'space') {
+      return spaces.find(s => s.id === automation.scope_id) || null;
+    }
+    if (automation.scope_type === 'folder') {
+      const folder = folders.find(f => f.id === automation.scope_id);
+      return folder ? spaces.find(s => s.id === folder.space_id) || null : null;
+    }
+    if (automation.scope_type === 'list') {
+      const list = lists.find(l => l.id === automation.scope_id);
+      return list ? spaces.find(s => s.id === list.space_id) || null : null;
+    }
+    return null;
+  }, [automation.scope_type, automation.scope_id, spaces, lists, folders]);
   const toggleAutomation = useToggleAutomation();
   const deleteAutomation = useDeleteAutomation();
 
@@ -85,6 +104,12 @@ export function AutomationCard({ automation }: AutomationCardProps) {
                   {getScopeIcon(automation.scope_type)}
                   {getScopeLabel(automation.scope_type)}
                 </Badge>
+                {resolvedSpace && (
+                  <Badge className="gap-1 text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+                    <LayoutGrid className="h-3 w-3" />
+                    {resolvedSpace.name}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
                 <span className="font-medium text-foreground/80">{trigger?.label || automation.trigger}</span>
