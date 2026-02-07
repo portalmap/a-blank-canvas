@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
-import mapLogo from '@/assets/map-logo.png';
+import { ThemeLogo } from '@/components/ThemeLogo';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -37,11 +38,15 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle variant="outline" />
+      </div>
+
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <img src={mapLogo} alt="MAP Flow" className="h-16 w-16" />
+            <ThemeLogo className="h-16 w-16 object-contain" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">MAP Flow</h1>
           <p className="text-muted-foreground">Gerencie projetos com eficiência</p>
