@@ -16,23 +16,34 @@ const ResetPassword = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [sessionTimedOut, setSessionTimedOut] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        setSessionReady(true);
+      } else if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
         setSessionReady(true);
       }
     });
 
-    // Also check if we already have a session (user clicked link and session was restored)
+    // Fallback: check if session already exists
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSessionReady(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Safety timeout: show error after 5 seconds instead of loading forever
+    const timeout = setTimeout(() => {
+      setSessionTimedOut(true);
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -78,13 +89,21 @@ const ResetPassword = () => {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Verificando...</CardTitle>
+              <CardTitle>{sessionTimedOut ? 'Link expirado ou inválido' : 'Verificando...'}</CardTitle>
               <CardDescription>
-                Validando seu link de redefinição de senha.
+                {sessionTimedOut
+                  ? 'Não foi possível validar seu link de redefinição de senha. O link pode ter expirado ou já sido utilizado.'
+                  : 'Validando seu link de redefinição de senha.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              {sessionTimedOut ? (
+                <Button onClick={() => navigate('/auth')} className="w-full">
+                  Voltar ao login
+                </Button>
+              ) : (
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              )}
             </CardContent>
           </Card>
         </div>
