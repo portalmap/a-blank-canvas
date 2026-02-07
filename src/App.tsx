@@ -25,6 +25,7 @@ import DashboardView from "./pages/DashboardView";
 import Automations from "./pages/Automations";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import AcceptInvite from "./pages/AcceptInvite";
 import TaskView from "./pages/TaskView";
@@ -42,6 +43,7 @@ const App = () => (
           <WorkspaceProvider>
             <Routes>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invite/:token" element={<AcceptInvite />} />
         <Route
           path="/*"
