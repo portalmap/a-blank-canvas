@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronRight, Circle, MoreHorizontal, Folder, List, Trash2, Pencil, Link, Move, Copy, Archive, FolderPlus, ListPlus } from "lucide-react";
+import { ChevronRight, Circle, MoreHorizontal, Folder, List, Trash2, Pencil, Link, Move, Copy, Archive, FolderPlus, ListPlus, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useFolders, useCreateFolder } from "@/hooks/useFolders";
 import { useLists, useCreateList } from "@/hooks/useLists";
 import { useSpace, useDeleteSpace, useUpdateSpace } from "@/hooks/useSpaces";
@@ -54,6 +55,7 @@ interface SpaceTreeItemProps {
 }
 
 export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const { activeWorkspace } = useWorkspace();
   const { data: currentSpace } = useSpace(space.id);
@@ -163,6 +165,10 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
               <DropdownMenuItem onClick={() => setIsListDialogOpen(true)}>
                 <ListPlus className="mr-2 h-4 w-4" />
                 Nova Lista
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/automations?scopeType=space&scopeId=${space.id}`)}>
+                <Zap className="mr-2 h-4 w-4" />
+                Ver Automações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Plus, Zap, UserPlus, Eye } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -9,11 +10,16 @@ import { useAutomations } from '@/hooks/useAutomations';
 
 const Automations = () => {
   const { activeWorkspace } = useWorkspace();
+  const [searchParams] = useSearchParams();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [filters, setFilters] = useState<AutomationsFilterState>({
-    scopeType: 'all',
-    scopeId: null,
-    searchTerm: '',
+  const [filters, setFilters] = useState<AutomationsFilterState>(() => {
+    const initialScopeType = searchParams.get('scopeType') || 'all';
+    const initialScopeId = searchParams.get('scopeId') || null;
+    return {
+      scopeType: initialScopeType as AutomationsFilterState['scopeType'],
+      scopeId: initialScopeId,
+      searchTerm: '',
+    };
   });
   const { data: automations = [] } = useAutomations(activeWorkspace?.id);
 
