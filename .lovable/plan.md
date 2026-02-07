@@ -1,69 +1,43 @@
 
-# Correção: Excluir automações ao deletar Space
+# Adicionar badge do Space no card de automacao
 
-## Problema
+## Objetivo
 
-A tabela `automations` usa um campo polimórfico `scope_id` que referencia Spaces, Folders ou Lists, mas **nao possui foreign key** para essas tabelas. Apenas tem FK para `workspaces` (com CASCADE).
+Exibir uma badge/tag com o nome do Space ao qual cada automacao pertence, facilitando a organizacao visual na listagem de automacoes.
 
-Quando um Space e excluido:
-- Folders sao deletados (CASCADE via `folders_space_id_fkey`)
-- Lists sao deletadas (CASCADE via `lists_space_id_fkey`)
-- Automacoes **permanecem orfas** porque nao ha vinculo de CASCADE
+## Como vai funcionar
 
-## Solucao
+Cada card de automacao vai mostrar uma nova badge colorida com o nome do Space, ao lado da badge de escopo (Lista, Pasta, Space, Workspace) que ja existe.
 
-Criar **triggers de banco de dados** que limpam automaticamente as automacoes quando um Space, Folder ou List e excluido.
+A resolucao do Space depende do tipo de escopo da automacao:
+- **Workspace**: sem Space (nao exibe badge)
+- **Space**: o `scope_id` e o proprio Space
+- **Folder**: busca o `space_id` do folder
+- **List**: busca o `space_id` da list
 
-## Detalhes Tecnicos
+## Alteracoes
 
-### Migracao SQL
+### 1. `src/components/automations/AutomationsList.tsx`
 
-Criar uma funcao e tres triggers:
+- Importar e carregar os Spaces do workspace usando `useSpaces`
+- Passar os dados de `spaces`, `lists` e `folders` como props para cada `AutomationCard`
 
-```sql
--- Funcao que deleta automacoes vinculadas ao registro excluido
-CREATE OR REPLACE FUNCTION delete_related_automations()
-RETURNS TRIGGER AS $$
-BEGIN
-  DELETE FROM automations
-  WHERE scope_id = OLD.id;
-  RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
+### 2. `src/components/automations/AutomationCard.tsx`
 
--- Trigger na tabela spaces
-CREATE TRIGGER trigger_delete_space_automations
-  BEFORE DELETE ON spaces
-  FOR EACH ROW
-  EXECUTE FUNCTION delete_related_automations();
+- Receber as novas props: `spaces`, `lists`, `folders`
+- Adicionar logica para resolver o nome do Space a partir do `scope_type` e `scope_id`:
+  - Se `scope_type === 'space'`: buscar o space com `id === scope_id`
+  - Se `scope_type === 'folder'`: buscar o folder, depois o space com `id === folder.space_id`
+  - Se `scope_type === 'list'`: buscar a list, depois o space com `id === list.space_id`
+  - Se `scope_type === 'workspace'`: nao exibir badge de Space
+- Renderizar uma badge adicional com o nome do Space (e icone LayoutGrid), usando uma cor suave para diferenciar das demais badges
 
--- Trigger na tabela folders
-CREATE TRIGGER trigger_delete_folder_automations
-  BEFORE DELETE ON folders
-  FOR EACH ROW
-  EXECUTE FUNCTION delete_related_automations();
+### Visual esperado
 
--- Trigger na tabela lists
-CREATE TRIGGER trigger_delete_list_automations
-  BEFORE DELETE ON lists
-  FOR EACH ROW
-  EXECUTE FUNCTION delete_related_automations();
+Cada card ficara assim:
+```
+[Zap] Automacao de transferencia...  [= Lista]  [# Space Name]
+       Alteracoes de status -> Mover tarefa
 ```
 
-### Por que triggers em vez de FK?
-
-O campo `scope_id` e **polimorfico** -- pode apontar para `spaces`, `folders` ou `lists` dependendo do `scope_type`. Nao e possivel criar uma FK normal para multiplas tabelas. Triggers resolvem isso de forma limpa.
-
-### Fluxo ao excluir um Space
-
-1. Trigger no Space: deleta automacoes com `scope_id = space_id`
-2. CASCADE deleta Folders do Space
-3. Trigger em cada Folder: deleta automacoes com `scope_id = folder_id`
-4. CASCADE deleta Lists do Space
-5. Trigger em cada List: deleta automacoes com `scope_id = list_id`
-
-### Alteracoes
-
-- **1 migracao SQL**: criar funcao + 3 triggers
-- **0 arquivos de codigo modificados**: a logica e toda no banco de dados
-- O codigo do frontend (`useDeleteSpace`, `useAutomations`) nao precisa de nenhuma alteracao
+A nova badge do Space aparece ao lado da badge de escopo existente, com estilo visual distinto (ex: fundo azul claro com texto azul).
