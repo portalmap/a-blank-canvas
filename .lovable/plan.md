@@ -1,43 +1,79 @@
 
-# Adicionar badge do Space no card de automacao
+
+# Adicionar "Ver Automacoes" no menu de contexto do Space, Pasta e Lista
 
 ## Objetivo
 
-Exibir uma badge/tag com o nome do Space ao qual cada automacao pertence, facilitando a organizacao visual na listagem de automacoes.
+Permitir acessar rapidamente a pagina de Automacoes ja filtrada pelo item selecionado (Space, Pasta ou Lista) diretamente pelo menu de contexto na sidebar.
 
 ## Como vai funcionar
 
-Cada card de automacao vai mostrar uma nova badge colorida com o nome do Space, ao lado da badge de escopo (Lista, Pasta, Space, Workspace) que ja existe.
-
-A resolucao do Space depende do tipo de escopo da automacao:
-- **Workspace**: sem Space (nao exibe badge)
-- **Space**: o `scope_id` e o proprio Space
-- **Folder**: busca o `space_id` do folder
-- **List**: busca o `space_id` da list
+1. Ao clicar com botao direito (ou no icone "...") em um Space, Pasta ou Lista, aparece uma nova opcao **"Ver Automacoes"** com icone de raio (Zap)
+2. Ao clicar, o usuario e redirecionado para `/automations?scopeType=space&scopeId=abc123`
+3. A pagina de Automacoes le os parametros da URL e ja inicia com os filtros aplicados
 
 ## Alteracoes
 
-### 1. `src/components/automations/AutomationsList.tsx`
+### 1. `src/pages/Automations.tsx`
 
-- Importar e carregar os Spaces do workspace usando `useSpaces`
-- Passar os dados de `spaces`, `lists` e `folders` como props para cada `AutomationCard`
+- Importar `useSearchParams` do `react-router-dom`
+- Na inicializacao do state `filters`, verificar se existem query params `scopeType` e `scopeId` na URL
+- Se existirem, usar esses valores como estado inicial dos filtros em vez do padrao `{ scopeType: 'all', scopeId: null }`
 
-### 2. `src/components/automations/AutomationCard.tsx`
+### 2. `src/components/workspace/SpaceTreeItem.tsx`
 
-- Receber as novas props: `spaces`, `lists`, `folders`
-- Adicionar logica para resolver o nome do Space a partir do `scope_type` e `scope_id`:
-  - Se `scope_type === 'space'`: buscar o space com `id === scope_id`
-  - Se `scope_type === 'folder'`: buscar o folder, depois o space com `id === folder.space_id`
-  - Se `scope_type === 'list'`: buscar a list, depois o space com `id === list.space_id`
-  - Se `scope_type === 'workspace'`: nao exibir badge de Space
-- Renderizar uma badge adicional com o nome do Space (e icone LayoutGrid), usando uma cor suave para diferenciar das demais badges
+- Importar `useNavigate` e o icone `Zap`
+- Adicionar um novo `DropdownMenuItem` chamado **"Ver Automacoes"** no menu de contexto
+- Ao clicar, navegar para `/automations?scopeType=space&scopeId={space.id}`
+- Posicionar o item apos "Nova Lista" e antes do separador
 
-### Visual esperado
+### 3. `src/components/workspace/FolderTreeItem.tsx`
 
-Cada card ficara assim:
+- Importar `useNavigate` e o icone `Zap`
+- Adicionar um novo `DropdownMenuItem` chamado **"Ver Automacoes"** no menu de contexto
+- Ao clicar, navegar para `/automations?scopeType=folder&scopeId={folder.id}`
+- Posicionar o item apos "Nova Lista" e antes do separador
+
+### 4. `src/components/workspace/ListTreeItem.tsx`
+
+- Importar o icone `Zap` (ja tem `useNavigate`)
+- Adicionar um novo `DropdownMenuItem` chamado **"Ver Automacoes"** no menu de contexto
+- Ao clicar, navegar para `/automations?scopeType=list&scopeId={list.id}`
+- Posicionar o item apos "Nova Tarefa" e antes do separador
+
+## Fluxo do usuario
+
+```text
+Sidebar                          Pagina de Automacoes
++------------------+             +-------------------------+
+| MAP | Accerth    |             |                         |
+|   [...]          |             | Filtro: [Spaces v]      |
+|   > Ver Autom.   | -- click -> | Item:  [Accerth v]      |
+|   > Renomear     |             | Automacoes filtradas... |
++------------------+             +-------------------------+
 ```
-[Zap] Automacao de transferencia...  [= Lista]  [# Space Name]
-       Alteracoes de status -> Mover tarefa
+
+## Detalhes tecnicos
+
+A pagina de Automacoes passara a ler `searchParams` na inicializacao:
+
+```typescript
+const [searchParams] = useSearchParams();
+const initialScopeType = searchParams.get('scopeType') || 'all';
+const initialScopeId = searchParams.get('scopeId') || null;
+
+const [filters, setFilters] = useState<AutomationsFilterState>({
+  scopeType: initialScopeType as AutomationsFilterState['scopeType'],
+  scopeId: initialScopeId,
+  searchTerm: '',
+});
 ```
 
-A nova badge do Space aparece ao lado da badge de escopo existente, com estilo visual distinto (ex: fundo azul claro com texto azul).
+Nos tree items, a navegacao sera simples:
+
+```typescript
+navigate(`/automations?scopeType=space&scopeId=${space.id}`);
+```
+
+Nenhuma alteracao de banco de dados e necessaria.
+
