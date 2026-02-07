@@ -1,88 +1,65 @@
 
 
-# Adicionar "Esqueci minha senha" na tela de login
+# Corrigir tela de redefinicao de senha travada em "Verificando..."
 
-## Objetivo
+## Problema
 
-Adicionar um link "Esqueci minha senha" na tela de login que permite ao usuario solicitar um e-mail de redefinicao de senha.
+A pagina `ResetPassword.tsx` fica travada no estado "Verificando..." porque:
 
-## Como vai funcionar
+1. Quando o usuario clica no link do e-mail, o cliente de autenticacao processa os tokens da URL e emite o evento `PASSWORD_RECOVERY`
+2. O `AuthContext` (componente pai) recebe esse evento primeiro, pois monta antes do `ResetPassword`
+3. Quando o `ResetPassword` registra seu proprio listener via `onAuthStateChange`, o evento `PASSWORD_RECOVERY` ja foi consumido
+4. O listener do `ResetPassword` recebe apenas `INITIAL_SESSION` (com a sessao ja estabelecida), que o codigo atual ignora
+5. O `getSession()` pode retornar a sessao, mas ha uma corrida de timing com o processamento dos tokens
 
-1. O usuario clica em "Esqueci minha senha" abaixo do campo de senha
-2. Aparece um formulario simples pedindo apenas o e-mail
-3. Ao enviar, o sistema dispara um e-mail de reset via autenticacao integrada (`supabase.auth.resetPasswordForEmail`)
-4. O usuario recebe um link no e-mail que o redireciona para uma pagina de redefinicao de senha
-5. Na pagina de redefinicao, o usuario digita a nova senha e confirma
+## Solucao
 
-## Alteracoes
+Alterar o `ResetPassword.tsx` para aceitar **qualquer evento que indique uma sessao valida**, nao apenas `PASSWORD_RECOVERY`.
 
-### 1. `src/contexts/AuthContext.tsx`
+### Arquivo: `src/pages/ResetPassword.tsx`
 
-- Adicionar a funcao `resetPassword(email: string)` ao contexto de autenticacao
-- Usar `supabase.auth.resetPasswordForEmail(email, { redirectTo })` para enviar o e-mail
-- O `redirectTo` vai apontar para `/auth/reset-password` (nova rota)
-- Atualizar a interface `AuthContextType` para incluir `resetPassword`
+Atualizar o `useEffect` para:
 
-### 2. `src/pages/Auth.tsx`
+1. Ouvir `PASSWORD_RECOVERY`, `INITIAL_SESSION` e `SIGNED_IN` -- qualquer um desses com sessao valida indica que o usuario chegou via link de reset
+2. Manter o fallback `getSession()` com logica melhorada
+3. Adicionar um timeout de seguranca (ex: 5 segundos) para mostrar uma mensagem de erro caso nenhum evento seja recebido, em vez de ficar carregando eternamente
 
-- Adicionar um estado `forgotPassword` para alternar entre o formulario de login e o de recuperacao
-- No modo "Esqueci minha senha":
-  - Exibir apenas o campo de e-mail e botao "Enviar link de redefinicao"
-  - Botao "Voltar ao login" para retornar ao formulario normal
-- Adicionar o link "Esqueci minha senha" logo abaixo do campo de senha, alinhado a direita
+Logica atualizada:
 
-### 3. Nova pagina: `src/pages/ResetPassword.tsx`
-
-- Pagina acessada via link do e-mail de reset
-- Formulario com:
-  - Campo "Nova senha"
-  - Campo "Confirmar nova senha"
-  - Botao de mostrar/ocultar senha
-  - Botao "Redefinir senha"
-- Usa `supabase.auth.updateUser({ password })` para atualizar a senha
-- Apos sucesso, redireciona para `/auth` com mensagem de sucesso
-
-### 4. `src/App.tsx`
-
-- Adicionar a rota `/auth/reset-password` apontando para `ResetPassword`
-- Essa rota fica fora do `ProtectedRoute` (usuario nao esta logado)
-
-## Fluxo do usuario
-
-```text
-Tela de Login                E-mail                    Redefinir Senha
-+-------------------+       +-----------------+       +-------------------+
-| Email             |       | Ola!            |       | Nova senha        |
-| [___________]     |       |                 |       | [___________]     |
-| Senha             |       | Clique aqui     |       | Confirmar senha   |
-| [___________]     |       | para redefinir  |       | [___________]     |
-| Esqueci minha     |       | sua senha.      |       |                   |
-|    senha  <--click-+-----> |                 +-----> | [Redefinir Senha] |
-|                   |       +-----------------+       +-------------------+
-| [   Entrar   ]    |                                        |
-+-------------------+                                        v
-                                                      Redireciona para
-                                                      tela de login
-```
-
-## Detalhes tecnicos
-
-### Funcao de reset no AuthContext:
 ```typescript
-const resetPassword = async (email: string) => {
-  const redirectUrl = `${window.location.origin}/auth/reset-password`;
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: redirectUrl,
+useEffect(() => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Aceitar qualquer evento que forneca uma sessao valida
+    if (event === 'PASSWORD_RECOVERY') {
+      setSessionReady(true);
+    } else if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
+      setSessionReady(true);
+    }
   });
-  // tratamento de erro e toast de sucesso
-};
+
+  // Fallback: verificar sessao existente
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      setSessionReady(true);
+    }
+  });
+
+  // Timeout de seguranca: se apos 5 segundos nao detectou sessao,
+  // mostrar mensagem de erro com opcao de voltar
+  const timeout = setTimeout(() => {
+    setSessionTimedOut(true);
+  }, 5000);
+
+  return () => {
+    subscription.unsubscribe();
+    clearTimeout(timeout);
+  };
+}, []);
 ```
 
-### Pagina ResetPassword:
-- Detecta a sessao via `onAuthStateChange` com evento `PASSWORD_RECOVERY`
-- Usa `supabase.auth.updateUser({ password })` para salvar a nova senha
+Adicionar estado `sessionTimedOut` e renderizar uma mensagem de erro quando o timeout for atingido, com botao para voltar ao login.
 
 ### Nenhuma alteracao de banco de dados necessaria
 
-O fluxo de reset de senha e nativo da autenticacao integrada, nao requer tabelas ou funcoes adicionais.
+O problema e exclusivamente de timing no frontend.
 
