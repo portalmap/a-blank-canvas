@@ -1,5 +1,7 @@
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose, Layers } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose, Layers, Sun, Moon } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
+import { useTheme } from 'next-themes';
+import mapLogoLight from '@/assets/map-logo-light.png';
 import { useLocation } from 'react-router-dom';
 import {
   Sidebar,
@@ -36,6 +38,7 @@ const modulesNavItems = [
 
 export function AppSidebar() {
   const { state, sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();
+  const { theme, setTheme } = useTheme();
   const location = useLocation();
   const { signOut } = useAuth();
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
@@ -85,9 +88,7 @@ export function AppSidebar() {
           {/* Logo + Nome - só quando expandido */}
           {!isCollapsed && (
             <div className="flex items-center gap-2">
-              <div className="bg-sidebar-primary rounded-lg p-2 flex items-center justify-center">
-                <span className="text-sidebar-primary-foreground font-bold text-lg leading-none">M</span>
-              </div>
+              <img src={mapLogoLight} alt="MAP Flow" className="h-8 w-8 object-contain" />
               <span className="font-semibold text-sidebar-foreground">MAP Flow</span>
             </div>
           )}
@@ -285,6 +286,21 @@ export function AppSidebar() {
                   </Tooltip>
                 </SidebarMenuItem>
               )}
+              <SidebarMenuItem>
+                <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      {!isCollapsed && <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>}
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right">
+                      {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <Tooltip delayDuration={isCollapsed ? 0 : 1000}>
                   <TooltipTrigger asChild>
