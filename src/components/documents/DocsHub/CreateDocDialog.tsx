@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { FileText, BookOpen } from 'lucide-react';
+import { EmojiPicker } from '@/components/documents/EmojiPicker';
 
 interface CreateDocDialogProps {
   open: boolean;
@@ -19,12 +20,6 @@ interface CreateDocDialogProps {
   isLoading?: boolean;
   folderId?: string | null;
 }
-
-const EMOJI_OPTIONS = [
-  '📄', '📝', '📋', '📌', '📎', '📂', '🗂️', '📑', '📒', '📓',
-  '💡', '🎯', '🚀', '⭐', '🔖', '🔗', '🧩', '📊', '📈', '🗒️',
-  '✏️', '🖊️', '📚', '🏷️', '💼', '🔍', '💬', '📮', '🧾', '📆',
-];
 
 export const CreateDocDialog = ({ open, onOpenChange, onSubmit, isLoading, folderId }: CreateDocDialogProps) => {
   const [title, setTitle] = useState('');
@@ -59,22 +54,7 @@ export const CreateDocDialog = ({ open, onOpenChange, onSubmit, isLoading, folde
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Ícone</Label>
-            <div className="flex flex-wrap gap-2">
-              {EMOJI_OPTIONS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEmoji(e)}
-                  className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${
-                    emoji === e 
-                      ? 'bg-primary/20 ring-2 ring-primary' 
-                      : 'bg-muted hover:bg-muted/80'
-                  }`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
+            <EmojiPicker selectedEmoji={emoji} onSelect={setEmoji} />
           </div>
 
           <div className="space-y-2">
