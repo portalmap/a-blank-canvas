@@ -96,10 +96,7 @@ export const DocsHubSidebar = ({
 
   return (
     <div
-      className={cn(
-        'border-r bg-muted/30 p-3 space-y-4 transition-all duration-300 flex flex-col overflow-y-auto',
-        isCollapsed ? 'w-14' : 'w-64'
-      )}
+      className="w-full h-full bg-muted/30 p-3 space-y-4 flex flex-col overflow-y-auto overflow-x-hidden"
     >
       {/* Toggle Button */}
       <div className={cn('flex', isCollapsed ? 'justify-center' : 'justify-end')}>
