@@ -593,6 +593,7 @@ export type Database = {
           color: string | null
           created_at: string | null
           id: string
+          is_wiki: boolean | null
           name: string
           parent_folder_id: string | null
           updated_at: string | null
@@ -603,6 +604,7 @@ export type Database = {
           color?: string | null
           created_at?: string | null
           id?: string
+          is_wiki?: boolean | null
           name: string
           parent_folder_id?: string | null
           updated_at?: string | null
@@ -613,6 +615,7 @@ export type Database = {
           color?: string | null
           created_at?: string | null
           id?: string
+          is_wiki?: boolean | null
           name?: string
           parent_folder_id?: string | null
           updated_at?: string | null

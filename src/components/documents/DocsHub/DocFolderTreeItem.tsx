@@ -27,6 +27,7 @@ interface DocFolderTreeItemProps {
   onToggleFavorite?: (doc: Document) => void;
   onArchiveDoc?: (doc: Document) => void;
   onDeleteDoc?: (doc: Document) => void;
+  onMoveDoc?: (doc: Document) => void;
   onCreateDocInFolder?: (folderId: string) => void;
   onRenameFolder?: (folder: DocumentFolder) => void;
   onDeleteFolder?: (folder: DocumentFolder) => void;
@@ -43,6 +44,7 @@ export function DocFolderTreeItem({
   onToggleFavorite,
   onArchiveDoc,
   onDeleteDoc,
+  onMoveDoc,
   onCreateDocInFolder,
   onRenameFolder,
   onDeleteFolder,
@@ -146,6 +148,7 @@ export function DocFolderTreeItem({
             onToggleFavorite={onToggleFavorite}
             onArchiveDoc={onArchiveDoc}
             onDeleteDoc={onDeleteDoc}
+            onMoveDoc={onMoveDoc}
             onCreateDocInFolder={onCreateDocInFolder}
             onRenameFolder={onRenameFolder}
             onDeleteFolder={onDeleteFolder}
@@ -162,6 +165,7 @@ export function DocFolderTreeItem({
             onToggleFavorite={onToggleFavorite}
             onArchive={onArchiveDoc}
             onDelete={onDeleteDoc}
+            onMove={onMoveDoc}
             depth={depth + 1}
           />
         ))}

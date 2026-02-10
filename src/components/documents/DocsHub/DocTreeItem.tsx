@@ -1,4 +1,4 @@
-import { MoreHorizontal, Star, Archive, Trash2, ExternalLink } from 'lucide-react';
+import { MoreHorizontal, Star, Archive, Trash2, ExternalLink, FolderInput } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,10 +16,11 @@ interface DocTreeItemProps {
   onToggleFavorite?: (doc: Document) => void;
   onArchive?: (doc: Document) => void;
   onDelete?: (doc: Document) => void;
+  onMove?: (doc: Document) => void;
   depth?: number;
 }
 
-export function DocTreeItem({ doc, onOpen, onToggleFavorite, onArchive, onDelete, depth = 0 }: DocTreeItemProps) {
+export function DocTreeItem({ doc, onOpen, onToggleFavorite, onArchive, onDelete, onMove, depth = 0 }: DocTreeItemProps) {
   return (
     <div
       className="flex items-center w-full group"
@@ -55,6 +56,12 @@ export function DocTreeItem({ doc, onOpen, onToggleFavorite, onArchive, onDelete
             <DropdownMenuItem onClick={() => onToggleFavorite(doc)}>
               <Star className={cn('mr-2 h-4 w-4', doc.isFavorited && 'fill-yellow-500 text-yellow-500')} />
               {doc.isFavorited ? 'Remover Favorito' : 'Favoritar'}
+            </DropdownMenuItem>
+          )}
+          {onMove && (
+            <DropdownMenuItem onClick={() => onMove(doc)}>
+              <FolderInput className="mr-2 h-4 w-4" />
+              Mover para...
             </DropdownMenuItem>
           )}
           {onArchive && (
