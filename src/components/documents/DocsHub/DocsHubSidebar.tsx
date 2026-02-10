@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, Star, BookOpen, FileText, Archive, Users, PanelLeftClose, PanelLeft, Plus, FolderPlus } from 'lucide-react';
+import { ChevronRight, Star, BookOpen, FileText, Archive, Users, PanelLeftClose, PanelLeft, Plus, FolderPlus, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DocumentFilter, Document, DocumentFolder } from '@/hooks/useDocuments';
 import { Button } from '@/components/ui/button';
@@ -37,16 +37,18 @@ interface DocsHubSidebarProps {
   onFilterChange: (filter: DocumentFilter) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  // Document tree props
   documents: Document[];
   folders: DocumentFolder[];
   onOpenDoc: (doc: Document) => void;
   onToggleFavorite?: (doc: Document) => void;
   onArchiveDoc?: (doc: Document) => void;
   onDeleteDoc?: (doc: Document) => void;
+  onMoveDoc?: (doc: Document) => void;
   onCreateDoc?: () => void;
   onCreateDocInFolder?: (folderId: string) => void;
   onCreateFolder?: () => void;
+  onCreateWikiFolder?: () => void;
+  onCreateWikiDoc?: () => void;
   onRenameFolder?: (folder: DocumentFolder) => void;
   onDeleteFolder?: (folder: DocumentFolder) => void;
 }
@@ -62,21 +64,29 @@ export const DocsHubSidebar = ({
   onToggleFavorite,
   onArchiveDoc,
   onDeleteDoc,
+  onMoveDoc,
   onCreateDoc,
   onCreateDocInFolder,
   onCreateFolder,
+  onCreateWikiFolder,
+  onCreateWikiDoc,
   onRenameFolder,
   onDeleteFolder,
 }: DocsHubSidebarProps) => {
   const [wikisOpen, setWikisOpen] = useState(false);
   const [archivedOpen, setArchivedOpen] = useState(false);
 
-  const wikiDocs = documents.filter(d => d.is_wiki && !d.is_archived);
   const archivedDocs = documents.filter(d => d.is_archived);
-  const rootFolders = folders.filter(f => !f.parent_folder_id);
-  const looseDocs = documents.filter(
-    d => !d.folder_id && !d.is_wiki && !d.is_archived
-  );
+
+  // Wiki section data
+  const wikiFolders = folders.filter(f => f.is_wiki && !f.parent_folder_id);
+  const allWikiFolders = folders.filter(f => f.is_wiki);
+  const looseWikiDocs = documents.filter(d => d.is_wiki && !d.is_archived && !d.folder_id);
+  const wikiDocsCount = documents.filter(d => d.is_wiki && !d.is_archived).length;
+
+  // Document tree data (non-wiki)
+  const rootFolders = folders.filter(f => !f.parent_folder_id && !f.is_wiki);
+  const looseDocs = documents.filter(d => !d.folder_id && !d.is_wiki && !d.is_archived);
 
   const getSubFolders = (parentId: string) =>
     folders.filter(f => f.parent_folder_id === parentId);
@@ -154,11 +164,61 @@ export const DocsHubSidebar = ({
               >
                 <BookOpen className="h-4 w-4 text-purple-500" />
                 <span>Wikis</span>
-                <span className="ml-auto text-xs text-muted-foreground">{wikiDocs.length}</span>
+                <span className="ml-auto text-xs text-muted-foreground">{wikiDocsCount}</span>
               </button>
+
+              {/* Wiki 3-dot menu */}
+              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {onCreateWikiDoc && (
+                      <DropdownMenuItem onClick={onCreateWikiDoc}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Novo Documento Wiki
+                      </DropdownMenuItem>
+                    )}
+                    {onCreateWikiFolder && (
+                      <DropdownMenuItem onClick={onCreateWikiFolder}>
+                        <FolderPlus className="mr-2 h-4 w-4" />
+                        Nova Pasta
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
             <CollapsibleContent className="ml-4">
-              {wikiDocs.map((doc) => (
+              {/* Wiki folders */}
+              {wikiFolders.map((folder) => (
+                <DocFolderTreeItem
+                  key={folder.id}
+                  folder={folder}
+                  documents={getFolderDocs(folder.id)}
+                  subFolders={getSubFolders(folder.id)}
+                  allFolders={allWikiFolders}
+                  allDocuments={documents}
+                  onOpenDoc={onOpenDoc}
+                  onToggleFavorite={onToggleFavorite}
+                  onArchiveDoc={onArchiveDoc}
+                  onDeleteDoc={onDeleteDoc}
+                  onMoveDoc={onMoveDoc}
+                  onCreateDocInFolder={onCreateDocInFolder}
+                  onRenameFolder={onRenameFolder}
+                  onDeleteFolder={onDeleteFolder}
+                />
+              ))}
+              {/* Loose wiki docs */}
+              {looseWikiDocs.map((doc) => (
                 <DocTreeItem
                   key={doc.id}
                   doc={doc}
@@ -166,9 +226,10 @@ export const DocsHubSidebar = ({
                   onToggleFavorite={onToggleFavorite}
                   onArchive={onArchiveDoc}
                   onDelete={onDeleteDoc}
+                  onMove={onMoveDoc}
                 />
               ))}
-              {wikiDocs.length === 0 && (
+              {wikiFolders.length === 0 && looseWikiDocs.length === 0 && (
                 <p className="text-xs text-muted-foreground px-6 py-2">Nenhuma wiki</p>
               )}
             </CollapsibleContent>
@@ -254,12 +315,13 @@ export const DocsHubSidebar = ({
               folder={folder}
               documents={getFolderDocs(folder.id)}
               subFolders={getSubFolders(folder.id)}
-              allFolders={folders}
+              allFolders={folders.filter(f => !f.is_wiki)}
               allDocuments={documents}
               onOpenDoc={onOpenDoc}
               onToggleFavorite={onToggleFavorite}
               onArchiveDoc={onArchiveDoc}
               onDeleteDoc={onDeleteDoc}
+              onMoveDoc={onMoveDoc}
               onCreateDocInFolder={onCreateDocInFolder}
               onRenameFolder={onRenameFolder}
               onDeleteFolder={onDeleteFolder}
@@ -275,6 +337,7 @@ export const DocsHubSidebar = ({
               onToggleFavorite={onToggleFavorite}
               onArchive={onArchiveDoc}
               onDelete={onDeleteDoc}
+              onMove={onMoveDoc}
             />
           ))}
 

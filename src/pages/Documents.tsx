@@ -8,6 +8,7 @@ import { DocsHubTable } from '@/components/documents/DocsHub/DocsHubTable';
 import { DocsHubFilters } from '@/components/documents/DocsHub/DocsHubFilters';
 import { DocsHubCard } from '@/components/documents/DocsHub/DocsHubCard';
 import { CreateDocDialog } from '@/components/documents/DocsHub/CreateDocDialog';
+import { MoveDocumentDialog } from '@/components/documents/DocsHub/MoveDocumentDialog';
 import { useDocuments, useDocumentTags, useDocumentFolders, DocumentFilter, Document, DocumentFolder } from '@/hooks/useDocuments';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -38,12 +39,15 @@ const Documents = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
   const [createDocFolderId, setCreateDocFolderId] = useState<string | null>(null);
+  const [createDocIsWiki, setCreateDocIsWiki] = useState(false);
+  const [createFolderIsWiki, setCreateFolderIsWiki] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<Document | null>(null);
   const [deleteFolder, setDeleteFolder] = useState<DocumentFolder | null>(null);
   const [renameFolder, setRenameFolder] = useState<DocumentFolder | null>(null);
   const [renameFolderName, setRenameFolderName] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [moveDoc, setMoveDoc] = useState<Document | null>(null);
 
   const { 
     documents, 
@@ -51,16 +55,15 @@ const Documents = () => {
     createDocument, 
     toggleFavorite, 
     archiveDocument,
-    deleteDocument 
+    deleteDocument,
+    moveDocument,
   } = useDocuments({ filter, search, tagIds: selectedTagIds });
 
-  // Fetch ALL documents for the sidebar tree (unfiltered)
   const { documents: allDocuments } = useDocuments({});
   
   const { tags } = useDocumentTags();
   const { folders, createFolder, updateFolder, deleteFolder: deleteFolderMutation } = useDocumentFolders();
 
-  // Stats
   const stats = useMemo(() => {
     const allDocs = allDocuments.filter(d => !d.is_archived);
     return {
@@ -72,9 +75,13 @@ const Documents = () => {
   }, [allDocuments]);
 
   const handleCreateDocument = async (data: { title: string; emoji?: string; is_wiki?: boolean; folder_id?: string }) => {
-    await createDocument.mutateAsync(data);
+    await createDocument.mutateAsync({
+      ...data,
+      is_wiki: data.is_wiki || createDocIsWiki,
+    });
     setCreateDialogOpen(false);
     setCreateDocFolderId(null);
+    setCreateDocIsWiki(false);
   };
 
   const handleOpenDoc = (doc: Document) => {
@@ -98,9 +105,10 @@ const Documents = () => {
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
-    await createFolder.mutateAsync({ name: newFolderName });
+    await createFolder.mutateAsync({ name: newFolderName, is_wiki: createFolderIsWiki });
     setNewFolderName('');
     setCreateFolderDialogOpen(false);
+    setCreateFolderIsWiki(false);
   };
 
   const handleRenameFolder = async () => {
@@ -119,7 +127,14 @@ const Documents = () => {
 
   const handleCreateDocInFolder = (folderId: string) => {
     setCreateDocFolderId(folderId);
+    const folder = folders.find(f => f.id === folderId);
+    setCreateDocIsWiki(folder?.is_wiki || false);
     setCreateDialogOpen(true);
+  };
+
+  const handleMoveDoc = (docId: string, folderId: string | null, isWiki: boolean) => {
+    moveDocument.mutate({ id: docId, folder_id: folderId, is_wiki: isWiki });
+    setMoveDoc(null);
   };
 
   const handleTagToggle = (tagId: string) => {
@@ -137,7 +152,6 @@ const Documents = () => {
 
   return (
     <div className="flex-1 flex h-full">
-      {/* Sidebar */}
       <DocsHubSidebar
         currentFilter={filter}
         onFilterChange={setFilter}
@@ -149,12 +163,26 @@ const Documents = () => {
         onToggleFavorite={handleToggleFavorite}
         onArchiveDoc={handleArchive}
         onDeleteDoc={setDeleteDoc}
+        onMoveDoc={setMoveDoc}
         onCreateDoc={() => {
           setCreateDocFolderId(null);
+          setCreateDocIsWiki(false);
           setCreateDialogOpen(true);
         }}
         onCreateDocInFolder={handleCreateDocInFolder}
-        onCreateFolder={() => setCreateFolderDialogOpen(true)}
+        onCreateFolder={() => {
+          setCreateFolderIsWiki(false);
+          setCreateFolderDialogOpen(true);
+        }}
+        onCreateWikiFolder={() => {
+          setCreateFolderIsWiki(true);
+          setCreateFolderDialogOpen(true);
+        }}
+        onCreateWikiDoc={() => {
+          setCreateDocFolderId(null);
+          setCreateDocIsWiki(true);
+          setCreateDialogOpen(true);
+        }}
         onRenameFolder={(folder) => {
           setRenameFolder(folder);
           setRenameFolderName(folder.name);
@@ -164,7 +192,6 @@ const Documents = () => {
 
       {/* Main Content */}
       <div className="flex-1 p-6 overflow-auto">
-        {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Documentos</h1>
@@ -172,13 +199,12 @@ const Documents = () => {
               Crie e compartilhe documentação, playbooks e guias
             </p>
           </div>
-          <Button onClick={() => { setCreateDocFolderId(null); setCreateDialogOpen(true); }}>
+          <Button onClick={() => { setCreateDocFolderId(null); setCreateDocIsWiki(false); setCreateDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Documento
           </Button>
         </div>
 
-        {/* Quick Access Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <DocsHubCard icon={FileText} title="Total de Docs" count={stats.total} color="#3b82f6" onClick={() => setFilter('all')} />
           <DocsHubCard icon={Clock} title="Recentes" count={stats.recent.length} color="#10b981" onClick={() => setFilter('all')} />
@@ -186,7 +212,6 @@ const Documents = () => {
           <DocsHubCard icon={BookOpen} title="Wikis" count={stats.wikis} color="#8b5cf6" onClick={() => setFilter('wikis')} />
         </div>
 
-        {/* Filters */}
         <div className="mb-4">
           <DocsHubFilters
             search={search}
@@ -198,7 +223,6 @@ const Documents = () => {
           />
         </div>
 
-        {/* Tabs */}
         <Tabs value={filter} onValueChange={(v) => setFilter(v as DocumentFilter)} className="mb-4">
           <TabsList>
             <TabsTrigger value="all">Todos</TabsTrigger>
@@ -209,7 +233,6 @@ const Documents = () => {
           </TabsList>
         </Tabs>
 
-        {/* Documents Table */}
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -227,23 +250,31 @@ const Documents = () => {
         )}
       </div>
 
-      {/* Create Document Dialog */}
       <CreateDocDialog
         open={createDialogOpen}
         onOpenChange={(open) => {
           setCreateDialogOpen(open);
-          if (!open) setCreateDocFolderId(null);
+          if (!open) { setCreateDocFolderId(null); setCreateDocIsWiki(false); }
         }}
         onSubmit={handleCreateDocument}
         isLoading={createDocument.isPending}
         folderId={createDocFolderId}
       />
 
+      <MoveDocumentDialog
+        open={!!moveDoc}
+        onOpenChange={() => setMoveDoc(null)}
+        document={moveDoc}
+        folders={folders}
+        onMove={handleMoveDoc}
+        isLoading={moveDocument.isPending}
+      />
+
       {/* Create Folder Dialog */}
       <Dialog open={createFolderDialogOpen} onOpenChange={setCreateFolderDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nova Pasta</DialogTitle>
+            <DialogTitle>{createFolderIsWiki ? 'Nova Pasta Wiki' : 'Nova Pasta'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -293,7 +324,6 @@ const Documents = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Document Confirmation */}
       <AlertDialog open={!!deleteDoc} onOpenChange={() => setDeleteDoc(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -311,7 +341,6 @@ const Documents = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Folder Confirmation */}
       <AlertDialog open={!!deleteFolder} onOpenChange={() => setDeleteFolder(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -44,6 +44,7 @@ export interface DocumentFolder {
   user_id: string;
   parent_folder_id: string | null;
   color: string;
+  is_wiki: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -258,6 +259,28 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
     },
   });
 
+  const moveDocument = useMutation({
+    mutationFn: async ({ id, folder_id, is_wiki }: { id: string; folder_id: string | null; is_wiki?: boolean }) => {
+      const updateData: Record<string, unknown> = { folder_id };
+      if (is_wiki !== undefined) {
+        updateData.is_wiki = is_wiki;
+      }
+      const { error } = await supabase
+        .from('documents')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      toast.success('Documento movido!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao mover documento: ' + error.message);
+    },
+  });
+
   return {
     documents: documentsQuery.data || [],
     isLoading: documentsQuery.isLoading,
@@ -267,6 +290,7 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
     deleteDocument,
     toggleFavorite,
     archiveDocument,
+    moveDocument,
   };
 };
 
@@ -343,7 +367,7 @@ export const useDocumentFolders = () => {
   });
 
   const createFolder = useMutation({
-    mutationFn: async (data: { name: string; color?: string; parent_folder_id?: string }) => {
+    mutationFn: async (data: { name: string; color?: string; parent_folder_id?: string; is_wiki?: boolean }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
       const { data: folder, error } = await supabase
@@ -353,6 +377,7 @@ export const useDocumentFolders = () => {
           name: data.name,
           color: data.color || '#6366f1',
           parent_folder_id: data.parent_folder_id || null,
+          is_wiki: data.is_wiki || false,
         })
         .select()
         .single();
