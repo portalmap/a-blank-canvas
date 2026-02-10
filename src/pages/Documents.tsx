@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, Star, BookOpen, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DocsHubSidebar } from '@/components/documents/DocsHub/DocsHubSidebar';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { ImperativePanelHandle } from 'react-resizable-panels';
 import { DocsHubTable } from '@/components/documents/DocsHub/DocsHubTable';
 import { DocsHubFilters } from '@/components/documents/DocsHub/DocsHubFilters';
 import { DocsHubCard } from '@/components/documents/DocsHub/DocsHubCard';
@@ -32,6 +34,7 @@ import {
 } from '@/components/ui/dialog';
 
 const Documents = () => {
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
   const navigate = useNavigate();
   const [filter, setFilter] = useState<DocumentFilter>('all');
   const [search, setSearch] = useState('');
@@ -152,103 +155,129 @@ const Documents = () => {
 
   return (
     <div className="flex-1 flex h-full">
-      <DocsHubSidebar
-        currentFilter={filter}
-        onFilterChange={setFilter}
-        isCollapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        documents={allDocuments}
-        folders={folders}
-        onOpenDoc={handleOpenDoc}
-        onToggleFavorite={handleToggleFavorite}
-        onArchiveDoc={handleArchive}
-        onDeleteDoc={setDeleteDoc}
-        onMoveDoc={setMoveDoc}
-        onCreateDoc={() => {
-          setCreateDocFolderId(null);
-          setCreateDocIsWiki(false);
-          setCreateDialogOpen(true);
-        }}
-        onCreateDocInFolder={handleCreateDocInFolder}
-        onCreateFolder={() => {
-          setCreateFolderIsWiki(false);
-          setCreateFolderDialogOpen(true);
-        }}
-        onCreateWikiFolder={() => {
-          setCreateFolderIsWiki(true);
-          setCreateFolderDialogOpen(true);
-        }}
-        onCreateWikiDoc={() => {
-          setCreateDocFolderId(null);
-          setCreateDocIsWiki(true);
-          setCreateDialogOpen(true);
-        }}
-        onRenameFolder={(folder) => {
-          setRenameFolder(folder);
-          setRenameFolderName(folder.name);
-        }}
-        onDeleteFolder={setDeleteFolder}
-      />
-
-      {/* Main Content */}
-      <div className="flex-1 p-6 overflow-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Documentos</h1>
-            <p className="text-muted-foreground mt-1">
-              Crie e compartilhe documentação, playbooks e guias
-            </p>
-          </div>
-          <Button onClick={() => { setCreateDocFolderId(null); setCreateDocIsWiki(false); setCreateDialogOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Documento
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <DocsHubCard icon={FileText} title="Total de Docs" count={stats.total} color="#3b82f6" onClick={() => setFilter('all')} />
-          <DocsHubCard icon={Clock} title="Recentes" count={stats.recent.length} color="#10b981" onClick={() => setFilter('all')} />
-          <DocsHubCard icon={Star} title="Favoritos" count={stats.favorites} color="#f59e0b" onClick={() => setFilter('favorites')} />
-          <DocsHubCard icon={BookOpen} title="Wikis" count={stats.wikis} color="#8b5cf6" onClick={() => setFilter('wikis')} />
-        </div>
-
-        <div className="mb-4">
-          <DocsHubFilters
-            search={search}
-            onSearchChange={setSearch}
-            tags={tags}
-            selectedTagIds={selectedTagIds}
-            onTagToggle={handleTagToggle}
-            onClearFilters={handleClearFilters}
-          />
-        </div>
-
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as DocumentFilter)} className="mb-4">
-          <TabsList>
-            <TabsTrigger value="all">Todos</TabsTrigger>
-            <TabsTrigger value="created">Criados por mim</TabsTrigger>
-            <TabsTrigger value="favorites">Favoritos</TabsTrigger>
-            <TabsTrigger value="wikis">Wikis</TabsTrigger>
-            <TabsTrigger value="archived">Arquivados</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : (
-          <DocsHubTable
-            documents={documents}
-            onOpen={handleOpenDoc}
+      <ResizablePanelGroup direction="horizontal">
+        <ResizablePanel
+          ref={sidebarPanelRef}
+          defaultSize={20}
+          minSize={sidebarCollapsed ? 3 : 10}
+          maxSize={sidebarCollapsed ? 5 : 40}
+          collapsible
+          collapsedSize={3}
+          onCollapse={() => setSidebarCollapsed(true)}
+          onExpand={() => setSidebarCollapsed(false)}
+        >
+          <DocsHubSidebar
+            currentFilter={filter}
+            onFilterChange={setFilter}
+            isCollapsed={sidebarCollapsed}
+            onToggleCollapse={() => {
+              const panel = sidebarPanelRef.current;
+              if (panel) {
+                if (sidebarCollapsed) {
+                  panel.expand();
+                  panel.resize(20);
+                } else {
+                  panel.collapse();
+                }
+              }
+            }}
+            documents={allDocuments}
+            folders={folders}
+            onOpenDoc={handleOpenDoc}
             onToggleFavorite={handleToggleFavorite}
-            onArchive={handleArchive}
-            onDelete={setDeleteDoc}
+            onArchiveDoc={handleArchive}
+            onDeleteDoc={setDeleteDoc}
+            onMoveDoc={setMoveDoc}
+            onCreateDoc={() => {
+              setCreateDocFolderId(null);
+              setCreateDocIsWiki(false);
+              setCreateDialogOpen(true);
+            }}
+            onCreateDocInFolder={handleCreateDocInFolder}
+            onCreateFolder={() => {
+              setCreateFolderIsWiki(false);
+              setCreateFolderDialogOpen(true);
+            }}
+            onCreateWikiFolder={() => {
+              setCreateFolderIsWiki(true);
+              setCreateFolderDialogOpen(true);
+            }}
+            onCreateWikiDoc={() => {
+              setCreateDocFolderId(null);
+              setCreateDocIsWiki(true);
+              setCreateDialogOpen(true);
+            }}
+            onRenameFolder={(folder) => {
+              setRenameFolder(folder);
+              setRenameFolderName(folder.name);
+            }}
+            onDeleteFolder={setDeleteFolder}
           />
-        )}
-      </div>
+        </ResizablePanel>
+
+        <ResizableHandle />
+
+        <ResizablePanel defaultSize={80}>
+          <div className="h-full p-6 overflow-auto">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold">Documentos</h1>
+                <p className="text-muted-foreground mt-1">
+                  Crie e compartilhe documentação, playbooks e guias
+                </p>
+              </div>
+              <Button onClick={() => { setCreateDocFolderId(null); setCreateDocIsWiki(false); setCreateDialogOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Documento
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <DocsHubCard icon={FileText} title="Total de Docs" count={stats.total} color="#3b82f6" onClick={() => setFilter('all')} />
+              <DocsHubCard icon={Clock} title="Recentes" count={stats.recent.length} color="#10b981" onClick={() => setFilter('all')} />
+              <DocsHubCard icon={Star} title="Favoritos" count={stats.favorites} color="#f59e0b" onClick={() => setFilter('favorites')} />
+              <DocsHubCard icon={BookOpen} title="Wikis" count={stats.wikis} color="#8b5cf6" onClick={() => setFilter('wikis')} />
+            </div>
+
+            <div className="mb-4">
+              <DocsHubFilters
+                search={search}
+                onSearchChange={setSearch}
+                tags={tags}
+                selectedTagIds={selectedTagIds}
+                onTagToggle={handleTagToggle}
+                onClearFilters={handleClearFilters}
+              />
+            </div>
+
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as DocumentFilter)} className="mb-4">
+              <TabsList>
+                <TabsTrigger value="all">Todos</TabsTrigger>
+                <TabsTrigger value="created">Criados por mim</TabsTrigger>
+                <TabsTrigger value="favorites">Favoritos</TabsTrigger>
+                <TabsTrigger value="wikis">Wikis</TabsTrigger>
+                <TabsTrigger value="archived">Arquivados</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : (
+              <DocsHubTable
+                documents={documents}
+                onOpen={handleOpenDoc}
+                onToggleFavorite={handleToggleFavorite}
+                onArchive={handleArchive}
+                onDelete={setDeleteDoc}
+              />
+            )}
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <CreateDocDialog
         open={createDialogOpen}
