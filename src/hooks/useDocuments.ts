@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
 
@@ -58,6 +59,7 @@ interface UseDocumentsOptions {
 
 export const useDocuments = (options: UseDocumentsOptions = {}) => {
   const { user } = useAuth();
+  const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
   const { filter = 'all', search, tagIds, folderId } = options;
 
@@ -166,6 +168,7 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
           content: {},
           folder_id: data.folder_id || null,
           visibility: 'private',
+          workspace_id: activeWorkspace?.id || null,
         })
         .select()
         .single();
