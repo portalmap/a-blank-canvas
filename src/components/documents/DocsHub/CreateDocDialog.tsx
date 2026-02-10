@@ -19,7 +19,11 @@ interface CreateDocDialogProps {
   isLoading?: boolean;
 }
 
-const EMOJI_OPTIONS = ['📄', '📝', '📋', '📌', '📎', '📂', '🗂️', '📑', '📒', '📓', '💡', '🎯', '🚀', '⭐', '🔖'];
+const EMOJI_OPTIONS = [
+  '📄', '📝', '📋', '📌', '📎', '📂', '🗂️', '📑', '📒', '📓',
+  '💡', '🎯', '🚀', '⭐', '🔖', '🔗', '🧩', '📊', '📈', '🗒️',
+  '✏️', '🖊️', '📚', '🏷️', '💼', '🔍', '💬', '📮', '🧾', '📆',
+];
 
 export const CreateDocDialog = ({ open, onOpenChange, onSubmit, isLoading }: CreateDocDialogProps) => {
   const [title, setTitle] = useState('');
