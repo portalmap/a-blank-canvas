@@ -15,8 +15,9 @@ import { FileText, BookOpen } from 'lucide-react';
 interface CreateDocDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { title: string; emoji?: string; is_wiki?: boolean }) => void;
+  onSubmit: (data: { title: string; emoji?: string; is_wiki?: boolean; folder_id?: string }) => void;
   isLoading?: boolean;
+  folderId?: string | null;
 }
 
 const EMOJI_OPTIONS = [
@@ -25,7 +26,7 @@ const EMOJI_OPTIONS = [
   '✏️', '🖊️', '📚', '🏷️', '💼', '🔍', '💬', '📮', '🧾', '📆',
 ];
 
-export const CreateDocDialog = ({ open, onOpenChange, onSubmit, isLoading }: CreateDocDialogProps) => {
+export const CreateDocDialog = ({ open, onOpenChange, onSubmit, isLoading, folderId }: CreateDocDialogProps) => {
   const [title, setTitle] = useState('');
   const [emoji, setEmoji] = useState('📄');
   const [isWiki, setIsWiki] = useState(false);
@@ -34,7 +35,12 @@ export const CreateDocDialog = ({ open, onOpenChange, onSubmit, isLoading }: Cre
     e.preventDefault();
     if (!title.trim()) return;
     
-    onSubmit({ title: title.trim(), emoji, is_wiki: isWiki });
+    onSubmit({ 
+      title: title.trim(), 
+      emoji, 
+      is_wiki: isWiki,
+      folder_id: folderId || undefined,
+    });
     setTitle('');
     setEmoji('📄');
     setIsWiki(false);
