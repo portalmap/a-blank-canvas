@@ -33,7 +33,7 @@ export const AssignedCommentsCard = () => {
     if (comment.source_type === 'task') {
       navigate(`/task/${comment.source_id}`);
     } else {
-      navigate(`/chat?channel=${comment.source_id}`);
+      navigate(`/chat?channel=${comment.source_id}&message=${comment.id}`);
     }
   };
 

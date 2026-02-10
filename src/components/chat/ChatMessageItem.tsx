@@ -16,9 +16,10 @@ interface ChatMessageItemProps {
   showAvatar: boolean;
   currentUserId?: string;
   workspaceId?: string;
+  isHighlighted?: boolean;
 }
 
-export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceId }: ChatMessageItemProps) => {
+export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceId, isHighlighted }: ChatMessageItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [editAssignee, setEditAssignee] = useState<WorkspaceMember | null>(null);
@@ -111,7 +112,14 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceI
   };
 
   return (
-    <div className={cn("flex gap-3 group relative", !showAvatar && "pl-10")}>
+    <div
+      id={`chat-msg-${message.id}`}
+      className={cn(
+        "flex gap-3 group relative rounded-md px-1 -mx-1 transition-colors duration-1000",
+        !showAvatar && "pl-10",
+        isHighlighted && "animate-highlight-fade"
+      )}
+    >
       {showAvatar && (
         <Avatar className="h-8 w-8 flex-shrink-0">
           <AvatarImage src={message.sender?.avatar_url || undefined} />

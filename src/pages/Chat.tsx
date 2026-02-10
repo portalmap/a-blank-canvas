@@ -1,12 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { ChatSidebar, ChatRoom, ChannelMembersDialog } from '@/components/chat';
 import { useAllChatChannels } from '@/hooks/useChat';
 
 const Chat = () => {
+  const [searchParams] = useSearchParams();
+  const channelParam = searchParams.get('channel');
+  const messageParam = searchParams.get('message');
   const [selectedChannelId, setSelectedChannelId] = useState<string>();
   const [showMembersDialog, setShowMembersDialog] = useState(false);
   const { data: channels, isLoading } = useAllChatChannels();
+
+  // Auto-select channel from URL param
+  useEffect(() => {
+    if (channelParam && channels?.some(c => c.id === channelParam)) {
+      setSelectedChannelId(channelParam);
+    }
+  }, [channelParam, channels]);
 
   const selectedChannel = channels?.find(c => c.id === selectedChannelId);
 
@@ -29,6 +40,7 @@ const Chat = () => {
             channelType={selectedChannel.type as 'space' | 'custom'}
             spaceColor={(selectedChannel as any).spaces?.color}
             workspaceId={selectedChannel.workspace_id}
+            highlightMessageId={messageParam || undefined}
             onOpenMembers={
               selectedChannel.type === 'custom'
                 ? () => setShowMembersDialog(true)

@@ -14,6 +14,7 @@ interface ChatRoomProps {
   channelType: 'space' | 'custom';
   spaceColor?: string;
   workspaceId?: string;
+  highlightMessageId?: string;
   onOpenMembers?: () => void;
 }
 
@@ -23,12 +24,14 @@ export const ChatRoom = ({
   channelType,
   spaceColor,
   workspaceId,
+  highlightMessageId,
   onOpenMembers 
 }: ChatRoomProps) => {
   const { data: messages, isLoading } = useChatMessages(channelId);
   const markAsRead = useMarkChannelAsRead();
   const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const highlightScrolledRef = useRef(false);
 
   // Marcar canal como lido quando abrir ou receber novas mensagens
   useEffect(() => {
@@ -37,12 +40,20 @@ export const ChatRoom = ({
     }
   }, [channelId, messages?.length]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Scroll to highlighted message or bottom
   useEffect(() => {
+    if (highlightMessageId && messages?.length && !highlightScrolledRef.current) {
+      const el = document.getElementById(`chat-msg-${highlightMessageId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        highlightScrolledRef.current = true;
+        return;
+      }
+    }
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages?.length]);
+  }, [messages?.length, highlightMessageId]);
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -88,6 +99,7 @@ export const ChatRoom = ({
                   showAvatar={showAvatar}
                   currentUserId={user?.id}
                   workspaceId={workspaceId}
+                  isHighlighted={message.id === highlightMessageId}
                 />
               );
             })}
