@@ -1,27 +1,39 @@
 
-# Sidebar de Documentos Redimensionavel
+# Abrir Chat Diretamente no Canal e Mensagem Referenciada
 
 ## Resumo
 
-Substituir a largura fixa do sidebar de documentos por um layout redimensionavel usando o componente `ResizablePanelGroup` (ja instalado via `react-resizable-panels`), permitindo ao usuario arrastar a borda para aumentar ou reduzir a largura horizontalmente.
+Quando o usuario clica no link de um comentario atribuido no chat (ex: "#MAP | Monvizo Chat"), o sistema navega para `/chat?channel=xxx` mas nao abre o canal correspondente. O problema e que `Chat.tsx` nao le os parametros da URL. Alem disso, vamos adicionar suporte para rolar ate a mensagem especifica e destaca-la visualmente.
 
 ## Alteracoes
 
-### 1. `src/pages/Documents.tsx`
+### 1. `src/pages/Chat.tsx`
 
-Envolver o `DocsHubSidebar` e o conteudo principal em um `ResizablePanelGroup` com dois `ResizablePanel` e um `ResizableHandle` entre eles.
+- Importar `useSearchParams` do `react-router-dom`
+- Ler os parametros `channel` e `message` da URL
+- Quando `channel` estiver presente na URL e os canais estiverem carregados, selecionar automaticamente esse canal
+- Passar o `messageId` (se presente) para o `ChatRoom` como prop `highlightMessageId`
 
-- Importar `ResizablePanelGroup`, `ResizablePanel`, `ResizableHandle` de `@/components/ui/resizable`
-- O painel do sidebar tera tamanho padrao de ~20%, minimo de ~10% e maximo de ~40%
-- O painel do conteudo principal ocupara o restante
-- Quando o sidebar estiver colapsado (`sidebarCollapsed = true`), o painel do sidebar tera tamanho reduzido automaticamente
+### 2. `src/components/home/AssignedCommentsCard.tsx`
 
-### 2. `src/components/documents/DocsHub/DocsHubSidebar.tsx`
+- Atualizar a navegacao para incluir o ID da mensagem na URL: `/chat?channel={channelId}&message={messageId}`
 
-- Remover a logica interna de largura fixa (`w-14` / `w-64`) do container principal
-- O componente passara a ocupar 100% da largura do painel pai (`w-full h-full`)
-- Manter o botao de colapsar/expandir e toda a logica de conteudo colapsado
+### 3. `src/components/chat/ChatRoom.tsx`
 
-## Resultado esperado
+- Receber nova prop opcional `highlightMessageId`
+- Quando presente, apos as mensagens carregarem, rolar ate o elemento da mensagem referenciada (usando `scrollIntoView`)
+- Passar o `highlightMessageId` para `ChatMessageItem`
 
-O usuario podera arrastar a borda entre o sidebar e o conteudo principal para ajustar a largura, similar ao sidebar principal do site. O handle de resize sera sutil (linha vertical na borda).
+### 4. `src/components/chat/ChatMessageItem.tsx`
+
+- Receber prop opcional `highlightMessageId`
+- Se o ID da mensagem corresponder, aplicar um efeito visual de destaque (fundo amarelo/primary com fade-out animado via CSS)
+- Adicionar um `id` ou `data-message-id` no elemento para permitir scroll programatico
+
+## Fluxo esperado
+
+1. Usuario clica no link "#MAP | Monvizo Chat" no card de comentarios atribuidos
+2. Navega para `/chat?channel=abc123&message=msg456`
+3. `Chat.tsx` le o parametro `channel`, seleciona o canal `abc123`
+4. `ChatRoom` carrega as mensagens e rola ate `msg456`
+5. A mensagem `msg456` pisca com destaque por ~2 segundos e depois volta ao normal
