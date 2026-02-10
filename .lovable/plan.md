@@ -1,117 +1,77 @@
 
-# Reorganizar sidebar de documentos com pastas expansiveis
 
-## Resumo
+# Liberar Wikis para todos os membros do workspace
 
-Transformar o sidebar de documentos para exibir uma arvore hierarquica de pastas e documentos, com setas de expansao para navegar a estrutura. "Todos os Docs", "Criados por mim" e "Favoritos" ficam como filtros. "Wikis" e "Arquivados" ficam como categorias fixas. Abaixo deles, aparece a arvore de pastas e documentos soltos.
+## Problema
 
-## Alteracoes no banco de dados
+Atualmente, documentos wiki so sao visiveis para o criador. Membros, administradores e proprietarios do workspace nao conseguem visualizar wikis criadas por outros usuarios.
 
-### Adicionar `workspace_id` a `document_folders`
+## Causa raiz
 
-A tabela `document_folders` existe mas nao tem `workspace_id`. Precisa dessa coluna para filtrar pastas por workspace, igual a tabela `documents`.
+1. Documentos sao criados sem `workspace_id` (sempre `null`)
+2. A politica RLS de SELECT so permite ver documentos proprios, com permissao explicita, ou com link publico
+3. A funcao `user_can_access_document` nao verifica se o usuario e membro do workspace para wikis
+
+## Solucao
+
+### 1. Banco de dados (migracao SQL)
+
+Atualizar a funcao `user_can_access_document` para incluir uma verificacao: se o documento e uma wiki e tem `workspace_id`, qualquer membro do workspace pode visualizar.
 
 ```sql
-ALTER TABLE document_folders ADD COLUMN workspace_id uuid REFERENCES workspaces(id);
+CREATE OR REPLACE FUNCTION user_can_access_document(_user_id uuid, _document_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM documents WHERE id = _document_id AND created_by_user_id = _user_id
+  ) OR EXISTS (
+    SELECT 1 FROM document_permissions WHERE document_id = _document_id AND user_id = _user_id
+  ) OR EXISTS (
+    SELECT 1 FROM document_permissions dp
+    JOIN team_members tm ON tm.team_id = dp.team_id
+    WHERE dp.document_id = _document_id AND tm.user_id = _user_id
+  ) OR EXISTS (
+    SELECT 1 FROM documents WHERE id = _document_id AND visibility = 'link'
+  ) OR EXISTS (
+    -- Wikis sao visiveis para todos os membros do workspace
+    SELECT 1 FROM documents d
+    JOIN workspace_members wm ON wm.workspace_id = d.workspace_id
+    WHERE d.id = _document_id
+      AND d.is_wiki = true
+      AND wm.user_id = _user_id
+  );
+$$;
 ```
 
-Tambem atualizar a RLS para considerar o workspace.
+Tambem atualizar os documentos wiki existentes para terem `workspace_id` preenchido (usando o workspace do criador):
 
-## Alteracoes no codigo
-
-### 1. Novo componente: `DocFolderTreeItem.tsx`
-
-Criar `src/components/documents/DocsHub/DocFolderTreeItem.tsx`:
-
-- Recebe uma pasta e a lista de documentos/subpastas
-- Usa `Collapsible` para expandir/recolher
-- Exibe icone de pasta + seta de expansao (`ChevronRight` rotacionando)
-- Dentro do collapsible, renderiza documentos filhos e subpastas recursivamente
-- Menu de contexto (3 pontos) com opcoes: Renomear, Novo Documento dentro, Excluir
-- Botao `+` ao passar o mouse para criar documento dentro da pasta
-
-### 2. Novo componente: `DocTreeItem.tsx`
-
-Criar `src/components/documents/DocsHub/DocTreeItem.tsx`:
-
-- Renderiza um documento individual na arvore
-- Exibe emoji + titulo
-- Clicavel para abrir o documento
-- Menu de contexto (3 pontos): Abrir, Favoritar, Arquivar, Excluir
-
-### 3. Atualizar `DocsHubSidebar.tsx`
-
-Reestruturar completamente:
-
-**Secao de filtros (topo):**
-- Todos os Docs (filtro)
-- Criados por mim (filtro)
-- Favoritos (filtro)
-
-**Secao de categorias:**
-- Wikis -- expansivel, mostra documentos marcados como wiki
-- Arquivados -- expansivel, mostra documentos arquivados
-
-**Secao de pastas e documentos (arvore):**
-- Separador visual
-- Titulo "Documentos" com botao `+` para criar pasta ou documento
-- Renderizar pastas raiz (sem parent) usando `DocFolderTreeItem`
-- Renderizar documentos soltos (sem folder_id, nao wiki, nao arquivado) usando `DocTreeItem`
-
-**Props adicionais necessarias:**
-- `documents: Document[]` -- todos os documentos para montar a arvore
-- `folders: DocumentFolder[]` -- todas as pastas
-- Callbacks: `onCreateFolder`, `onCreateDocInFolder`, `onDeleteFolder`, `onRenameFolder`
-
-### 4. Atualizar `useDocuments.ts`
-
-- Adicionar `workspace_id` ao `useDocumentFolders` para filtrar por workspace
-- Adicionar `workspace_id` ao `createFolder` mutation
-
-### 5. Atualizar `Documents.tsx`
-
-- Importar e usar `useDocumentFolders`
-- Passar documentos e pastas para o sidebar
-- Adicionar handlers para criar/renomear/excluir pastas
-- Atualizar `CreateDocDialog` para aceitar `folder_id` opcional
-- Adicionar dialog para criar pasta (nome + emoji opcional)
-
-### 6. Atualizar `CreateDocDialog.tsx`
-
-- Aceitar prop `folderId` opcional
-- Quando tiver `folderId`, passar no submit
-
-## Resultado visual esperado
-
-```text
-Sidebar:
-  [filtro] Todos os Docs
-  [filtro] Criados por mim
-  [filtro] Favoritos
-  ─────────────────
-  > Wikis                    (expansivel - mostra docs wiki)
-  > Arquivados               (expansivel - mostra docs arquivados)
-  ─────────────────
-  Documentos            [+]  (titulo + botao criar)
-  > Cultura MAP         ...  (pasta - expansivel)
-    > Desafios G4 SKILLS
-    > Entrei para MAP e agora?
-      > PLAYBOOK DE FOTO     (subdocumento)
-  > Boas Praticas MAP   ...
-    > Knowledge Article 1
-    > Knowledge Article 2
-  > Playbooks Processos ...
-    > Playbook de Onboarding
-    > Playbook de Check-in
-  Documento Solto 1          (doc sem pasta)
-  Documento Solto 2
+```sql
+UPDATE documents d
+SET workspace_id = (
+  SELECT wm.workspace_id FROM workspace_members wm
+  WHERE wm.user_id = d.created_by_user_id
+  LIMIT 1
+)
+WHERE d.is_wiki = true AND d.workspace_id IS NULL;
 ```
 
-## Detalhes tecnicos
+### 2. Codigo: Salvar `workspace_id` ao criar documentos
 
-- Reutilizar o padrao `Collapsible` ja usado no sidebar do workspace (SpaceTreeItem)
-- `ChevronRight` com `rotate-90` quando aberto
-- Pastas suportam hierarquia via `parent_folder_id`
-- Documentos vinculados a pastas via `folder_id`
-- A secao "Recentes" sera removida pois a arvore ja mostra todos os docs
-- Nenhum dado existente sera perdido -- o `folder_id` dos documentos atuais e `null`, entao aparecerao como "soltos"
+Alterar `useDocuments.ts` para incluir `workspace_id` do workspace ativo ao criar documentos. Isso garante que novos wikis sejam associados ao workspace e acessiveis por todos os membros.
+
+- Importar `useWorkspace` no hook
+- Passar `workspace_id: activeWorkspace?.id` no `insert` do `createDocument`
+
+### 3. Codigo: Filtrar wikis por workspace
+
+Atualizar a query de wikis em `useDocuments.ts` para, quando o filtro for `wikis`, nao filtrar por `created_by_user_id` -- a RLS ja garante que o usuario so vera wikis do seu workspace.
+
+## Resultado
+
+- Qualquer membro do workspace vera todas as wikis do workspace
+- Documentos privados continuam visiveis apenas para o criador
+- Novos documentos serao associados ao workspace ativo
