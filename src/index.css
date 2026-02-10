@@ -127,3 +127,12 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes highlight-fade {
+  0% { background-color: hsl(var(--primary) / 0.25); }
+  100% { background-color: transparent; }
+}
+
+.animate-highlight-fade {
+  animation: highlight-fade 2s ease-out forwards;
+}
