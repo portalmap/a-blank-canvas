@@ -29,8 +29,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Json } from '@/integrations/supabase/types';
 import { ShareDocumentDialog } from '@/components/documents/ShareDocumentDialog';
 import { RichTextEditor } from '@/components/documents/editor';
-
-const EMOJI_OPTIONS = ['📄', '📝', '📋', '📌', '📎', '📂', '🗂️', '📑', '📒', '📓', '💡', '🎯', '🚀', '⭐', '🔖'];
+import { EmojiPicker } from '@/components/documents/EmojiPicker';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 const DocumentView = () => {
   const { id } = useParams<{ id: string }>();
@@ -336,30 +340,24 @@ const DocumentView = () => {
         <div className="max-w-4xl mx-auto py-8 px-6">
           {/* Emoji + Title */}
           <div className="flex items-start gap-4 mb-8">
-            <div className="relative">
-              <button
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="text-5xl hover:bg-muted rounded-lg p-2 transition-colors"
-                disabled={document.is_protected}
-              >
-                {emoji}
-              </button>
-              {showEmojiPicker && (
-                <div className="absolute top-full left-0 mt-2 bg-popover border rounded-lg shadow-lg p-3 z-10">
-                  <div className="grid grid-cols-5 gap-2">
-                    {EMOJI_OPTIONS.map((e) => (
-                      <button
-                        key={e}
-                        onClick={() => handleEmojiSelect(e)}
-                        className="text-2xl hover:bg-muted rounded p-1 transition-colors"
-                      >
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+              <PopoverTrigger asChild>
+                <button
+                  className="text-5xl hover:bg-muted rounded-lg p-2 transition-colors"
+                  disabled={document.is_protected}
+                >
+                  {emoji}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-3" align="start">
+                <EmojiPicker
+                  selectedEmoji={emoji}
+                  onSelect={(e) => {
+                    handleEmojiSelect(e);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
             <Input
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
