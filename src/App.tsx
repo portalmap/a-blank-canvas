@@ -10,6 +10,7 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { GuestBlockedRoute } from "@/components/GuestRoute";
+import { WorkspaceRequiredGuard } from "@/components/WorkspaceRequiredGuard";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileHeader } from "@/components/MobileHeader";
 import { NotificationListener } from "@/components/notifications/NotificationListener";
@@ -53,6 +54,7 @@ const App = () => (
           path="/*"
           element={
             <ProtectedRoute>
+              <WorkspaceRequiredGuard>
                 <SidebarProvider>
                     <NotificationListener />
                     <div className="flex flex-col h-screen w-full overflow-hidden">
@@ -83,6 +85,7 @@ const App = () => (
                       </div>
                     </div>
                   </SidebarProvider>
+                </WorkspaceRequiredGuard>
                 </ProtectedRoute>
               }
             />
