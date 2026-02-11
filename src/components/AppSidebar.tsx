@@ -50,15 +50,18 @@ export function AppSidebar() {
   const { data: unreadChannels } = useUnreadChannels();
   
   const isAdmin = userRole?.isAdmin ?? false;
+  const isGuest = userRole?.isGuest ?? false;
   const isActive = (path: string) => location.pathname === path;
   const isCollapsed = state === 'collapsed';
   const hasUnreadMessages = unreadChannels && unreadChannels.length > 0;
   
-  // Filtrar módulos - Automações só para admin
-  const filteredModulesNavItems = modulesNavItems.filter(item => {
-    if (item.url === '/automations') return isAdmin;
-    return true;
-  });
+  // Filtrar módulos - Guest não vê nenhum módulo extra, Automações só para admin
+  const filteredModulesNavItems = isGuest
+    ? []
+    : modulesNavItems.filter(item => {
+        if (item.url === '/automations') return isAdmin;
+        return true;
+      });
 
   // Resize handler
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -208,6 +211,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {!isGuest && (
         <SidebarGroup>
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -267,6 +271,7 @@ export function AppSidebar() {
             )}
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>

@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
+export type WorkspaceRole = 'admin' | 'member' | 'limited_member' | 'guest';
+
 export const useUserRole = () => {
   const { user } = useAuth();
   const { activeWorkspace } = useWorkspace();
@@ -10,7 +12,7 @@ export const useUserRole = () => {
   return useQuery({
     queryKey: ['user-role', user?.id, activeWorkspace?.id],
     queryFn: async () => {
-      if (!user) return { isAdmin: false, isGlobalOwner: false, isOwner: false, role: null };
+      if (!user) return { isAdmin: false, isGlobalOwner: false, isOwner: false, isGuest: false, role: null, workspaceRole: 'member' as WorkspaceRole };
 
       // 1. Verificar roles globais (user_roles)
       const { data: globalRoles } = await supabase
@@ -24,7 +26,7 @@ export const useUserRole = () => {
 
       // Se tem role global de admin+, já é admin
       if (isGlobalOwner || isOwner || isGlobalAdmin) {
-        return { isAdmin: true, isGlobalOwner, isOwner, role: 'admin' as const };
+        return { isAdmin: true, isGlobalOwner, isOwner, isGuest: false, role: 'admin' as const, workspaceRole: 'admin' as WorkspaceRole };
       }
 
       // 2. Verificar role no workspace ativo
@@ -36,12 +38,16 @@ export const useUserRole = () => {
           .eq('workspace_id', activeWorkspace.id)
           .single();
 
-        if (membership?.role === 'admin') {
-          return { isAdmin: true, isGlobalOwner: false, isOwner: false, role: 'admin' as const };
+        const wsRole = (membership?.role as WorkspaceRole) || 'member';
+
+        if (wsRole === 'admin') {
+          return { isAdmin: true, isGlobalOwner: false, isOwner: false, isGuest: false, role: 'admin' as const, workspaceRole: wsRole };
         }
+
+        return { isAdmin: false, isGlobalOwner: false, isOwner: false, isGuest: wsRole === 'guest', role: wsRole as any, workspaceRole: wsRole };
       }
 
-      return { isAdmin: false, isGlobalOwner: false, isOwner: false, role: 'member' as const };
+      return { isAdmin: false, isGlobalOwner: false, isOwner: false, isGuest: false, role: 'member' as const, workspaceRole: 'member' as WorkspaceRole };
     },
     enabled: !!user,
   });

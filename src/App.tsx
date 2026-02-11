@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { GuestBlockedRoute } from "@/components/GuestRoute";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileHeader } from "@/components/MobileHeader";
 import { NotificationListener } from "@/components/notifications/NotificationListener";
@@ -61,19 +62,19 @@ const App = () => (
                         <main className="flex-1 overflow-auto">
                           <Routes>
                           <Route path="/" element={<HomePage />} />
-                          <Route path="/workspaces" element={<WorkspaceOverview />} />
+                          <Route path="/workspaces" element={<GuestBlockedRoute><WorkspaceOverview /></GuestBlockedRoute>} />
                           <Route path="/everything" element={<EverythingView />} />
-                          <Route path="/spaces" element={<SpacesView />} />
-                          <Route path="/space/:spaceId" element={<SpaceDetailView />} />
-                          <Route path="/folder/:folderId" element={<FolderDetailView />} />
-                          <Route path="/list/:listId" element={<ListDetailView />} />
+                          <Route path="/spaces" element={<GuestBlockedRoute><SpacesView /></GuestBlockedRoute>} />
+                          <Route path="/space/:spaceId" element={<GuestBlockedRoute><SpaceDetailView /></GuestBlockedRoute>} />
+                          <Route path="/folder/:folderId" element={<GuestBlockedRoute><FolderDetailView /></GuestBlockedRoute>} />
+                          <Route path="/list/:listId" element={<GuestBlockedRoute><ListDetailView /></GuestBlockedRoute>} />
                           <Route path="/task/:taskId" element={<TaskView />} />
-                          <Route path="/chat" element={<Chat />} />
-                          <Route path="/teams" element={<Teams />} />
-                          <Route path="/documents" element={<Documents />} />
-                          <Route path="/documents/:id" element={<DocumentView />} />
-                          <Route path="/dashboards" element={<Dashboards />} />
-                          <Route path="/dashboards/:id" element={<DashboardView />} />
+                          <Route path="/chat" element={<GuestBlockedRoute><Chat /></GuestBlockedRoute>} />
+                          <Route path="/teams" element={<GuestBlockedRoute><Teams /></GuestBlockedRoute>} />
+                          <Route path="/documents" element={<GuestBlockedRoute><Documents /></GuestBlockedRoute>} />
+                          <Route path="/documents/:id" element={<GuestBlockedRoute><DocumentView /></GuestBlockedRoute>} />
+                          <Route path="/dashboards" element={<GuestBlockedRoute><Dashboards /></GuestBlockedRoute>} />
+                          <Route path="/dashboards/:id" element={<GuestBlockedRoute><DashboardView /></GuestBlockedRoute>} />
                           <Route path="/automations" element={<AdminRoute><Automations /></AdminRoute>} />
                           <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                           <Route path="*" element={<NotFound />} />
