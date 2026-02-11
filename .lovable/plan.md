@@ -1,75 +1,88 @@
 
-# Forcar Selecao de Workspace ao Entrar (para todos os usuarios)
+# Tornar Pastas de Documentos Visiveis para o Workspace
 
 ## Problema
 
-Quando um usuario (especialmente o convidado) nao tem um workspace padrao definido, ele entra no sistema sem workspace ativo. Sem workspace ativo, o `useUserRole` nao consegue detectar o role real (retorna `isGuest: false`), e os modulos ficam todos visiveis ate que o usuario selecione um workspace manualmente.
+As pastas de documentos (`document_folders`) estao configuradas como **pessoais** - tanto as politicas de seguranca (RLS) quanto o codigo filtram por `user_id`. Isso significa que apenas o criador da pasta consegue ve-la. As pastas precisam ser visiveis para todos os membros do workspace (exceto convidados, que nao acessam o modulo de Documentos).
 
-## Solucao
-
-Criar um componente interceptor que, quando nao ha workspace ativo, exibe um dialog/tela de selecao de workspace obrigatorio **para todos os usuarios**. Isso beneficia todos (nao so guests), pois o sistema ja depende de um workspace ativo para funcionar corretamente.
+Alem disso, as pastas existentes no banco nao tem `workspace_id` preenchido (todas estao `null`).
 
 ## Alteracoes
 
-### 1. Criar `src/components/WorkspaceRequiredGuard.tsx`
+### 1. Migracao no banco de dados
 
-Um componente que envolve o conteudo principal do app. Quando `activeWorkspace` for `null` e o usuario estiver autenticado:
+- Atualizar as 4 pastas existentes para terem o `workspace_id` correto (associar ao workspace existente do criador)
+- Substituir as 4 politicas RLS atuais (baseadas em `user_id`) por novas politicas baseadas em `workspace_id` + membership no workspace:
+  - **SELECT**: Permitir leitura para quem e membro do workspace da pasta (excluindo role `guest`)
+  - **INSERT**: Permitir criacao para membros do workspace (exceto `guest`)
+  - **UPDATE**: Permitir edicao para membros do workspace (exceto `guest`)
+  - **DELETE**: Permitir exclusao apenas para `admin` e `member` (nao `limited_member` nem `guest`)
 
-- Busca a lista de workspaces do usuario
-- Se tiver **apenas 1 workspace**, seleciona automaticamente (sem perguntar)
-- Se tiver **mais de 1**, exibe um dialog modal obrigatorio pedindo para escolher
-- O dialog tambem oferece a opcao de "Definir como padrao" para que na proxima vez ja entre direto
+### 2. `src/hooks/useDocuments.ts` - useDocumentFolders
 
-Layout do dialog:
-- Titulo: "Selecione um Workspace"
-- Lista de workspaces como cards clicaveis
-- Checkbox opcional: "Definir como padrao para proximas vezes"
-- Sem botao de fechar (obrigatorio escolher)
+Alterar a query de `document_folders` para:
+- Filtrar por `workspace_id` do workspace ativo (em vez de `user_id`)
+- Ao criar pasta, incluir o `workspace_id` do workspace ativo
 
-### 2. Integrar no `src/App.tsx`
-
-Envolver o conteudo das rotas protegidas com o `WorkspaceRequiredGuard`, logo apos o `ProtectedRoute`. Assim, qualquer usuario autenticado sem workspace ativo sera interceptado antes de ver a interface.
-
+Mudanca principal:
 ```text
-<ProtectedRoute>
-  <WorkspaceRequiredGuard>
-    <SidebarProvider>
-      ...conteudo normal...
-    </SidebarProvider>
-  </WorkspaceRequiredGuard>
-</ProtectedRoute>
+// DE:
+.eq('user_id', user.id)
+
+// PARA:
+.eq('workspace_id', activeWorkspace.id)
 ```
 
-### 3. Ajustar `src/contexts/WorkspaceContext.tsx`
+E ao criar:
+```text
+// Adicionar workspace_id ao insert
+workspace_id: activeWorkspace.id
+```
 
-Adicionar um flag `isLoadingDefault` que indica se o sistema ainda esta tentando carregar o workspace padrao do perfil. Isso evita que o guard exiba o dialog antes de o auto-load ter chance de rodar.
+### 3. Nenhuma alteracao na sidebar ou componentes visuais
 
-O fluxo sera:
-1. Usuario faz login
-2. `WorkspaceContext` tenta carregar workspace padrao do perfil
-3. Se encontrar, seleciona automaticamente -> guard nao aparece
-4. Se nao encontrar, `isLoadingDefault` vira false -> guard exibe dialog
-
-### 4. Nenhuma alteracao no banco de dados
-
-A funcionalidade de `default_workspace_id` no `profiles` ja existe. Sera reutilizada para salvar a preferencia quando o usuario marcar "Definir como padrao".
+A sidebar (`DocsHubSidebar`) ja renderiza as pastas que recebe via props. Uma vez que o hook retorne as pastas do workspace, elas aparecerao automaticamente para todos os membros.
 
 ## Detalhes tecnicos
 
-Componente `WorkspaceRequiredGuard`:
+Migracao SQL:
 ```text
-- Usa useWorkspace() para checar activeWorkspace
-- Usa useWorkspaces() para listar workspaces disponiveis
-- Usa useSetDefaultWorkspace() para salvar preferencia
-- Se workspaces.length === 1, chama setActiveWorkspace automaticamente
-- Se workspaces.length > 1, renderiza Dialog com preventClose
-- Ao selecionar, chama setActiveWorkspace(workspace)
-- Se checkbox "padrao" marcado, tambem chama setDefaultWorkspace.mutate(workspace.id)
+-- Preencher workspace_id nas pastas existentes (buscar do workspace do criador)
+UPDATE document_folders df
+SET workspace_id = wm.workspace_id
+FROM workspace_members wm
+WHERE wm.user_id = df.user_id
+  AND df.workspace_id IS NULL;
+
+-- Remover politicas antigas
+DROP POLICY "Users can view their own folders" ON document_folders;
+DROP POLICY "Users can create their own folders" ON document_folders;
+DROP POLICY "Users can update their own folders" ON document_folders;
+DROP POLICY "Users can delete their own folders" ON document_folders;
+
+-- Novas politicas baseadas em workspace
+CREATE POLICY "Workspace members can view folders"
+ON document_folders FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM workspace_members wm
+    WHERE wm.workspace_id = document_folders.workspace_id
+      AND wm.user_id = auth.uid()
+      AND wm.role != 'guest'
+  )
+);
+
+-- INSERT, UPDATE, DELETE com logica similar
 ```
 
-Flag no WorkspaceContext:
+Alteracao no hook `useDocumentFolders`:
 ```text
-- Novo estado: isLoadingDefault (inicia true, vira false apos loadDefaultWorkspace completar)
-- Expor no contexto para o guard saber quando esperar
-- Guard so mostra dialog quando isLoadingDefault === false E activeWorkspace === null
+// Importar useWorkspace
+const { activeWorkspace } = useWorkspace();
+
+// Query: filtrar por workspace
+.eq('workspace_id', activeWorkspace.id)
+
+// Create: incluir workspace_id
+insert({ ..., workspace_id: activeWorkspace.id })
 ```
