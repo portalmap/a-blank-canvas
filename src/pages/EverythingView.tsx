@@ -45,6 +45,9 @@ export default function EverythingView() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [groupBy, setGroupBy] = useState<GroupByOption>('due_date');
+  const { data: roleInfo } = useUserRole();
+  const isGuest = roleInfo?.isGuest ?? false;
+
   const [filters, setFilters] = useState<FilterState>({
     statuses: [],
     priorities: [],
@@ -58,8 +61,9 @@ export default function EverythingView() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
-  const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined, filters.viewMode);
-  const { data: roleInfo } = useUserRole();
+  // Guest always sees only assigned tasks
+  const effectiveViewMode = isGuest ? 'assigned' : filters.viewMode;
+  const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined, effectiveViewMode);
   const { data: statuses = [] } = useStatuses(selectedWorkspaceId ?? undefined);
   const { data: defaultStatus } = useDefaultStatus(selectedWorkspaceId ?? undefined);
 
@@ -209,11 +213,13 @@ export default function EverythingView() {
                   </SelectContent>
                 </Select>
                 <span className="text-sm text-muted-foreground">
-                  {roleInfo?.isAdmin 
-                    ? 'Todas as tarefas do workspace' 
-                    : filters.viewMode === 'my-spaces'
-                      ? 'Todas as tarefas dos seus Spaces'
-                      : 'Suas tarefas atribuídas'}
+                  {isGuest
+                    ? 'Suas tarefas atribuídas'
+                    : roleInfo?.isAdmin 
+                      ? 'Todas as tarefas do workspace' 
+                      : filters.viewMode === 'my-spaces'
+                        ? 'Todas as tarefas dos seus Spaces'
+                        : 'Suas tarefas atribuídas'}
                 </span>
               </div>
             </div>
@@ -241,12 +247,14 @@ export default function EverythingView() {
 
             <div className="flex items-center gap-3">
               <GroupBySelector value={groupBy} onChange={setGroupBy} />
+              {!isGuest && (
               <EverythingFilters
                 filters={filters}
                 onChange={setFilters}
                 availableStatuses={availableStatuses}
                 isAdmin={roleInfo?.isAdmin === true}
               />
+              )}
               <ColumnSelector
                 listId={null}
                 scope="everything"
