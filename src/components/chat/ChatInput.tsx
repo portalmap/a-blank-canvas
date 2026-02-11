@@ -35,11 +35,24 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const autoResize = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const maxHeight = 200;
+    el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px';
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  };
+
   const handleSubmit = async () => {
     const trimmedContent = content.trim();
     if (!trimmedContent || sendMessage.isPending) return;
 
     setContent('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '44px';
+      textareaRef.current.style.overflowY = 'hidden';
+    }
     const assigneeId = selectedAssignee?.user_id;
     
     const result = await sendMessage.mutateAsync({ 
@@ -99,11 +112,14 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
         <Textarea
           ref={textareaRef}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => {
+            setContent(e.target.value);
+            autoResize();
+          }}
           onKeyDown={handleKeyDown}
           placeholder={`Mensagem em #${channelName}`}
           className="min-h-[44px] max-h-[200px] resize-none"
-          rows={1}
+          style={{ overflowY: 'hidden' }}
         />
         <CommentAssigneeSelector
           workspaceId={workspaceId}
