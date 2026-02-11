@@ -1,39 +1,115 @@
 
-# Abrir Chat Diretamente no Canal e Mensagem Referenciada
+# Modulo de Notificacoes em Tempo Real (Toast)
 
 ## Resumo
 
-Quando o usuario clica no link de um comentario atribuido no chat (ex: "#MAP | Monvizo Chat"), o sistema navega para `/chat?channel=xxx` mas nao abre o canal correspondente. O problema e que `Chat.tsx` nao le os parametros da URL. Alem disso, vamos adicionar suporte para rolar ate a mensagem especifica e destaca-la visualmente.
+Criar um sistema de notificacoes via toast (sonner) que aparece em tempo real para o usuario logado. Sem tela de listagem de notificacoes, sem armazenamento obrigatorio. As notificacoes sao pessoais (so para o proprio usuario) e cada uma dispara apenas uma vez. Ao clicar, redireciona para o item relacionado.
 
-## Alteracoes
+## Tipos de Notificacao
 
-### 1. `src/pages/Chat.tsx`
+| Tipo | Gatilho | Navegacao ao clicar |
+|------|---------|-------------------|
+| Tarefa atribuida | Nova entrada em `task_assignees` com `user_id = eu` | `/task/{taskId}` |
+| Comentario atribuido (tarefa) | Nova entrada em `task_comments` com `assignee_id = eu` | `/task/{taskId}` |
+| Comentario atribuido (chat) | Nova mensagem em `chat_messages` com `assignee_id = eu` | `/chat?channel={channelId}&message={msgId}` |
+| Tarefa atrasada | Task com `due_date < hoje` e sem `completed_at` | `/task/{taskId}` |
+| Tarefa vence amanha | Task com `due_date = amanha` e sem `completed_at` | `/task/{taskId}` |
+| Novo post no feed | Nova entrada em `feed_posts` no workspace | `/` (pagina Inicio) |
+| Permissao de Space adicionada | Nova entrada em `space_permissions` com `user_id = eu` | `/space/{spaceId}` |
+| Permissao de Space removida | Entrada removida de `space_permissions` com `user_id = eu` | Toast informativo apenas |
 
-- Importar `useSearchParams` do `react-router-dom`
-- Ler os parametros `channel` e `message` da URL
-- Quando `channel` estiver presente na URL e os canais estiverem carregados, selecionar automaticamente esse canal
-- Passar o `messageId` (se presente) para o `ChatRoom` como prop `highlightMessageId`
+## Arquitetura
 
-### 2. `src/components/home/AssignedCommentsCard.tsx`
+### 1. Realtime (Supabase)
 
-- Atualizar a navegacao para incluir o ID da mensagem na URL: `/chat?channel={channelId}&message={messageId}`
+Habilitar realtime nas tabelas que ainda nao tem:
+- `task_assignees`
+- `task_comments`
+- `feed_posts`
+- `space_permissions`
 
-### 3. `src/components/chat/ChatRoom.tsx`
+(Tabela `chat_messages` ja tem realtime habilitado.)
 
-- Receber nova prop opcional `highlightMessageId`
-- Quando presente, apos as mensagens carregarem, rolar ate o elemento da mensagem referenciada (usando `scrollIntoView`)
-- Passar o `highlightMessageId` para `ChatMessageItem`
+### 2. Componente `NotificationListener`
 
-### 4. `src/components/chat/ChatMessageItem.tsx`
+Um componente invisivel montado no layout principal (dentro de `ProtectedRoute` em `App.tsx`) que:
+- Escuta mudancas realtime nas tabelas acima, filtrando por `user_id = auth.uid()`
+- Para tarefas atrasadas/vencendo amanha: faz um polling a cada 5 minutos
+- Usa `localStorage` para armazenar IDs ja notificados (previne duplicatas)
+- Exibe toast via `sonner` com mensagem e botao de acao (navegar)
 
-- Receber prop opcional `highlightMessageId`
-- Se o ID da mensagem corresponder, aplicar um efeito visual de destaque (fundo amarelo/primary com fade-out animado via CSS)
-- Adicionar um `id` ou `data-message-id` no elemento para permitir scroll programatico
+### 3. Tab "Notificacoes" em Configuracoes
 
-## Fluxo esperado
+Nova aba no `Settings.tsx` com toggles simples para habilitar/desabilitar cada tipo de notificacao. Essas configuracoes sao globais (workspace-level), gerenciadas pelo admin.
 
-1. Usuario clica no link "#MAP | Monvizo Chat" no card de comentarios atribuidos
-2. Navega para `/chat?channel=abc123&message=msg456`
-3. `Chat.tsx` le o parametro `channel`, seleciona o canal `abc123`
-4. `ChatRoom` carrega as mensagens e rola ate `msg456`
-5. A mensagem `msg456` pisca com destaque por ~2 segundos e depois volta ao normal
+### 4. Tabela `notification_settings`
+
+Nova tabela no banco para armazenar as preferencias globais do workspace:
+
+```text
+notification_settings
+- id (uuid, PK)
+- workspace_id (uuid, FK, unique)
+- task_assigned (boolean, default true)
+- comment_assigned (boolean, default true)
+- task_due_tomorrow (boolean, default true)
+- task_overdue (boolean, default true)
+- feed_new_post (boolean, default true)
+- space_permission_change (boolean, default true)
+- created_at (timestamp)
+- updated_at (timestamp)
+```
+
+RLS: admins podem gerenciar, membros podem ler.
+
+## Detalhes Tecnicos
+
+### Arquivos a criar
+
+1. **`src/components/notifications/NotificationListener.tsx`**
+   - Componente invisivel que monta subscricoes Realtime
+   - useEffect para polling de tarefas atrasadas/vencendo
+   - localStorage keys: `notified_task_assign_{id}`, `notified_overdue_{taskId}_{date}`, etc.
+   - Usa `toast()` do sonner com `onClick` para navegacao via `useNavigate`
+   - Le configuracoes do workspace via hook
+
+2. **`src/hooks/useNotificationSettings.ts`**
+   - Hook para ler/salvar configuracoes de notificacao do workspace
+   - Query + Mutation para tabela `notification_settings`
+
+3. **`src/components/settings/NotificationSettings.tsx`**
+   - UI com switches para cada tipo de notificacao
+   - Layout simples em card com descricoes curtas
+
+### Arquivos a modificar
+
+4. **`src/App.tsx`**
+   - Adicionar `<NotificationListener />` dentro do layout protegido
+
+5. **`src/pages/Settings.tsx`**
+   - Adicionar aba "Notificacoes" com o componente `NotificationSettings`
+
+### Migracao SQL
+
+- Criar tabela `notification_settings`
+- Habilitar realtime em `task_assignees`, `task_comments`, `feed_posts`, `space_permissions`
+- RLS policies para a nova tabela
+
+### Logica de "apenas uma vez"
+
+Para cada notificacao, armazenar no localStorage um Set de IDs ja notificados. Exemplos:
+- Tarefa atribuida: key = `notif_task_assign`, valor = Set de `task_assignees.id`
+- Tarefa atrasada: key = `notif_overdue`, valor = Set de `{taskId}_{date}` (notifica uma vez por dia)
+- Tarefa vence amanha: key = `notif_due_tomorrow`, valor = Set de `{taskId}_{date}`
+- Limpar entradas com mais de 7 dias para nao acumular
+
+### Formato do Toast
+
+Toast compacto usando `sonner`:
+```text
+[icone] Titulo curto
+Descricao breve
+[Botao: Ver →]
+```
+
+Duracao: 8 segundos, com botao de acao para navegar.
