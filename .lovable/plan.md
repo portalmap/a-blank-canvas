@@ -1,43 +1,75 @@
 
-# Corrigir Restricoes do Convidado (Guest)
+# Forcar Selecao de Workspace ao Entrar (para todos os usuarios)
 
-## Problema Raiz
+## Problema
 
-O bug principal esta no `WorkspaceContext.tsx`. Quando o sistema valida a membership do workspace, ele so aceita os roles `['admin', 'member']`. Isso faz com que guests e limited_members tenham o workspace **removido** do estado. Sem workspace ativo, o `useUserRole` nao consegue detectar que o usuario e guest (retorna `isGuest: false`), e todas as restricoes da sidebar e rotas ficam desativadas.
+Quando um usuario (especialmente o convidado) nao tem um workspace padrao definido, ele entra no sistema sem workspace ativo. Sem workspace ativo, o `useUserRole` nao consegue detectar o role real (retorna `isGuest: false`), e os modulos ficam todos visiveis ate que o usuario selecione um workspace manualmente.
 
-Fluxo do bug:
-1. Guest faz login -> workspace carrega do localStorage
-2. `validateWorkspaceMembership` roda -> ve que o role e `guest`
-3. Como `guest` nao esta em `['admin', 'member']`, limpa o workspace
-4. Sem workspace, `useUserRole` retorna `isGuest: false`
-5. Sidebar mostra tudo, rotas nao bloqueiam
+## Solucao
 
-O "flash" que voce ve (workspace aparece e some) e exatamente esse comportamento.
+Criar um componente interceptor que, quando nao ha workspace ativo, exibe um dialog/tela de selecao de workspace obrigatorio **para todos os usuarios**. Isso beneficia todos (nao so guests), pois o sistema ja depende de um workspace ativo para funcionar corretamente.
 
 ## Alteracoes
 
-### 1. `src/contexts/WorkspaceContext.tsx` - Aceitar todos os roles validos
+### 1. Criar `src/components/WorkspaceRequiredGuard.tsx`
 
-**Linha 97** - No `loadDefaultWorkspace`, incluir `guest` e `limited_member` na lista de roles aceitos:
-- De: `['admin', 'member']`
-- Para: `['admin', 'member', 'limited_member', 'guest']`
+Um componente que envolve o conteudo principal do app. Quando `activeWorkspace` for `null` e o usuario estiver autenticado:
 
-**Linha 153** - No `validateWorkspaceMembership`, mesma correcao:
-- De: `['admin', 'member']`
-- Para: `['admin', 'member', 'limited_member', 'guest']`
+- Busca a lista de workspaces do usuario
+- Se tiver **apenas 1 workspace**, seleciona automaticamente (sem perguntar)
+- Se tiver **mais de 1**, exibe um dialog modal obrigatorio pedindo para escolher
+- O dialog tambem oferece a opcao de "Definir como padrao" para que na proxima vez ja entre direto
 
-### 2. `src/components/settings/UserManagement.tsx` - Remover "Gerenciar Permissoes de Spaces" para guests
+Layout do dialog:
+- Titulo: "Selecione um Workspace"
+- Lista de workspaces como cards clicaveis
+- Checkbox opcional: "Definir como padrao para proximas vezes"
+- Sem botao de fechar (obrigatorio escolher)
 
-**Linha 452** - Alterar a condicao `canManagePermissions` para excluir usuarios com role `guest`:
-- De: `canManagePermissions={canEdit && !member.isGlobalOwner}`
-- Para: `canManagePermissions={canEdit && !member.isGlobalOwner && member.role !== 'guest'}`
+### 2. Integrar no `src/App.tsx`
 
-Isso remove a opcao "Gerenciar Permissoes de Spaces" do menu de acoes para convidados, ja que eles so veem tarefas atribuidas e nao precisam de acesso a spaces.
+Envolver o conteudo das rotas protegidas com o `WorkspaceRequiredGuard`, logo apos o `ProtectedRoute`. Assim, qualquer usuario autenticado sem workspace ativo sera interceptado antes de ver a interface.
 
-## Resultado Esperado
+```text
+<ProtectedRoute>
+  <WorkspaceRequiredGuard>
+    <SidebarProvider>
+      ...conteudo normal...
+    </SidebarProvider>
+  </WorkspaceRequiredGuard>
+</ProtectedRoute>
+```
 
-- Guest faz login -> workspace permanece ativo
-- `useUserRole` detecta corretamente `isGuest: true`
-- Sidebar mostra apenas "Inicio" e "Tudo"
-- Rotas bloqueadas redirecionam para /
-- No painel de usuarios, convidados nao tem a opcao de gerenciar permissoes de Spaces
+### 3. Ajustar `src/contexts/WorkspaceContext.tsx`
+
+Adicionar um flag `isLoadingDefault` que indica se o sistema ainda esta tentando carregar o workspace padrao do perfil. Isso evita que o guard exiba o dialog antes de o auto-load ter chance de rodar.
+
+O fluxo sera:
+1. Usuario faz login
+2. `WorkspaceContext` tenta carregar workspace padrao do perfil
+3. Se encontrar, seleciona automaticamente -> guard nao aparece
+4. Se nao encontrar, `isLoadingDefault` vira false -> guard exibe dialog
+
+### 4. Nenhuma alteracao no banco de dados
+
+A funcionalidade de `default_workspace_id` no `profiles` ja existe. Sera reutilizada para salvar a preferencia quando o usuario marcar "Definir como padrao".
+
+## Detalhes tecnicos
+
+Componente `WorkspaceRequiredGuard`:
+```text
+- Usa useWorkspace() para checar activeWorkspace
+- Usa useWorkspaces() para listar workspaces disponiveis
+- Usa useSetDefaultWorkspace() para salvar preferencia
+- Se workspaces.length === 1, chama setActiveWorkspace automaticamente
+- Se workspaces.length > 1, renderiza Dialog com preventClose
+- Ao selecionar, chama setActiveWorkspace(workspace)
+- Se checkbox "padrao" marcado, tambem chama setDefaultWorkspace.mutate(workspace.id)
+```
+
+Flag no WorkspaceContext:
+```text
+- Novo estado: isLoadingDefault (inicia true, vira false apos loadDefaultWorkspace completar)
+- Expor no contexto para o guard saber quando esperar
+- Guard so mostra dialog quando isLoadingDefault === false E activeWorkspace === null
+```
