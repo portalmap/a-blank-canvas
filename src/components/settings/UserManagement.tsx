@@ -449,7 +449,7 @@ export function UserManagement() {
                   canEdit={canEdit}
                   canDelete={canDelete(member)}
                   canDeleteFromSystem={canDeleteFromSystem(member)}
-                  canManagePermissions={canEdit && !member.isGlobalOwner}
+                  canManagePermissions={canEdit && !member.isGlobalOwner && member.role !== 'guest'}
                 />
               ))
             )}

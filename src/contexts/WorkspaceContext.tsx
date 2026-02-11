@@ -94,7 +94,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
             .eq('user_id', user.id)
             .single();
 
-          if (membership && ['admin', 'member'].includes(membership.role)) {
+          if (membership && ['admin', 'member', 'limited_member', 'guest'].includes(membership.role)) {
             setActiveWorkspace(workspace);
           }
         }
@@ -150,7 +150,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         .single();
       
       // If user is not a member with valid role, clear the stored workspace
-      if (!membership || !['admin', 'member'].includes(membership.role)) {
+      if (!membership || !['admin', 'member', 'limited_member', 'guest'].includes(membership.role)) {
         clearActiveWorkspace();
       }
 
