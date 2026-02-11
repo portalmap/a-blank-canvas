@@ -9,6 +9,7 @@ import { TagsSettings } from "@/components/settings/TagsSettings";
 import { WebhooksSettings } from "@/components/settings/webhooks/WebhooksSettings";
 import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettings";
 import { ApiSettings } from "@/components/settings/api/ApiSettings";
+import { NotificationSettings } from "@/components/settings/NotificationSettings";
 
 export default function Settings() {
   return (
@@ -21,7 +22,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-10 lg:w-[1200px]">
+        <TabsList className="grid w-full grid-cols-11 lg:w-[1320px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
@@ -30,6 +31,7 @@ export default function Settings() {
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="invites">Convites</TabsTrigger>
           <TabsTrigger value="guests">Convidados</TabsTrigger>
+          <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
         </TabsList>
@@ -64,6 +66,10 @@ export default function Settings() {
 
         <TabsContent value="guests" className="mt-6">
           <GuestPermissionsManager />
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6">
+          <NotificationSettings />
         </TabsContent>
 
         <TabsContent value="webhooks" className="mt-6">

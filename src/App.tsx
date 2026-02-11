@@ -11,6 +11,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileHeader } from "@/components/MobileHeader";
+import { NotificationListener } from "@/components/notifications/NotificationListener";
 import HomePage from "./pages/HomePage";
 import WorkspaceOverview from "./pages/WorkspaceOverview";
 import SpacesView from "./pages/SpacesView";
@@ -52,6 +53,7 @@ const App = () => (
           element={
             <ProtectedRoute>
                 <SidebarProvider>
+                    <NotificationListener />
                     <div className="flex flex-col h-screen w-full overflow-hidden">
                       <MobileHeader />
                       <div className="flex flex-1 overflow-hidden">

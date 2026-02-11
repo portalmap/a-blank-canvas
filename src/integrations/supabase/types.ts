@@ -1222,6 +1222,53 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          comment_assigned: boolean
+          created_at: string
+          feed_new_post: boolean
+          id: string
+          space_permission_change: boolean
+          task_assigned: boolean
+          task_due_tomorrow: boolean
+          task_overdue: boolean
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          comment_assigned?: boolean
+          created_at?: string
+          feed_new_post?: boolean
+          id?: string
+          space_permission_change?: boolean
+          task_assigned?: boolean
+          task_due_tomorrow?: boolean
+          task_overdue?: boolean
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          comment_assigned?: boolean
+          created_at?: string
+          feed_new_post?: boolean
+          id?: string
+          space_permission_change?: boolean
+          task_assigned?: boolean
+          task_due_tomorrow?: boolean
+          task_overdue?: boolean
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
