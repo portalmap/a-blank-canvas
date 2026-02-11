@@ -17,6 +17,7 @@ interface WorkspaceContextType {
   clearActiveWorkspace: () => void;
   isWorkspaceSelected: boolean;
   isValidatingWorkspace: boolean;
+  isLoadingDefault: boolean;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -26,6 +27,7 @@ const STORAGE_KEY = 'active-workspace';
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [isValidatingWorkspace, setIsValidatingWorkspace] = useState(true);
+  const [isLoadingDefault, setIsLoadingDefault] = useState(true);
   const [hasCheckedDefault, setHasCheckedDefault] = useState(false);
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -64,7 +66,10 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadDefaultWorkspace = async () => {
       // Wait for auth to finish loading
-      if (authLoading || !user || activeWorkspace || hasCheckedDefault) {
+      if (authLoading) return;
+      
+      if (!user || activeWorkspace || hasCheckedDefault) {
+        setIsLoadingDefault(false);
         return;
       }
 
@@ -99,6 +104,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       }
+      setIsLoadingDefault(false);
     };
 
     loadDefaultWorkspace();
@@ -170,6 +176,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         clearActiveWorkspace,
         isWorkspaceSelected,
         isValidatingWorkspace: authLoading || isValidatingWorkspace,
+        isLoadingDefault: authLoading || isLoadingDefault,
       }}
     >
       {children}
