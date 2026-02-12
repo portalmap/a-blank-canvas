@@ -65,13 +65,14 @@ export const useDocuments = (options: UseDocumentsOptions = {}) => {
   const { filter = 'all', search, tagIds, folderId } = options;
 
   const documentsQuery = useQuery({
-    queryKey: ['documents', user?.id, filter, search, tagIds, folderId],
+    queryKey: ['documents', user?.id, activeWorkspace?.id, filter, search, tagIds, folderId],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id || !activeWorkspace?.id) return [];
 
       let query = supabase
         .from('documents')
         .select('*')
+        .eq('workspace_id', activeWorkspace.id)
         .order('updated_at', { ascending: false });
 
       // Filter by folder if specified
@@ -347,17 +348,18 @@ export const useDocumentTags = () => {
 
 export const useDocumentFolders = () => {
   const { user } = useAuth();
+  const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
 
   const foldersQuery = useQuery({
-    queryKey: ['document-folders', user?.id],
+    queryKey: ['document-folders', user?.id, activeWorkspace?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id || !activeWorkspace?.id) return [];
 
       const { data, error } = await supabase
         .from('document_folders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('workspace_id', activeWorkspace.id)
         .order('name');
 
       if (error) throw error;
@@ -378,6 +380,7 @@ export const useDocumentFolders = () => {
           color: data.color || '#6366f1',
           parent_folder_id: data.parent_folder_id || null,
           is_wiki: data.is_wiki || false,
+          workspace_id: activeWorkspace?.id || null,
         })
         .select()
         .single();
