@@ -42,6 +42,7 @@ export interface DocumentFolder {
   id: string;
   name: string;
   user_id: string;
+  workspace_id: string | null;
   parent_folder_id: string | null;
   color: string;
   is_wiki: boolean;
