@@ -42,7 +42,6 @@ export interface DocumentFolder {
   id: string;
   name: string;
   user_id: string;
-  workspace_id: string | null;
   parent_folder_id: string | null;
   color: string;
   is_wiki: boolean;
@@ -348,35 +347,33 @@ export const useDocumentTags = () => {
 
 export const useDocumentFolders = () => {
   const { user } = useAuth();
-  const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
 
   const foldersQuery = useQuery({
-    queryKey: ['document-folders', activeWorkspace?.id],
+    queryKey: ['document-folders', user?.id],
     queryFn: async () => {
-      if (!activeWorkspace?.id) return [];
+      if (!user?.id) return [];
 
       const { data, error } = await supabase
         .from('document_folders')
         .select('*')
-        .eq('workspace_id', activeWorkspace.id)
+        .eq('user_id', user.id)
         .order('name');
 
       if (error) throw error;
       return data as DocumentFolder[] || [];
     },
-    enabled: !!activeWorkspace?.id,
+    enabled: !!user?.id,
   });
 
   const createFolder = useMutation({
     mutationFn: async (data: { name: string; color?: string; parent_folder_id?: string; is_wiki?: boolean }) => {
-      if (!user?.id || !activeWorkspace?.id) throw new Error('Usuário não autenticado');
+      if (!user?.id) throw new Error('Usuário não autenticado');
 
       const { data: folder, error } = await supabase
         .from('document_folders')
         .insert({
           user_id: user.id,
-          workspace_id: activeWorkspace.id,
           name: data.name,
           color: data.color || '#6366f1',
           parent_folder_id: data.parent_folder_id || null,
