@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, ArrowLeftRight, CheckSquare, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useTheme } from 'next-themes';
 import mapLogoLight from '@/assets/map-logo-light.png';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +25,19 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUnreadChannels } from '@/hooks/useChatUnread';
+import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
+import { useDefaultWorkspace, useSetDefaultWorkspace, useCreateWorkspace } from '@/hooks/useWorkspaces';
+import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const homeNavItem = { title: 'Início', url: '/', icon: Home };
 
@@ -43,17 +56,40 @@ export function AppSidebar() {
   const [workspaceOpen, setWorkspaceOpen] = useState(true);
   const { theme, setTheme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut } = useAuth();
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: userRole } = useUserRole();
   const { data: unreadChannels } = useUnreadChannels();
+  const { data: canCreate } = useCanCreateWorkspace();
+  const { data: defaultWorkspaceId } = useDefaultWorkspace();
+  const setDefaultWorkspace = useSetDefaultWorkspace();
+  const createWorkspace = useCreateWorkspace();
+  
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
   
   const isAdmin = userRole?.isAdmin ?? false;
   const isGuest = userRole?.isGuest ?? false;
   const isActive = (path: string) => location.pathname === path;
   const isCollapsed = state === 'collapsed';
   const hasUnreadMessages = unreadChannels && unreadChannels.length > 0;
+  const isDefaultWorkspace = activeWorkspace?.id === defaultWorkspaceId;
+
+  const handleToggleDefault = () => {
+    if (!activeWorkspace) return;
+    setDefaultWorkspace.mutate(isDefaultWorkspace ? null : activeWorkspace.id);
+  };
+
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWorkspaceName.trim()) return;
+    await createWorkspace.mutateAsync(newWorkspaceName.trim());
+    setNewWorkspaceName('');
+    setIsCreateOpen(false);
+  };
   
   // Filtrar módulos - Guest não vê nenhum módulo extra, Automações só para admin
   const filteredModulesNavItems = isGuest
@@ -88,6 +124,7 @@ export function AppSidebar() {
   };
 
   return (
+    <>
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
@@ -230,13 +267,57 @@ export function AppSidebar() {
                     </button>
                   </CollapsibleTrigger>
                   {!isCollapsed && (
-                    <button
-                      onClick={clearActiveWorkspace}
-                      className="p-1 hover:bg-sidebar-accent rounded flex-shrink-0"
-                      title="Trocar Workspace"
-                    >
-                      <ArrowLeftRight className="h-4 w-4" />
-                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="p-1 hover:bg-sidebar-accent rounded flex-shrink-0"
+                          title="Opções do Workspace"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={clearActiveWorkspace}>
+                          <ArrowLeftRight className="h-4 w-4 mr-2" />
+                          Trocar Workspace
+                        </DropdownMenuItem>
+                        {canCreate && (
+                          <DropdownMenuItem onClick={() => setIsCreateOpen(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Novo Workspace
+                          </DropdownMenuItem>
+                        )}
+                        {isAdmin && (
+                          <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Renomear
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleToggleDefault}>
+                          {isDefaultWorkspace ? (
+                            <>
+                              <StarOff className="h-4 w-4 mr-2" />
+                              Remover Padrão
+                            </>
+                          ) : (
+                            <>
+                              <Star className="h-4 w-4 mr-2" />
+                              Definir como Padrão
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        {isAdmin && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => navigate('/workspaces')}>
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Detalhes do Workspace
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
                 
@@ -342,5 +423,42 @@ export function AppSidebar() {
         />
       )}
     </Sidebar>
+
+    {/* Workspace Edit Dialog */}
+    <WorkspaceEditDialog
+      workspace={activeWorkspace}
+      open={isEditOpen}
+      onOpenChange={setIsEditOpen}
+    />
+
+    {/* Create Workspace Dialog */}
+    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Novo Workspace</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleCreateWorkspace} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="ws-name">Nome do Workspace *</Label>
+            <Input
+              id="ws-name"
+              placeholder="Meu Projeto"
+              value={newWorkspaceName}
+              onChange={(e) => setNewWorkspaceName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={createWorkspace.isPending}>
+              {createWorkspace.isPending ? 'Criando...' : 'Criar'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
