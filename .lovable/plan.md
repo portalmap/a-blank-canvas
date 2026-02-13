@@ -1,47 +1,41 @@
 
-# Corrigir Visibilidade de Pastas e Documentos Wiki
 
-## Problema
+# Adicionar Menu de Acoes no Workspace da Sidebar
 
-As pastas Wiki e os documentos sumiram porque o hook `useDocumentFolders` filtra por `user_id = auth.uid()`. Isso faz com que apenas o criador das pastas as veja. Os dados estao intactos no banco (4 pastas wiki e 20+ documentos wiki).
+## O que sera feito
 
-O hook `useDocuments` tambem nao filtra por `workspace_id`, o que pode causar vazamento de dados entre workspaces (um usuario vendo documentos de outro workspace).
+Substituir o botao de "trocar workspace" (icone de setas) na sidebar por um menu de "3 pontinhos" (MoreHorizontal) com as seguintes opcoes:
 
-## Alteracoes
+- **Trocar Workspace** - disponivel para todos
+- **Novo Workspace** - apenas para usuarios com permissao (global_owner, owner, admin global)
+- **Renomear Workspace** - apenas para admins do workspace
+- **Definir como Padrao / Remover Padrao** - disponivel para todos
+- **Detalhes do Workspace** - navega para a pagina de workspaces (apenas admins)
 
-### 1. `src/hooks/useDocuments.ts` - Corrigir query de pastas
+## Regras de Permissao
 
-No `useDocumentFolders` (linha 352-366):
-- Remover o filtro `.eq('user_id', user.id)` 
-- Adicionar filtro `.eq('workspace_id', activeWorkspace.id)` para buscar todas as pastas do workspace ativo
-- Importar `useWorkspace` e usar `activeWorkspace`
-- Ajustar a queryKey para incluir `activeWorkspace?.id`
+- Guest: ve apenas "Trocar Workspace" e "Definir como Padrao" (mas guest nao ve a secao Principal, entao na pratica nao afeta)
+- Member / Limited Member: "Trocar Workspace" e "Definir como Padrao"
+- Admin do workspace: todas as opcoes
+- Global Owner / Owner / Admin global: todas as opcoes + "Novo Workspace"
 
-Resultado: todos os membros do workspace verao as pastas wiki (e as pastas de documentos do workspace).
+## Alteracoes Tecnicas
 
-### 2. `src/hooks/useDocuments.ts` - Filtrar documentos por workspace
+### 1. `src/components/AppSidebar.tsx`
 
-No `useDocuments` (linhas 72-96):
-- Adicionar `.eq('workspace_id', activeWorkspace.id)` na query base de documentos
-- Isso garante que documentos de outros workspaces nao aparecem
-- Ajustar a queryKey para incluir `activeWorkspace?.id`
+- Importar `MoreHorizontal` do lucide-react e `DropdownMenu` do radix
+- Importar `useCanCreateWorkspace`, `useDefaultWorkspace`, `useSetDefaultWorkspace`
+- Importar `WorkspaceEditDialog` e adicionar estado para controlar o dialog de edicao
+- Substituir o botao `ArrowLeftRight` (linha 233-239) por um `DropdownMenu` com icone `MoreHorizontal`
+- Itens do menu:
+  - "Trocar Workspace" -> chama `clearActiveWorkspace()`
+  - "Novo Workspace" -> abre dialog de criacao (condicional: `canCreate`)
+  - "Renomear" -> abre `WorkspaceEditDialog` (condicional: `isAdmin`)
+  - "Definir como Padrao" / "Remover Padrao" -> toggle via `setDefaultWorkspace`
+- Adicionar dialog de criacao de workspace inline (reutilizando a logica do WorkspaceOverview)
+- Adicionar `WorkspaceEditDialog` para renomear
 
-### 3. `src/hooks/useDocuments.ts` - Corrigir createFolder
+### 2. Nenhuma alteracao no banco de dados
 
-No `createFolder` (linha 370-392):
-- Adicionar `workspace_id: activeWorkspace?.id` ao insert, pois a pasta precisa estar vinculada ao workspace
+Todas as permissoes ja existem. O `useCanCreateWorkspace` verifica roles globais e o `useUserRole` verifica o role no workspace.
 
-## Resumo tecnico
-
-```text
-// useDocumentFolders - ANTES:
-.eq('user_id', user.id)
-
-// useDocumentFolders - DEPOIS:
-.eq('workspace_id', activeWorkspace.id)
-
-// useDocuments query - ADICIONAR:
-.eq('workspace_id', activeWorkspace.id)
-```
-
-Nenhuma alteracao no banco de dados e necessaria. Os dados ja existem com `workspace_id` preenchido e as RLS policies ja validam acesso por workspace.
