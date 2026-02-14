@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useCreateAutomation } from '@/hooks/useAutomations';
+import { useCreateAutomation, useAutomationsByScope, useDeleteAutomation } from '@/hooks/useAutomations';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { User, Eye, Loader2 } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { User, Eye, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserMultiSelect } from './advanced/UserMultiSelect';
 
@@ -21,6 +22,8 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   const createAutomation = useCreateAutomation();
+  const deleteAutomation = useDeleteAutomation();
+  const { data: scopeAutomations } = useAutomationsByScope(scopeType, scopeId);
 
   const { data: members } = useQuery({
     queryKey: ['workspace-members-with-profiles', workspaceId],
@@ -55,6 +58,29 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
     setActionType(type);
     setSelectedUserIds([]);
     setDialogOpen(true);
+  };
+
+  // Get existing automations for the current action type
+  const existingAutomations = (scopeAutomations || []).filter(
+    a => a.action_type === actionType && a.trigger === 'on_task_created'
+  );
+
+  const existingUserEntries: { userId: string; automationId: string; profile: { full_name: string | null; avatar_url: string | null } | null }[] = [];
+  existingAutomations.forEach(automation => {
+    const config = automation.action_config as Record<string, any>;
+    const userIds: string[] = config.user_ids || (config.user_id ? [config.user_id] : []);
+    userIds.forEach(uid => {
+      const member = members?.find(m => m.user_id === uid);
+      existingUserEntries.push({
+        userId: uid,
+        automationId: automation.id,
+        profile: member?.profile || null,
+      });
+    });
+  });
+
+  const handleDeleteAutomation = async (automationId: string) => {
+    await deleteAutomation.mutateAsync(automationId);
   };
 
   const handleSubmit = async () => {
@@ -127,16 +153,57 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <UserMultiSelect
-              label="Selecione os usuários"
-              users={members?.map(m => ({
-                id: m.user_id,
-                full_name: m.profile?.full_name || null,
-                avatar_url: m.profile?.avatar_url || null
-              })) || []}
-              selectedIds={selectedUserIds}
-              onSelectionChange={setSelectedUserIds}
-            />
+            {/* Existing assigned users */}
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-2">
+                {actionType === 'auto_assign_user' ? 'Usuários atribuídos' : 'Seguidores atuais'}
+              </p>
+              {existingUserEntries.length === 0 ? (
+                <p className="text-sm text-muted-foreground/60 italic">Nenhum usuário atribuído ainda</p>
+              ) : (
+                <div className="space-y-2">
+                  {existingUserEntries.map((entry, idx) => (
+                    <div key={`${entry.automationId}-${entry.userId}-${idx}`} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          {entry.profile?.avatar_url && <AvatarImage src={entry.profile.avatar_url} />}
+                          <AvatarFallback className="text-xs">
+                            {(entry.profile?.full_name || '?').charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{entry.profile?.full_name || 'Usuário'}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteAutomation(entry.automationId)}
+                        disabled={deleteAutomation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Add new users */}
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-2">Adicionar novos</p>
+              <UserMultiSelect
+                label="Selecione os usuários"
+                users={members?.map(m => ({
+                  id: m.user_id,
+                  full_name: m.profile?.full_name || null,
+                  avatar_url: m.profile?.avatar_url || null
+                })) || []}
+                selectedIds={selectedUserIds}
+                onSelectionChange={setSelectedUserIds}
+              />
+            </div>
           </div>
 
           <DialogFooter>
