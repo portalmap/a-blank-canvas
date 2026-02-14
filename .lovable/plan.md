@@ -1,41 +1,39 @@
-
-
-# Adicionar Menu de Acoes no Workspace da Sidebar
+# Adicionar "Novo Space" ao Menu de 3 Pontinhos do Workspace
 
 ## O que sera feito
 
-Substituir o botao de "trocar workspace" (icone de setas) na sidebar por um menu de "3 pontinhos" (MoreHorizontal) com as seguintes opcoes:
-
-- **Trocar Workspace** - disponivel para todos
-- **Novo Workspace** - apenas para usuarios com permissao (global_owner, owner, admin global)
-- **Renomear Workspace** - apenas para admins do workspace
-- **Definir como Padrao / Remover Padrao** - disponivel para todos
-- **Detalhes do Workspace** - navega para a pagina de workspaces (apenas admins)
+Adicionar a opcao "Novo Space" no dropdown menu de acoes do workspace na sidebar, entre "Novo Workspace" e "Renomear". Ao clicar, abre o `CreateSpaceDialog` ja existente.
 
 ## Regras de Permissao
 
-- Guest: ve apenas "Trocar Workspace" e "Definir como Padrao" (mas guest nao ve a secao Principal, entao na pratica nao afeta)
-- Member / Limited Member: "Trocar Workspace" e "Definir como Padrao"
-- Admin do workspace: todas as opcoes
-- Global Owner / Owner / Admin global: todas as opcoes + "Novo Workspace"
+- **Admin / Global Owner / Owner**: pode criar spaces
+- **Member**: NAO pode criar spaces
+- **Limited Member**: NAO pode criar spaces (conforme regra existente - nao pode modificar estrutura organizacional)
+- **Guest**: NAO ve a secao Principal, entao nao se aplica
 
-## Alteracoes Tecnicas
+## Alteracao
 
-### 1. `src/components/AppSidebar.tsx`
+### `src/components/AppSidebar.tsx`
 
-- Importar `MoreHorizontal` do lucide-react e `DropdownMenu` do radix
-- Importar `useCanCreateWorkspace`, `useDefaultWorkspace`, `useSetDefaultWorkspace`
-- Importar `WorkspaceEditDialog` e adicionar estado para controlar o dialog de edicao
-- Substituir o botao `ArrowLeftRight` (linha 233-239) por um `DropdownMenu` com icone `MoreHorizontal`
-- Itens do menu:
-  - "Trocar Workspace" -> chama `clearActiveWorkspace()`
-  - "Novo Workspace" -> abre dialog de criacao (condicional: `canCreate`)
-  - "Renomear" -> abre `WorkspaceEditDialog` (condicional: `isAdmin`)
-  - "Definir como Padrao" / "Remover Padrao" -> toggle via `setDefaultWorkspace`
-- Adicionar dialog de criacao de workspace inline (reutilizando a logica do WorkspaceOverview)
-- Adicionar `WorkspaceEditDialog` para renomear
+1. Importar `CreateSpaceDialog` de `@/components/spaces/CreateSpaceDialog`
+2. Adicionar estado `isCreateSpaceOpen` (useState boolean)
+3. Adicionar item no dropdown menu apos "Novo Workspace":
+  - Icone: `FolderPlus` (importar do lucide-react) ou `Plus`
+  - Texto: "Novo Space"
+  - Condicional: visivel apenas se NAO for `limited_member` (verificar via `userRole`)
+4. Renderizar `CreateSpaceDialog` com `workspaceId={activeWorkspace.id}` junto aos outros dialogs no final do componente
 
-### 2. Nenhuma alteracao no banco de dados
+Posicao no menu:
 
-Todas as permissoes ja existem. O `useCanCreateWorkspace` verifica roles globais e o `useUserRole` verifica o role no workspace.
+```
+Trocar Workspace
+Novo Workspace (se canCreate)
+Novo Space (se nao for limited_member)
+Renomear (se admin)
+---
+Definir como Padrao
+---
+Detalhes do Workspace (se admin)
+```
 
+Nenhuma alteracao no banco de dados necessaria.
