@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink, FolderPlus } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useTheme } from 'next-themes';
 import mapLogoLight from '@/assets/map-logo-light.png';
@@ -28,6 +28,7 @@ import { useUnreadChannels } from '@/hooks/useChatUnread';
 import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
 import { useDefaultWorkspace, useSetDefaultWorkspace, useCreateWorkspace } from '@/hooks/useWorkspaces';
 import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
+import { CreateSpaceDialog } from '@/components/spaces/CreateSpaceDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +70,7 @@ export function AppSidebar() {
   
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   
   const isAdmin = userRole?.isAdmin ?? false;
@@ -288,6 +290,12 @@ export function AppSidebar() {
                           </DropdownMenuItem>
                         )}
                         {isAdmin && (
+                          <DropdownMenuItem onClick={() => setIsCreateSpaceOpen(true)}>
+                            <FolderPlus className="h-4 w-4 mr-2" />
+                            Novo Space
+                          </DropdownMenuItem>
+                        )}
+                        {isAdmin && (
                           <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Renomear
@@ -459,6 +467,15 @@ export function AppSidebar() {
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Create Space Dialog */}
+    {activeWorkspace && (
+      <CreateSpaceDialog
+        open={isCreateSpaceOpen}
+        onOpenChange={setIsCreateSpaceOpen}
+        workspaceId={activeWorkspace.id}
+      />
+    )}
     </>
   );
 }
