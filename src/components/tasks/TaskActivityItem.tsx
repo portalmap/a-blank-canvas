@@ -176,9 +176,15 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
         assigneeId: newAssigneeId,
       });
 
+      // Determinar o novo activity_type baseado na presença de atribuído
+      const newActivityType = newAssigneeId 
+        ? 'assignment.created' 
+        : 'comment.edited';
+
       // Atualizar a atividade existente com o novo conteúdo, atribuído e flag de edição
       await updateActivityMetadata.mutateAsync({
         activityId: activity.id,
+        activityType: newActivityType,
         metadata: {
           ...activity.metadata,
           comment_id: activity.metadata.comment_id,
