@@ -291,8 +291,8 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
               <>
                 {isEditing ? (
                   <div className="mt-2 space-y-2">
-                    {/* Seletor de atribuído - apenas para comentários do tipo assignment */}
-                    {activity.activity_type === 'assignment.created' && (
+                    {/* Seletor de atribuído - disponível para qualquer comentário editável */}
+                    {(
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground">Atribuir a:</span>
                         <CommentAssigneeSelector
