@@ -104,13 +104,19 @@ export const useUpdateActivityMetadata = () => {
     mutationFn: async ({
       activityId,
       metadata,
+      activityType,
     }: {
       activityId: string;
       metadata: Record<string, any>;
+      activityType?: string;
     }) => {
+      const updateData: Record<string, any> = { metadata };
+      if (activityType) {
+        updateData.activity_type = activityType;
+      }
       const { data, error } = await supabase
         .from('task_activities')
-        .update({ metadata })
+        .update(updateData)
         .eq('id', activityId)
         .select()
         .single();
