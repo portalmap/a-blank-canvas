@@ -1,119 +1,136 @@
 
-# Correcao: Incompatibilidade de Campos entre UI e Motor de Automacao
+# Re-avaliar Automacoes Quando Condicoes Mudam (Tag, Prioridade, etc.)
 
-## Problema Raiz
+## Problema
 
-A interface do construtor de automacoes salva os campos de configuracao com nomes **diferentes** dos que o motor de execucao espera. Isso faz com que as acoes falhem silenciosamente (retornam sem fazer nada).
+Atualmente, as automacoes so sao avaliadas no **momento exato** da mudanca de status. Se o usuario muda o status primeiro e depois adiciona a tag, a automacao nao dispara porque:
 
-## Incompatibilidades Encontradas
+1. No momento da mudanca de status, a tag nao existia -- a condicao falha
+2. Quando a tag e adicionada depois, ninguem re-avalia as automacoes
 
-| Acao | Campo salvo pela UI | Campo esperado pelo motor | Resultado |
-|------|---------------------|--------------------------|-----------|
-| `remove_tag` | `tag_id` (UUID da tag) | `tag_name` (nome da tag) | Falha silenciosa |
-| `add_tag` | `tag_id` (UUID da tag) | `tag_name` (nome da tag) | Falha silenciosa |
-| `set_start_date` | `date_type` + `days_count` | `days_from_now` | Falha silenciosa |
-| `set_due_date` | `date_type` + `days_count` | `days_from_now` | Falha silenciosa |
-| `send_webhook` | `url` | `webhook_url` | Falha silenciosa |
-
-As acoes `move_task`, `set_status`, `remove_all_assignees` e `add_assignee` estao corretas.
+O usuario quer que a ordem nao importe: se o status ja esta no estado correto E a tag e adicionada, a automacao deve disparar.
 
 ## Solucao
 
-Corrigir o motor de execucao (`useStatusChangeAutomations.ts`) para usar os mesmos nomes de campos que a UI salva. Tambem adicionar suporte a todos os tipos de data configurados na UI (`first_day_of_month`, `last_day_of_month`, `days_after_trigger`, `specific_day`).
+Criar uma funcao `reevaluateConditionAutomations` que e chamada sempre que um campo relevante para condicoes muda (tag adicionada/removida, prioridade alterada, etc.). Essa funcao:
+
+1. Busca todas as automacoes com condicoes que dependem do campo alterado
+2. Verifica se o gatilho (trigger) ja foi satisfeito pelo estado atual da tarefa (ex: o status atual esta nos `to_status_ids`)
+3. Se o gatilho ja foi cumprido E as condicoes agora sao verdadeiras, executa as acoes
+
+Para evitar execucoes duplicadas, sera adicionada uma tabela de controle ou um campo de "ultimo status avaliado" para rastrear quais automacoes ja foram executadas para aquela tarefa.
 
 ## Detalhes Tecnicos
 
-### Arquivo: `src/hooks/useStatusChangeAutomations.ts`
+### 1. `src/hooks/useStatusChangeAutomations.ts` - Nova funcao
 
-**1. Corrigir `executeRemoveTag` (linha 726-752):**
-
-Atualmente busca por `config?.tag_name`. Deve buscar por `config?.tag_id` e deletar diretamente pela relacao tag_id:
+Adicionar `reevaluateConditionAutomations`:
 
 ```typescript
-const executeRemoveTag = async (info, config, automationName) => {
-  const tagId = config?.tag_id;
-  if (!tagId) return;
+export const reevaluateConditionAutomations = async (
+  taskId: string,
+  workspaceId: string
+): Promise<void> => {
+  // 1. Buscar dados atuais da tarefa (status, list_id)
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('id, status_id, list_id, workspace_id')
+    .eq('id', taskId)
+    .single();
 
-  await supabase
-    .from('task_tag_relations')
-    .delete()
-    .eq('task_id', info.taskId)
-    .eq('tag_id', tagId);
+  if (!task) return;
+
+  // 2. Buscar hierarquia de escopo
+  const { data: list } = await supabase
+    .from('lists')
+    .select('id, space_id, folder_id')
+    .eq('id', task.list_id)
+    .single();
+
+  // 3. Buscar automacoes on_status_changed com condicoes
+  const { data: automations } = await supabase
+    .from('automations')
+    .select('*')
+    .eq('trigger', 'on_status_changed')
+    .eq('enabled', true)
+    .eq('workspace_id', workspaceId);
+
+  // 4. Para cada automacao com condicoes:
+  //    - Verificar se o status ATUAL da tarefa satisfaz to_status_ids
+  //    - Avaliar condicoes com dados frescos
+  //    - Se tudo bater, executar acoes
+  //    - Usar tabela automation_executions para evitar duplicatas
 };
 ```
 
-**2. Corrigir `executeAddTag` (linha 680-721):**
+### 2. `src/hooks/useTaskTags.ts` - Chamar re-avaliacao
 
-Atualmente busca por `config?.tag_name`. Deve usar `config?.tag_id` diretamente:
-
-```typescript
-const executeAddTag = async (info, config, automationName) => {
-  const tagId = config?.tag_id;
-  if (!tagId) return;
-
-  await supabase
-    .from('task_tag_relations')
-    .upsert(
-      { task_id: info.taskId, tag_id: tagId },
-      { onConflict: 'task_id,tag_id' }
-    );
-};
-```
-
-**3. Corrigir `executeSetDueDate` (linha 607-651):**
-
-Deve suportar `date_type` e `days_count` da UI:
+No `useAddTaskTag` e `useRemoveTaskTag`, apos a operacao, chamar `reevaluateConditionAutomations`:
 
 ```typescript
-const executeSetDueDate = async (info, config, automationName) => {
-  let dueDate: string | null = null;
-
-  if (config?.date_type === 'days_after_trigger') {
-    const days = parseInt(config.days_count) || 0;
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    dueDate = date.toISOString().split('T')[0];
-  } else if (config?.date_type === 'first_day_of_month') {
-    const now = new Date();
-    dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      .toISOString().split('T')[0];
-  } else if (config?.date_type === 'last_day_of_month') {
-    const now = new Date();
-    dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      .toISOString().split('T')[0];
-  } else if (config?.date_type === 'specific_day') {
-    const day = parseInt(config.day_of_month) || 1;
-    const now = new Date();
-    dueDate = new Date(now.getFullYear(), now.getMonth(), day)
-      .toISOString().split('T')[0];
-  } else if (config?.days_from_now) {
-    // Compatibilidade legada
-    const date = new Date();
-    date.setDate(date.getDate() + parseInt(config.days_from_now));
-    dueDate = date.toISOString().split('T')[0];
-  } else if (config?.due_date) {
-    dueDate = config.due_date;
-  }
-
-  if (!dueDate) return;
-  // ... update task
-};
+export function useAddTaskTag() {
+  return useMutation({
+    mutationFn: async ({ taskId, tagId }) => {
+      // ... insert existente ...
+    },
+    onSuccess: async (_, variables) => {
+      // ... invalidateQueries existente ...
+      
+      // Buscar workspace_id da tarefa e re-avaliar
+      const { data: task } = await supabase
+        .from('tasks')
+        .select('workspace_id')
+        .eq('id', variables.taskId)
+        .single();
+      
+      if (task) {
+        reevaluateConditionAutomations(variables.taskId, task.workspace_id);
+      }
+    },
+  });
+}
 ```
 
-**4. Corrigir `executeSetStartDate` (linha 802-843):**
+### 3. Prevencao de duplicatas - Tabela `automation_executions`
 
-Mesma logica da correcao de `executeSetDueDate`, mas atualizando o campo `start_date`.
+Criar tabela para registrar execucoes e evitar que a mesma automacao execute duas vezes para a mesma tarefa no mesmo "ciclo":
 
-**5. Corrigir `executeSendWebhook` (linha 972-1003):**
-
-Usar `config?.url` alem de `config?.webhook_url`:
-
-```typescript
-const url = config?.webhook_url || config?.url;
+```sql
+CREATE TABLE automation_executions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  automation_id UUID REFERENCES automations(id) ON DELETE CASCADE,
+  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  status_id UUID, -- o status que disparou
+  executed_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(automation_id, task_id, status_id)
+);
 ```
 
-### Arquivo modificado
+Antes de executar, verificar se ja existe registro. Quando o status muda novamente, o registro antigo nao impede (pois o status_id e diferente).
 
-- `src/hooks/useStatusChangeAutomations.ts`
+### 4. Fluxo resumido
 
-Nenhuma alteracao no banco de dados necessaria.
+```text
+Cenario: Status muda primeiro, tag adicionada depois
+
+1. Usuario muda status para "Concluido"
+   -> executeStatusChangeAutomations() dispara
+   -> Condicao "tag = enviar social media" -- NAO TEM a tag
+   -> Automacao NAO executa (correto)
+
+2. Usuario adiciona tag "enviar social media"
+   -> useAddTaskTag.onSuccess
+   -> reevaluateConditionAutomations(taskId, workspaceId)
+   -> Busca automacoes com condicoes
+   -> Status atual = "Concluido" esta em to_status_ids? SIM
+   -> Tag "enviar social media" presente? SIM
+   -> Ja executou para este status? NAO
+   -> EXECUTA automacao!
+   -> Registra em automation_executions
+```
+
+### Arquivos modificados
+
+- `src/hooks/useStatusChangeAutomations.ts` - adicionar `reevaluateConditionAutomations` + registrar execucoes em `executeStatusChangeAutomations`
+- `src/hooks/useTaskTags.ts` - chamar re-avaliacao no `onSuccess` de add/remove tag
+- Nova migracao SQL para criar tabela `automation_executions`
