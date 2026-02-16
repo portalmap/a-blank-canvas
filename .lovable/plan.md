@@ -1,104 +1,119 @@
 
+# Correcao: Incompatibilidade de Campos entre UI e Motor de Automacao
 
-# Automacao Nao Funciona: Causa Raiz e Correcao
+## Problema Raiz
 
-## Problema Encontrado
+A interface do construtor de automacoes salva os campos de configuracao com nomes **diferentes** dos que o motor de execucao espera. Isso faz com que as acoes falhem silenciosamente (retornam sem fazer nada).
 
-A funcao `executeStatusChangeAutomations` so e chamada em **um unico lugar**: no `TaskKanbanView.tsx` (drag & drop no Kanban). Quando o usuario muda o status de uma tarefa pela **tela de detalhe** (`TaskMainContent.tsx`) ou pelo **drawer** (`TaskDetailDrawer.tsx`), a automacao **nunca e executada**.
+## Incompatibilidades Encontradas
 
-Ou seja, o motor de automacoes existe e esta correto, mas ninguem o chama quando o status muda fora do Kanban.
+| Acao | Campo salvo pela UI | Campo esperado pelo motor | Resultado |
+|------|---------------------|--------------------------|-----------|
+| `remove_tag` | `tag_id` (UUID da tag) | `tag_name` (nome da tag) | Falha silenciosa |
+| `add_tag` | `tag_id` (UUID da tag) | `tag_name` (nome da tag) | Falha silenciosa |
+| `set_start_date` | `date_type` + `days_count` | `days_from_now` | Falha silenciosa |
+| `set_due_date` | `date_type` + `days_count` | `days_from_now` | Falha silenciosa |
+| `send_webhook` | `url` | `webhook_url` | Falha silenciosa |
 
-## Locais que mudam status sem chamar automacoes
-
-| Arquivo | Funcao | Situacao |
-|---------|--------|----------|
-| `TaskMainContent.tsx` | `handleStatusChange` (linha 112) | Chama `updateTask` + `createActivity`, mas **nao chama** `executeStatusChangeAutomations` |
-| `TaskDetailDrawer.tsx` | `handleStatusChange` (linha 85) | Chama apenas `updateTask`, **nao chama** `executeStatusChangeAutomations` |
-| `TaskListView.tsx` | Mudancas de status inline | Precisa verificar se ha mudanca de status inline |
-| Bulk actions (`StatusBulkPopover.tsx`) | Mudanca em lote | Precisa verificar |
+As acoes `move_task`, `set_status`, `remove_all_assignees` e `add_assignee` estao corretas.
 
 ## Solucao
 
-Adicionar a chamada `executeStatusChangeAutomations` em todos os locais onde o status e alterado.
+Corrigir o motor de execucao (`useStatusChangeAutomations.ts`) para usar os mesmos nomes de campos que a UI salva. Tambem adicionar suporte a todos os tipos de data configurados na UI (`first_day_of_month`, `last_day_of_month`, `days_after_trigger`, `specific_day`).
 
 ## Detalhes Tecnicos
 
-### 1. `src/components/tasks/TaskMainContent.tsx`
+### Arquivo: `src/hooks/useStatusChangeAutomations.ts`
 
-Na funcao `handleStatusChange` (linha 112), apos o `createActivity`, adicionar:
+**1. Corrigir `executeRemoveTag` (linha 726-752):**
+
+Atualmente busca por `config?.tag_name`. Deve buscar por `config?.tag_id` e deletar diretamente pela relacao tag_id:
 
 ```typescript
-import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
+const executeRemoveTag = async (info, config, automationName) => {
+  const tagId = config?.tag_id;
+  if (!tagId) return;
 
-const handleStatusChange = async (statusId: string) => {
-  const taskId = task.id;
-  const oldStatus = statuses?.find(s => s.id === task.status_id);
-  const newStatus = statuses?.find(s => s.id === statusId);
-  const oldStatusName = oldStatus?.name || null;
-  const newStatusName = newStatus?.name || null;
-
-  try {
-    await updateTask.mutateAsync({ id: taskId, statusId });
-    await createActivity.mutateAsync({
-      taskId,
-      activityType: 'status.changed',
-      fieldName: 'status_id',
-      oldValue: oldStatusName,
-      newValue: newStatusName,
-    });
-
-    // NOVO: Executar automacoes de mudanca de status
-    if (task.status_id !== statusId) {
-      executeStatusChangeAutomations({
-        taskId,
-        workspaceId: task.workspace_id,
-        listId: task.list_id,
-        oldStatusId: task.status_id,
-        newStatusId: statusId,
-      });
-    }
-  } catch (error) {
-    console.error('Erro ao atualizar status:', error);
-  }
+  await supabase
+    .from('task_tag_relations')
+    .delete()
+    .eq('task_id', info.taskId)
+    .eq('tag_id', tagId);
 };
 ```
 
-### 2. `src/components/tasks/TaskDetailDrawer.tsx`
+**2. Corrigir `executeAddTag` (linha 680-721):**
 
-Na funcao `handleStatusChange` (linha 85), adicionar a mesma logica:
+Atualmente busca por `config?.tag_name`. Deve usar `config?.tag_id` diretamente:
 
 ```typescript
-import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
+const executeAddTag = async (info, config, automationName) => {
+  const tagId = config?.tag_id;
+  if (!tagId) return;
 
-const handleStatusChange = async (statusId: string) => {
-  const oldStatusId = task.status_id;
-  await updateTask.mutateAsync({ id: task.id, statusId });
-
-  // NOVO: Executar automacoes de mudanca de status
-  if (oldStatusId !== statusId) {
-    executeStatusChangeAutomations({
-      taskId: task.id,
-      workspaceId: task.workspace_id,
-      listId: task.list_id,
-      oldStatusId,
-      newStatusId: statusId,
-    });
-  }
+  await supabase
+    .from('task_tag_relations')
+    .upsert(
+      { task_id: info.taskId, tag_id: tagId },
+      { onConflict: 'task_id,tag_id' }
+    );
 };
 ```
 
-### 3. Verificar `TaskListView.tsx` e `StatusBulkPopover.tsx`
+**3. Corrigir `executeSetDueDate` (linha 607-651):**
 
-Verificar se ha mudancas de status inline nesses arquivos e adicionar a mesma chamada se necessario.
+Deve suportar `date_type` e `days_count` da UI:
 
-### Nota sobre invalidacao de queries
+```typescript
+const executeSetDueDate = async (info, config, automationName) => {
+  let dueDate: string | null = null;
 
-Apos a execucao das automacoes (que podem mover tarefas, mudar status, etc.), e necessario invalidar as queries relevantes para a UI refletir as mudancas. Isso sera feito chamando `queryClient.invalidateQueries` apos o retorno de `executeStatusChangeAutomations`.
+  if (config?.date_type === 'days_after_trigger') {
+    const days = parseInt(config.days_count) || 0;
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    dueDate = date.toISOString().split('T')[0];
+  } else if (config?.date_type === 'first_day_of_month') {
+    const now = new Date();
+    dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      .toISOString().split('T')[0];
+  } else if (config?.date_type === 'last_day_of_month') {
+    const now = new Date();
+    dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString().split('T')[0];
+  } else if (config?.date_type === 'specific_day') {
+    const day = parseInt(config.day_of_month) || 1;
+    const now = new Date();
+    dueDate = new Date(now.getFullYear(), now.getMonth(), day)
+      .toISOString().split('T')[0];
+  } else if (config?.days_from_now) {
+    // Compatibilidade legada
+    const date = new Date();
+    date.setDate(date.getDate() + parseInt(config.days_from_now));
+    dueDate = date.toISOString().split('T')[0];
+  } else if (config?.due_date) {
+    dueDate = config.due_date;
+  }
 
-### Arquivos modificados
+  if (!dueDate) return;
+  // ... update task
+};
+```
 
-- `src/components/tasks/TaskMainContent.tsx` - adicionar chamada de automacao
-- `src/components/tasks/TaskDetailDrawer.tsx` - adicionar chamada de automacao
-- Possivelmente `src/components/views/TaskListView.tsx` e `src/components/tasks/bulk-actions/StatusBulkPopover.tsx`
+**4. Corrigir `executeSetStartDate` (linha 802-843):**
+
+Mesma logica da correcao de `executeSetDueDate`, mas atualizando o campo `start_date`.
+
+**5. Corrigir `executeSendWebhook` (linha 972-1003):**
+
+Usar `config?.url` alem de `config?.webhook_url`:
+
+```typescript
+const url = config?.webhook_url || config?.url;
+```
+
+### Arquivo modificado
+
+- `src/hooks/useStatusChangeAutomations.ts`
 
 Nenhuma alteracao no banco de dados necessaria.
