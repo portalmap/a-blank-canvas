@@ -70,6 +70,14 @@ export function AutomationCard({ automation, spaces = [], lists = [], folders = 
   const trigger = getTriggerById(automation.trigger);
   const action = getActionById(automation.action_type);
   const actionConfig = automation.action_config as Record<string, any> | null;
+  
+  // Build full trigger labels including OR triggers
+  const orTriggers = (actionConfig?.or_triggers as string[] | undefined) || [];
+  const allTriggerLabels = [trigger?.label || automation.trigger];
+  for (const orId of orTriggers) {
+    const orTrigger = getTriggerById(orId);
+    if (orTrigger) allTriggerLabels.push(orTrigger.label);
+  }
 
   // Get a summary of the action config
   const getConfigSummary = () => {
@@ -111,8 +119,17 @@ export function AutomationCard({ automation, spaces = [], lists = [], folders = 
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                <span className="font-medium text-foreground/80">{trigger?.label || automation.trigger}</span>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 flex-wrap">
+                {allTriggerLabels.map((label, idx) => (
+                  <span key={idx} className="flex items-center gap-1.5">
+                    {idx > 0 && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 font-semibold text-primary border-primary/30">
+                        OU
+                      </Badge>
+                    )}
+                    <span className="font-medium text-foreground/80">{label}</span>
+                  </span>
+                ))}
                 <ArrowRight className="h-3 w-3" />
                 <span className="font-medium text-foreground/80">{action?.label || automation.action_type}</span>
               </div>
