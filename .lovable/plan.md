@@ -1,61 +1,32 @@
 
-# Executar Automacoes da Lista de Destino Quando Uma Tarefa e Movida
+
+# Atualizar Texto do Dialogo de Atribuicao Automatica
 
 ## Problema
 
-Quando uma tarefa e movida para outra lista (seja por automacao ou manualmente), as automacoes configuradas na lista de destino (como "atribuicao automatica") nao disparam. Isso acontece porque:
+O dialogo de "Atribuicao Automatica" diz "Todas as tarefas **criadas** nesta Lista..." mas a funcionalidade ja cobre tarefas movidas tambem (implementado anteriormente). O texto precisa refletir isso para o usuario entender que a atribuicao acontece tanto na criacao quanto na movimentacao.
 
-1. A funcao `applyAutomationsToTask` so e chamada na **criacao** de tarefas
-2. A acao `move_task` no motor de automacoes move a tarefa mas nao dispara automacoes da lista destino
-3. O `useMoveTask` (mover manual) tambem nao dispara automacoes
+## O que ja funciona
 
-O resultado e que a tarefa chega na lista nova sem responsavel, mesmo existindo uma automacao de atribuicao automatica configurada.
+A logica de backend (`applyAutomationsToTask`) ja e chamada tanto na criacao de tarefas quanto na movimentacao (via `useMoveTask` e `executeMoveTask`). Nenhuma alteracao de logica e necessaria.
 
-## Solucao
+## Alteracao
 
-Chamar `applyAutomationsToTask` apos qualquer movimentacao de tarefa, para que as automacoes da lista destino (atribuicao automatica, seguir automaticamente, etc.) sejam executadas.
+### Arquivo: `src/components/automations/QuickAutomationButtons.tsx`
 
-## Detalhes Tecnicos
+Atualizar o texto da descricao do dialogo (linha 124) de:
 
-### 1. Arquivo: `src/hooks/useStatusChangeAutomations.ts` - Funcao `executeMoveTask`
+> "Todas as tarefas **criadas** nesta Lista terão este usuario como responsavel."
 
-Apos mover a tarefa, chamar `applyAutomationsToTask` com o novo `list_id`:
+Para:
 
-```typescript
-const executeMoveTask = async (info, config, automationName) => {
-  // ... logica existente de mover ...
+> "Todas as tarefas **criadas ou movidas** para esta Lista terão este usuario como responsavel."
 
-  // Apos mover com sucesso, aplicar automacoes da lista destino
-  await applyAutomationsToTask({
-    id: info.taskId,
-    workspace_id: info.workspaceId,
-    list_id: targetListId,
-  });
-};
-```
+Tambem atualizar a descricao gerada na criacao da automacao (linha 105) para refletir o comportamento completo.
 
-### 2. Arquivo: `src/hooks/useTasks.ts` - Hook `useMoveTask`
+### Resumo
 
-No `mutationFn`, apos mover a tarefa manualmente, tambem chamar `applyAutomationsToTask`:
+- 1 arquivo modificado: `src/components/automations/QuickAutomationButtons.tsx`
+- Apenas alteracoes de texto, sem mudanca de logica
+- A funcionalidade de atribuir ao mover ja esta implementada
 
-```typescript
-mutationFn: async ({ id, listId, workspaceId, ... }) => {
-  // ... update existente ...
-
-  // Aplicar automacoes da lista destino
-  await applyAutomationsToTask({
-    id,
-    workspace_id: workspaceId,
-    list_id: listId,
-  });
-
-  return data;
-};
-```
-
-### Arquivos modificados
-
-- `src/hooks/useStatusChangeAutomations.ts` - adicionar chamada `applyAutomationsToTask` no `executeMoveTask`
-- `src/hooks/useTasks.ts` - adicionar chamada `applyAutomationsToTask` no `useMoveTask`
-
-Nenhuma alteracao no banco de dados necessaria.
