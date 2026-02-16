@@ -68,7 +68,8 @@ export const AdvancedAutomationBuilder = ({
         setUseMultipleActions(true);
         setActions(config.actions);
         setSelectedAction(null);
-        setActionConfig({});
+        const { actions: _, ...restConfig } = config;
+        setActionConfig(restConfig);
       } else {
         setUseMultipleActions(false);
         setSelectedAction(automation.action_type);
