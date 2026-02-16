@@ -41,36 +41,6 @@ export interface TriggerCategory {
 
 export const TRIGGER_CATEGORIES: TriggerCategory[] = [
   {
-    name: 'Popular',
-    icon: Star,
-    triggers: [
-      { 
-        id: 'on_task_created', 
-        label: 'Tarefa ou subtarefa criada', 
-        description: 'Quando uma nova tarefa é criada neste escopo',
-        icon: Plus 
-      },
-      { 
-        id: 'on_custom_field_changed', 
-        label: 'Alterações de campo personalizado', 
-        description: 'Quando um campo personalizado é alterado',
-        icon: Edit 
-      },
-      { 
-        id: 'on_status_changed', 
-        label: 'Alterações de status', 
-        description: 'Quando o status de uma tarefa muda',
-        icon: CircleDot 
-      },
-      { 
-        id: 'on_schedule', 
-        label: 'A cada...', 
-        description: 'Executar em intervalos regulares',
-        icon: Clock 
-      },
-    ]
-  },
-  {
     name: 'AI',
     icon: Sparkles,
     triggers: [
@@ -86,6 +56,12 @@ export const TRIGGER_CATEGORIES: TriggerCategory[] = [
     name: 'Adicionar ou mover',
     icon: ArrowRight,
     triggers: [
+      { 
+        id: 'on_task_created', 
+        label: 'Tarefa ou subtarefa criada', 
+        description: 'Quando uma nova tarefa é criada neste escopo',
+        icon: Plus 
+      },
       { 
         id: 'on_task_added_here', 
         label: 'Tarefa ou subtarefa existente adicionada aqui', 
@@ -135,6 +111,12 @@ export const TRIGGER_CATEGORIES: TriggerCategory[] = [
     icon: Calendar,
     triggers: [
       { 
+        id: 'on_schedule', 
+        label: 'A cada...', 
+        description: 'Executar em intervalos regulares',
+        icon: Clock 
+      },
+      { 
         id: 'on_due_date_changed', 
         label: 'Alterações da data final', 
         description: 'Quando a data de vencimento é alterada',
@@ -182,6 +164,18 @@ export const TRIGGER_CATEGORIES: TriggerCategory[] = [
     name: 'Gerenciamento de tarefas',
     icon: Settings2,
     triggers: [
+      { 
+        id: 'on_status_changed', 
+        label: 'Alterações de status', 
+        description: 'Quando o status de uma tarefa muda',
+        icon: CircleDot 
+      },
+      { 
+        id: 'on_custom_field_changed', 
+        label: 'Alterações de campo personalizado', 
+        description: 'Quando um campo personalizado é alterado',
+        icon: Edit 
+      },
       { 
         id: 'on_assignee_added', 
         label: 'Responsável adicionado', 
