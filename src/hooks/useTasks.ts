@@ -76,6 +76,17 @@ export const useMoveTask = () => {
         },
       });
 
+      // Apply destination list automations (auto-assign, auto-follow, etc.)
+      try {
+        await applyAutomationsToTask({
+          id,
+          workspace_id: workspaceId,
+          list_id: listId,
+        });
+      } catch (applyError) {
+        console.error('Error applying destination list automations:', applyError);
+      }
+
       return data;
     },
     onSuccess: (data) => {
@@ -84,6 +95,8 @@ export const useMoveTask = () => {
       queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['all-tasks-with-assignees'] });
       queryClient.invalidateQueries({ queryKey: ['task-activities', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['task-assignees'] });
+      queryClient.invalidateQueries({ queryKey: ['task-followers'] });
       toast.success('Tarefa movida com sucesso!');
     },
     onError: (error) => {

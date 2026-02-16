@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { QueryClient } from '@tanstack/react-query';
+import { applyAutomationsToTask } from './useApplyAutomations';
 
 interface StatusChangeInfo {
   taskId: string;
@@ -850,6 +851,17 @@ const executeMoveTask = async (
   });
 
   console.log(`Task ${info.taskId} moved to list ${targetListId}`);
+
+  // Apply destination list automations (auto-assign, auto-follow, etc.)
+  try {
+    await applyAutomationsToTask({
+      id: info.taskId,
+      workspace_id: info.workspaceId,
+      list_id: targetListId,
+    });
+  } catch (applyError) {
+    console.error('Error applying destination list automations:', applyError);
+  }
 };
 
 /**
