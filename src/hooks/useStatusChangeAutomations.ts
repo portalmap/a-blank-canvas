@@ -381,6 +381,35 @@ const executeAction = async (
       await executeRemoveTag(info, config, automationName);
       break;
 
+    case 'move_task':
+      await executeMoveTask(info, config, automationName);
+      break;
+
+    case 'set_start_date':
+      await executeSetStartDate(info, config, automationName);
+      break;
+
+    case 'remove_assignee':
+      await executeRemoveAssignee(info, config, automationName);
+      break;
+
+    case 'remove_all_assignees':
+      await executeRemoveAllAssignees(info, automationName);
+      break;
+
+    case 'auto_add_follower':
+    case 'add_follower':
+      await executeAddFollower(info, config, automationName);
+      break;
+
+    case 'send_notification':
+      await executeSendNotification(info, config, automationName);
+      break;
+
+    case 'send_webhook':
+      await executeSendWebhook(info, config, automationName);
+      break;
+
     default:
       console.log(`Action type '${actionType}' not implemented for status change`);
   }
@@ -720,4 +749,255 @@ const executeRemoveTag = async (
     .eq('tag_id', tag.id);
 
   console.log(`Tag "${tagName}" removed from task ${info.taskId}`);
+};
+
+/**
+ * Move task to another list
+ */
+const executeMoveTask = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const targetListId = config?.target_list_id;
+  if (!targetListId) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: oldList } = await supabase
+    .from('lists')
+    .select('name')
+    .eq('id', info.listId)
+    .single();
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ list_id: targetListId })
+    .eq('id', info.taskId);
+
+  if (error) throw error;
+
+  // Update info.listId so subsequent actions use the new list context
+  info.listId = targetListId;
+
+  const { data: newList } = await supabase
+    .from('lists')
+    .select('name')
+    .eq('id', targetListId)
+    .single();
+
+  await logAutomationActivity(info.taskId, user.id, 'task.moved', {
+    oldValue: oldList?.name || info.listId,
+    newValue: newList?.name || targetListId,
+    metadata: { automation_name: automationName, target_list_id: targetListId },
+  });
+
+  console.log(`Task ${info.taskId} moved to list ${targetListId}`);
+};
+
+/**
+ * Set start date for the task
+ */
+const executeSetStartDate = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('start_date')
+    .eq('id', info.taskId)
+    .single();
+
+  const oldStartDate = task?.start_date;
+
+  let startDate: string | null = null;
+  if (config?.days_from_now) {
+    const date = new Date();
+    date.setDate(date.getDate() + parseInt(config.days_from_now));
+    startDate = date.toISOString().split('T')[0];
+  } else if (config?.start_date) {
+    startDate = config.start_date;
+  }
+
+  if (!startDate) return;
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ start_date: startDate })
+    .eq('id', info.taskId);
+
+  if (error) throw error;
+
+  await logAutomationActivity(info.taskId, user.id, 'start_date.changed', {
+    oldValue: oldStartDate || null,
+    newValue: startDate,
+    metadata: { automation_name: automationName },
+  });
+
+  console.log(`Start date set to ${startDate} for task ${info.taskId}`);
+};
+
+/**
+ * Remove specific assignees from the task
+ */
+const executeRemoveAssignee = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const userIds = config?.user_ids || (config?.user_id ? [config.user_id] : []);
+  if (!userIds.length) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  for (const userId of userIds) {
+    const { error } = await supabase
+      .from('task_assignees')
+      .delete()
+      .eq('task_id', info.taskId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error removing assignee:', error);
+      continue;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single();
+
+    await logAutomationActivity(info.taskId, user.id, 'assignee.removed', {
+      oldValue: profile?.full_name || userId,
+      metadata: { assignee_id: userId, automation_name: automationName },
+    });
+  }
+
+  console.log(`${userIds.length} assignee(s) removed from task ${info.taskId}`);
+};
+
+/**
+ * Remove all assignees from the task
+ */
+const executeRemoveAllAssignees = async (
+  info: StatusChangeInfo,
+  automationName: string
+): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('task_assignees')
+    .delete()
+    .eq('task_id', info.taskId);
+
+  if (error) throw error;
+
+  await logAutomationActivity(info.taskId, user.id, 'assignees.cleared', {
+    metadata: { automation_name: automationName },
+  });
+
+  console.log(`All assignees removed from task ${info.taskId}`);
+};
+
+/**
+ * Add followers to the task
+ */
+const executeAddFollower = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const userIds = config?.user_ids || (config?.user_id ? [config.user_id] : []);
+  if (!userIds.length) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  for (const userId of userIds) {
+    const { error } = await supabase
+      .from('task_followers')
+      .upsert(
+        { task_id: info.taskId, user_id: userId, source_type: 'automation' },
+        { onConflict: 'task_id,user_id' }
+      );
+
+    if (error) {
+      console.error('Error adding follower:', error);
+      continue;
+    }
+  }
+
+  console.log(`${userIds.length} follower(s) added to task ${info.taskId}`);
+};
+
+/**
+ * Send a notification
+ */
+const executeSendNotification = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const message = config?.message || `Automação "${automationName}" disparada`;
+  const userIds = config?.user_ids || [];
+
+  if (!userIds.length) return;
+
+  for (const userId of userIds) {
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      workspace_id: info.workspaceId,
+      title: automationName,
+      message,
+      type: 'automation',
+      reference_id: info.taskId,
+      reference_type: 'task',
+    });
+  }
+
+  console.log(`Notification sent to ${userIds.length} user(s) for task ${info.taskId}`);
+};
+
+/**
+ * Send a webhook
+ */
+const executeSendWebhook = async (
+  info: StatusChangeInfo,
+  config: Record<string, any> | null,
+  automationName: string
+): Promise<void> => {
+  const url = config?.webhook_url;
+  if (!url) return;
+
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', info.taskId)
+    .single();
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'automation.triggered',
+        automation_name: automationName,
+        task,
+        old_status_id: info.oldStatusId,
+        new_status_id: info.newStatusId,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    console.log(`Webhook sent to ${url} for task ${info.taskId}`);
+  } catch (err) {
+    console.error('Error sending webhook:', err);
+  }
 };
