@@ -243,11 +243,11 @@ export const executeStatusChangeAutomations = async (
     if (list.folder_id) scopeIds.push(list.folder_id);
     scopeIds.push(info.listId);
 
-    // 3. Fetch automations with 'on_status_changed' trigger
+    // 3. Fetch automations that might match 'on_status_changed' (including via or_triggers)
+    // We fetch all enabled automations for the workspace and filter client-side
     const { data: automations, error } = await supabase
       .from('automations')
       .select('*')
-      .eq('trigger', 'on_status_changed')
       .eq('enabled', true)
       .eq('workspace_id', info.workspaceId);
 
@@ -256,8 +256,15 @@ export const executeStatusChangeAutomations = async (
       return result;
     }
 
+    // Filter to only automations whose trigger or or_triggers include 'on_status_changed'
+    const statusAutomations = automations.filter(a => {
+      const config = a.action_config as Record<string, any> | null;
+      const orTriggers = (config?.or_triggers as string[] | undefined) || [];
+      return a.trigger === 'on_status_changed' || orTriggers.includes('on_status_changed');
+    });
+
     // 4. Filter automations by matching scopes
-    const applicableAutomations = automations.filter((automation) => {
+    const applicableAutomations = statusAutomations.filter((automation) => {
       // Workspace-level automations
       if (!automation.scope_id && automation.scope_type === 'workspace') {
         return true;

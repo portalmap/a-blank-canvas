@@ -45,6 +45,7 @@ export const AdvancedAutomationBuilder = ({
 
   const [name, setName] = useState('');
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
+  const [selectedTriggers, setSelectedTriggers] = useState<string[]>([]);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [actionConfig, setActionConfig] = useState<Record<string, any>>({});
   const [conditions, setConditions] = useState<AutomationCondition[]>([]);
@@ -64,6 +65,11 @@ export const AdvancedAutomationBuilder = ({
       
       // Handle legacy single action or new multiple actions
       const config = automation.action_config || {};
+      
+      // Reconstruct OR triggers
+      const orTriggers = (config.or_triggers as string[] | undefined) || [];
+      setSelectedTriggers([automation.trigger, ...orTriggers]);
+      
       if (config.actions && Array.isArray(config.actions)) {
         setUseMultipleActions(true);
         setActions(config.actions);
@@ -97,6 +103,7 @@ export const AdvancedAutomationBuilder = ({
   const resetForm = () => {
     setName('');
     setSelectedTrigger(null);
+    setSelectedTriggers([]);
     setSelectedAction(null);
     setActionConfig({});
     setConditions([]);
@@ -115,7 +122,7 @@ export const AdvancedAutomationBuilder = ({
   };
 
   const handleSubmit = async () => {
-    if (!selectedTrigger) {
+    if (selectedTriggers.length === 0 && !selectedTrigger) {
       toast.error('Selecione um gatilho');
       return;
     }
@@ -147,12 +154,23 @@ export const AdvancedAutomationBuilder = ({
       }
     }
 
-    const trigger = getTriggerById(selectedTrigger);
+    // Determine primary trigger and OR triggers
+    const primaryTriggerId = selectedTriggers.length > 0 ? selectedTriggers[0] : selectedTrigger!;
+    const orTriggerIds = selectedTriggers.length > 1 ? selectedTriggers.slice(1) : [];
+    
+    const trigger = getTriggerById(primaryTriggerId);
     
     // Build final action config with trigger_config, conditions, and actions
     const finalActionConfig: Record<string, any> = {
       ...actionConfig,
     };
+    
+    // Add OR triggers if any
+    if (orTriggerIds.length > 0) {
+      finalActionConfig.or_triggers = orTriggerIds;
+    } else {
+      delete finalActionConfig.or_triggers;
+    }
     
     // Add conditions if any
     if (conditions.length > 0) {
@@ -170,14 +188,16 @@ export const AdvancedAutomationBuilder = ({
       : selectedAction;
 
     const primaryAction = getActionById(primaryActionType || '');
-    const description = name || `Quando ${trigger?.label} → ${useMultipleActions ? `${actions.length} ações` : primaryAction?.label}`;
+    const triggerLabels = selectedTriggers.map(id => getTriggerById(id)?.label).filter(Boolean);
+    const triggerDesc = triggerLabels.length > 1 ? triggerLabels.join(' OU ') : (trigger?.label || '');
+    const description = name || `Quando ${triggerDesc} → ${useMultipleActions ? `${actions.length} ações` : primaryAction?.label}`;
 
     try {
       if (isEditMode && automation) {
         await updateAutomation.mutateAsync({
           id: automation.id,
           description,
-          trigger: selectedTrigger as any,
+          trigger: primaryTriggerId as any,
           action_type: primaryActionType as any,
           action_config: finalActionConfig,
           scope_type: scope.scopeType,
@@ -187,7 +207,7 @@ export const AdvancedAutomationBuilder = ({
         await createAutomation.mutateAsync({
           workspaceId,
           description,
-          trigger: selectedTrigger as any,
+          trigger: primaryTriggerId as any,
           actionType: primaryActionType as any,
           actionConfig: finalActionConfig,
           scopeType: scope.scopeType,
@@ -203,8 +223,9 @@ export const AdvancedAutomationBuilder = ({
 
   const isPending = createAutomation.isPending || updateAutomation.isPending;
 
-  const selectedTriggerData = selectedTrigger ? getTriggerById(selectedTrigger) : null;
-  const selectedTriggerCategory = selectedTrigger ? getCategoryByTriggerId(selectedTrigger) : null;
+  const selectedTriggersData = selectedTriggers.map(id => getTriggerById(id)).filter(Boolean);
+  const selectedTriggerData = selectedTriggersData.length > 0 ? selectedTriggersData[0] : null;
+  const selectedTriggerCategory = selectedTriggers.length > 0 ? getCategoryByTriggerId(selectedTriggers[0]) : null;
   const selectedActionData = selectedAction ? getActionById(selectedAction) : null;
 
   return (
@@ -255,7 +276,7 @@ export const AdvancedAutomationBuilder = ({
             <div className="space-y-3">
               {/* Trigger Card */}
               <Card 
-                className={`p-4 cursor-pointer transition-all ${
+                className={`p-4 cursor-pointer transition-all relative ${
                   activeStep === 'trigger' ? 'ring-2 ring-primary' : ''
                 }`}
                 onClick={() => setActiveStep('trigger')}
@@ -270,28 +291,61 @@ export const AdvancedAutomationBuilder = ({
                   )}
                 </div>
 
-                {selectedTriggerData ? (
-                  <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
-                    <selectedTriggerData.icon className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">{selectedTriggerData.label}</span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 ml-auto"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTrigger(null);
-                        // Clear trigger config when trigger is cleared
-                        const { trigger_config, ...rest } = actionConfig;
-                        setActionConfig(rest);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                {selectedTriggersData.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {selectedTriggersData.map((triggerData, idx) => {
+                      const TriggerIcon = triggerData!.icon;
+                      return (
+                      <div key={triggerData!.id}>
+                        {idx > 0 && (
+                          <div className="flex items-center justify-center my-1">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-semibold text-primary border-primary/30">
+                              OU
+                            </Badge>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 p-2 bg-accent rounded-lg">
+                          <TriggerIcon className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">{triggerData!.label}</span>
+                          {selectedTriggersData.length > 1 && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 ml-auto"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newTriggers = selectedTriggers.filter(id => id !== triggerData!.id);
+                                setSelectedTriggers(newTriggers);
+                                setSelectedTrigger(newTriggers[0] || null);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      );
+                    })}
+                    {selectedTriggersData.length === 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 absolute top-4 right-4"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTrigger(null);
+                          setSelectedTriggers([]);
+                          const { trigger_config, or_triggers, ...rest } = actionConfig;
+                          setActionConfig(rest);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Clique para selecionar um gatilho
+                    Clique para selecionar um ou mais gatilhos
                   </p>
                 )}
 
@@ -299,9 +353,20 @@ export const AdvancedAutomationBuilder = ({
                   <div className="mt-4 border-t pt-4">
                     <TriggerSelector
                       selectedTrigger={selectedTrigger}
+                      selectedTriggers={selectedTriggers}
                       onSelectTrigger={(id) => {
                         setSelectedTrigger(id);
+                        setSelectedTriggers([id]);
                         setActiveStep('action');
+                      }}
+                      onToggleTrigger={(id) => {
+                        setSelectedTriggers(prev => {
+                          const newTriggers = prev.includes(id)
+                            ? prev.filter(t => t !== id)
+                            : [...prev, id];
+                          setSelectedTrigger(newTriggers[0] || null);
+                          return newTriggers;
+                        });
                       }}
                       workspaceId={workspaceId}
                       scopeType={scope.scopeType}
@@ -464,7 +529,7 @@ export const AdvancedAutomationBuilder = ({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!selectedTrigger || (!useMultipleActions && !selectedAction) || (useMultipleActions && actions.length === 0) || isPending}
+            disabled={selectedTriggers.length === 0 || (!useMultipleActions && !selectedAction) || (useMultipleActions && actions.length === 0) || isPending}
           >
             {isPending 
               ? (isEditMode ? 'Salvando...' : 'Criando...') 

@@ -38,22 +38,29 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
     if (folderId) scopeIds.push(folderId);
     scopeIds.push(task.list_id);
 
-    // 4. Fetch all active automations for task_created trigger
+    // 4. Fetch all active automations for task creation/move triggers
     const { data: automations, error } = await supabase
       .from('automations')
       .select('*')
-      .in('trigger', ['on_task_created', 'on_task_moved_here', 'on_task_added_here'])
       .eq('enabled', true)
       .eq('workspace_id', task.workspace_id)
-      .in('action_type', ['auto_assign_user', 'auto_add_follower']);
+      .in('action_type', ['auto_assign_user', 'auto_add_follower', 'remove_all_assignees']);
 
     if (error || !automations) {
       console.error('Error fetching automations:', error);
       return result;
     }
 
-    // 5. Filter automations by matching scopes
+    // 5. Filter automations by matching scopes and triggers (including or_triggers)
+    const relevantTriggers = ['on_task_created', 'on_task_moved_here', 'on_task_added_here'];
     const applicableAutomations = automations.filter(automation => {
+      // Check if this automation matches any relevant trigger (primary or OR)
+      const actionConfig = automation.action_config as Record<string, any> | null;
+      const orTriggers = (actionConfig?.or_triggers as string[] | undefined) || [];
+      const allTriggers = [automation.trigger, ...orTriggers];
+      const matchesTrigger = allTriggers.some(t => relevantTriggers.includes(t));
+      if (!matchesTrigger) return false;
+
       // Workspace-level automations (scope_id is null)
       if (!automation.scope_id && automation.scope_type === 'workspace') {
         return true;

@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { TRIGGER_CATEGORIES, TriggerOption } from './triggerCategories';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TriggerInlineConfig } from './TriggerInlineConfig';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface TemplateListInfo {
   id: string;
@@ -14,7 +15,9 @@ interface TemplateListInfo {
 
 interface TriggerSelectorProps {
   selectedTrigger: string | null;
+  selectedTriggers?: string[];
   onSelectTrigger: (triggerId: string) => void;
+  onToggleTrigger?: (triggerId: string) => void;
   workspaceId: string;
   scopeType: 'workspace' | 'space' | 'folder' | 'list';
   scopeId?: string;
@@ -29,7 +32,9 @@ const TRIGGERS_WITH_CONFIG = ['on_status_changed', 'on_tag_added', 'on_tag_remov
 
 export const TriggerSelector = ({ 
   selectedTrigger, 
+  selectedTriggers = [],
   onSelectTrigger,
+  onToggleTrigger,
   workspaceId,
   scopeType,
   scopeId,
@@ -38,7 +43,16 @@ export const TriggerSelector = ({
   isTemplateContext,
   templateLists,
 }: TriggerSelectorProps) => {
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['Popular']);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(
+    TRIGGER_CATEGORIES.map(c => c.name)
+  );
+
+  const multiMode = !!onToggleTrigger;
+
+  // Build full set of selected triggers
+  const allSelectedTriggers = multiMode
+    ? selectedTriggers
+    : selectedTrigger ? [selectedTrigger] : [];
 
   const toggleCategory = (categoryName: string) => {
     setExpandedCategories(prev => 
@@ -49,7 +63,11 @@ export const TriggerSelector = ({
   };
 
   const handleSelectTrigger = (trigger: TriggerOption) => {
-    onSelectTrigger(trigger.id);
+    if (multiMode && onToggleTrigger) {
+      onToggleTrigger(trigger.id);
+    } else {
+      onSelectTrigger(trigger.id);
+    }
   };
 
   const hasInlineConfig = (triggerId: string) => TRIGGERS_WITH_CONFIG.includes(triggerId);
@@ -60,7 +78,7 @@ export const TriggerSelector = ({
         {TRIGGER_CATEGORIES.map((category) => {
           const isExpanded = expandedCategories.includes(category.name);
           const CategoryIcon = category.icon;
-          const hasSelectedTrigger = category.triggers.some(t => t.id === selectedTrigger);
+          const hasSelectedTrigger = category.triggers.some(t => allSelectedTriggers.includes(t.id));
 
           return (
             <div key={category.name} className="rounded-md overflow-hidden">
@@ -90,7 +108,7 @@ export const TriggerSelector = ({
                 <div className="ml-5 space-y-0.5 pb-1.5">
                   {category.triggers.map((trigger) => {
                     const TriggerIcon = trigger.icon;
-                    const isSelected = selectedTrigger === trigger.id;
+                    const isSelected = allSelectedTriggers.includes(trigger.id);
                     const showConfig = isSelected && hasInlineConfig(trigger.id);
 
                     return (
@@ -103,10 +121,18 @@ export const TriggerSelector = ({
                             isSelected && "bg-primary/10 border border-primary/30"
                           )}
                         >
-                          <TriggerIcon className={cn(
-                            "h-3.5 w-3.5",
-                            isSelected ? "text-primary" : "text-muted-foreground"
-                          )} />
+                          {multiMode ? (
+                            <Checkbox
+                              checked={isSelected}
+                              className="pointer-events-none h-3.5 w-3.5"
+                              tabIndex={-1}
+                            />
+                          ) : (
+                            <TriggerIcon className={cn(
+                              "h-3.5 w-3.5",
+                              isSelected ? "text-primary" : "text-muted-foreground"
+                            )} />
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className={cn(
                               "text-xs truncate",
@@ -120,7 +146,7 @@ export const TriggerSelector = ({
                               </p>
                             )}
                           </div>
-                          {isSelected && (
+                          {isSelected && !multiMode && (
                             <Check className="h-3.5 w-3.5 text-primary shrink-0" />
                           )}
                         </button>
