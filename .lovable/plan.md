@@ -1,103 +1,104 @@
 
 
-# Implementar Acao "Mover Tarefa" e Outras Acoes Faltantes no Motor de Automacoes
+# Automacao Nao Funciona: Causa Raiz e Correcao
 
-## Problema
+## Problema Encontrado
 
-A acao `move_task` (Mover tarefa) esta definida na interface do construtor de automacoes (`actionCategories.ts`), porem **nao esta implementada** no motor de execucao (`useStatusChangeAutomations.ts`). Quando a automacao dispara, o switch/case no metodo `executeAction` cai no `default` e apenas imprime um log no console, sem executar nenhuma acao.
+A funcao `executeStatusChangeAutomations` so e chamada em **um unico lugar**: no `TaskKanbanView.tsx` (drag & drop no Kanban). Quando o usuario muda o status de uma tarefa pela **tela de detalhe** (`TaskMainContent.tsx`) ou pelo **drawer** (`TaskDetailDrawer.tsx`), a automacao **nunca e executada**.
 
-Acoes faltantes no motor de execucao:
+Ou seja, o motor de automacoes existe e esta correto, mas ninguem o chama quando o status muda fora do Kanban.
 
-| Acao | Status |
-|------|--------|
-| `move_task` | **Nao implementada** (prioridade do usuario) |
-| `set_start_date` | **Nao implementada** (presente na automacao do usuario) |
-| `remove_assignee` | **Nao implementada** |
-| `remove_all_assignees` | **Nao implementada** |
-| `auto_add_follower` / `add_follower` | **Nao implementada** |
-| `send_notification` | **Nao implementada** |
-| `send_webhook` | **Nao implementada** |
+## Locais que mudam status sem chamar automacoes
+
+| Arquivo | Funcao | Situacao |
+|---------|--------|----------|
+| `TaskMainContent.tsx` | `handleStatusChange` (linha 112) | Chama `updateTask` + `createActivity`, mas **nao chama** `executeStatusChangeAutomations` |
+| `TaskDetailDrawer.tsx` | `handleStatusChange` (linha 85) | Chama apenas `updateTask`, **nao chama** `executeStatusChangeAutomations` |
+| `TaskListView.tsx` | Mudancas de status inline | Precisa verificar se ha mudanca de status inline |
+| Bulk actions (`StatusBulkPopover.tsx`) | Mudanca em lote | Precisa verificar |
 
 ## Solucao
 
-Implementar todas as acoes faltantes no arquivo `src/hooks/useStatusChangeAutomations.ts`, adicionando os cases no switch e as funcoes de execucao correspondentes.
+Adicionar a chamada `executeStatusChangeAutomations` em todos os locais onde o status e alterado.
 
 ## Detalhes Tecnicos
 
-### `src/hooks/useStatusChangeAutomations.ts`
+### 1. `src/components/tasks/TaskMainContent.tsx`
 
-**1. Adicionar case `move_task` no switch (linha 350-386):**
+Na funcao `handleStatusChange` (linha 112), apos o `createActivity`, adicionar:
 
 ```typescript
-case 'move_task':
-  await executeMoveTask(info, config, automationName);
-  break;
+import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
 
-case 'set_start_date':
-  await executeSetStartDate(info, config, automationName);
-  break;
+const handleStatusChange = async (statusId: string) => {
+  const taskId = task.id;
+  const oldStatus = statuses?.find(s => s.id === task.status_id);
+  const newStatus = statuses?.find(s => s.id === statusId);
+  const oldStatusName = oldStatus?.name || null;
+  const newStatusName = newStatus?.name || null;
 
-case 'remove_assignee':
-  await executeRemoveAssignee(info, config, automationName);
-  break;
+  try {
+    await updateTask.mutateAsync({ id: taskId, statusId });
+    await createActivity.mutateAsync({
+      taskId,
+      activityType: 'status.changed',
+      fieldName: 'status_id',
+      oldValue: oldStatusName,
+      newValue: newStatusName,
+    });
 
-case 'remove_all_assignees':
-  await executeRemoveAllAssignees(info, automationName);
-  break;
-
-case 'auto_add_follower':
-case 'add_follower':
-  await executeAddFollower(info, config, automationName);
-  break;
-
-case 'send_notification':
-  await executeSendNotification(info, config, automationName);
-  break;
-
-case 'send_webhook':
-  await executeSendWebhook(info, config, automationName);
-  break;
+    // NOVO: Executar automacoes de mudanca de status
+    if (task.status_id !== statusId) {
+      executeStatusChangeAutomations({
+        taskId,
+        workspaceId: task.workspace_id,
+        listId: task.list_id,
+        oldStatusId: task.status_id,
+        newStatusId: statusId,
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar status:', error);
+  }
+};
 ```
 
-**2. Implementar `executeMoveTask`:**
+### 2. `src/components/tasks/TaskDetailDrawer.tsx`
 
-- Ler `config.target_list_id`
-- Atualizar `tasks.list_id` para o novo list_id
-- Registrar atividade de automacao
+Na funcao `handleStatusChange` (linha 85), adicionar a mesma logica:
 
-**3. Implementar `executeSetStartDate`:**
+```typescript
+import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
 
-- Mesma logica de `executeSetDueDate` mas atualizando o campo `start_date`
-- Suportar `days_from_now` e data fixa
+const handleStatusChange = async (statusId: string) => {
+  const oldStatusId = task.status_id;
+  await updateTask.mutateAsync({ id: task.id, statusId });
 
-**4. Implementar `executeRemoveAssignee`:**
+  // NOVO: Executar automacoes de mudanca de status
+  if (oldStatusId !== statusId) {
+    executeStatusChangeAutomations({
+      taskId: task.id,
+      workspaceId: task.workspace_id,
+      listId: task.list_id,
+      oldStatusId,
+      newStatusId: statusId,
+    });
+  }
+};
+```
 
-- Ler `config.user_id` ou `config.user_ids`
-- Deletar de `task_assignees`
+### 3. Verificar `TaskListView.tsx` e `StatusBulkPopover.tsx`
 
-**5. Implementar `executeRemoveAllAssignees`:**
+Verificar se ha mudancas de status inline nesses arquivos e adicionar a mesma chamada se necessario.
 
-- Deletar todos os registros de `task_assignees` para o `task_id`
+### Nota sobre invalidacao de queries
 
-**6. Implementar `executeAddFollower`:**
+Apos a execucao das automacoes (que podem mover tarefas, mudar status, etc.), e necessario invalidar as queries relevantes para a UI refletir as mudancas. Isso sera feito chamando `queryClient.invalidateQueries` apos o retorno de `executeStatusChangeAutomations`.
 
-- Ler `config.user_ids`
-- Upsert em `task_followers`
+### Arquivos modificados
 
-**7. Implementar `executeSendNotification`:**
-
-- Inserir em tabela `notifications` com a mensagem configurada
-
-**8. Implementar `executeSendWebhook`:**
-
-- Fazer fetch POST para a URL configurada com dados da tarefa
-
-### Importante: Atualizacao do `info` entre acoes
-
-Quando `move_task` e executado antes de `set_status` em uma sequencia de multiplas acoes, o `listId` no objeto `info` precisa ser atualizado para que acoes subsequentes (como `set_status`) usem o contexto correto da nova lista. Isso sera tratado passando um objeto mutavel ou retornando o novo estado.
-
-### Arquivo modificado
-
-- `src/hooks/useStatusChangeAutomations.ts` - adicionar implementacao de todas as acoes faltantes
+- `src/components/tasks/TaskMainContent.tsx` - adicionar chamada de automacao
+- `src/components/tasks/TaskDetailDrawer.tsx` - adicionar chamada de automacao
+- Possivelmente `src/components/views/TaskListView.tsx` e `src/components/tasks/bulk-actions/StatusBulkPopover.tsx`
 
 Nenhuma alteracao no banco de dados necessaria.
