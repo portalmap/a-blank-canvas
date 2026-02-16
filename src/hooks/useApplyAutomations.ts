@@ -42,7 +42,7 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
     const { data: automations, error } = await supabase
       .from('automations')
       .select('*')
-      .eq('trigger', 'on_task_created')
+      .in('trigger', ['on_task_created', 'on_task_moved_here', 'on_task_added_here'])
       .eq('enabled', true)
       .eq('workspace_id', task.workspace_id)
       .in('action_type', ['auto_assign_user', 'auto_add_follower']);
