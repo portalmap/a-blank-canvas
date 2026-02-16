@@ -102,7 +102,7 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
       actionConfig: { user_ids: selectedUserIds },
       scopeType,
       scopeId,
-      description: `${actionType === 'auto_assign_user' ? 'Atribuir' : 'Adicionar como seguidor'} ${selectedNames}${suffix} em ${scopeName}`,
+      description: `${actionType === 'auto_assign_user' ? 'Atribuir' : 'Adicionar como seguidor'} ${selectedNames}${suffix} ao criar ou mover tarefas em ${scopeName}`,
     });
 
     setDialogOpen(false);
@@ -121,7 +121,7 @@ const QuickAutomationButtons = ({ workspaceId, scopeType, scopeId, scopeName }: 
       ? 'terão este usuário como responsável' 
       : 'terão este usuário como seguidor';
     
-    return `Todas as tarefas criadas nesta ${scopeLabel} "${scopeName}" ${action}.`;
+    return `Todas as tarefas criadas ou movidas para esta ${scopeLabel} "${scopeName}" ${action}.`;
   };
 
   return (
