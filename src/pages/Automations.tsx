@@ -60,7 +60,7 @@ const Automations = () => {
             <div>
               <h3 className="font-semibold">Atribuição Automática</h3>
               <p className="text-sm text-muted-foreground">
-                Atribua responsáveis automaticamente quando tarefas são criadas
+                Atribua responsáveis automaticamente quando tarefas são criadas ou movidas
               </p>
             </div>
           </div>
