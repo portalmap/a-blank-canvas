@@ -320,6 +320,19 @@ export const executeStatusChangeAutomations = async (
         
         result.automationsExecuted++;
 
+        // Record execution for duplicate prevention (only for automations with conditions)
+        if (conditions && conditions.length > 0) {
+          try {
+            await supabase.from('automation_executions').insert({
+              automation_id: automation.id,
+              task_id: info.taskId,
+              status_id: info.newStatusId,
+            });
+          } catch (execErr) {
+            console.error('Error recording automation execution:', execErr);
+          }
+        }
+
         if (automation.action_type === 'create_subtask' || 
             actionsArray?.some(a => a.type === 'create_subtask')) {
           result.subtasksCreated++;
@@ -1044,5 +1057,135 @@ const executeSendWebhook = async (
     console.log(`Webhook sent to ${url} for task ${info.taskId}`);
   } catch (err) {
     console.error('Error sending webhook:', err);
+  }
+};
+
+/**
+ * Re-evaluate automations when a condition-relevant field changes (e.g. tag added/removed).
+ * This allows automations to fire regardless of the order of operations.
+ */
+export const reevaluateConditionAutomations = async (
+  taskId: string,
+  workspaceId: string
+): Promise<void> => {
+  try {
+    // 1. Fetch current task data
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('id, status_id, list_id, workspace_id')
+      .eq('id', taskId)
+      .single();
+
+    if (!task) return;
+
+    // 2. Get list hierarchy for scope filtering
+    const { data: list } = await supabase
+      .from('lists')
+      .select('id, space_id, folder_id')
+      .eq('id', task.list_id)
+      .single();
+
+    if (!list) return;
+
+    // 3. Build scope IDs
+    const scopeIds: string[] = [workspaceId];
+    if (list.space_id) scopeIds.push(list.space_id);
+    if (list.folder_id) scopeIds.push(list.folder_id);
+    scopeIds.push(task.list_id);
+
+    // 4. Fetch all enabled on_status_changed automations with conditions
+    const { data: automations } = await supabase
+      .from('automations')
+      .select('*')
+      .eq('trigger', 'on_status_changed')
+      .eq('enabled', true)
+      .eq('workspace_id', workspaceId);
+
+    if (!automations || automations.length === 0) return;
+
+    // 5. Filter by scope
+    const applicableAutomations = automations.filter((automation) => {
+      if (!automation.scope_id && automation.scope_type === 'workspace') return true;
+      return automation.scope_id && scopeIds.includes(automation.scope_id);
+    });
+
+    // 6. Fetch fresh task data for condition evaluation
+    const taskData = await fetchTaskData(taskId);
+    if (!taskData) return;
+
+    for (const automation of applicableAutomations) {
+      try {
+        const actionConfig = automation.action_config as Record<string, any> | null;
+        const conditions = actionConfig?.conditions as AutomationCondition[] | undefined;
+
+        // Only re-evaluate automations that HAVE conditions
+        if (!conditions || conditions.length === 0) continue;
+
+        // Check if current status satisfies the trigger's to_status_ids
+        const triggerConfig = actionConfig?.trigger_config;
+        if (triggerConfig) {
+          const toStatusIds: string[] = triggerConfig.to_status_ids ||
+            (triggerConfig.to_status_id ? [triggerConfig.to_status_id] : []);
+
+          // If to_status_ids is specified, current status must match
+          if (toStatusIds.length > 0 && !toStatusIds.includes(task.status_id)) {
+            continue;
+          }
+        }
+
+        // Evaluate conditions with fresh data
+        const conditionsMet = evaluateConditions(conditions, taskData);
+        if (!conditionsMet) continue;
+
+        // Check for duplicate execution
+        const { data: existingExecution } = await supabase
+          .from('automation_executions')
+          .select('id')
+          .eq('automation_id', automation.id)
+          .eq('task_id', taskId)
+          .eq('status_id', task.status_id)
+          .maybeSingle();
+
+        if (existingExecution) {
+          console.log(`Automation ${automation.id} already executed for task ${taskId} at status ${task.status_id}`);
+          continue;
+        }
+
+        // Record execution to prevent duplicates
+        await supabase.from('automation_executions').insert({
+          automation_id: automation.id,
+          task_id: taskId,
+          status_id: task.status_id,
+        });
+
+        const automationName = automation.description || `Automação ${automation.id.slice(0, 8)}`;
+
+        // Build a StatusChangeInfo for action execution
+        const info: StatusChangeInfo = {
+          taskId,
+          workspaceId,
+          listId: task.list_id,
+          oldStatusId: task.status_id, // same as current since status didn't change now
+          newStatusId: task.status_id,
+        };
+
+        // Execute actions
+        const actionsArray = actionConfig?.actions as Array<{ type: string; config: Record<string, any> }> | undefined;
+
+        if (actionsArray && actionsArray.length > 0) {
+          for (const action of actionsArray) {
+            await executeAction(action.type, info, action.config, automationName);
+          }
+        } else {
+          await executeAction(automation.action_type, info, actionConfig, automationName);
+        }
+
+        console.log(`Automation ${automation.id} executed via re-evaluation for task ${taskId}`);
+      } catch (err) {
+        console.error(`Error re-evaluating automation ${automation.id}:`, err);
+      }
+    }
+  } catch (error) {
+    console.error('Error in reevaluateConditionAutomations:', error);
   }
 };

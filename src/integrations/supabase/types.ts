@@ -81,6 +81,45 @@ export type Database = {
           },
         ]
       }
+      automation_executions: {
+        Row: {
+          automation_id: string
+          executed_at: string
+          id: string
+          status_id: string | null
+          task_id: string
+        }
+        Insert: {
+          automation_id: string
+          executed_at?: string
+          id?: string
+          status_id?: string | null
+          task_id: string
+        }
+        Update: {
+          automation_id?: string
+          executed_at?: string
+          id?: string
+          status_id?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_executions_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_logs: {
         Row: {
           automation_id: string
