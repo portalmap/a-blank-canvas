@@ -8,6 +8,7 @@ import { Calendar, Clock, Flag, X } from 'lucide-react';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
 import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
@@ -125,6 +126,17 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         oldValue: oldStatusName,
         newValue: newStatusName,
       });
+
+      // Executar automações de mudança de status
+      if (task.status_id !== statusId) {
+        executeStatusChangeAutomations({
+          taskId,
+          workspaceId: task.workspace_id,
+          listId: task.list_id,
+          oldStatusId: task.status_id,
+          newStatusId: statusId,
+        });
+      }
     } catch (error) {
       console.error('Erro ao atualizar status ou registrar atividade:', error);
     }

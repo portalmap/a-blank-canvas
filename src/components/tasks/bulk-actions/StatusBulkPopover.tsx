@@ -6,6 +6,8 @@ import {
 } from "@/components/ui/popover";
 import { useStatusesForScope } from "@/hooks/useStatuses";
 import { useBulkUpdateStatus } from "@/hooks/useBulkTaskActions";
+import { executeStatusChangeAutomations } from "@/hooks/useStatusChangeAutomations";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface StatusBulkPopoverProps {
@@ -27,13 +29,34 @@ export function StatusBulkPopover({
   const { data: statuses } = useStatusesForScope('list', listId, workspaceId);
   const updateStatus = useBulkUpdateStatus();
 
-  const handleSelectStatus = (statusId: string) => {
+  const handleSelectStatus = async (statusId: string) => {
+    // Fetch old status IDs for each task before bulk update
+    const { data: tasksData } = await supabase
+      .from('tasks')
+      .select('id, status_id, list_id')
+      .in('id', taskIds);
+
     updateStatus.mutate(
       { taskIds, statusId },
       {
         onSuccess: () => {
           setOpen(false);
           onSuccess();
+
+          // Execute automations for each task
+          if (tasksData) {
+            for (const task of tasksData) {
+              if (task.status_id !== statusId) {
+                executeStatusChangeAutomations({
+                  taskId: task.id,
+                  workspaceId,
+                  listId: task.list_id || listId || '',
+                  oldStatusId: task.status_id,
+                  newStatusId: statusId,
+                });
+              }
+            }
+          }
         },
       }
     );

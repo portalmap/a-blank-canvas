@@ -9,6 +9,7 @@ import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
 import { Calendar, Clock, Flag, X, Loader2, Maximize2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useUpdateTask } from '@/hooks/useTasks';
+import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useTask } from '@/hooks/useTask';
 import { SubtaskList } from './SubtaskList';
@@ -83,7 +84,19 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
   };
 
   const handleStatusChange = async (statusId: string) => {
+    const oldStatusId = task.status_id;
     await updateTask.mutateAsync({ id: task.id, statusId });
+
+    // Executar automações de mudança de status
+    if (oldStatusId !== statusId) {
+      executeStatusChangeAutomations({
+        taskId: task.id,
+        workspaceId: task.workspace_id,
+        listId: task.list_id,
+        oldStatusId,
+        newStatusId: statusId,
+      });
+    }
   };
 
   const handlePriorityChange = async (priority: 'low' | 'medium' | 'high' | 'urgent') => {
