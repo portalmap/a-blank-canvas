@@ -623,7 +623,23 @@ const executeSetDueDate = async (
   
   let dueDate: string | null = null;
 
-  if (config?.days_from_now) {
+  if (config?.date_type === 'days_after_trigger') {
+    const days = parseInt(config.days_count) || 0;
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    dueDate = date.toISOString().split('T')[0];
+  } else if (config?.date_type === 'first_day_of_month') {
+    const now = new Date();
+    dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0];
+  } else if (config?.date_type === 'last_day_of_month') {
+    const now = new Date();
+    dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  } else if (config?.date_type === 'specific_day') {
+    const day = parseInt(config.day_of_month) || 1;
+    const now = new Date();
+    dueDate = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
+  } else if (config?.days_from_now) {
+    // Legacy compatibility
     const date = new Date();
     date.setDate(date.getDate() + parseInt(config.days_from_now));
     dueDate = date.toISOString().split('T')[0];
@@ -682,42 +698,46 @@ const executeAddTag = async (
   config: Record<string, any> | null,
   automationName: string
 ): Promise<void> => {
+  // Support both tag_id (from UI) and legacy tag_name
+  const tagId = config?.tag_id;
   const tagName = config?.tag_name;
-  if (!tagName) return;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!tagId && !tagName) return;
 
-  // Find or create tag
-  let { data: tag } = await supabase
-    .from('task_tags')
-    .select('id')
-    .eq('workspace_id', info.workspaceId)
-    .eq('name', tagName)
-    .single();
+  let resolvedTagId = tagId;
 
-  if (!tag) {
-    const { data: newTag, error: createError } = await supabase
+  // If only tag_name provided (legacy), resolve to tag_id
+  if (!resolvedTagId && tagName) {
+    const { data: tag } = await supabase
       .from('task_tags')
-      .insert({ workspace_id: info.workspaceId, name: tagName })
       .select('id')
+      .eq('workspace_id', info.workspaceId)
+      .eq('name', tagName)
       .single();
 
-    if (createError) throw createError;
-    tag = newTag;
+    if (!tag) {
+      const { data: newTag, error: createError } = await supabase
+        .from('task_tags')
+        .insert({ workspace_id: info.workspaceId, name: tagName })
+        .select('id')
+        .single();
+      if (createError) throw createError;
+      resolvedTagId = newTag?.id;
+    } else {
+      resolvedTagId = tag.id;
+    }
   }
 
-  if (!tag) return;
+  if (!resolvedTagId) return;
 
-  // Add tag relation
   await supabase
     .from('task_tag_relations')
     .upsert(
-      { task_id: info.taskId, tag_id: tag.id },
+      { task_id: info.taskId, tag_id: resolvedTagId },
       { onConflict: 'task_id,tag_id' }
     );
 
-  console.log(`Tag "${tagName}" added to task ${info.taskId}`);
+  console.log(`Tag added to task ${info.taskId} (tag_id: ${resolvedTagId})`);
 };
 
 /**
@@ -728,27 +748,35 @@ const executeRemoveTag = async (
   config: Record<string, any> | null,
   automationName: string
 ): Promise<void> => {
+  // Support both tag_id (from UI) and legacy tag_name
+  const tagId = config?.tag_id;
   const tagName = config?.tag_name;
-  if (!tagName) return;
 
-  // Find tag
-  const { data: tag } = await supabase
-    .from('task_tags')
-    .select('id')
-    .eq('workspace_id', info.workspaceId)
-    .eq('name', tagName)
-    .single();
+  if (!tagId && !tagName) return;
 
-  if (!tag) return;
+  let resolvedTagId = tagId;
 
-  // Remove tag relation
+  // If only tag_name provided (legacy), resolve to tag_id
+  if (!resolvedTagId && tagName) {
+    const { data: tag } = await supabase
+      .from('task_tags')
+      .select('id')
+      .eq('workspace_id', info.workspaceId)
+      .eq('name', tagName)
+      .single();
+    if (!tag) return;
+    resolvedTagId = tag.id;
+  }
+
+  if (!resolvedTagId) return;
+
   await supabase
     .from('task_tag_relations')
     .delete()
     .eq('task_id', info.taskId)
-    .eq('tag_id', tag.id);
+    .eq('tag_id', resolvedTagId);
 
-  console.log(`Tag "${tagName}" removed from task ${info.taskId}`);
+  console.log(`Tag removed from task ${info.taskId} (tag_id: ${resolvedTagId})`);
 };
 
 /**
@@ -816,7 +844,24 @@ const executeSetStartDate = async (
   const oldStartDate = task?.start_date;
 
   let startDate: string | null = null;
-  if (config?.days_from_now) {
+
+  if (config?.date_type === 'days_after_trigger') {
+    const days = parseInt(config.days_count) || 0;
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    startDate = date.toISOString().split('T')[0];
+  } else if (config?.date_type === 'first_day_of_month') {
+    const now = new Date();
+    startDate = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0];
+  } else if (config?.date_type === 'last_day_of_month') {
+    const now = new Date();
+    startDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  } else if (config?.date_type === 'specific_day') {
+    const day = parseInt(config.day_of_month) || 1;
+    const now = new Date();
+    startDate = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split('T')[0];
+  } else if (config?.days_from_now) {
+    // Legacy compatibility
     const date = new Date();
     date.setDate(date.getDate() + parseInt(config.days_from_now));
     startDate = date.toISOString().split('T')[0];
@@ -974,7 +1019,7 @@ const executeSendWebhook = async (
   config: Record<string, any> | null,
   automationName: string
 ): Promise<void> => {
-  const url = config?.webhook_url;
+  const url = config?.webhook_url || config?.url;
   if (!url) return;
 
   const { data: task } = await supabase
