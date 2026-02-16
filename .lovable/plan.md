@@ -1,43 +1,103 @@
 
 
-# Fix: Status Filter Not Saving and Automation Not Working
+# Implementar Acao "Mover Tarefa" e Outras Acoes Faltantes no Motor de Automacoes
 
-## Root Cause
+## Problema
 
-In `src/components/automations/advanced/AdvancedAutomationBuilder.tsx`, line 71, when loading an automation that uses multiple actions:
+A acao `move_task` (Mover tarefa) esta definida na interface do construtor de automacoes (`actionCategories.ts`), porem **nao esta implementada** no motor de execucao (`useStatusChangeAutomations.ts`). Quando a automacao dispara, o switch/case no metodo `executeAction` cai no `default` e apenas imprime um log no console, sem executar nenhuma acao.
+
+Acoes faltantes no motor de execucao:
+
+| Acao | Status |
+|------|--------|
+| `move_task` | **Nao implementada** (prioridade do usuario) |
+| `set_start_date` | **Nao implementada** (presente na automacao do usuario) |
+| `remove_assignee` | **Nao implementada** |
+| `remove_all_assignees` | **Nao implementada** |
+| `auto_add_follower` / `add_follower` | **Nao implementada** |
+| `send_notification` | **Nao implementada** |
+| `send_webhook` | **Nao implementada** |
+
+## Solucao
+
+Implementar todas as acoes faltantes no arquivo `src/hooks/useStatusChangeAutomations.ts`, adicionando os cases no switch e as funcoes de execucao correspondentes.
+
+## Detalhes Tecnicos
+
+### `src/hooks/useStatusChangeAutomations.ts`
+
+**1. Adicionar case `move_task` no switch (linha 350-386):**
 
 ```typescript
-if (config.actions && Array.isArray(config.actions)) {
-  setUseMultipleActions(true);
-  setActions(config.actions);
-  setSelectedAction(null);
-  setActionConfig({});  // BUG: clears trigger_config!
-}
+case 'move_task':
+  await executeMoveTask(info, config, automationName);
+  break;
+
+case 'set_start_date':
+  await executeSetStartDate(info, config, automationName);
+  break;
+
+case 'remove_assignee':
+  await executeRemoveAssignee(info, config, automationName);
+  break;
+
+case 'remove_all_assignees':
+  await executeRemoveAllAssignees(info, automationName);
+  break;
+
+case 'auto_add_follower':
+case 'add_follower':
+  await executeAddFollower(info, config, automationName);
+  break;
+
+case 'send_notification':
+  await executeSendNotification(info, config, automationName);
+  break;
+
+case 'send_webhook':
+  await executeSendWebhook(info, config, automationName);
+  break;
 ```
 
-`setActionConfig({})` erases the `trigger_config` object which holds the status filter (`from_status_ids`, `to_status_ids`). This causes two problems:
+**2. Implementar `executeMoveTask`:**
 
-1. The status selectors show "Qualquer status" instead of the saved values when editing
-2. Saving the automation writes an empty config, so the automation either fires for all status changes or stops matching the intended one
+- Ler `config.target_list_id`
+- Atualizar `tasks.list_id` para o novo list_id
+- Registrar atividade de automacao
 
-## Fix
+**3. Implementar `executeSetStartDate`:**
 
-### `src/components/automations/advanced/AdvancedAutomationBuilder.tsx`
+- Mesma logica de `executeSetDueDate` mas atualizando o campo `start_date`
+- Suportar `days_from_now` e data fixa
 
-**Line 71** - Instead of clearing `actionConfig`, preserve `trigger_config` (and any other non-action fields):
+**4. Implementar `executeRemoveAssignee`:**
 
-```typescript
-if (config.actions && Array.isArray(config.actions)) {
-  setUseMultipleActions(true);
-  setActions(config.actions);
-  setSelectedAction(null);
-  // Preserve trigger_config and other top-level config, only remove actions array
-  const { actions: _, ...restConfig } = config;
-  setActionConfig(restConfig);
-}
-```
+- Ler `config.user_id` ou `config.user_ids`
+- Deletar de `task_assignees`
 
-This extracts the `actions` array but keeps `trigger_config`, `conditions`, and any other top-level properties in `actionConfig`. Since conditions are also loaded separately (lines 80-86), there is no conflict.
+**5. Implementar `executeRemoveAllAssignees`:**
 
-No database changes required.
+- Deletar todos os registros de `task_assignees` para o `task_id`
 
+**6. Implementar `executeAddFollower`:**
+
+- Ler `config.user_ids`
+- Upsert em `task_followers`
+
+**7. Implementar `executeSendNotification`:**
+
+- Inserir em tabela `notifications` com a mensagem configurada
+
+**8. Implementar `executeSendWebhook`:**
+
+- Fazer fetch POST para a URL configurada com dados da tarefa
+
+### Importante: Atualizacao do `info` entre acoes
+
+Quando `move_task` e executado antes de `set_status` em uma sequencia de multiplas acoes, o `listId` no objeto `info` precisa ser atualizado para que acoes subsequentes (como `set_status`) usem o contexto correto da nova lista. Isso sera tratado passando um objeto mutavel ou retornando o novo estado.
+
+### Arquivo modificado
+
+- `src/hooks/useStatusChangeAutomations.ts` - adicionar implementacao de todas as acoes faltantes
+
+Nenhuma alteracao no banco de dados necessaria.
