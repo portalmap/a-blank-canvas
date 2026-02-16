@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { QueryClient } from '@tanstack/react-query';
 
 interface StatusChangeInfo {
   taskId: string;
@@ -206,8 +207,18 @@ const fetchTaskData = async (taskId: string): Promise<TaskData | null> => {
 /**
  * Executes automations triggered by status changes
  */
+const invalidateAutomationQueries = (queryClient: QueryClient, taskId: string) => {
+  queryClient.invalidateQueries({ queryKey: ['tasks'] });
+  queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+  queryClient.invalidateQueries({ queryKey: ['subtasks'] });
+  queryClient.invalidateQueries({ queryKey: ['task-tag-relations'] });
+  queryClient.invalidateQueries({ queryKey: ['task-assignees'] });
+  queryClient.invalidateQueries({ queryKey: ['task-activities'] });
+};
+
 export const executeStatusChangeAutomations = async (
-  info: StatusChangeInfo
+  info: StatusChangeInfo,
+  queryClient?: QueryClient
 ): Promise<AutomationExecutionResult> => {
   const result: AutomationExecutionResult = {
     automationsExecuted: 0,
@@ -341,6 +352,10 @@ export const executeStatusChangeAutomations = async (
         console.error(`Error executing automation ${automation.id}:`, actionError);
         result.errors.push(`Automation ${automation.id}: ${actionError}`);
       }
+    }
+
+    if (queryClient && result.automationsExecuted > 0) {
+      invalidateAutomationQueries(queryClient, info.taskId);
     }
 
     return result;
@@ -1066,7 +1081,8 @@ const executeSendWebhook = async (
  */
 export const reevaluateConditionAutomations = async (
   taskId: string,
-  workspaceId: string
+  workspaceId: string,
+  queryClient?: QueryClient
 ): Promise<void> => {
   try {
     // 1. Fetch current task data
@@ -1181,6 +1197,11 @@ export const reevaluateConditionAutomations = async (
         }
 
         console.log(`Automation ${automation.id} executed via re-evaluation for task ${taskId}`);
+
+        // Invalidate queries immediately
+        if (queryClient) {
+          invalidateAutomationQueries(queryClient, taskId);
+        }
       } catch (err) {
         console.error(`Error re-evaluating automation ${automation.id}:`, err);
       }

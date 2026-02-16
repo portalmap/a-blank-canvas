@@ -129,7 +129,7 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
             listId: task.list_id,
             oldStatusId: source.droppableId,
             newStatusId: destination.droppableId,
-          });
+          }, queryClient);
 
           if (automationResult.automationsExecuted > 0) {
             console.log(`${automationResult.automationsExecuted} automações executadas`);

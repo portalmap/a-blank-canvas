@@ -9,6 +9,7 @@ import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
 import { Calendar, Clock, Flag, X, Loader2, Maximize2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useUpdateTask } from '@/hooks/useTasks';
+import { useQueryClient } from '@tanstack/react-query';
 import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useTask } from '@/hooks/useTask';
@@ -34,6 +35,7 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
+  const queryClient = useQueryClient();
   const { data: task, isLoading } = useTask(taskId);
   const updateTask = useUpdateTask();
   const { data: statuses } = useStatusesForScope('list', task?.list_id ?? undefined, task?.workspace_id);
@@ -95,7 +97,7 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
         listId: task.list_id,
         oldStatusId,
         newStatusId: statusId,
-      });
+      }, queryClient);
     }
   };
 
