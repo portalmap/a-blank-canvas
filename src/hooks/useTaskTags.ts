@@ -233,7 +233,7 @@ export function useAddTaskTag() {
           .eq('id', variables.taskId)
           .single();
         if (task) {
-          reevaluateConditionAutomations(variables.taskId, task.workspace_id);
+          reevaluateConditionAutomations(variables.taskId, task.workspace_id, queryClient);
         }
       } catch (err) {
         console.error('Error triggering automation re-evaluation:', err);
@@ -274,7 +274,7 @@ export function useRemoveTaskTag() {
           .eq('id', variables.taskId)
           .single();
         if (task) {
-          reevaluateConditionAutomations(variables.taskId, task.workspace_id);
+          reevaluateConditionAutomations(variables.taskId, task.workspace_id, queryClient);
         }
       } catch (err) {
         console.error('Error triggering automation re-evaluation:', err);

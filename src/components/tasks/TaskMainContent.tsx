@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,6 +52,7 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState(task.description || '');
 
+  const queryClient = useQueryClient();
   const updateTask = useUpdateTask();
   const createActivity = useCreateTaskActivity();
   const { data: statuses } = useStatusesForScope('list', task.list_id, task.workspace_id);
@@ -135,7 +137,7 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
           listId: task.list_id,
           oldStatusId: task.status_id,
           newStatusId: statusId,
-        });
+        }, queryClient);
       }
     } catch (error) {
       console.error('Erro ao atualizar status ou registrar atividade:', error);

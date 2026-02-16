@@ -9,6 +9,7 @@ import { useBulkUpdateStatus } from "@/hooks/useBulkTaskActions";
 import { executeStatusChangeAutomations } from "@/hooks/useStatusChangeAutomations";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface StatusBulkPopoverProps {
   children: ReactNode;
@@ -26,6 +27,7 @@ export function StatusBulkPopover({
   onSuccess,
 }: StatusBulkPopoverProps) {
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { data: statuses } = useStatusesForScope('list', listId, workspaceId);
   const updateStatus = useBulkUpdateStatus();
 
@@ -53,7 +55,7 @@ export function StatusBulkPopover({
                   listId: task.list_id || listId || '',
                   oldStatusId: task.status_id,
                   newStatusId: statusId,
-                });
+                }, queryClient);
               }
             }
           }
