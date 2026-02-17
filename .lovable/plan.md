@@ -1,66 +1,55 @@
 
 
-# Adicionar funcao "OU" para gatilhos de automacao
+# Implementar Lógica "OU" de Gatilhos nas Automações de Template
 
 ## Problema
+O dialog de automações de template (`TemplateAutomationDialog.tsx`) permite selecionar apenas **um gatilho**, enquanto o construtor de automações normais (`AdvancedAutomationBuilder.tsx`) ja suporta multiplos gatilhos com logica "OU". A funcionalidade precisa ser espelhada.
 
-Atualmente, cada automacao suporta apenas um gatilho. O usuario quer poder selecionar multiplos gatilhos com logica "OU" -- por exemplo, disparar quando uma tarefa for **criada OU movida** para a lista.
+## Mudancas Necessarias
 
-## Abordagem
+### 1. Atualizar `TemplateAutomationDialog.tsx`
 
-O banco de dados armazena um unico campo `trigger` (enum). Em vez de alterar o schema do banco, vamos armazenar os gatilhos adicionais no campo `action_config` como `or_triggers: string[]`. Isso evita migracoes e mantem compatibilidade com automacoes existentes.
+**Estado:** Adicionar `selectedTriggers` (array) ao lado do `selectedTrigger` existente, replicando o padrao do `AdvancedAutomationBuilder`.
+
+**Carregamento (useEffect de edicao):** Reconstruir os gatilhos "OU" a partir de `action_config.or_triggers`, assim:
+```text
+const orTriggers = (config.or_triggers as string[]) || [];
+setSelectedTriggers([automation.trigger, ...orTriggers]);
+```
+
+**TriggerSelector:** Passar as props `selectedTriggers` e `onToggleTrigger` para habilitar o modo multi-selecao com checkboxes.
+
+**Exibicao dos gatilhos selecionados:** Trocar a exibicao de gatilho unico por uma lista com badges "OU" entre eles, permitindo remover individualmente (exatamente como no `AdvancedAutomationBuilder`).
+
+**Submissao (handleSubmit):** Separar o gatilho primario dos extras e salvar `or_triggers` no `action_config`:
+```text
+const primaryTriggerId = selectedTriggers[0];
+const orTriggerIds = selectedTriggers.slice(1);
+if (orTriggerIds.length > 0) {
+  finalActionConfig.or_triggers = orTriggerIds;
+}
+```
+
+**Reset:** Limpar `selectedTriggers` no `resetForm`.
+
+### 2. Atualizar `TemplateAutomationsSection.tsx`
+
+Exibir badges "OU" na listagem de automacoes do template, lendo `action_config.or_triggers` e mostrando todos os gatilhos concatenados, igual ao `AutomationCard.tsx`.
+
+### 3. Garantir Compatibilidade no Apply
+
+O hook `useApplyAutomations.ts` que aplica as automacoes criadas a partir de templates ja suporta `or_triggers` no `action_config`, entao nao precisa de mudancas no motor de execucao.
+
+## Resumo de Arquivos Modificados
+
+| Arquivo | Alteracao |
+|---|---|
+| `src/components/settings/TemplateAutomationDialog.tsx` | Adicionar estado multi-trigger, passar props ao TriggerSelector, salvar/carregar or_triggers, exibir badges OU |
+| `src/components/settings/TemplateAutomationsSection.tsx` | Exibir badges OU na listagem |
 
 ## Detalhes Tecnicos
 
-### 1. UI: Multi-selecao de gatilhos no `TriggerSelector`
-
-**Arquivo: `src/components/automations/advanced/TriggerSelector.tsx`**
-
-- Mudar de selecao unica para multi-selecao de triggers
-- Prop `selectedTrigger: string | null` passa a conviver com `selectedTriggers: string[]` (ou armazenar no config como `or_triggers`)
-- Ao clicar num trigger ja selecionado, desmarcar. Ao clicar num novo, adicionar
-- Mostrar checkmarks em todos os selecionados
-- Exibir badge "OU" entre os triggers selecionados no card resumo
-
-### 2. UI: Exibir multiplos triggers no `AdvancedAutomationBuilder`
-
-**Arquivo: `src/components/automations/advanced/AdvancedAutomationBuilder.tsx`**
-
-- Atualizar o card de gatilho para mostrar multiplos triggers selecionados (com "OU" entre eles)
-- Ao salvar, armazenar o primeiro trigger no campo `trigger` do DB e os demais em `action_config.or_triggers`
-- Ao carregar (modo edicao), reconstruir a lista completa de triggers a partir de `trigger` + `action_config.or_triggers`
-- Atualizar a descricao gerada para listar todos os triggers
-
-### 3. Engine: Atualizar `useApplyAutomations.ts`
-
-**Arquivo: `src/hooks/useApplyAutomations.ts`**
-
-- Apos buscar automacoes, verificar tambem o campo `action_config.or_triggers` de cada automacao
-- Uma automacao e aplicavel se o evento atual corresponder ao `trigger` principal OU a qualquer item em `or_triggers`
-- Impacto: automacoes de criacao/movimentacao de tarefas
-
-### 4. Engine: Atualizar `useStatusChangeAutomations.ts`
-
-**Arquivo: `src/hooks/useStatusChangeAutomations.ts`**
-
-- Mesma logica: ao buscar automacoes por trigger, tambem considerar automacoes cujo `or_triggers` inclua o trigger buscado
-- Isso requer buscar automacoes de forma mais ampla e filtrar no cliente
-
-### 5. Exibicao na lista de automacoes
-
-**Arquivo: `src/components/automations/AutomationCard.tsx`**
-
-- Ao exibir o trigger de uma automacao, verificar se existe `or_triggers` no config e mostrar todos os triggers concatenados com "OU"
-
-## Resumo de arquivos modificados
-
-1. `src/components/automations/advanced/TriggerSelector.tsx` -- multi-selecao
-2. `src/components/automations/advanced/AdvancedAutomationBuilder.tsx` -- exibicao e persistencia
-3. `src/hooks/useApplyAutomations.ts` -- engine de execucao
-4. `src/hooks/useStatusChangeAutomations.ts` -- engine de execucao
-5. `src/components/automations/AutomationCard.tsx` -- exibicao no card
-
-## Nenhuma alteracao de banco de dados
-
-Os triggers adicionais sao armazenados em `action_config.or_triggers`, aproveitando o campo JSON existente.
+- O padrao sera copiado diretamente do `AdvancedAutomationBuilder.tsx` (linhas 47-48, 69-71, 157-173, 294-340, 354-370)
+- Nenhuma alteracao de banco de dados necessaria -- `or_triggers` ja e armazenado dentro do campo JSONB `action_config`
+- O `TriggerSelector` ja aceita as props `selectedTriggers` e `onToggleTrigger` opcionais
 
