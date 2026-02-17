@@ -150,6 +150,10 @@ export function TemplateAutomationsSection({
                 const trigger = getTriggerById(automation.trigger);
                 const action = getActionById(automation.action_type);
                 const ScopeIcon = getScopeIcon(automation.scope_type);
+                const config = (automation.action_config || {}) as Record<string, any>;
+                const orTriggers = (config.or_triggers as string[] | undefined) || [];
+                const allTriggerIds = [automation.trigger, ...orTriggers];
+                const allTriggersData = allTriggerIds.map(id => getTriggerById(id)).filter(Boolean);
 
                 return (
                   <div 
@@ -169,10 +173,19 @@ export function TemplateAutomationsSection({
                       <p className="text-sm font-medium truncate">
                         {automation.description || `${trigger?.label} → ${action?.label}`}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {trigger?.label || automation.trigger}
-                        </Badge>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {allTriggersData.map((t, idx) => (
+                          <span key={t!.id} className="flex items-center gap-1">
+                            {idx > 0 && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 font-semibold text-primary border-primary/30">
+                                OU
+                              </Badge>
+                            )}
+                            <Badge variant="secondary" className="text-xs">
+                              {t!.label}
+                            </Badge>
+                          </span>
+                        ))}
                         <span className="text-muted-foreground">→</span>
                         <Badge variant="outline" className="text-xs">
                           {action?.label || automation.action_type}

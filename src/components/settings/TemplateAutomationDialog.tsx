@@ -67,6 +67,7 @@ export function TemplateAutomationDialog({
 
   const [name, setName] = useState('');
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
+  const [selectedTriggers, setSelectedTriggers] = useState<string[]>([]);
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [actionConfig, setActionConfig] = useState<Record<string, any>>({});
   const [conditions, setConditions] = useState<AutomationCondition[]>([]);
@@ -90,6 +91,11 @@ export function TemplateAutomationDialog({
 
       // Handle legacy single action or new multiple actions
       const config = automation.action_config || {};
+      
+      // Reconstruct OR triggers
+      const orTriggers = (config.or_triggers as string[] | undefined) || [];
+      setSelectedTriggers([automation.trigger, ...orTriggers]);
+
       if (config.actions && Array.isArray(config.actions)) {
         setUseMultipleActions(true);
         setActions(config.actions);
@@ -116,6 +122,7 @@ export function TemplateAutomationDialog({
   const resetForm = () => {
     setName('');
     setSelectedTrigger(null);
+    setSelectedTriggers([]);
     setSelectedAction(null);
     setActionConfig({});
     setConditions([]);
@@ -136,7 +143,7 @@ export function TemplateAutomationDialog({
   };
 
   const handleSubmit = async () => {
-    if (!selectedTrigger) {
+    if (selectedTriggers.length === 0 && !selectedTrigger) {
       toast.error('Selecione um gatilho');
       return;
     }
@@ -178,12 +185,23 @@ export function TemplateAutomationDialog({
       return;
     }
 
-    const trigger = getTriggerById(selectedTrigger);
+    // Determine primary trigger and OR triggers
+    const primaryTriggerId = selectedTriggers.length > 0 ? selectedTriggers[0] : selectedTrigger!;
+    const orTriggerIds = selectedTriggers.length > 1 ? selectedTriggers.slice(1) : [];
+
+    const trigger = getTriggerById(primaryTriggerId);
     
     // Build final action config
     const finalActionConfig: Record<string, any> = {
       ...actionConfig,
     };
+
+    // Add OR triggers if any
+    if (orTriggerIds.length > 0) {
+      finalActionConfig.or_triggers = orTriggerIds;
+    } else {
+      delete finalActionConfig.or_triggers;
+    }
 
     // Add conditions if any
     if (conditions.length > 0) {
@@ -209,7 +227,7 @@ export function TemplateAutomationDialog({
           id: automation.id,
           templateId,
           description,
-          trigger: selectedTrigger as any,
+          trigger: primaryTriggerId as any,
           action_type: primaryActionType as any,
           action_config: finalActionConfig,
           scope_type: scopeType,
@@ -220,7 +238,7 @@ export function TemplateAutomationDialog({
         await createAutomation.mutateAsync({
           templateId,
           description,
-          trigger: selectedTrigger as any,
+          trigger: primaryTriggerId as any,
           actionType: primaryActionType as any,
           actionConfig: finalActionConfig,
           scopeType,
@@ -237,8 +255,8 @@ export function TemplateAutomationDialog({
 
   const isPending = createAutomation.isPending || updateAutomation.isPending;
 
-  const selectedTriggerData = selectedTrigger ? getTriggerById(selectedTrigger) : null;
-  const selectedTriggerCategory = selectedTrigger ? getCategoryByTriggerId(selectedTrigger) : null;
+  const selectedTriggersData = selectedTriggers.map(id => getTriggerById(id)).filter(Boolean);
+  const selectedTriggerCategory = selectedTriggers.length > 0 ? getCategoryByTriggerId(selectedTriggers[0]) : null;
   const selectedActionData = selectedAction ? getActionById(selectedAction) : null;
 
   // Get lists for current folder context
@@ -377,28 +395,61 @@ export function TemplateAutomationDialog({
                   )}
                 </div>
 
-                {selectedTriggerData ? (
-                  <div className="flex items-center gap-2 p-1.5 bg-accent rounded-md">
-                    <selectedTriggerData.icon className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-xs font-medium">{selectedTriggerData.label}</span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 ml-auto"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTrigger(null);
-                        // Clear trigger config
-                        const { trigger_config, ...rest } = actionConfig;
-                        setActionConfig(rest);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                {selectedTriggersData.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {selectedTriggersData.map((triggerData, idx) => {
+                      const TriggerIcon = triggerData!.icon;
+                      return (
+                      <div key={triggerData!.id}>
+                        {idx > 0 && (
+                          <div className="flex items-center justify-center my-1">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-semibold text-primary border-primary/30">
+                              OU
+                            </Badge>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 p-1.5 bg-accent rounded-md">
+                          <TriggerIcon className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-xs font-medium">{triggerData!.label}</span>
+                          {selectedTriggersData.length > 1 && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 ml-auto"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newTriggers = selectedTriggers.filter(id => id !== triggerData!.id);
+                                setSelectedTriggers(newTriggers);
+                                setSelectedTrigger(newTriggers[0] || null);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      );
+                    })}
+                    {selectedTriggersData.length === 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 absolute top-3 right-3"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTrigger(null);
+                          setSelectedTriggers([]);
+                          const { trigger_config, or_triggers, ...rest } = actionConfig;
+                          setActionConfig(rest);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Clique para selecionar um gatilho
+                    Clique para selecionar um ou mais gatilhos
                   </p>
                 )}
 
@@ -406,9 +457,20 @@ export function TemplateAutomationDialog({
                   <div className="mt-3 border-t pt-3">
                     <TriggerSelector
                       selectedTrigger={selectedTrigger}
+                      selectedTriggers={selectedTriggers}
                       onSelectTrigger={(id) => {
                         setSelectedTrigger(id);
+                        setSelectedTriggers([id]);
                         setActiveStep('action');
+                      }}
+                      onToggleTrigger={(id) => {
+                        setSelectedTriggers(prev => {
+                          const newTriggers = prev.includes(id)
+                            ? prev.filter(t => t !== id)
+                            : [...prev, id];
+                          setSelectedTrigger(newTriggers[0] || null);
+                          return newTriggers;
+                        });
                       }}
                       workspaceId={workspaceId}
                       scopeType={scopeType === 'space' ? 'workspace' : scopeType}
@@ -584,7 +646,7 @@ export function TemplateAutomationDialog({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!selectedTrigger || (!useMultipleActions && !selectedAction) || (useMultipleActions && actions.length === 0) || isPending}
+            disabled={(selectedTriggers.length === 0 && !selectedTrigger) || (!useMultipleActions && !selectedAction) || (useMultipleActions && actions.length === 0) || isPending}
           >
             {isPending 
               ? (isEditMode ? 'Salvando...' : 'Adicionando...') 
