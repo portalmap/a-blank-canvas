@@ -77,6 +77,7 @@ const useTask = (taskId?: string) => {
           parent_id,
           completed_at,
           created_at,
+          recurrence_config,
           assignee:profiles(full_name, avatar_url),
           status:statuses(name, color)
         `)
