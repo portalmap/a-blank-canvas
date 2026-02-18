@@ -286,7 +286,8 @@ export const useUpdateTask = () => {
       assigneeId,
       dueDate,
       startDate,
-      completedAt
+      completedAt,
+      recurrenceConfig
     }: { 
       id: string; 
       title?: string; 
@@ -297,6 +298,7 @@ export const useUpdateTask = () => {
       dueDate?: string | null;
       startDate?: string | null;
       completedAt?: string | null;
+      recurrenceConfig?: Record<string, any> | null;
     }) => {
       const updateData: any = {};
       if (title !== undefined) updateData.title = title;
@@ -307,6 +309,7 @@ export const useUpdateTask = () => {
       if (dueDate !== undefined) updateData.due_date = dueDate;
       if (startDate !== undefined) updateData.start_date = startDate;
       if (completedAt !== undefined) updateData.completed_at = completedAt;
+      if (recurrenceConfig !== undefined) updateData.recurrence_config = recurrenceConfig;
 
       if (Object.keys(updateData).length === 0) {
         throw new Error('Nenhum campo para atualizar');
