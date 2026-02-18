@@ -16,6 +16,7 @@ import './editor-styles.css';
 interface SimpleRichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
+  onBlur?: (content: string) => void;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -25,6 +26,7 @@ interface SimpleRichTextEditorProps {
 export const SimpleRichTextEditor = ({ 
   content, 
   onChange, 
+  onBlur,
   disabled = false,
   placeholder = "Adicione uma descrição...",
   className = "",
@@ -62,6 +64,12 @@ export const SimpleRichTextEditor = ({
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
       onChange(json);
+    },
+    onBlur: ({ editor }) => {
+      if (onBlur) {
+        const json = JSON.stringify(editor.getJSON());
+        onBlur(json);
+      }
     },
   });
 
