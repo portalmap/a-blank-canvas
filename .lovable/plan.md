@@ -1,34 +1,61 @@
 
 
-# Corrigir Recorrência Não Salvando
+# Salvar Descrição Apenas ao Sair do Editor
 
-## Causa Raiz
+## Problema
 
-O problema não é no salvamento — os dados são gravados corretamente no banco. O problema é que a query que busca a tarefa na página de detalhe (`TaskView.tsx`, linha 66) **não inclui `recurrence_config` no SELECT**, então o campo sempre volta como `undefined`. Após salvar, o React Query invalida o cache e refaz a busca, mas como `recurrence_config` não está na lista de campos, ele nunca aparece.
+Atualmente, o `SimpleRichTextEditor` dispara `onChange` a cada tecla digitada (via `onUpdate` do TipTap), e o `TaskMainContent` salva no banco e registra atividade a cada chamada. Isso gera dezenas de requisições e registros de atividade desnecessários.
 
-## Correção
+## Solução
 
-**Arquivo:** `src/pages/TaskView.tsx`
+Separar o fluxo em dois callbacks no `SimpleRichTextEditor`:
+- `onChange` (local): chamado a cada tecla, apenas atualiza o estado local
+- `onBlur` (novo): chamado quando o editor perde o foco, dispara o salvamento real
 
-Adicionar `recurrence_config` à lista de campos no SELECT da query local `useTask` (linha 66-82). Trocar a seleção explícita de campos por `*` (que já é usado em outros hooks como `useTask.ts`) ou simplesmente adicionar o campo faltante.
+### Alteracoes
 
-A abordagem mais simples e segura é adicionar `recurrence_config` à lista existente de campos selecionados, mantendo a consistência com o padrão atual do arquivo.
+**1. `src/components/documents/editor/SimpleRichTextEditor.tsx`**
 
-### Detalhe técnico
+- Adicionar prop `onBlur` opcional ao componente
+- Configurar o evento `onBlur` do TipTap para chamar esse callback com o conteudo atual do editor
+- Manter `onUpdate`/`onChange` funcionando normalmente para outros usos do componente
 
-Linha ~67 do `TaskView.tsx`, no `.select(...)`:
+**2. `src/components/tasks/TaskMainContent.tsx`**
+
+- Separar `handleDescriptionChange` em duas funcoes:
+  - `handleDescriptionLocalChange`: apenas atualiza o estado local (`setEditDescription`)
+  - `handleDescriptionSave`: faz o salvamento real no banco e registra a atividade (somente se houve mudanca)
+- Passar `handleDescriptionLocalChange` como `onChange` e `handleDescriptionSave` como `onBlur` para o `SimpleRichTextEditor`
+
+### Detalhe Tecnico
+
+No `SimpleRichTextEditor`, o TipTap suporta o evento `onBlur` nativamente:
 
 ```text
-Antes:
-  id, title, description, status_id, priority, assignee_id,
-  start_date, due_date, list_id, workspace_id, parent_id,
-  completed_at, created_at, ...
-
-Depois:
-  id, title, description, status_id, priority, assignee_id,
-  start_date, due_date, list_id, workspace_id, parent_id,
-  completed_at, created_at, recurrence_config, ...
+const editor = useEditor({
+  ...
+  onBlur: ({ editor }) => {
+    const json = JSON.stringify(editor.getJSON());
+    onBlur?.(json);
+  },
+});
 ```
 
-Nenhuma outra alteração é necessária — o salvamento e a invalidação de cache já estão funcionando corretamente.
+No `TaskMainContent`:
+
+```text
+// Apenas atualiza estado local (sem salvar)
+const handleDescriptionLocalChange = (newDescription: string) => {
+  setEditDescription(newDescription);
+};
+
+// Salva no banco apenas quando perde foco
+const handleDescriptionSave = async (currentContent: string) => {
+  const oldDescription = task.description || null;
+  if (currentContent === oldDescription) return;
+  // ... salvar e registrar atividade
+};
+```
+
+Isso elimina completamente o problema de multiplos salvamentos e registros de atividade durante a digitacao.
 
