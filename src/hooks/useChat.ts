@@ -266,8 +266,12 @@ export const useSendMessage = () => {
       if (error) throw error;
       return { ...data, hasAssignee: !!assigneeId };
     },
-    onError: (error) => {
-      toast.error('Erro ao enviar mensagem');
+    onError: (error: any) => {
+      if (error?.code === 'PGRST303' || error?.message?.includes('JWT expired')) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+      } else {
+        toast.error('Erro ao enviar mensagem');
+      }
       console.error(error);
     },
   });
