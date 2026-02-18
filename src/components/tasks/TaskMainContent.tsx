@@ -360,12 +360,6 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         </div>
       </div>
 
-      {/* Responsáveis */}
-      <TaskAssigneesManager taskId={task.id} workspaceId={task.workspace_id} />
-
-      {/* Etiquetas */}
-      <TaskTagsSelector taskId={task.id} workspaceId={task.workspace_id} />
-
       {/* Recorrência */}
       <TaskRecurrenceConfig
         taskId={task.id}
@@ -373,6 +367,12 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         workspaceId={task.workspace_id}
         recurrenceConfig={(task as any).recurrence_config || null}
       />
+
+      {/* Responsáveis */}
+      <TaskAssigneesManager taskId={task.id} workspaceId={task.workspace_id} />
+
+      {/* Etiquetas */}
+      <TaskTagsSelector taskId={task.id} workspaceId={task.workspace_id} />
 
       <Separator />
 
