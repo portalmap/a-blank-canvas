@@ -56,6 +56,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ) {
           navigate('/');
         }
+
+        // Detect session loss (JWT expired / forced sign out)
+        if (event === 'SIGNED_OUT' && previousSessionRef.current) {
+          queryClient.clear();
+          toast.info('Sua sessão expirou. Faça login novamente.');
+          navigate('/auth');
+        }
         
         previousSessionRef.current = newSession;
       }
