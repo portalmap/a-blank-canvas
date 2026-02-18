@@ -1,55 +1,81 @@
 
 
-# Corrigir Tratamento de JWT Expirado no Chat (e em toda a aplicacao)
+# Adicionar Recorrencia Diretamente na Tarefa
 
-## Diagnostico
+## Visao Geral
 
-O erro "Erro ao enviar mensagem" nao e especifico do chat. **Todas** as requisicoes ao banco estao falhando com `JWT expired` (status 401). O token de autenticacao expirou e o mecanismo de refresh automatico nao conseguiu renova-lo (provavelmente a aba ficou inativa por muito tempo ou o refresh token tambem expirou).
+Permitir configurar recorrencia individualmente em cada tarefa, diretamente na tela de detalhe da tarefa (TaskMainContent). Quando o status da tarefa mudar para um status de "conclusao", o sistema executara automaticamente a acao de recorrencia configurada (criar nova tarefa ou resetar status).
 
-**Solucao imediata para o usuario:** Fazer logout e login novamente.
+## Alteracoes no Banco de Dados
 
-## Melhoria Proposta
-
-Adicionar deteccao global de JWT expirado para redirecionar automaticamente ao login quando isso ocorrer, evitando que o usuario veja erros genericos sem entender o motivo.
-
-### Alteracoes
-
-**1. `src/contexts/AuthContext.tsx`**
-
-Adicionar tratamento do evento `TOKEN_REFRESHED` com falha e do evento `SIGNED_OUT` no `onAuthStateChange`. Quando detectar que a sessao foi perdida (newSession === null e havia sessao anterior), exibir um toast informativo e redirecionar para `/auth`.
+Adicionar coluna `recurrence_config` (JSONB, nullable) na tabela `tasks` para armazenar a configuracao de recorrencia por tarefa.
 
 ```text
-if (event === 'SIGNED_OUT' && previousSessionRef.current) {
-  toast.info('Sua sessao expirou. Faca login novamente.');
-  navigate('/auth');
+Estrutura do JSONB:
+{
+  "recurrence_type": "daily" | "weekly" | "biweekly" | "monthly" | "quarterly",
+  "day_of_week": "monday" | "tuesday" | ... (para weekly/biweekly),
+  "monthly_mode": "first_day" | "last_day" | "specific_day" (para monthly/quarterly),
+  "day_of_month": 15 (quando monthly_mode = specific_day),
+  "trigger_on_status_id": "uuid-do-status-de-conclusao",
+  "skip_weekends": true/false,
+  "repeat_forever": true/false,
+  "on_complete_action": "create_new_task" | "update_status",
+  "reset_status_id": "uuid-do-status-destino" (quando on_complete_action = update_status)
 }
 ```
 
-**2. `src/integrations/supabase/client.ts`** (nao editavel diretamente)
+## Novo Componente: TaskRecurrenceConfig
 
-O cliente ja esta configurado com `autoRefreshToken: true`, entao nao ha mudanca aqui.
+Criar `src/components/tasks/TaskRecurrenceConfig.tsx` que:
+- Exibe um botao/secao "Recorrencia" na tela de detalhe da tarefa (abaixo das etiquetas, antes da descricao)
+- Ao clicar, abre um painel/collapsible com os controles de configuracao
+- Reutiliza a mesma logica visual do `ActionConfigForm.tsx` (frequencia, dia da semana, opcoes de conclusao)
+- Salva/atualiza o campo `recurrence_config` na tarefa via `useUpdateTask`
 
-**3. `src/hooks/useChat.ts` (opcional)**
+**Campos do componente:**
+- Frequencia (diariamente, semanal, quinzenal, mensal, trimestral)
+- Dia da semana (para semanal/quinzenal)
+- Dia do periodo (para mensal/trimestral)
+- Status que dispara a recorrencia (lista de status "done")
+- Checkbox: Ignorar fins de semana
+- Checkbox: Repetir para sempre
+- Acao ao concluir: Criar nova tarefa OU Atualizar status para X
+- Botao para remover recorrencia
 
-Adicionar tratamento especifico no `onError` do `useSendMessage` para detectar erro 401/PGRST303 e orientar o usuario a relogar:
+## Integracao com TaskMainContent
 
-```text
-onError: (error: any) => {
-  if (error?.code === 'PGRST303' || error?.message?.includes('JWT expired')) {
-    toast.error('Sessao expirada. Por favor, faca login novamente.');
-  } else {
-    toast.error('Erro ao enviar mensagem');
-  }
-}
-```
+Adicionar o componente `TaskRecurrenceConfig` na tela de detalhe, entre as etiquetas (TaskTagsSelector) e o Separator antes da descricao.
 
-## Resumo
+## Integracao com o Motor de Execucao
+
+Atualizar `src/hooks/useStatusChangeAutomations.ts` > `executeStatusChangeAutomations` para, alem de verificar automacoes da tabela `automations`, tambem verificar se a tarefa possui `recurrence_config` e se o novo status corresponde ao `trigger_on_status_id`. Se sim, executar a acao de recorrencia:
+
+- **create_new_task**: Duplica a tarefa com as datas recalculadas conforme a frequencia e reseta o status para o primeiro status ativo.
+- **update_status**: Muda o status da tarefa para `reset_status_id` e recalcula as datas.
+
+## Atualizacao do Hook useUpdateTask
+
+Garantir que o hook `useUpdateTask` suporte atualizar o campo `recurrence_config` (JSONB).
+
+## Resumo de Arquivos
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/contexts/AuthContext.tsx` | Detectar perda de sessao e redirecionar para login com mensagem informativa |
-| `src/hooks/useChat.ts` | Mensagem de erro especifica para JWT expirado no envio de mensagem |
+| Migracao SQL | Adicionar coluna `recurrence_config` (JSONB nullable) na tabela `tasks` |
+| `src/components/tasks/TaskRecurrenceConfig.tsx` | Novo componente com UI de configuracao de recorrencia |
+| `src/components/tasks/TaskMainContent.tsx` | Incluir o `TaskRecurrenceConfig` na tela de detalhe |
+| `src/hooks/useTasks.ts` | Suportar `recurrence_config` no update |
+| `src/hooks/useStatusChangeAutomations.ts` | Verificar e executar recorrencia por tarefa ao mudar status |
 
-## Nota
+## Logica de Calculo de Datas
 
-A causa raiz e a expiracao natural do token. A correcao melhora a experiencia do usuario ao informar claramente o que aconteceu e redirecionar automaticamente, em vez de exibir erros genericos.
+Ao disparar a recorrencia, as novas datas serao calculadas com base na frequencia:
+- **daily**: +1 dia util (respeitando skip_weekends)
+- **weekly**: proximo dia da semana configurado
+- **biweekly**: +14 dias ao dia da semana configurado
+- **monthly**: proximo mes no dia/modo configurado
+- **quarterly**: +3 meses no dia/modo configurado
+
+A `start_date` e `due_date` serao recalculadas mantendo o mesmo intervalo entre elas que existia na tarefa original.
+
