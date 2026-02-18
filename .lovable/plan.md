@@ -1,61 +1,32 @@
 
 
-# Salvar Descrição Apenas ao Sair do Editor
+# Corrigir Criação de Canais Personalizados
 
-## Problema
+## Causa Raiz
 
-Atualmente, o `SimpleRichTextEditor` dispara `onChange` a cada tecla digitada (via `onUpdate` do TipTap), e o `TaskMainContent` salva no banco e registra atividade a cada chamada. Isso gera dezenas de requisições e registros de atividade desnecessários.
+As duas políticas de INSERT na tabela `chat_channels` estão marcadas como **RESTRICTIVE**. No PostgreSQL, políticas restritivas funcionam como filtros adicionais, mas o acesso só é concedido se pelo menos uma política **PERMISSIVE** for aprovada primeiro. Como não existe nenhuma política permissiva de INSERT, todos os usuários (incluindo Lucas) recebem erro ao tentar criar canais.
 
-## Solução
+## Correção
 
-Separar o fluxo em dois callbacks no `SimpleRichTextEditor`:
-- `onChange` (local): chamado a cada tecla, apenas atualiza o estado local
-- `onBlur` (novo): chamado quando o editor perde o foco, dispara o salvamento real
+Remover as duas políticas de INSERT restritivas e criar uma única política **PERMISSIVE** que consolida a lógica:
 
-### Alteracoes
+```sql
+-- Remover políticas antigas
+DROP POLICY IF EXISTS "Members can create channels" ON chat_channels;
+DROP POLICY IF EXISTS "Workspace members can create custom channels" ON chat_channels;
 
-**1. `src/components/documents/editor/SimpleRichTextEditor.tsx`**
-
-- Adicionar prop `onBlur` opcional ao componente
-- Configurar o evento `onBlur` do TipTap para chamar esse callback com o conteudo atual do editor
-- Manter `onUpdate`/`onChange` funcionando normalmente para outros usos do componente
-
-**2. `src/components/tasks/TaskMainContent.tsx`**
-
-- Separar `handleDescriptionChange` em duas funcoes:
-  - `handleDescriptionLocalChange`: apenas atualiza o estado local (`setEditDescription`)
-  - `handleDescriptionSave`: faz o salvamento real no banco e registra a atividade (somente se houve mudanca)
-- Passar `handleDescriptionLocalChange` como `onChange` e `handleDescriptionSave` como `onBlur` para o `SimpleRichTextEditor`
-
-### Detalhe Tecnico
-
-No `SimpleRichTextEditor`, o TipTap suporta o evento `onBlur` nativamente:
-
-```text
-const editor = useEditor({
-  ...
-  onBlur: ({ editor }) => {
-    const json = JSON.stringify(editor.getJSON());
-    onBlur?.(json);
-  },
-});
+-- Criar política permissiva consolidada
+CREATE POLICY "Members can create channels"
+ON chat_channels FOR INSERT
+TO authenticated
+WITH CHECK (
+  created_by_user_id = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM workspace_members wm
+    WHERE wm.workspace_id = chat_channels.workspace_id
+    AND wm.user_id = auth.uid()
+  )
+);
 ```
 
-No `TaskMainContent`:
-
-```text
-// Apenas atualiza estado local (sem salvar)
-const handleDescriptionLocalChange = (newDescription: string) => {
-  setEditDescription(newDescription);
-};
-
-// Salva no banco apenas quando perde foco
-const handleDescriptionSave = async (currentContent: string) => {
-  const oldDescription = task.description || null;
-  if (currentContent === oldDescription) return;
-  // ... salvar e registrar atividade
-};
-```
-
-Isso elimina completamente o problema de multiplos salvamentos e registros de atividade durante a digitacao.
-
+Esta política permite que qualquer membro do workspace crie canais (de qualquer tipo), desde que o `created_by_user_id` seja o próprio usuário autenticado. Nenhuma alteração de código é necessária.
