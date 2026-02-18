@@ -91,22 +91,22 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
     }
   };
 
-  const handleDescriptionChange = async (newDescription: string) => {
+  const handleDescriptionLocalChange = (newDescription: string) => {
     setEditDescription(newDescription);
-    
-    // Debounce could be added here, but for now save on each change
+  };
+
+  const handleDescriptionSave = async (currentContent: string) => {
     const oldDescription = task.description || null;
-    
-    if (newDescription === oldDescription) return;
+    if (currentContent === oldDescription) return;
     
     try {
-      await updateTask.mutateAsync({ id: task.id, description: newDescription || null });
+      await updateTask.mutateAsync({ id: task.id, description: currentContent || null });
       await createActivity.mutateAsync({
         taskId: task.id,
         activityType: 'description.changed',
         fieldName: 'description',
         oldValue: oldDescription,
-        newValue: newDescription || null,
+        newValue: currentContent || null,
       });
     } catch (error) {
       console.error('Erro ao atualizar descrição ou registrar atividade:', error);
@@ -381,7 +381,8 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         <label className="text-sm font-medium">Descrição</label>
         <SimpleRichTextEditor
           content={editDescription}
-          onChange={handleDescriptionChange}
+          onChange={handleDescriptionLocalChange}
+          onBlur={handleDescriptionSave}
           placeholder="Adicione uma descrição..."
           minHeight="100px"
         />
