@@ -2321,6 +2321,7 @@ export type Database = {
           list_id: string
           parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
+          recurrence_config: Json | null
           start_date: string | null
           status_id: string
           time_spent: number | null
@@ -2343,6 +2344,7 @@ export type Database = {
           list_id: string
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_config?: Json | null
           start_date?: string | null
           status_id: string
           time_spent?: number | null
@@ -2365,6 +2367,7 @@ export type Database = {
           list_id?: string
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_config?: Json | null
           start_date?: string | null
           status_id?: string
           time_spent?: number | null

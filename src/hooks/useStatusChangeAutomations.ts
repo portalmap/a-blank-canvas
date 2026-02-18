@@ -217,6 +217,226 @@ const invalidateAutomationQueries = (queryClient: QueryClient, taskId: string) =
   queryClient.invalidateQueries({ queryKey: ['task-activities'] });
 };
 
+/**
+ * Calculate next dates based on recurrence config
+ */
+const calculateNextDates = (
+  currentStartDate: string | null,
+  currentDueDate: string | null,
+  config: Record<string, any>
+): { startDate: string | null; dueDate: string | null } => {
+  const now = new Date();
+  const recurrenceType = config.recurrence_type;
+  const skipWeekends = config.skip_weekends || false;
+
+  // Calculate interval between start and due
+  let intervalDays = 0;
+  if (currentStartDate && currentDueDate) {
+    const s = new Date(currentStartDate + 'T00:00:00');
+    const d = new Date(currentDueDate + 'T00:00:00');
+    intervalDays = Math.round((d.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  let nextDate = new Date(now);
+
+  const dayOfWeekMap: Record<string, number> = {
+    sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+    thursday: 4, friday: 5, saturday: 6,
+  };
+
+  switch (recurrenceType) {
+    case 'daily':
+      nextDate.setDate(nextDate.getDate() + 1);
+      break;
+    case 'weekly': {
+      const targetDay = dayOfWeekMap[config.day_of_week || 'monday'];
+      nextDate.setDate(nextDate.getDate() + ((7 + targetDay - nextDate.getDay()) % 7 || 7));
+      break;
+    }
+    case 'biweekly': {
+      const targetDay2 = dayOfWeekMap[config.day_of_week || 'monday'];
+      nextDate.setDate(nextDate.getDate() + ((7 + targetDay2 - nextDate.getDay()) % 7 || 7) + 7);
+      break;
+    }
+    case 'monthly': {
+      const mode = config.monthly_mode || 'first_day';
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      if (mode === 'first_day') nextDate.setDate(1);
+      else if (mode === 'last_day') { nextDate.setMonth(nextDate.getMonth() + 1); nextDate.setDate(0); }
+      else if (mode === 'specific_day') nextDate.setDate(Math.min(config.day_of_month || 1, 28));
+      break;
+    }
+    case 'quarterly': {
+      const mode2 = config.monthly_mode || 'first_day';
+      nextDate.setMonth(nextDate.getMonth() + 3);
+      if (mode2 === 'first_day') nextDate.setDate(1);
+      else if (mode2 === 'last_day') { nextDate.setMonth(nextDate.getMonth() + 1); nextDate.setDate(0); }
+      else if (mode2 === 'specific_day') nextDate.setDate(Math.min(config.day_of_month || 1, 28));
+      break;
+    }
+  }
+
+  // Skip weekends
+  if (skipWeekends) {
+    while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
+      nextDate.setDate(nextDate.getDate() + 1);
+    }
+  }
+
+  const nextStartDate = nextDate.toISOString().split('T')[0];
+  let nextDueDate: string | null = null;
+  if (intervalDays > 0) {
+    const due = new Date(nextDate);
+    due.setDate(due.getDate() + intervalDays);
+    if (skipWeekends) {
+      while (due.getDay() === 0 || due.getDay() === 6) {
+        due.setDate(due.getDate() + 1);
+      }
+    }
+    nextDueDate = due.toISOString().split('T')[0];
+  }
+
+  return {
+    startDate: currentStartDate ? nextStartDate : null,
+    dueDate: currentDueDate ? (nextDueDate || nextStartDate) : null,
+  };
+};
+
+/**
+ * Execute task-level recurrence when status changes to the trigger status
+ */
+const executeTaskRecurrence = async (
+  info: StatusChangeInfo,
+  queryClient?: QueryClient
+): Promise<boolean> => {
+  // Fetch task with recurrence_config
+  const { data: task, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', info.taskId)
+    .single();
+
+  if (error || !task) return false;
+
+  const recConfig = task.recurrence_config as Record<string, any> | null;
+  if (!recConfig || !recConfig.trigger_on_status_id) return false;
+
+  // Check if new status matches trigger
+  if (info.newStatusId !== recConfig.trigger_on_status_id) return false;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const nextDates = calculateNextDates(task.start_date, task.due_date, recConfig);
+
+  if (recConfig.on_complete_action === 'create_new_task') {
+    // Find default/first active status for the list
+    const { data: defaultStatus } = await supabase
+      .from('statuses')
+      .select('id')
+      .eq('scope_id', task.list_id)
+      .eq('scope_type', 'list')
+      .eq('is_default', true)
+      .maybeSingle();
+
+    let newStatusId = defaultStatus?.id;
+    if (!newStatusId) {
+      const { data: firstStatus } = await supabase
+        .from('statuses')
+        .select('id')
+        .eq('scope_id', task.list_id)
+        .eq('scope_type', 'list')
+        .order('order_index', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      newStatusId = firstStatus?.id || task.status_id;
+    }
+
+    // Create new task (duplicate)
+    const { data: newTask, error: createError } = await supabase
+      .from('tasks')
+      .insert({
+        workspace_id: task.workspace_id,
+        list_id: task.list_id,
+        status_id: newStatusId,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        assignee_id: task.assignee_id,
+        start_date: nextDates.startDate,
+        due_date: nextDates.dueDate,
+        created_by_user_id: user.id,
+        recurrence_config: recConfig,
+      })
+      .select('id')
+      .single();
+
+    if (createError) {
+      console.error('Error creating recurring task:', createError);
+      return false;
+    }
+
+    // Copy assignees to new task
+    const { data: assignees } = await supabase
+      .from('task_assignees')
+      .select('user_id')
+      .eq('task_id', info.taskId);
+
+    if (assignees && assignees.length > 0) {
+      await supabase.from('task_assignees').insert(
+        assignees.map(a => ({ task_id: newTask.id, user_id: a.user_id }))
+      );
+    }
+
+    // Log activity
+    await logAutomationActivity(info.taskId, user.id, 'recurrence.executed', {
+      metadata: {
+        action: 'create_new_task',
+        new_task_id: newTask.id,
+        recurrence_type: recConfig.recurrence_type,
+      },
+    });
+
+    console.log(`Recurrence: created new task ${newTask.id} from ${info.taskId}`);
+  } else if (recConfig.on_complete_action === 'update_status') {
+    const resetStatusId = recConfig.reset_status_id;
+    if (!resetStatusId) return false;
+
+    const updateData: any = { status_id: resetStatusId, completed_at: null };
+    if (nextDates.startDate) updateData.start_date = nextDates.startDate;
+    if (nextDates.dueDate) updateData.due_date = nextDates.dueDate;
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update(updateData)
+      .eq('id', info.taskId);
+
+    if (updateError) {
+      console.error('Error resetting recurring task:', updateError);
+      return false;
+    }
+
+    // Log activity
+    await logAutomationActivity(info.taskId, user.id, 'recurrence.executed', {
+      metadata: {
+        action: 'update_status',
+        reset_status_id: resetStatusId,
+        recurrence_type: recConfig.recurrence_type,
+      },
+    });
+
+    console.log(`Recurrence: reset task ${info.taskId} to status ${resetStatusId}`);
+  }
+
+  if (queryClient) {
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['task', info.taskId] });
+    queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+  }
+
+  return true;
+};
+
 export const executeStatusChangeAutomations = async (
   info: StatusChangeInfo,
   queryClient?: QueryClient
@@ -360,6 +580,17 @@ export const executeStatusChangeAutomations = async (
         console.error(`Error executing automation ${automation.id}:`, actionError);
         result.errors.push(`Automation ${automation.id}: ${actionError}`);
       }
+    }
+
+    // === TASK-LEVEL RECURRENCE ===
+    try {
+      const recurrenceResult = await executeTaskRecurrence(info, queryClient);
+      if (recurrenceResult) {
+        result.automationsExecuted++;
+      }
+    } catch (recurrenceError) {
+      console.error('Error executing task recurrence:', recurrenceError);
+      result.errors.push(`Task recurrence: ${recurrenceError}`);
     }
 
     if (queryClient && result.automationsExecuted > 0) {

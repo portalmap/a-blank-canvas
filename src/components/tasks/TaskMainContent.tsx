@@ -15,6 +15,7 @@ import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { TaskTagsSelector } from './TaskTagsSelector';
+import { TaskRecurrenceConfig } from './TaskRecurrenceConfig';
 import { SimpleRichTextEditor } from '@/components/documents/editor';
 import { cn } from '@/lib/utils';
 import { startOfDay, isBefore, isEqual } from 'date-fns';
@@ -364,6 +365,14 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
       {/* Etiquetas */}
       <TaskTagsSelector taskId={task.id} workspaceId={task.workspace_id} />
+
+      {/* Recorrência */}
+      <TaskRecurrenceConfig
+        taskId={task.id}
+        listId={task.list_id}
+        workspaceId={task.workspace_id}
+        recurrenceConfig={(task as any).recurrence_config || null}
+      />
 
       <Separator />
 
