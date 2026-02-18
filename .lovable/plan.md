@@ -1,55 +1,55 @@
 
 
-# Implementar Lógica "OU" de Gatilhos nas Automações de Template
+# Corrigir Tratamento de JWT Expirado no Chat (e em toda a aplicacao)
 
-## Problema
-O dialog de automações de template (`TemplateAutomationDialog.tsx`) permite selecionar apenas **um gatilho**, enquanto o construtor de automações normais (`AdvancedAutomationBuilder.tsx`) ja suporta multiplos gatilhos com logica "OU". A funcionalidade precisa ser espelhada.
+## Diagnostico
 
-## Mudancas Necessarias
+O erro "Erro ao enviar mensagem" nao e especifico do chat. **Todas** as requisicoes ao banco estao falhando com `JWT expired` (status 401). O token de autenticacao expirou e o mecanismo de refresh automatico nao conseguiu renova-lo (provavelmente a aba ficou inativa por muito tempo ou o refresh token tambem expirou).
 
-### 1. Atualizar `TemplateAutomationDialog.tsx`
+**Solucao imediata para o usuario:** Fazer logout e login novamente.
 
-**Estado:** Adicionar `selectedTriggers` (array) ao lado do `selectedTrigger` existente, replicando o padrao do `AdvancedAutomationBuilder`.
+## Melhoria Proposta
 
-**Carregamento (useEffect de edicao):** Reconstruir os gatilhos "OU" a partir de `action_config.or_triggers`, assim:
+Adicionar deteccao global de JWT expirado para redirecionar automaticamente ao login quando isso ocorrer, evitando que o usuario veja erros genericos sem entender o motivo.
+
+### Alteracoes
+
+**1. `src/contexts/AuthContext.tsx`**
+
+Adicionar tratamento do evento `TOKEN_REFRESHED` com falha e do evento `SIGNED_OUT` no `onAuthStateChange`. Quando detectar que a sessao foi perdida (newSession === null e havia sessao anterior), exibir um toast informativo e redirecionar para `/auth`.
+
 ```text
-const orTriggers = (config.or_triggers as string[]) || [];
-setSelectedTriggers([automation.trigger, ...orTriggers]);
-```
-
-**TriggerSelector:** Passar as props `selectedTriggers` e `onToggleTrigger` para habilitar o modo multi-selecao com checkboxes.
-
-**Exibicao dos gatilhos selecionados:** Trocar a exibicao de gatilho unico por uma lista com badges "OU" entre eles, permitindo remover individualmente (exatamente como no `AdvancedAutomationBuilder`).
-
-**Submissao (handleSubmit):** Separar o gatilho primario dos extras e salvar `or_triggers` no `action_config`:
-```text
-const primaryTriggerId = selectedTriggers[0];
-const orTriggerIds = selectedTriggers.slice(1);
-if (orTriggerIds.length > 0) {
-  finalActionConfig.or_triggers = orTriggerIds;
+if (event === 'SIGNED_OUT' && previousSessionRef.current) {
+  toast.info('Sua sessao expirou. Faca login novamente.');
+  navigate('/auth');
 }
 ```
 
-**Reset:** Limpar `selectedTriggers` no `resetForm`.
+**2. `src/integrations/supabase/client.ts`** (nao editavel diretamente)
 
-### 2. Atualizar `TemplateAutomationsSection.tsx`
+O cliente ja esta configurado com `autoRefreshToken: true`, entao nao ha mudanca aqui.
 
-Exibir badges "OU" na listagem de automacoes do template, lendo `action_config.or_triggers` e mostrando todos os gatilhos concatenados, igual ao `AutomationCard.tsx`.
+**3. `src/hooks/useChat.ts` (opcional)**
 
-### 3. Garantir Compatibilidade no Apply
+Adicionar tratamento especifico no `onError` do `useSendMessage` para detectar erro 401/PGRST303 e orientar o usuario a relogar:
 
-O hook `useApplyAutomations.ts` que aplica as automacoes criadas a partir de templates ja suporta `or_triggers` no `action_config`, entao nao precisa de mudancas no motor de execucao.
+```text
+onError: (error: any) => {
+  if (error?.code === 'PGRST303' || error?.message?.includes('JWT expired')) {
+    toast.error('Sessao expirada. Por favor, faca login novamente.');
+  } else {
+    toast.error('Erro ao enviar mensagem');
+  }
+}
+```
 
-## Resumo de Arquivos Modificados
+## Resumo
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/components/settings/TemplateAutomationDialog.tsx` | Adicionar estado multi-trigger, passar props ao TriggerSelector, salvar/carregar or_triggers, exibir badges OU |
-| `src/components/settings/TemplateAutomationsSection.tsx` | Exibir badges OU na listagem |
+| `src/contexts/AuthContext.tsx` | Detectar perda de sessao e redirecionar para login com mensagem informativa |
+| `src/hooks/useChat.ts` | Mensagem de erro especifica para JWT expirado no envio de mensagem |
 
-## Detalhes Tecnicos
+## Nota
 
-- O padrao sera copiado diretamente do `AdvancedAutomationBuilder.tsx` (linhas 47-48, 69-71, 157-173, 294-340, 354-370)
-- Nenhuma alteracao de banco de dados necessaria -- `or_triggers` ja e armazenado dentro do campo JSONB `action_config`
-- O `TriggerSelector` ja aceita as props `selectedTriggers` e `onToggleTrigger` opcionais
-
+A causa raiz e a expiracao natural do token. A correcao melhora a experiencia do usuario ao informar claramente o que aconteceu e redirecionar automaticamente, em vez de exibir erros genericos.
