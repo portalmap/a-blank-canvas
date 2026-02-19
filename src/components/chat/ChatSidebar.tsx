@@ -119,8 +119,8 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
     // Ordenar canais alfabeticamente dentro de cada workspace
     Object.values(grouped).forEach(group => {
       group.spaceChannels.sort((a, b) => {
-        const nameA = (a.spaces?.name || a.name).toLowerCase();
-        const nameB = (b.spaces?.name || b.name).toLowerCase();
+        const nameA = a.name.toLowerCase();
+        const nameB = b.name.toLowerCase();
         return nameA.localeCompare(nameB, 'pt-BR');
       });
       group.customChannels.sort((a, b) => {
@@ -249,7 +249,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                               style={{ backgroundColor: channel.spaces?.color || '#6366f1' }}
                             />
                             <span className="truncate">
-                              {channel.spaces?.name || channel.name}
+                              {channel.name}
                             </span>
                             {unreadChannelIds?.includes(channel.id) && (
                               <span className="ml-auto h-2 w-2 rounded-full bg-destructive flex-shrink-0" />

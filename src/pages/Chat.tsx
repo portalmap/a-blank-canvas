@@ -32,11 +32,7 @@ const Chat = () => {
         {selectedChannel ? (
           <ChatRoom
             channelId={selectedChannel.id}
-            channelName={
-              selectedChannel.type === 'space'
-                ? (selectedChannel as any).spaces?.name || selectedChannel.name
-                : selectedChannel.name
-            }
+            channelName={selectedChannel.name}
             channelType={selectedChannel.type as 'space' | 'custom'}
             spaceColor={(selectedChannel as any).spaces?.color}
             workspaceId={selectedChannel.workspace_id}
