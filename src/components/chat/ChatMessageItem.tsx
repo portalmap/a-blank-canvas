@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ChatMessageWithSender } from '@/hooks/useChat';
+import { ChatAttachments } from './ChatAttachments';
 import { useUpdateChatMessage, useResolveChatAssignment } from '@/hooks/useChat';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
@@ -186,6 +187,9 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceI
                 <span className="text-xs text-muted-foreground ml-1">(editado)</span>
               )}
             </p>
+
+            {/* Anexos */}
+            <ChatAttachments attachments={message.attachments as any[] || []} />
             
             {/* Indicador de atribuição */}
             {hasAssignment && (

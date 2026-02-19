@@ -1,12 +1,14 @@
 import { useState, useRef, KeyboardEvent } from 'react';
-import { Send, X } from 'lucide-react';
+import { Send, X, Paperclip, FileIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSendMessage } from '@/hooks/useChat';
 import { useCreateNotification } from '@/hooks/useNotifications';
+import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
+import { toast } from 'sonner';
 
 interface ChatInputProps {
   channelId: string;
@@ -17,16 +19,18 @@ interface ChatInputProps {
 export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProps) => {
   const [content, setContent] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<WorkspaceMember | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const sendMessage = useSendMessage();
   const createNotification = useCreateNotification();
+  const { uploadFiles } = useUploadChatAttachments();
 
   const getDisplayName = (member: WorkspaceMember) => {
     const fullName = member.profile?.full_name;
     if (!fullName) return 'Usuário';
-    if (fullName.includes('@')) {
-      return fullName.split('@')[0];
-    }
+    if (fullName.includes('@')) return fullName.split('@')[0];
     return fullName;
   };
 
@@ -44,36 +48,63 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
   };
 
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setPendingFiles(prev => [...prev, ...files]);
+    }
+    e.target.value = '';
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async () => {
     const trimmedContent = content.trim();
-    if (!trimmedContent || sendMessage.isPending) return;
+    if ((!trimmedContent && pendingFiles.length === 0) || sendMessage.isPending || isUploading) return;
 
-    setContent('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '44px';
-      textareaRef.current.style.overflowY = 'hidden';
-    }
-    const assigneeId = selectedAssignee?.user_id;
-    
-    const result = await sendMessage.mutateAsync({ 
-      channelId, 
-      content: trimmedContent,
-      assigneeId,
-    });
+    setIsUploading(true);
 
-    // Criar notificação se houver atribuição
-    if (selectedAssignee && workspaceId && result.hasAssignee) {
-      await createNotification.mutateAsync({
-        userId: selectedAssignee.user_id,
-        workspaceId,
-        type: 'chat_assignment',
-        title: 'Nova atribuição no chat',
-        message: `Você foi atribuído em uma mensagem no canal #${channelName}`,
+    try {
+      let attachments: any[] | undefined;
+      if (pendingFiles.length > 0) {
+        attachments = await uploadFiles(pendingFiles);
+      }
+
+      setContent('');
+      setPendingFiles([]);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '44px';
+        textareaRef.current.style.overflowY = 'hidden';
+      }
+
+      const assigneeId = selectedAssignee?.user_id;
+      const result = await sendMessage.mutateAsync({
+        channelId,
+        content: trimmedContent || (attachments ? '📎 Anexo' : ''),
+        assigneeId,
+        attachments,
       });
-    }
 
-    setSelectedAssignee(null);
-    textareaRef.current?.focus();
+      if (selectedAssignee && workspaceId && result.hasAssignee) {
+        await createNotification.mutateAsync({
+          userId: selectedAssignee.user_id,
+          workspaceId,
+          type: 'chat_assignment',
+          title: 'Nova atribuição no chat',
+          message: `Você foi atribuído em uma mensagem no canal #${channelName}`,
+        });
+      }
+
+      setSelectedAssignee(null);
+      textareaRef.current?.focus();
+    } catch (err) {
+      toast.error('Erro ao enviar anexo');
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -82,6 +113,8 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
       handleSubmit();
     }
   };
+
+  const isImage = (file: File) => file.type.startsWith('image/');
 
   return (
     <div className="border-t p-4">
@@ -97,14 +130,44 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
           <span className="text-sm">
             Atribuído a: <strong>{getDisplayName(selectedAssignee)}</strong>
           </span>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-5 w-5 ml-auto"
             onClick={() => setSelectedAssignee(null)}
           >
             <X className="h-3 w-3" />
           </Button>
+        </div>
+      )}
+
+      {/* Pending files preview */}
+      {pendingFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {pendingFiles.map((file, i) => (
+            <div key={i} className="relative group border border-border rounded-md overflow-hidden">
+              {isImage(file) ? (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={file.name}
+                  className="h-16 w-16 object-cover"
+                />
+              ) : (
+                <div className="h-16 w-16 flex flex-col items-center justify-center bg-muted p-1">
+                  <FileIcon className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-[9px] text-muted-foreground truncate w-full text-center mt-0.5">
+                    {file.name.split('.').pop()}
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => removePendingFile(i)}
+                className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-4 w-4 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -121,6 +184,22 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
           className="min-h-[44px] max-h-[200px] resize-none"
           style={{ overflowY: 'hidden' }}
         />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={handleFilesSelected}
+          className="hidden"
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="flex-shrink-0"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
         <CommentAssigneeSelector
           workspaceId={workspaceId}
           selectedAssignee={selectedAssignee}
@@ -128,7 +207,7 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
         />
         <Button
           onClick={handleSubmit}
-          disabled={!content.trim() || sendMessage.isPending}
+          disabled={(!content.trim() && pendingFiles.length === 0) || sendMessage.isPending || isUploading}
           size="icon"
           className="flex-shrink-0"
         >
