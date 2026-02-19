@@ -19,8 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, ArrowLeft, PanelRightClose, PanelRight, Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 import { TaskMainContent } from '@/components/tasks/TaskMainContent';
 import { TaskActivityPanel } from '@/components/tasks/TaskActivityPanel';
-import { useState, useEffect } from 'react';
-import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -95,7 +94,6 @@ const TaskView = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
   const [showActivityPanel, setShowActivityPanel] = useState(true);
-  const [hasLoggedCreation, setHasLoggedCreation] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string>('');
@@ -107,7 +105,6 @@ const TaskView = () => {
   const { data: currentFolder } = useFolder(currentList?.folder_id);
   const { data: allLists } = useListsForWorkspace(task?.workspace_id);
   const duplicateTask = useDuplicateTask();
-  const createActivity = useCreateTaskActivity();
 
   // Fetch workspace directly from task to display in breadcrumb
   const { data: taskWorkspace } = useQuery({
@@ -154,31 +151,6 @@ const TaskView = () => {
     navigate(-1);
   };
 
-  // Registrar atividade de criação se for a primeira visita
-  useEffect(() => {
-    const checkAndLogCreation = async () => {
-      if (!task || hasLoggedCreation) return;
-
-      // Verificar se já existe atividade de criação
-      const { data: existingActivity } = await supabase
-        .from('task_activities')
-        .select('id')
-        .eq('task_id', task.id)
-        .eq('activity_type', 'task.created')
-        .limit(1);
-
-      if (!existingActivity || existingActivity.length === 0) {
-        // Registrar criação
-        await createActivity.mutateAsync({
-          taskId: task.id,
-          activityType: 'task.created',
-        });
-      }
-      setHasLoggedCreation(true);
-    };
-
-    checkAndLogCreation();
-  }, [task?.id, hasLoggedCreation]);
 
   if (taskLoading || !task) {
     return (

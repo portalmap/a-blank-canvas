@@ -239,6 +239,14 @@ export const useCreateTask = () => {
 
       if (error) throw error;
 
+      // Registrar atividade de criação com o usuário real
+      await supabase.from('task_activities').insert({
+        task_id: data.id,
+        user_id: user.id,
+        activity_type: 'task.created',
+        metadata: { created_by: 'user' },
+      });
+
       // Aplicar automações (responsáveis e seguidores automáticos)
       try {
         const result = await applyAutomationsToTask({
