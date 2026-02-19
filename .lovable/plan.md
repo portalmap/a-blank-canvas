@@ -1,27 +1,25 @@
 
-# Excluir Canais "Empresa Teste"
+# Corrigir exibicao do nome dos canais de Space no Chat
 
-## O que sera feito
+## Problema
 
-Excluir os 3 canais de chat identificados no banco de dados:
+Na sidebar do chat, os canais de Space exibem o nome do **Space** (`channel.spaces?.name`) em vez do nome do **canal** (`channel.name`). Os nomes dos canais no banco de dados ja possuem " Chat" no final (ex: "MAP | Gabbai Chat"), mas a UI mostra apenas o nome do Space (ex: "MAP | Gabbai").
 
-| Canal | ID |
-|---|---|
-| MAP \| Empresa Teste 2 Chat | `2cf7eb8d-2f5a-4f8a-acaa-db2c19e3d12e` |
-| MAP \| Empresa Teste Chat | `fa790b89-7a0f-4c4d-8ed9-6973a749664c` |
-| MAP \| Empresa Teste Chat | `a4dcef5e-868b-4292-a34d-34ce12d62eef` |
+O mesmo problema ocorre no `ChatRoom` (header do chat) em `Chat.tsx`.
 
-## Dados relacionados
+## Solucao
 
-- **Mensagens**: nenhuma (os canais estao vazios)
-- **Membros**: nenhum registro
-- **Status de leitura**: 3 registros que serao excluidos junto
+Alterar a sidebar e a pagina do chat para sempre usar `channel.name` em vez de `channel.spaces?.name` nos canais de tipo Space.
 
-## Execucao
+## Alteracoes
 
-Uma unica migracao SQL para:
+### 1. `src/components/chat/ChatSidebar.tsx`
 
-1. Excluir registros de `chat_read_status` dos 3 canais
-2. Excluir os 3 registros de `chat_channels`
+- **Linha 252**: Trocar `{channel.spaces?.name || channel.name}` por `{channel.name}`
+- **Linhas 121-124**: Ajustar a ordenacao para usar `channel.name` em vez de `channel.spaces?.name`
 
-Nenhuma alteracao de codigo e necessaria.
+### 2. `src/pages/Chat.tsx`
+
+- **Linhas 39-42**: No `channelName` passado ao `ChatRoom`, trocar a logica que prioriza `spaces?.name` para usar diretamente `selectedChannel.name`
+
+Nenhuma alteracao de banco de dados e necessaria.
