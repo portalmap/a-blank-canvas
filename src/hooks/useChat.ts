@@ -218,6 +218,7 @@ export const useChatMessages = (channelId?: string) => {
                     ? { 
                         ...msg, 
                         content: updatedMsg.content,
+                        attachments: updatedMsg.attachments,
                         edited_at: updatedMsg.edited_at,
                         edit_count: updatedMsg.edit_count,
                         assignee_id: updatedMsg.assignee_id,
@@ -245,21 +246,28 @@ export const useSendMessage = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ channelId, content, assigneeId }: { 
+    mutationFn: async ({ channelId, content, assigneeId, attachments }: { 
       channelId: string; 
       content: string;
       assigneeId?: string;
+      attachments?: any[];
     }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
+      const insertData: any = {
+        channel_id: channelId,
+        sender_id: user.id,
+        content,
+        assignee_id: assigneeId || null,
+      };
+
+      if (attachments && attachments.length > 0) {
+        insertData.attachments = attachments;
+      }
+
       const { data, error } = await supabase
         .from('chat_messages')
-        .insert({
-          channel_id: channelId,
-          sender_id: user.id,
-          content,
-          assignee_id: assigneeId || null,
-        })
+        .insert(insertData)
         .select()
         .single();
 
