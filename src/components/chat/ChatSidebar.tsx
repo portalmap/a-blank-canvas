@@ -58,13 +58,18 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   const [expandedSections, setExpandedSections] = useState<Record<string, { spaces: boolean; custom: boolean }>>({});
   const [channelToDelete, setChannelToDelete] = useState<ChannelWithWorkspace | null>(null);
 
+  const canCreateChannel = userRole?.workspaceRole === 'admin' || userRole?.workspaceRole === 'member';
+
   const canDeleteChannel = (channel: ChannelWithWorkspace) => {
     // Global owner, owner or admin can delete any channel
     if (userRole?.isGlobalOwner || userRole?.isOwner || userRole?.isAdmin) {
       return true;
     }
-    // Channel creator can delete their own channel
-    return channel.created_by_user_id === user?.id;
+    // Channel creator can delete their own channel (members only)
+    if (userRole?.workspaceRole === 'member') {
+      return channel.created_by_user_id === user?.id;
+    }
+    return false;
   };
 
   const handleDeleteChannel = async () => {
@@ -171,15 +176,17 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
             <MessageCircle className="h-4 w-4" />
             Chat
           </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => setShowCreateDialog(true)}
-            title="Novo canal"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          {canCreateChannel && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setShowCreateDialog(true)}
+              title="Novo canal"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -328,15 +335,17 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                           </div>
                         ))}
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-                          onClick={() => setShowCreateDialog(true)}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Novo canal
-                        </Button>
+                        {canCreateChannel && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowCreateDialog(true)}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Novo canal
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
