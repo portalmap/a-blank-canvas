@@ -153,36 +153,49 @@ export function useFilteredAllTasks(
 
       if (tasksError) throw tasksError;
 
-      // Fetch all assignees for these tasks
+      // Fetch all assignees for these tasks (batched to avoid URL length limits)
       const fetchedTaskIds = tasks?.map(t => t.id) || [];
       if (fetchedTaskIds.length === 0) return [];
 
-      const { data: assignees, error: assigneesError } = await supabase
-        .from('task_assignees')
-        .select(`
-          task_id,
-          user_id
-        `)
-        .in('task_id', fetchedTaskIds);
+      const BATCH_SIZE = 50;
+      const taskChunks: string[][] = [];
+      for (let i = 0; i < fetchedTaskIds.length; i += BATCH_SIZE) {
+        taskChunks.push(fetchedTaskIds.slice(i, i + BATCH_SIZE));
+      }
 
-      if (assigneesError) throw assigneesError;
+      const allAssignees: { task_id: string; user_id: string }[] = [];
+      for (const chunk of taskChunks) {
+        const { data, error } = await supabase
+          .from('task_assignees')
+          .select('task_id, user_id')
+          .in('task_id', chunk);
+        if (error) throw error;
+        if (data) allAssignees.push(...data);
+      }
 
-      // Fetch profiles for assignees
-      const userIds = [...new Set((assignees || []).map(a => a.user_id))];
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
+      // Fetch profiles for assignees (batched)
+      const userIds = [...new Set(allAssignees.map(a => a.user_id))];
+      const allProfiles: { id: string; full_name: string | null; avatar_url: string | null }[] = [];
+      const userChunks: string[][] = [];
+      for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+        userChunks.push(userIds.slice(i, i + BATCH_SIZE));
+      }
+      for (const chunk of userChunks) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', chunk);
+        if (error) throw error;
+        if (data) allProfiles.push(...data);
+      }
 
-      if (profilesError) throw profilesError;
-
-      const profilesMap = (profiles || []).reduce((acc, p) => {
+      const profilesMap = allProfiles.reduce((acc, p) => {
         acc[p.id] = p;
         return acc;
       }, {} as Record<string, { id: string; full_name: string | null; avatar_url: string | null }>);
 
       // Map assignees to tasks
-      const assigneesByTask = (assignees || []).reduce((acc, a) => {
+      const assigneesByTask = allAssignees.reduce((acc, a) => {
         if (!acc[a.task_id]) acc[a.task_id] = [];
         const profile = profilesMap[a.user_id];
         if (profile) acc[a.task_id].push(profile);
