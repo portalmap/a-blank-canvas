@@ -1270,7 +1270,33 @@ const executeSendNotification = async (
   automationName: string
 ): Promise<void> => {
   const message = config?.message || `Automação "${automationName}" disparada`;
-  const userIds = config?.user_ids || [];
+  
+  let userIds: string[] = [];
+  const targetType = config?.target_type;
+
+  if (targetType === 'task_creator') {
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('created_by_user_id')
+      .eq('id', info.taskId)
+      .single();
+    if (task?.created_by_user_id) userIds = [task.created_by_user_id];
+  } else if (targetType === 'task_assignees') {
+    const { data: assignees } = await supabase
+      .from('task_assignees')
+      .select('user_id')
+      .eq('task_id', info.taskId);
+    userIds = assignees?.map(a => a.user_id) || [];
+  } else if (targetType === 'task_followers') {
+    const { data: followers } = await supabase
+      .from('task_followers')
+      .select('user_id')
+      .eq('task_id', info.taskId);
+    userIds = followers?.map(f => f.user_id) || [];
+  } else {
+    // specific_users or legacy fallback
+    userIds = config?.user_ids || (config?.user_id ? [config.user_id] : []);
+  }
 
   if (!userIds.length) return;
 
