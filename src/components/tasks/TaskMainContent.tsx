@@ -15,6 +15,7 @@ import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
 import { TaskAssigneesManager } from './TaskAssigneesManager';
 import { TaskTagsSelector } from './TaskTagsSelector';
+import { TaskFollowersManager } from './TaskFollowersManager';
 import { TaskRecurrenceConfig } from './TaskRecurrenceConfig';
 import { SimpleRichTextEditor } from '@/components/documents/editor';
 import { cn } from '@/lib/utils';
@@ -370,6 +371,9 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
 
       {/* Responsáveis */}
       <TaskAssigneesManager taskId={task.id} workspaceId={task.workspace_id} />
+
+      {/* Seguidores */}
+      <TaskFollowersManager taskId={task.id} workspaceId={task.workspace_id} />
 
       {/* Etiquetas */}
       <TaskTagsSelector taskId={task.id} workspaceId={task.workspace_id} />
