@@ -17,6 +17,7 @@ import { TaskListView } from '@/components/views/TaskListView';
 import { TaskKanbanView } from '@/components/views/TaskKanbanView';
 import { TaskSprintView } from '@/components/views/TaskSprintView';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
+import { EntityFollowersManager } from '@/components/followers/EntityFollowersManager';
 import { GroupBySelector, GroupByOption } from '@/components/everything/GroupBySelector';
 import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
 import { AssigneeFilterPanel } from '@/components/everything/AssigneeFilterPanel';
@@ -294,6 +295,11 @@ const ListDetailView = () => {
 
         <div className="flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-4">
+            <EntityFollowersManager
+              entityType="list"
+              entityId={listId!}
+              workspaceId={activeWorkspace.id}
+            />
             <QuickAutomationButtons
               workspaceId={activeWorkspace.id}
               scopeType="list"
