@@ -16,6 +16,7 @@ import { Loader2, Plus, FolderOpen, List, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
+import { EntityFollowersManager } from '@/components/followers/EntityFollowersManager';
 
 const SpaceDetailView = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -103,12 +104,19 @@ const SpaceDetailView = () => {
             <p className="text-muted-foreground mt-1">{currentSpace.description}</p>
           )}
         </div>
-        <QuickAutomationButtons
-          workspaceId={activeWorkspace.id}
-          scopeType="space"
-          scopeId={spaceId!}
-          scopeName={currentSpace.name}
-        />
+        <div className="flex items-center gap-4">
+          <EntityFollowersManager
+            entityType="space"
+            entityId={spaceId!}
+            workspaceId={activeWorkspace.id}
+          />
+          <QuickAutomationButtons
+            workspaceId={activeWorkspace.id}
+            scopeType="space"
+            scopeId={spaceId!}
+            scopeName={currentSpace.name}
+          />
+        </div>
       </div>
 
       <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
