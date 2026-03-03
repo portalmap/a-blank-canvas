@@ -1,62 +1,64 @@
 
 
-# Corrigir modulo "Tudo" - query de assignees excede limite de URL
+# Expandir seleção de destinatários na ação "Enviar notificação"
 
-## Problema
+## Objetivo
 
-O modulo "Tudo" nao exibe tarefas porque a query de `task_assignees` falha com erro **400 Bad Request**. O usuario logado e `global_owner` (admin), entao TODAS as tarefas do workspace sao carregadas. Quando o hook tenta buscar os assignees, passa centenas de task IDs em um unico `.in()` filter, gerando uma URL que excede o limite de tamanho aceito pela API.
+Permitir que a ação "Enviar notificação" nas automações envie para destinatários dinâmicos além de usuários específicos: **criador da tarefa**, **responsáveis da tarefa** e **seguidores da tarefa**.
 
-A request que falha:
-```
-GET /task_assignees?task_id=in.(id1,id2,...id200+) -> 400 Bad Request
-```
+## Alterações
 
-## Causa raiz
+### 1. `src/components/automations/advanced/actionCategories.ts`
 
-No `useFilteredAllTasks.ts`, linhas 160-166, todos os IDs sao passados de uma vez:
-```typescript
-const { data: assignees, error: assigneesError } = await supabase
-  .from('task_assignees')
-  .select('task_id, user_id')
-  .in('task_id', fetchedTaskIds); // <- centenas de IDs = URL muito longa
-```
-
-O mesmo problema existe em `useAllTasks.ts` (hook `useAllTasksWithAssignees`).
-
-## Solucao
-
-Dividir as queries de `task_assignees` e `profiles` em lotes (batches) de no maximo 50 IDs por requisicao, depois juntar os resultados.
-
-## Alteracoes
-
-### 1. `src/hooks/useFilteredAllTasks.ts`
-
-Substituir a query unica de `task_assignees` (linhas 156-168) por uma funcao que divide os IDs em chunks de 50 e faz as requisicoes em paralelo:
+Alterar o campo `user_id` (type `user`) da ação `send_notification` para um novo tipo `notification_target` que suportará tanto usuários específicos quanto papéis dinâmicos:
 
 ```typescript
-// Dividir em lotes de 50
-const BATCH_SIZE = 50;
-const chunks = [];
-for (let i = 0; i < fetchedTaskIds.length; i += BATCH_SIZE) {
-  chunks.push(fetchedTaskIds.slice(i, i + BATCH_SIZE));
-}
-
-const allAssignees = [];
-for (const chunk of chunks) {
-  const { data, error } = await supabase
-    .from('task_assignees')
-    .select('task_id, user_id')
-    .in('task_id', chunk);
-  if (error) throw error;
-  if (data) allAssignees.push(...data);
+{
+  id: 'send_notification',
+  configFields: [
+    { name: 'message', label: 'Mensagem', type: 'text', required: true },
+    { name: 'target_type', label: 'Destinatários', type: 'notification_target', required: true }
+  ]
 }
 ```
 
-Aplicar a mesma logica de batching para a query de `profiles`.
+Adicionar `'notification_target'` ao union type de `ActionConfigField.type`.
 
-### 2. `src/hooks/useAllTasks.ts`
+### 2. `src/components/automations/advanced/ActionConfigForm.tsx`
 
-Aplicar a mesma correcao de batching no hook `useAllTasksWithAssignees`, que tem o mesmo problema potencial.
+Adicionar um novo `case 'notification_target'` no `renderField` que renderiza:
 
-Nenhuma alteracao de banco de dados e necessaria.
+- Um **Select** para escolher o tipo de destinatário:
+  - `specific_users` — Usuários específicos
+  - `task_creator` — Criador da tarefa
+  - `task_assignees` — Responsáveis da tarefa
+  - `task_followers` — Seguidores da tarefa
+
+- Se `specific_users` for selecionado, mostrar o `UserMultiSelect` abaixo para escolher os usuários.
+- Caso contrário, nenhum campo adicional (o motor resolve dinamicamente).
+
+Os valores são salvos no config como:
+```json
+{ "target_type": "task_assignees", "message": "..." }
+// ou
+{ "target_type": "specific_users", "user_ids": ["uuid1", "uuid2"], "message": "..." }
+```
+
+### 3. `src/hooks/useStatusChangeAutomations.ts` — `executeSendNotification`
+
+Atualizar a função para resolver os destinatários dinamicamente com base no `target_type`:
+
+- `specific_users`: usa `config.user_ids` (comportamento atual, mantém retrocompatibilidade com `user_id` legado)
+- `task_creator`: busca `created_by_user_id` da tarefa (campo existente na tabela `tasks`)
+- `task_assignees`: busca todos os `user_id` de `task_assignees` para a tarefa
+- `task_followers`: busca todos os `user_id` de `task_followers` para a tarefa
+
+Para retrocompatibilidade, se `target_type` não existir no config, usa o comportamento atual (`user_ids` ou `user_id`).
+
+### Detalhes técnicos
+
+- Nenhuma alteração de banco de dados é necessária
+- A tabela `tasks` já possui `created_by_user_id`
+- As tabelas `task_assignees` e `task_followers` já existem
+- Automações existentes com `user_id` continuarão funcionando pela lógica de fallback
 
