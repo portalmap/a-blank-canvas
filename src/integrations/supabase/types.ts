@@ -1072,35 +1072,6 @@ export type Database = {
           },
         ]
       }
-      folder_followers: {
-        Row: {
-          created_at: string | null
-          folder_id: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          folder_id: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          folder_id?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "folder_followers_folder_id_fkey"
-            columns: ["folder_id"]
-            isOneToOne: false
-            referencedRelation: "folders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       folder_permissions: {
         Row: {
           created_at: string
@@ -1180,35 +1151,6 @@ export type Database = {
             columns: ["status_template_id"]
             isOneToOne: false
             referencedRelation: "status_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      list_followers: {
-        Row: {
-          created_at: string | null
-          id: string
-          list_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          list_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          list_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "list_followers_list_id_fkey"
-            columns: ["list_id"]
-            isOneToOne: false
-            referencedRelation: "lists"
             referencedColumns: ["id"]
           },
         ]
@@ -1463,35 +1405,6 @@ export type Database = {
             columns: ["default_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      space_followers: {
-        Row: {
-          created_at: string | null
-          id: string
-          space_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          space_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          space_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "space_followers_space_id_fkey"
-            columns: ["space_id"]
-            isOneToOne: false
-            referencedRelation: "spaces"
             referencedColumns: ["id"]
           },
         ]

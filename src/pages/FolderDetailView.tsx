@@ -16,7 +16,6 @@ import { Loader2, Plus, List, FolderOpen, ChevronRight } from 'lucide-react';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import DateRangeFilter from '@/components/filters/DateRangeFilter';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
-import { EntityFollowersManager } from '@/components/followers/EntityFollowersManager';
 
 const FolderDetailView = () => {
   const { folderId } = useParams<{ folderId: string }>();
@@ -105,11 +104,6 @@ const FolderDetailView = () => {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <EntityFollowersManager
-            entityType="folder"
-            entityId={folderId!}
-            workspaceId={activeWorkspace.id}
-          />
           <QuickAutomationButtons
             workspaceId={activeWorkspace.id}
             scopeType="folder"
