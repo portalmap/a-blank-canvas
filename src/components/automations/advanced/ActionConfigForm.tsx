@@ -758,6 +758,50 @@ export const ActionConfigForm = ({
           </div>
         );
 
+      case 'notification_target':
+        return (
+          <div key={field.name} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{field.label} {field.required && <span className="text-destructive">*</span>}</Label>
+              <Select
+                value={config.target_type || ''}
+                onValueChange={(value) => {
+                  const newConfig: Record<string, any> = { ...config, target_type: value };
+                  if (value !== 'specific_users') {
+                    delete newConfig.user_ids;
+                    delete newConfig.user_id;
+                  }
+                  onConfigChange(newConfig);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o destinatário..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="specific_users">Usuários específicos</SelectItem>
+                  <SelectItem value="task_creator">Criador da tarefa</SelectItem>
+                  <SelectItem value="task_assignees">Responsáveis da tarefa</SelectItem>
+                  <SelectItem value="task_followers">Seguidores da tarefa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {config.target_type === 'specific_users' && (
+              <UserMultiSelect
+                label="Usuários"
+                users={members?.map(m => ({
+                  id: m.user_id,
+                  full_name: m.profile?.full_name || null,
+                  avatar_url: m.profile?.avatar_url || null
+                })) || []}
+                selectedIds={config.user_ids || (config.user_id ? [config.user_id] : [])}
+                onSelectionChange={(ids) => handleFieldChange('user_ids', ids)}
+                required
+              />
+            )}
+          </div>
+        );
+
       case 'number':
         return (
           <div key={field.name} className="space-y-2">

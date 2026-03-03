@@ -26,7 +26,7 @@ export interface ActionOption {
 export interface ActionConfigField {
   name: string;
   label: string;
-  type: 'select' | 'text' | 'user' | 'users' | 'status' | 'priority' | 'date' | 'number' | 'list' | 'tag' | 'date_config';
+  type: 'select' | 'text' | 'user' | 'users' | 'status' | 'priority' | 'date' | 'number' | 'list' | 'tag' | 'date_config' | 'notification_target';
   required?: boolean;
   options?: { value: string; label: string }[];
 }
@@ -156,7 +156,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
     icon: Bell,
     configFields: [
       { name: 'message', label: 'Mensagem', type: 'text', required: true },
-      { name: 'user_id', label: 'Para usuário', type: 'user', required: true }
+      { name: 'target_type', label: 'Destinatários', type: 'notification_target', required: true }
     ]
   },
   {
