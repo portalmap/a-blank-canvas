@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { ChatSidebar, ChatRoom, ChannelMembersDialog } from '@/components/chat';
 import { useAllChatChannels } from '@/hooks/useChat';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 const Chat = () => {
   const [searchParams] = useSearchParams();
