@@ -169,7 +169,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   });
 
   return (
-    <div className="w-64 border-r bg-muted/30 flex flex-col">
+    <div className="w-full h-full border-r bg-muted/30 flex flex-col">
       <div className="p-3 border-b">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-sm flex items-center gap-2">
