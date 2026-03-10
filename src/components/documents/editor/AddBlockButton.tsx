@@ -23,7 +23,7 @@ export const AddBlockButton = ({ editor }: AddBlockButtonProps) => {
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const isHoveringHandle = useRef(false);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (hideTimeoutRef.current) {
