@@ -255,12 +255,9 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                               className="h-2 w-2 rounded-full flex-shrink-0"
                               style={{ backgroundColor: channel.spaces?.color || '#6366f1' }}
                             />
-                            <span className="truncate">
+                            <span className={cn("truncate", unreadChannelIds?.includes(channel.id) && "font-bold text-destructive")}>
                               {channel.name}
                             </span>
-                            {unreadChannelIds?.includes(channel.id) && (
-                              <span className="ml-auto h-2 w-2 rounded-full bg-destructive flex-shrink-0" />
-                            )}
                           </button>
                         ))}
                         {spaceChannels.length === 0 && (
@@ -303,10 +300,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                               )}
                             >
                               <Hash className="h-3.5 w-3.5 flex-shrink-0" />
-                              <span className="truncate">{channel.name}</span>
-                              {unreadChannelIds?.includes(channel.id) && (
-                                <span className="ml-auto h-2 w-2 rounded-full bg-destructive flex-shrink-0" />
-                              )}
+                              <span className={cn("truncate", unreadChannelIds?.includes(channel.id) && "font-bold text-destructive")}>{channel.name}</span>
                             </button>
                             
                             {canDeleteChannel(channel) && (
