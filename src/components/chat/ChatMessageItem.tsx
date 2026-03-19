@@ -133,7 +133,7 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceI
           <div className="flex items-baseline gap-2 mb-0.5">
             <span className="font-medium text-sm">{senderName}</span>
             <span className="text-xs text-muted-foreground">
-              {format(new Date(message.created_at), "HH:mm", { locale: ptBR })}
+              {format(new Date(message.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </span>
           </div>
         )}
