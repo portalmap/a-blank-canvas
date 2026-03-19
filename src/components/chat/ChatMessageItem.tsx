@@ -133,7 +133,7 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceI
           <div className="flex items-baseline gap-2 mb-0.5">
             <span className="font-medium text-sm">{senderName}</span>
             <span className="text-xs text-muted-foreground">
-              {format(new Date(message.created_at), "HH:mm", { locale: ptBR })}
+              {format(new Date(message.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </span>
           </div>
         )}
@@ -213,8 +213,10 @@ export const ChatMessageItem = ({ message, showAvatar, currentUserId, workspaceI
 
             {/* Indicador de resolvido */}
             {isResolved && (
-              <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                <Check className="h-3 w-3" />
+              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                <UserPlus className="h-3 w-3" />
+                <span>Atribuído a: {getAssigneeName()}</span>
+                <Check className="h-3 w-3 ml-1" />
                 <span>(resolvido)</span>
               </div>
             )}
