@@ -2963,6 +2963,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_user_profile_as_admin: {
+        Args: {
+          new_bio?: string
+          new_full_name?: string
+          new_phone?: string
+          target_user_id: string
+        }
+        Returns: boolean
+      }
       user_can_access_document: {
         Args: { _document_id: string; _user_id: string }
         Returns: boolean
