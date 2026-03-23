@@ -160,16 +160,25 @@ export function UserEditDialog({
     setLoading(true);
     try {
       // Atualizar perfil
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: fullName,
-          phone,
-          bio,
-        })
-        .eq("id", user.id);
-
-      if (profileError) throw profileError;
+      if (isEditingSelf) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            full_name: fullName,
+            phone,
+            bio,
+          })
+          .eq("id", user.id);
+        if (profileError) throw profileError;
+      } else {
+        const { error: rpcError } = await supabase.rpc('update_user_profile_as_admin', {
+          target_user_id: user.id,
+          new_full_name: fullName,
+          new_phone: phone,
+          new_bio: bio,
+        });
+        if (rpcError) throw rpcError;
+      }
 
       // Atualizar role se necessário e permitido
       if (canEditRole && role !== user.role && !user.isGlobalOwner && !user.isOwner) {
