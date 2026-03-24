@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { reevaluateConditionAutomations } from "@/hooks/useStatusChangeAutomations";
+import { reevaluateConditionAutomations, executeTagAutomations } from "@/hooks/useStatusChangeAutomations";
 
 export interface TaskTag {
   id: string;
@@ -225,7 +225,7 @@ export function useAddTaskTag() {
         queryKey: ["task-tag-relations", variables.taskId],
       });
 
-      // Re-evaluate automations since tag condition may now be met
+      // Execute tag-triggered automations
       try {
         const { data: task } = await supabase
           .from('tasks')
@@ -233,6 +233,7 @@ export function useAddTaskTag() {
           .eq('id', variables.taskId)
           .single();
         if (task) {
+          executeTagAutomations(variables.taskId, task.workspace_id, variables.tagId, 'on_tag_added', queryClient);
           reevaluateConditionAutomations(variables.taskId, task.workspace_id, queryClient);
         }
       } catch (err) {
@@ -266,7 +267,7 @@ export function useRemoveTaskTag() {
         queryKey: ["task-tag-relations", variables.taskId],
       });
 
-      // Re-evaluate automations since tag condition may now be met
+      // Execute tag-triggered automations
       try {
         const { data: task } = await supabase
           .from('tasks')
@@ -274,6 +275,7 @@ export function useRemoveTaskTag() {
           .eq('id', variables.taskId)
           .single();
         if (task) {
+          executeTagAutomations(variables.taskId, task.workspace_id, variables.tagId, 'on_tag_removed', queryClient);
           reevaluateConditionAutomations(variables.taskId, task.workspace_id, queryClient);
         }
       } catch (err) {

@@ -1352,6 +1352,150 @@ const executeSendWebhook = async (
 };
 
 /**
+ * Execute automations triggered by tag additions or removals
+ */
+export const executeTagAutomations = async (
+  taskId: string,
+  workspaceId: string,
+  tagId: string,
+  event: 'on_tag_added' | 'on_tag_removed',
+  queryClient?: QueryClient
+): Promise<void> => {
+  try {
+    // 1. Fetch task info
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('id, status_id, list_id, workspace_id')
+      .eq('id', taskId)
+      .single();
+
+    if (!task) return;
+
+    // 2. Get list hierarchy for scope filtering
+    const { data: list } = await supabase
+      .from('lists')
+      .select('id, space_id, folder_id')
+      .eq('id', task.list_id)
+      .single();
+
+    if (!list) return;
+
+    // 3. Build scope IDs
+    const scopeIds: string[] = [workspaceId];
+    if (list.space_id) scopeIds.push(list.space_id);
+    if (list.folder_id) scopeIds.push(list.folder_id);
+    scopeIds.push(task.list_id);
+
+    // 4. Fetch all enabled automations for the workspace
+    const { data: automations, error } = await supabase
+      .from('automations')
+      .select('*')
+      .eq('enabled', true)
+      .eq('workspace_id', workspaceId);
+
+    if (error || !automations) return;
+
+    // 5. Filter to automations whose trigger or or_triggers include the event
+    const tagAutomations = automations.filter(a => {
+      const config = a.action_config as Record<string, any> | null;
+      const orTriggers = (config?.or_triggers as string[] | undefined) || [];
+      return a.trigger === event || orTriggers.includes(event);
+    });
+
+    // 6. Filter by scope
+    const applicableAutomations = tagAutomations.filter((automation) => {
+      if (!automation.scope_id && automation.scope_type === 'workspace') return true;
+      return automation.scope_id && scopeIds.includes(automation.scope_id);
+    });
+
+    if (applicableAutomations.length === 0) return;
+
+    console.log(`Found ${applicableAutomations.length} applicable automations for ${event}`);
+
+    // 7. Fetch task data once for condition evaluation
+    let taskData: TaskData | null = null;
+
+    for (const automation of applicableAutomations) {
+      try {
+        const actionConfig = automation.action_config as Record<string, any> | null;
+
+        // Check trigger_config.tag_ids filter
+        const triggerConfig = actionConfig?.trigger_config;
+        if (triggerConfig?.tag_ids && Array.isArray(triggerConfig.tag_ids) && triggerConfig.tag_ids.length > 0) {
+          if (!triggerConfig.tag_ids.includes(tagId)) {
+            continue; // This automation is for different tags
+          }
+        }
+
+        // Evaluate conditions
+        const conditions = actionConfig?.conditions as AutomationCondition[] | undefined;
+        if (conditions && conditions.length > 0) {
+          if (!taskData) {
+            taskData = await fetchTaskData(taskId);
+          }
+          if (!taskData) continue;
+
+          const conditionsMet = evaluateConditions(conditions, taskData);
+          if (!conditionsMet) continue;
+        }
+
+        // Check for duplicate execution (use tagId as status_id for dedup key)
+        const { data: existingExecution } = await supabase
+          .from('automation_executions')
+          .select('id')
+          .eq('automation_id', automation.id)
+          .eq('task_id', taskId)
+          .eq('status_id', tagId)
+          .maybeSingle();
+
+        if (existingExecution) {
+          console.log(`Tag automation ${automation.id} already executed for task ${taskId} with tag ${tagId}`);
+          continue;
+        }
+
+        // Record execution
+        await supabase.from('automation_executions').insert({
+          automation_id: automation.id,
+          task_id: taskId,
+          status_id: tagId, // reusing status_id column as dedup key for the tag
+        });
+
+        const automationName = automation.description || `Automação ${automation.id.slice(0, 8)}`;
+
+        const info: StatusChangeInfo = {
+          taskId,
+          workspaceId,
+          listId: task.list_id,
+          oldStatusId: task.status_id,
+          newStatusId: task.status_id,
+        };
+
+        // Execute actions (multi or single)
+        const actionsArray = actionConfig?.actions as Array<{ type: string; config: Record<string, any> }> | undefined;
+
+        if (actionsArray && actionsArray.length > 0) {
+          for (const action of actionsArray) {
+            await executeAction(action.type, info, action.config, automationName);
+          }
+        } else {
+          await executeAction(automation.action_type, info, actionConfig, automationName);
+        }
+
+        console.log(`Tag automation ${automation.id} executed for task ${taskId} (${event})`);
+      } catch (err) {
+        console.error(`Error executing tag automation ${automation.id}:`, err);
+      }
+    }
+
+    if (queryClient) {
+      invalidateAutomationQueries(queryClient, taskId);
+    }
+  } catch (error) {
+    console.error('Error in executeTagAutomations:', error);
+  }
+};
+
+/**
  * Re-evaluate automations when a condition-relevant field changes (e.g. tag added/removed).
  * This allows automations to fire regardless of the order of operations.
  */
@@ -1385,15 +1529,23 @@ export const reevaluateConditionAutomations = async (
     if (list.folder_id) scopeIds.push(list.folder_id);
     scopeIds.push(task.list_id);
 
-    // 4. Fetch all enabled on_status_changed automations with conditions
-    const { data: automations } = await supabase
+    // 4. Fetch all enabled automations and filter client-side (including or_triggers)
+    const { data: allAutomations } = await supabase
       .from('automations')
       .select('*')
-      .eq('trigger', 'on_status_changed')
       .eq('enabled', true)
       .eq('workspace_id', workspaceId);
 
-    if (!automations || automations.length === 0) return;
+    if (!allAutomations || allAutomations.length === 0) return;
+
+    // Filter to automations that include 'on_status_changed' as primary or or_trigger
+    const automations = allAutomations.filter(a => {
+      const config = a.action_config as Record<string, any> | null;
+      const orTriggers = (config?.or_triggers as string[] | undefined) || [];
+      return a.trigger === 'on_status_changed' || orTriggers.includes('on_status_changed');
+    });
+
+    if (automations.length === 0) return;
 
     // 5. Filter by scope
     const applicableAutomations = automations.filter((automation) => {
