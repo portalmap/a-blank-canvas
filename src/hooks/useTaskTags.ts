@@ -267,7 +267,7 @@ export function useRemoveTaskTag() {
         queryKey: ["task-tag-relations", variables.taskId],
       });
 
-      // Re-evaluate automations since tag condition may now be met
+      // Execute tag-triggered automations
       try {
         const { data: task } = await supabase
           .from('tasks')
@@ -275,6 +275,7 @@ export function useRemoveTaskTag() {
           .eq('id', variables.taskId)
           .single();
         if (task) {
+          executeTagAutomations(variables.taskId, task.workspace_id, variables.tagId, 'on_tag_removed', queryClient);
           reevaluateConditionAutomations(variables.taskId, task.workspace_id, queryClient);
         }
       } catch (err) {
