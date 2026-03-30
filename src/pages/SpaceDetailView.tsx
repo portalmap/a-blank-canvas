@@ -124,9 +124,6 @@ const SpaceDetailView = () => {
             />
             {currentSpace.name}
           </h1>
-          {currentSpace.description && (
-            <p className="text-muted-foreground mt-1">{currentSpace.description}</p>
-          )}
         </div>
         <div className="flex items-center gap-4">
           <EntityFollowersManager
