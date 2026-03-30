@@ -60,6 +60,7 @@ export function UserEditDialog({
 }: UserEditDialogProps) {
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState(user.fullName);
+  const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone || "");
   const [bio, setBio] = useState(user.bio || "");
   const [role, setRole] = useState<WorkspaceRole>(
@@ -159,6 +160,27 @@ export function UserEditDialog({
     
     setLoading(true);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Update email in auth.users if changed
+      if (normalizedEmail !== user.email.trim().toLowerCase()) {
+        if (!canResetPassword) {
+          toast.error("Você não tem permissão para alterar o e-mail");
+          setLoading(false);
+          return;
+        }
+
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('update-user-email', {
+          body: {
+            userId: user.id,
+            newEmail: normalizedEmail,
+          },
+        });
+
+        if (emailError) throw emailError;
+        if (emailData?.error) throw new Error(emailData.error);
+      }
+
       // Atualizar perfil
       if (isEditingSelf) {
         const { error: profileError } = await supabase
@@ -182,7 +204,6 @@ export function UserEditDialog({
 
       // Atualizar role se necessário e permitido
       if (canEditRole && role !== user.role && !user.isGlobalOwner && !user.isOwner) {
-        // Validar se o role é permitido
         if (!isValidWorkspaceRole(role)) {
           toast.error("Role inválido selecionado");
           return;
@@ -246,7 +267,17 @@ export function UserEditDialog({
 
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" value={user.email} disabled className="bg-muted" />
+            {canResetPassword ? (
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+              />
+            ) : (
+              <Input id="email" value={email} disabled className="bg-muted" />
+            )}
           </div>
 
           <div className="space-y-2">
