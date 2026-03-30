@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { Loader2, Plus, FolderOpen, List, ChevronRight } from 'lucide-react';
+import { Loader2, Plus, FolderOpen, List, ChevronRight, Pencil, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
