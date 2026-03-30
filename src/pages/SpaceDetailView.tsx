@@ -119,6 +119,52 @@ const SpaceDetailView = () => {
         </div>
       </div>
 
+      {/* Área descritiva do Space */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Descrição do Space
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isEditingDescription ? (
+            <div className="space-y-3">
+              <Textarea
+                value={editedDescription}
+                onChange={(e) => setEditedDescription(e.target.value)}
+                placeholder="Descreva o propósito, objetivos e informações importantes deste space..."
+                className="min-h-[120px]"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setIsEditingDescription(false)}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSaveDescription} disabled={savingDescription}>
+                  {savingDescription && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="cursor-pointer group min-h-[48px] flex items-start gap-2"
+              onClick={() => {
+                setEditedDescription(currentSpace.description || '');
+                setIsEditingDescription(true);
+              }}
+            >
+              {currentSpace.description ? (
+                <p className="text-sm text-foreground whitespace-pre-wrap flex-1">{currentSpace.description}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic flex-1">Clique para adicionar uma descrição...</p>
+              )}
+              <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
 
       <Tabs defaultValue="folders" className="w-full">
