@@ -279,7 +279,6 @@ export function UserEditDialog({
               <Input id="email" value={email} disabled className="bg-muted" />
             )}
           </div>
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="phone">Telefone</Label>
