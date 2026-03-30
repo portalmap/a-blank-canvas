@@ -60,6 +60,7 @@ export function UserEditDialog({
 }: UserEditDialogProps) {
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState(user.fullName);
+  const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone || "");
   const [bio, setBio] = useState(user.bio || "");
   const [role, setRole] = useState<WorkspaceRole>(
