@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpace } from '@/hooks/useSpaces';
 import { useFolders, useCreateFolder } from '@/hooks/useFolders';
 import { useLists, useCreateList } from '@/hooks/useLists';
 import { useTaskStats } from '@/hooks/useTaskStats';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { Loader2, Plus, FolderOpen, List, ChevronRight } from 'lucide-react';
+import { Loader2, Plus, FolderOpen, List, ChevronRight, Pencil, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
@@ -22,6 +25,7 @@ const SpaceDetailView = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
   const { activeWorkspace } = useWorkspace();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: currentSpace, isLoading: spaceLoading } = useSpace(spaceId);
   const { data: folders, isLoading: foldersLoading } = useFolders(spaceId);
@@ -37,6 +41,9 @@ const SpaceDetailView = () => {
   const [newFolderDescription, setNewFolderDescription] = useState('');
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
 
   const handleCreateFolder = async () => {
     if (!spaceId || !newFolderName.trim()) return;
@@ -50,6 +57,23 @@ const SpaceDetailView = () => {
     setNewFolderName('');
     setNewFolderDescription('');
     setIsFolderDialogOpen(false);
+  };
+
+  const handleSaveDescription = async () => {
+    if (!spaceId) return;
+    setSavingDescription(true);
+    const { error } = await supabase
+      .from('spaces')
+      .update({ description: editedDescription || null })
+      .eq('id', spaceId);
+    setSavingDescription(false);
+    if (error) {
+      toast.error('Erro ao salvar descrição');
+      return;
+    }
+    toast.success('Descrição atualizada!');
+    setIsEditingDescription(false);
+    queryClient.invalidateQueries({ queryKey: ['space', spaceId] });
   };
 
   const handleCreateList = async () => {
@@ -100,9 +124,6 @@ const SpaceDetailView = () => {
             />
             {currentSpace.name}
           </h1>
-          {currentSpace.description && (
-            <p className="text-muted-foreground mt-1">{currentSpace.description}</p>
-          )}
         </div>
         <div className="flex items-center gap-4">
           <EntityFollowersManager
@@ -118,6 +139,52 @@ const SpaceDetailView = () => {
           />
         </div>
       </div>
+
+      {/* Área descritiva do Space */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Descrição do Space
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isEditingDescription ? (
+            <div className="space-y-3">
+              <Textarea
+                value={editedDescription}
+                onChange={(e) => setEditedDescription(e.target.value)}
+                placeholder="Descreva o propósito, objetivos e informações importantes deste space..."
+                className="min-h-[120px]"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setIsEditingDescription(false)}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSaveDescription} disabled={savingDescription}>
+                  {savingDescription && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="cursor-pointer group min-h-[48px] flex items-start gap-2"
+              onClick={() => {
+                setEditedDescription(currentSpace.description || '');
+                setIsEditingDescription(true);
+              }}
+            >
+              {currentSpace.description ? (
+                <p className="text-sm text-foreground whitespace-pre-wrap flex-1">{currentSpace.description}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic flex-1">Clique para adicionar uma descrição...</p>
+              )}
+              <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
 
