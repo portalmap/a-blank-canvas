@@ -59,6 +59,23 @@ const SpaceDetailView = () => {
     setIsFolderDialogOpen(false);
   };
 
+  const handleSaveDescription = async () => {
+    if (!spaceId) return;
+    setSavingDescription(true);
+    const { error } = await supabase
+      .from('spaces')
+      .update({ description: editedDescription || null })
+      .eq('id', spaceId);
+    setSavingDescription(false);
+    if (error) {
+      toast.error('Erro ao salvar descrição');
+      return;
+    }
+    toast.success('Descrição atualizada!');
+    setIsEditingDescription(false);
+    queryClient.invalidateQueries({ queryKey: ['space', spaceId] });
+  };
+
   const handleCreateList = async () => {
     if (!currentSpace || !spaceId || !newListName.trim()) return;
 
