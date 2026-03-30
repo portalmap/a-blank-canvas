@@ -1,69 +1,46 @@
 
+Objetivo: corrigir definitivamente o problema de login desse usuário e fazer o botão “Salvar cadastro” sincronizar os dados no banco completo (autenticação + perfil), não só no perfil.
 
-# Análise: Automações ligadas a etiquetas não funcionam
+1) Diagnóstico confirmado (causa raiz)
+- Hoje, ao salvar no cadastro, o sistema atualiza apenas `profiles` (nome/telefone/bio).
+- O e-mail de login vem de `auth.users` (base de autenticação) e não está sendo atualizado pelo formulário.
+- Resultado: fica inconsistente (`profiles` com e-mail correto, `auth.users` com e-mail antigo/typo), então login e “esqueci a senha” continuam falhando.
 
-## Problemas encontrados
+2) Correção estrutural (fluxo correto de atualização)
+- Criar função de backend `update-user-email` (admin-only) para atualizar e-mail em `auth.users` via API administrativa segura.
+- Validar permissões (global owner/owner/admin de workspace), validar formato de e-mail e tratar erro de e-mail já existente.
+- Atualizar `UserEditDialog` para:
+  - ter estado local de e-mail editável;
+  - ao clicar “Salvar”, se e-mail mudou, chamar `update-user-email`;
+  - depois salvar perfil (nome/telefone/bio) como já faz hoje;
+  - invalidar queries para refletir imediatamente no UI.
 
-### Problema Principal: Triggers `on_tag_added` e `on_tag_removed` não têm execução implementada
+3) Correção de dados do caso atual (joaopessoa)
+- Executar correção pontual do e-mail no registro de autenticação desse usuário para o endereço correto.
+- Confirmar consistência final:
+  - `auth.users.email` = correto
+  - listagem de usuários exibindo o mesmo valor
+  - login com senha resetada funcionando
+  - fluxo “esqueci a senha” enviando para o e-mail certo
 
-Os triggers "Etiqueta adicionada" e "Tag removida" existem na UI (podem ser configurados e salvos), mas **não há código no motor de execução que os dispare**. 
+4) Robustez para evitar reincidência
+- Regra no formulário: normalizar e-mail (`trim + lowercase`) antes de salvar.
+- Mensagens de erro claras (ex.: e-mail duplicado, permissão insuficiente, formato inválido).
+- Log de auditoria simples na função para facilitar suporte futuro.
 
-Quando uma tag é adicionada/removida (`useAddTaskTag` / `useRemoveTaskTag` em `useTaskTags.ts`), o código apenas chama `reevaluateConditionAutomations()`, que:
-- Busca **somente** automações com `trigger === 'on_status_changed'` (linha 1392)
-- Verifica se condições de tag foram satisfeitas nessas automações
-- **Ignora completamente** automações cujo trigger primário é `on_tag_added` ou `on_tag_removed`
+5) Impacto no sistema
+- Sem mudança de schema/tabela.
+- Sem impacto em tarefas, chat, automações ou permissões existentes.
+- Mudança focada no módulo de usuários/autenticação para garantir sincronização completa no salvar.
 
-Ou seja: automações do tipo "Quando etiqueta X for adicionada → fazer Y" **nunca são disparadas**.
-
-### Problema Secundário: `reevaluateConditionAutomations` ignora `or_triggers`
-
-A função filtra por `trigger === 'on_status_changed'` direto (linha 1392), mas não verifica `or_triggers`. Se uma automação tem trigger primário diferente mas inclui `on_status_changed` como OR trigger, a re-avaliação não a encontra.
-
-## Solução proposta
-
-### 1. Criar função `executeTagAutomations` no motor de execução
-
-Nova função em `src/hooks/useStatusChangeAutomations.ts` que:
-- Recebe `taskId`, `workspaceId`, `tagId`, e `event` (`'on_tag_added'` ou `'on_tag_removed'`)
-- Busca automações ativas no workspace
-- Filtra por trigger primário ou `or_triggers` que incluam o evento
-- Filtra por escopo (workspace → space → folder → list)
-- Verifica `trigger_config.tag_ids`: se especificado, só dispara se o tagId está na lista
-- Avalia condições adicionais (se houver)
-- Executa as ações configuradas (single ou multi-action)
-
-### 2. Chamar `executeTagAutomations` nos hooks de tag
-
-Em `src/hooks/useTaskTags.ts`:
-- No `onSuccess` de `useAddTaskTag`: chamar `executeTagAutomations(taskId, workspaceId, tagId, 'on_tag_added')`
-- No `onSuccess` de `useRemoveTaskTag`: chamar `executeTagAutomations(taskId, workspaceId, tagId, 'on_tag_removed')`
-- Manter a chamada existente de `reevaluateConditionAutomations` para condições em automações de status
-
-### 3. Corrigir `reevaluateConditionAutomations` para considerar `or_triggers`
-
-Alterar a query na linha 1392 para buscar todas as automações ativas do workspace e filtrar client-side por trigger primário ou `or_triggers`, igual já é feito em `executeStatusChangeAutomations` (linhas 480-484).
-
-## Arquivos a editar
-
-- **`src/hooks/useStatusChangeAutomations.ts`**: Adicionar `executeTagAutomations` e corrigir `reevaluateConditionAutomations`
-- **`src/hooks/useTaskTags.ts`**: Importar e chamar `executeTagAutomations` nos hooks de add/remove tag
-
-## Lógica da nova função
-
-```text
-executeTagAutomations(taskId, workspaceId, tagId, event)
-  │
-  ├── Buscar task → list → space/folder (hierarquia de escopo)
-  ├── Buscar todas automações ativas do workspace
-  ├── Filtrar por trigger === event OU or_triggers inclui event
-  ├── Filtrar por escopo (workspace/space/folder/list)
-  ├── Para cada automação:
-  │   ├── Verificar trigger_config.tag_ids (se vazio = qualquer tag)
-  │   ├── Avaliar conditions (se houver)
-  │   ├── Verificar duplicata em automation_executions
-  │   └── Executar ações via executeAction()
-  └── Invalidar queries
-```
-
-Nenhuma migração de banco necessária.
-
+Detalhes técnicos
+- Arquivos a ajustar:
+  - `supabase/functions/update-user-email/index.ts` (novo)
+  - `src/components/settings/UserEditDialog.tsx` (editar para salvar e-mail + perfil no mesmo fluxo)
+  - `supabase/config.toml` (adicionar bloco da função, mantendo validação JWT conforme padrão do projeto)
+- Ordem de execução no salvar:
+  1. validar permissões e dados
+  2. atualizar e-mail na autenticação (se alterado)
+  3. atualizar perfil (`full_name`, `phone`, `bio`)
+  4. invalidar cache/listagens
+- Resultado esperado: “Salvar cadastro” passa a atualizar o banco completo de forma consistente.
