@@ -267,7 +267,18 @@ export function UserEditDialog({
 
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" value={user.email} disabled className="bg-muted" />
+            {canResetPassword ? (
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+              />
+            ) : (
+              <Input id="email" value={email} disabled className="bg-muted" />
+            )}
+          </div>
           </div>
 
           <div className="space-y-2">
