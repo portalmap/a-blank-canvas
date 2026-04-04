@@ -86,13 +86,14 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
           placeholder="Escreva um comentário..."
           rows={3}
         />
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <AudioRecorderButton onAudioReady={handleAudioReady} disabled={isUploadingAudio} />
           <Button 
             size="sm" 
             onClick={handleSubmit}
             disabled={!newComment.trim() || createComment.isPending}
           >
-            {createComment.isPending ? (
+            {createComment.isPending || isUploadingAudio ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : null}
             Comentar
