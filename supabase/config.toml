@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.update-user-email]
 verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false
