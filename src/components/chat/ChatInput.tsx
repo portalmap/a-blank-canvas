@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSendMessage } from '@/hooks/useChat';
 import { useCreateNotification } from '@/hooks/useNotifications';
 import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
+import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { toast } from 'sonner';
