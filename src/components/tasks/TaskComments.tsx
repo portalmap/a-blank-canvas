@@ -23,6 +23,8 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
   const { data: comments, isLoading } = useTaskComments(taskId);
   const createComment = useCreateTaskComment();
   const deleteComment = useDeleteTaskComment();
+  const { uploadFiles } = useUploadChatAttachments();
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
 
   const handleSubmit = async () => {
     if (!newComment.trim()) return;
