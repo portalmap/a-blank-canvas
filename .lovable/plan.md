@@ -1,23 +1,52 @@
 
 
-# Corrigir aba Automações: mostrar apenas automações, não o template completo
+# Expandir busca de automações para incluir nome do Space
 
 ## Problema
 
-Ao clicar "Editar Automações" na aba de Automações das Configurações, abre o `SpaceTemplateEditor` completo (com estrutura de pastas, listas, tarefas, cores, etc.) — exatamente igual à aba Templates. O usuário quer ver **apenas** as automações do template, com opções de criar, editar, ativar/desativar, duplicar, excluir e aplicar em Spaces.
+A busca atual filtra apenas pelo campo `description` da automação. Quando o usuário pesquisa um termo como "tráfego" ou o nome de um cliente (ex: "Delta Soluções"), automações que têm esse texto apenas no badge do Space não aparecem.
 
 ## Solução
 
-### `src/components/settings/AutomationTemplateSettings.tsx`
-- Substituir o `SpaceTemplateEditor` por uma tela dedicada que mostra apenas:
-  - Botão voltar + nome do template
-  - O componente `TemplateAutomationsSection` (já existe e gerencia automações individualmente)
-  - Botão "Aplicar em Spaces" para aplicação em massa
-- Buscar folders/lists do template via `useSpaceTemplate(templateId)` para passar ao `TemplateAutomationsSection` (necessário para exibir o escopo das automações)
+### Arquivo: `src/components/automations/AutomationsList.tsx`
 
-### `src/components/settings/AutomationTemplateList.tsx`
-- Sem alteração funcional — já está correto (lista templates com automações e permite editar/aplicar)
+Expandir o filtro de busca (linhas 78-83) para procurar o termo em múltiplos campos:
+
+1. **`description`** — título da automação (já existe)
+2. **Nome do Space** — resolvido via `lists`/`folders`/`spaces` (o badge azul mostrado no card)
+3. **Trigger label** e **Action label** — texto como "Etiqueta adicionada", "Mover tarefa"
+
+A lógica será: se qualquer um dos campos contiver o termo buscado, a automação aparece.
+
+```typescript
+// Buscar em description + space name + trigger/action labels
+if (filters?.searchTerm) {
+  const searchLower = filters.searchTerm.toLowerCase();
+  const description = automation.description?.toLowerCase() || '';
+  
+  // Resolver nome do space
+  let spaceName = '';
+  if (automation.scope_type === 'list') {
+    const list = lists.find(l => l.id === automation.scope_id);
+    const space = list ? spaces.find(s => s.id === list.space_id) : null;
+    spaceName = space?.name?.toLowerCase() || '';
+  } else if (automation.scope_type === 'folder') {
+    const folder = folders.find(f => f.id === automation.scope_id);
+    const space = folder ? spaces.find(s => s.id === folder.space_id) : null;
+    spaceName = space?.name?.toLowerCase() || '';
+  } else if (automation.scope_type === 'space') {
+    const space = spaces.find(s => s.id === automation.scope_id);
+    spaceName = space?.name?.toLowerCase() || '';
+  }
+  
+  const matches = description.includes(searchLower) 
+    || spaceName.includes(searchLower);
+  if (!matches) return false;
+}
+```
 
 ## Resultado
-A aba Automações fica independente e focada: lista os templates que têm automações, ao clicar "Editar" mostra apenas a gestão de automações (sem a estrutura completa do template), e permite aplicar em Spaces.
+- Pesquisar "tráfego" retorna automações com esse termo no título OU no nome do Space
+- Pesquisar "Delta" retorna todas automações do Space "MAP | Delta Soluções"
+- 1 arquivo editado
 
