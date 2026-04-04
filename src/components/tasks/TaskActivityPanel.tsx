@@ -28,6 +28,7 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
   const [newComment, setNewComment] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<WorkspaceMember | null>(null);
   const [pendingFiles, setPendingFiles] = useState<{ file: File; preview?: string }[]>([]);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   
   const { activeWorkspace } = useWorkspace();
   const effectiveWorkspaceId = workspaceId || activeWorkspace?.id;
