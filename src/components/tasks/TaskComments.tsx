@@ -37,6 +37,37 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
     setNewComment('');
   };
 
+  const handleAudioReady = async (file: File, description?: string) => {
+    setIsUploadingAudio(true);
+    try {
+      const attachments = await uploadFiles([file]);
+      const audioUrl = attachments[0]?.file_url;
+      if (!audioUrl) throw new Error('Upload falhou');
+      const commentContent = description
+        ? `🎤 ${description}\n[audio:${audioUrl}]`
+        : `[audio:${audioUrl}]`;
+      await createComment.mutateAsync({ taskId, content: commentContent });
+    } catch {
+      toast.error('Erro ao enviar áudio');
+    } finally {
+      setIsUploadingAudio(false);
+    }
+  };
+
+  const renderCommentContent = (content: string) => {
+    const audioMatch = content.match(/\[audio:(.*?)\]/);
+    if (audioMatch) {
+      const audioUrl = audioMatch[1];
+      const desc = content.replace(/\[audio:.*?\]/, '').replace(/^🎤\s*/, '').trim();
+      return (
+        <div>
+          <AudioPlayer src={audioUrl} description={desc || undefined} />
+        </div>
+      );
+    }
+    return <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm font-medium">
