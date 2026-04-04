@@ -46,9 +46,17 @@ export const AudioRecorderButton = ({ onAudioReady, disabled }: AudioRecorderBut
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+        },
+      });
+      const opusType = 'audio/webm;codecs=opus';
+      const mimeType = MediaRecorder.isTypeSupported(opusType) ? opusType : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg');
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128000 });
 
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
