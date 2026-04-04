@@ -75,11 +75,26 @@ export function AutomationsList({ workspaceId, filters }: AutomationsListProps) 
         if (automation.scope_id !== filters.scopeId) return false;
       }
 
-      // Filter by search term
+      // Filter by search term (description + space name)
       if (filters?.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
         const description = automation.description?.toLowerCase() || '';
-        if (!description.includes(searchLower)) return false;
+
+        let spaceName = '';
+        if (automation.scope_type === 'list') {
+          const list = lists.find(l => l.id === automation.scope_id);
+          const space = list ? spaces.find(s => s.id === list.space_id) : null;
+          spaceName = space?.name?.toLowerCase() || '';
+        } else if (automation.scope_type === 'folder') {
+          const folder = folders.find(f => f.id === automation.scope_id);
+          const space = folder ? spaces.find(s => s.id === folder.space_id) : null;
+          spaceName = space?.name?.toLowerCase() || '';
+        } else if (automation.scope_type === 'space') {
+          const space = spaces.find(s => s.id === automation.scope_id);
+          spaceName = space?.name?.toLowerCase() || '';
+        }
+
+        if (!description.includes(searchLower) && !spaceName.includes(searchLower)) return false;
       }
 
       return true;
