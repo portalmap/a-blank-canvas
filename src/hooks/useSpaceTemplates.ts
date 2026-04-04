@@ -1008,27 +1008,16 @@ function remapAutomation(
   automation: TemplateAutomation,
   folderIdMap: Record<string, string>,
   listIdMap: Record<string, string>,
+  statusIdMap: Record<string, string>,
   spaceId: string,
   workspaceId: string
 ): Database['public']['Tables']['automations']['Insert'] | null {
-  // Clone config to avoid mutation
-  const remappedConfig = JSON.parse(JSON.stringify(automation.action_config || {}));
-
-  // Remap target_list_id in "move_task" actions
-  if (remappedConfig.actions && Array.isArray(remappedConfig.actions)) {
-    remappedConfig.actions = remappedConfig.actions.map((action: { type: string; config?: { target_list_id?: string } }) => {
-      if (action.type === 'move_task' && action.config?.target_list_id) {
-        const newListId = listIdMap[action.config.target_list_id];
-        if (newListId) {
-          action.config.target_list_id = newListId;
-        } else {
-          // Can't remap this action - list not found
-          return null;
-        }
-      }
-      return action;
-    }).filter(Boolean);
-  }
+  // Use the existing deep remap helper that handles trigger_config, actions, and conditions
+  const remappedConfig = remapTemplateAutomationConfig(
+    automation.action_config as Record<string, unknown>,
+    listIdMap,
+    statusIdMap
+  );
 
   // Determine real scope_id
   let scopeId: string | null = spaceId;
@@ -1036,10 +1025,10 @@ function remapAutomation(
 
   if (automation.scope_type === 'list' && automation.list_ref_id) {
     scopeId = listIdMap[automation.list_ref_id] || null;
-    if (!scopeId) return null; // Can't map this automation
+    if (!scopeId) return null;
   } else if (automation.scope_type === 'folder' && automation.folder_ref_id) {
     scopeId = folderIdMap[automation.folder_ref_id] || null;
-    if (!scopeId) return null; // Can't map this automation
+    if (!scopeId) return null;
   } else if (automation.scope_type === 'space') {
     scopeId = spaceId;
   }
