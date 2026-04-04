@@ -14,6 +14,8 @@ import { AttachmentPreview } from './AttachmentPreview';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useUploadAttachment } from '@/hooks/useTaskAttachments';
+import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
+import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
 import { toast } from 'sonner';
 
 interface TaskActivityPanelProps {
@@ -26,6 +28,7 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
   const [newComment, setNewComment] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<WorkspaceMember | null>(null);
   const [pendingFiles, setPendingFiles] = useState<{ file: File; preview?: string }[]>([]);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   
   const { activeWorkspace } = useWorkspace();
   const effectiveWorkspaceId = workspaceId || activeWorkspace?.id;
@@ -34,6 +37,7 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
   const createComment = useCreateTaskComment();
   const createActivity = useCreateTaskActivity();
   const createNotification = useCreateNotification();
+  const { uploadFiles: uploadChatFiles } = useUploadChatAttachments();
   const uploadAttachment = useUploadAttachment();
   
   const activitiesEndRef = useRef<HTMLDivElement>(null);
@@ -262,6 +266,33 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
             <CommentAttachmentButton
               onFilesSelected={handleFilesSelected}
               disabled={uploadAttachment.isPending}
+            />
+            <AudioRecorderButton
+              onAudioReady={async (blob, description) => {
+                setIsUploadingAudio(true);
+                try {
+                  const file = new File([blob], `audio_${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+                  const [uploaded] = await uploadChatFiles([file]);
+                  const content = description
+                    ? `🎤 ${description} [audio:${uploaded.file_url}]`
+                    : `🎤 [audio:${uploaded.file_url}]`;
+                  const comment = await createComment.mutateAsync({
+                    taskId,
+                    content,
+                  });
+                  await createActivity.mutateAsync({
+                    taskId,
+                    activityType: 'comment.created',
+                    metadata: { comment_id: comment.id, content },
+                  });
+                  toast.success('Áudio enviado com sucesso');
+                } catch (error) {
+                  console.error('Erro ao enviar áudio:', error);
+                  toast.error('Erro ao enviar áudio');
+                } finally {
+                  setIsUploadingAudio(false);
+                }
+              }}
             />
           </div>
           <div className="flex items-center gap-2">
