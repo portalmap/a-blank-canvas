@@ -1,13 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserProfile } from "@/components/settings/UserProfile";
 import { WorkspaceSettings } from "@/components/settings/WorkspaceSettings";
-import { UserInviteForm } from "@/components/settings/UserInviteForm";
-import { GuestPermissionsManager } from "@/components/settings/GuestPermissionsManager";
 import { UserManagement } from "@/components/settings/UserManagement";
 import { StatusSettings } from "@/components/settings/StatusSettings";
 import { TagsSettings } from "@/components/settings/TagsSettings";
 import { WebhooksSettings } from "@/components/settings/webhooks/WebhooksSettings";
 import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettings";
+import { AutomationTemplateSettings } from "@/components/settings/AutomationTemplateSettings";
 import { ApiSettings } from "@/components/settings/api/ApiSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 
@@ -22,15 +21,14 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-11 lg:w-[1320px]">
+        <TabsList className="grid w-full grid-cols-10 lg:w-[1200px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="tags">Etiquetas</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="automations">Automações</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
-          <TabsTrigger value="invites">Convites</TabsTrigger>
-          <TabsTrigger value="guests">Convidados</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
@@ -56,16 +54,12 @@ export default function Settings() {
           <TagsSettings />
         </TabsContent>
 
+        <TabsContent value="automations" className="mt-6">
+          <AutomationTemplateSettings />
+        </TabsContent>
+
         <TabsContent value="users" className="mt-6">
           <UserManagement />
-        </TabsContent>
-
-        <TabsContent value="invites" className="mt-6">
-          <UserInviteForm />
-        </TabsContent>
-
-        <TabsContent value="guests" className="mt-6">
-          <GuestPermissionsManager />
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-6">
