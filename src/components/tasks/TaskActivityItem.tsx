@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AudioPlayer } from '@/components/audio/AudioPlayer';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';

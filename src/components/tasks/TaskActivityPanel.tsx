@@ -267,6 +267,33 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
               onFilesSelected={handleFilesSelected}
               disabled={uploadAttachment.isPending}
             />
+            <AudioRecorderButton
+              onAudioReady={async (blob, description) => {
+                setIsUploadingAudio(true);
+                try {
+                  const file = new File([blob], `audio_${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+                  const [uploaded] = await uploadChatFiles([file]);
+                  const content = description
+                    ? `🎤 ${description} [audio:${uploaded.file_url}]`
+                    : `🎤 [audio:${uploaded.file_url}]`;
+                  const comment = await createComment.mutateAsync({
+                    taskId,
+                    content,
+                  });
+                  await createActivity.mutateAsync({
+                    taskId,
+                    activityType: 'comment.created',
+                    metadata: { comment_id: comment.id, content },
+                  });
+                  toast.success('Áudio enviado com sucesso');
+                } catch (error) {
+                  console.error('Erro ao enviar áudio:', error);
+                  toast.error('Erro ao enviar áudio');
+                } finally {
+                  setIsUploadingAudio(false);
+                }
+              }}
+            />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:inline">
