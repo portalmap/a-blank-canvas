@@ -37,6 +37,7 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
   const createComment = useCreateTaskComment();
   const createActivity = useCreateTaskActivity();
   const createNotification = useCreateNotification();
+  const { uploadFiles: uploadChatFiles } = useUploadChatAttachments();
   const uploadAttachment = useUploadAttachment();
   
   const activitiesEndRef = useRef<HTMLDivElement>(null);
