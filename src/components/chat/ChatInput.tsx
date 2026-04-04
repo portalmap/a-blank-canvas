@@ -61,6 +61,13 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleAudioReady = (file: File, description?: string) => {
+    setPendingFiles(prev => [...prev, file]);
+    if (description) {
+      setContent(prev => prev ? `${prev}\n🎤 ${description}` : `🎤 ${description}`);
+    }
+  };
+
   const handleSubmit = async () => {
     const trimmedContent = content.trim();
     if ((!trimmedContent && pendingFiles.length === 0) || sendMessage.isPending || isUploading) return;
