@@ -144,9 +144,7 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
                     </Button>
                   )}
                 </div>
-                <p className="text-sm text-foreground whitespace-pre-wrap">
-                  {comment.content}
-                </p>
+                {renderCommentContent(comment.content)}
               </div>
             </div>
           ))

@@ -208,6 +208,7 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
         >
           <Paperclip className="h-4 w-4" />
         </Button>
+        <AudioRecorderButton onAudioReady={handleAudioReady} disabled={isUploading} />
         <CommentAssigneeSelector
           workspaceId={workspaceId}
           selectedAssignee={selectedAssignee}

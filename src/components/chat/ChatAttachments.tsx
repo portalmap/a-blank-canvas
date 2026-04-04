@@ -26,7 +26,9 @@ export const ChatAttachments = ({ attachments }: ChatAttachmentsProps) => {
     <>
       <div className="flex flex-wrap gap-2 mt-1">
         {attachments.map((att, i) =>
-          isImage(att.file_type) ? (
+          isAudio(att.file_type) ? (
+            <AudioPlayer key={i} src={att.file_url} description={att.description} />
+          ) : isImage(att.file_type) ? (
             <img
               key={i}
               src={att.file_url}
