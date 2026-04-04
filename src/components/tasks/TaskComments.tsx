@@ -7,6 +7,10 @@ import { useTaskComments, useCreateTaskComment, useDeleteTaskComment } from '@/h
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
+import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
+import { AudioPlayer } from '@/components/audio/AudioPlayer';
+import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
+import { toast } from 'sonner';
 
 interface TaskCommentsProps {
   taskId: string;
@@ -19,6 +23,8 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
   const { data: comments, isLoading } = useTaskComments(taskId);
   const createComment = useCreateTaskComment();
   const deleteComment = useDeleteTaskComment();
+  const { uploadFiles } = useUploadChatAttachments();
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
 
   const handleSubmit = async () => {
     if (!newComment.trim()) return;
@@ -29,6 +35,37 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
     });
 
     setNewComment('');
+  };
+
+  const handleAudioReady = async (file: File, description?: string) => {
+    setIsUploadingAudio(true);
+    try {
+      const attachments = await uploadFiles([file]);
+      const audioUrl = attachments[0]?.file_url;
+      if (!audioUrl) throw new Error('Upload falhou');
+      const commentContent = description
+        ? `🎤 ${description}\n[audio:${audioUrl}]`
+        : `[audio:${audioUrl}]`;
+      await createComment.mutateAsync({ taskId, content: commentContent });
+    } catch {
+      toast.error('Erro ao enviar áudio');
+    } finally {
+      setIsUploadingAudio(false);
+    }
+  };
+
+  const renderCommentContent = (content: string) => {
+    const audioMatch = content.match(/\[audio:(.*?)\]/);
+    if (audioMatch) {
+      const audioUrl = audioMatch[1];
+      const desc = content.replace(/\[audio:.*?\]/, '').replace(/^🎤\s*/, '').trim();
+      return (
+        <div>
+          <AudioPlayer src={audioUrl} description={desc || undefined} />
+        </div>
+      );
+    }
+    return <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>;
   };
 
   return (
@@ -49,13 +86,14 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
           placeholder="Escreva um comentário..."
           rows={3}
         />
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <AudioRecorderButton onAudioReady={handleAudioReady} disabled={isUploadingAudio} />
           <Button 
             size="sm" 
             onClick={handleSubmit}
             disabled={!newComment.trim() || createComment.isPending}
           >
-            {createComment.isPending ? (
+            {createComment.isPending || isUploadingAudio ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : null}
             Comentar
@@ -106,9 +144,7 @@ export const TaskComments = ({ taskId }: TaskCommentsProps) => {
                     </Button>
                   )}
                 </div>
-                <p className="text-sm text-foreground whitespace-pre-wrap">
-                  {comment.content}
-                </p>
+                {renderCommentContent(comment.content)}
               </div>
             </div>
           ))

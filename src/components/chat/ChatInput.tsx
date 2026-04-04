@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSendMessage } from '@/hooks/useChat';
 import { useCreateNotification } from '@/hooks/useNotifications';
 import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
+import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { toast } from 'sonner';
@@ -58,6 +59,13 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
 
   const removePendingFile = (index: number) => {
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAudioReady = (file: File, description?: string) => {
+    setPendingFiles(prev => [...prev, file]);
+    if (description) {
+      setContent(prev => prev ? `${prev}\n🎤 ${description}` : `🎤 ${description}`);
+    }
   };
 
   const handleSubmit = async () => {
@@ -200,6 +208,7 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
         >
           <Paperclip className="h-4 w-4" />
         </Button>
+        <AudioRecorderButton onAudioReady={handleAudioReady} disabled={isUploading} />
         <CommentAssigneeSelector
           workspaceId={workspaceId}
           selectedAssignee={selectedAssignee}
