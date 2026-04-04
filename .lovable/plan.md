@@ -1,25 +1,55 @@
 
 
-# Adicionar área descritiva editável no Space
+# Mensagens de áudio no Chat e Comentários (estilo WhatsApp)
 
-## O que será feito
+Sim, será similar ao WhatsApp — botão de microfone para gravar, player inline com barra de progresso para ouvir, e possibilidade de adicionar uma descrição textual ao áudio antes de enviar.
 
-Adicionar um card editável de descrição detalhada logo acima do dashboard de gráficos (TaskStatsDashboard) na página do Space. O campo `description` da tabela `spaces` já existe no banco — será reutilizado.
+## Componentes novos
 
-## Alteração
+### 1. `src/components/audio/AudioRecorderButton.tsx`
+- Botão de microfone que ao pressionar inicia gravação via `MediaRecorder` API
+- Durante gravação: indicador pulsante vermelho + cronômetro
+- Ao parar: preview do áudio + campo de texto para **descrição do áudio** (opcional) + botões descartar/enviar
+- Callback `onAudioReady(file: File, description?: string)`
 
-**Arquivo: `src/pages/SpaceDetailView.tsx`**
+### 2. `src/components/audio/AudioPlayer.tsx`
+- Player inline compacto estilo WhatsApp: play/pause, barra de progresso arrastável, duração
+- Exibe a **descrição do áudio** abaixo do player (se houver)
+- Ícone de microfone para identificar visualmente como mensagem de voz
 
-1. Adicionar estado local para controle de edição (`isEditingDescription`, `editedDescription`)
-2. Inserir um `Card` entre o header (título + botões) e o `TaskStatsDashboard`, contendo:
-   - **Modo visualização**: exibe a descrição com texto formatado (ou placeholder "Clique para adicionar uma descrição...") + ícone de edição
-   - **Modo edição**: `Textarea` com botões Salvar/Cancelar
-3. Ao salvar, chamar `supabase.from('spaces').update({ description }).eq('id', spaceId)` e invalidar a query do space
-4. Remover a linha duplicada de descrição que já existe abaixo do título (linha 103-105), já que a nova área descritiva a substitui
+## Alterações em arquivos existentes
 
-## Resultado
+### 3. `src/hooks/useChatAttachments.ts`
+- Sem mudança estrutural — áudio é tratado como arquivo normal no upload
 
-- Card com a descrição detalhada do Space, editável inline por qualquer membro
-- Posicionado logo acima dos gráficos de Visão Geral
-- Usa o campo `description` já existente no banco — sem migração necessária
+### 4. `src/components/chat/ChatInput.tsx`
+- Adicionar `AudioRecorderButton` ao lado dos botões existentes (anexo, atribuir, enviar)
+- Quando áudio gravado com descrição: adicionar arquivo ao `pendingFiles` e incluir a descrição no conteúdo da mensagem (ex: `🎤 {descrição}`)
+
+### 5. `src/components/chat/ChatAttachments.tsx`
+- Detectar `file_type` que começa com `audio/`
+- Renderizar `AudioPlayer` ao invés do card de download genérico
+- Passar a descrição (extraída do conteúdo da mensagem ou do campo `file_name` metadata)
+
+### 6. `src/components/tasks/TaskComments.tsx`
+- Adicionar `AudioRecorderButton` ao lado do botão "Comentar"
+- Upload do áudio via `useUploadChatAttachments` (reutiliza bucket existente)
+- Salvar URL + descrição no conteúdo do comentário
+
+## Fluxo do usuário
+
+```text
+1. Clica no microfone → navegador pede permissão
+2. Gravando: indicador vermelho + tempo
+3. Clica parar → preview do áudio + campo "Adicionar descrição..."
+4. (Opcional) digita descrição: "Resumo da reunião com cliente"
+5. Clica enviar → upload + mensagem enviada
+6. Destinatário vê: player inline + descrição abaixo
+```
+
+## Detalhes técnicos
+- **Formato**: `audio/webm` (Chrome/Edge/Firefox) com fallback `audio/ogg`
+- **Armazenamento**: bucket `chat-attachments` (já público)
+- **Sem migração**: usa o mesmo campo JSONB `attachments` existente
+- **Descrição**: armazenada como campo extra no objeto de attachment (`description`) dentro do JSONB
 
