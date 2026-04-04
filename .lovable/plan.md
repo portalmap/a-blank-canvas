@@ -1,52 +1,46 @@
 
 
-# Expandir busca de automações para incluir nome do Space
+# Corrigir mapeamento de status ao aplicar automações em Spaces
 
-## Problema
+## Problema encontrado
 
-A busca atual filtra apenas pelo campo `description` da automação. Quando o usuário pesquisa um termo como "tráfego" ou o nome de um cliente (ex: "Delta Soluções"), automações que têm esse texto apenas no badge do Space não aparecem.
+A automação "Transferência do Social Media > Criativos" foi aplicada no space "MAP | MAP Cliente", mas **os IDs de status não foram convertidos**. Os IDs `36745b3b...`, `d3ae2d45...`, etc. são de `status_template_items` — não existem como status reais. Por isso, quando a tarefa muda de status, o motor de automações compara IDs reais (`84159972...` = "Concluído") contra IDs de template inexistentes e nunca encontra correspondência.
+
+**Causa raiz**: A função `remapAutomation` (linha 1007) usada por `useApplyTemplateAutomationsToSpaces` só mapeia `target_list_id` e `scope_id`. Ela **ignora completamente** `trigger_config.from_status_ids`, `trigger_config.to_status_ids` e `actions[].config.status_id`.
+
+Já existe uma função `remapTemplateAutomationConfig` (linha 901) que faz exatamente esse mapeamento de status, mas ela só é usada na criação de Space a partir do template — não na aplicação em massa.
 
 ## Solução
 
-### Arquivo: `src/components/automations/AutomationsList.tsx`
+### Arquivo: `src/hooks/useSpaceTemplates.ts`
 
-Expandir o filtro de busca (linhas 78-83) para procurar o termo em múltiplos campos:
+**1. Na função `useApplyTemplateAutomationsToSpaces` (linha 1100):**
+- Buscar os status do template (via `status_template_items` + `template_id` do space template)
+- Buscar os status reais do space destino
+- Criar um `statusIdMap` mapeando por nome
+- Passar esse mapa para `remapAutomation`
 
-1. **`description`** — título da automação (já existe)
-2. **Nome do Space** — resolvido via `lists`/`folders`/`spaces` (o badge azul mostrado no card)
-3. **Trigger label** e **Action label** — texto como "Etiqueta adicionada", "Mover tarefa"
+**2. Na função `remapAutomation` (linha 1007):**
+- Adicionar parâmetro `statusIdMap`
+- Substituir a lógica manual de remap do `action_config` pela chamada a `remapTemplateAutomationConfig` (que já trata `from_status_ids`, `to_status_ids`, `status_id` em ações e condições)
 
-A lógica será: se qualquer um dos campos contiver o termo buscado, a automação aparece.
-
-```typescript
-// Buscar em description + space name + trigger/action labels
-if (filters?.searchTerm) {
-  const searchLower = filters.searchTerm.toLowerCase();
-  const description = automation.description?.toLowerCase() || '';
-  
-  // Resolver nome do space
-  let spaceName = '';
-  if (automation.scope_type === 'list') {
-    const list = lists.find(l => l.id === automation.scope_id);
-    const space = list ? spaces.find(s => s.id === list.space_id) : null;
-    spaceName = space?.name?.toLowerCase() || '';
-  } else if (automation.scope_type === 'folder') {
-    const folder = folders.find(f => f.id === automation.scope_id);
-    const space = folder ? spaces.find(s => s.id === folder.space_id) : null;
-    spaceName = space?.name?.toLowerCase() || '';
-  } else if (automation.scope_type === 'space') {
-    const space = spaces.find(s => s.id === automation.scope_id);
-    spaceName = space?.name?.toLowerCase() || '';
-  }
-  
-  const matches = description.includes(searchLower) 
-    || spaceName.includes(searchLower);
-  if (!matches) return false;
-}
+### Lógica de mapeamento de status
+```text
+Template status_template_items:     Status reais do space destino:
+  "A Fazer" (f5fb5e8d...)        →   "A Fazer" (02cd91a7...)
+  "Em Progresso" (66131d04...)   →   "Em Progresso" (56149ca6...)
+  "Env. Aprovação" (e8466a10...) →   "Env. Aprovação" (6fe27b5d...)
+  "Concluído" (8bcbc13b...)      →   "Concluído" (84159972...)
 ```
+Mapeamento feito por **nome** do status, considerando os status da lista de destino (scope) com fallback para status do workspace.
+
+### Fluxo corrigido
+1. Buscar `status_template_items` do template vinculado ao space template
+2. Buscar status reais do space destino (por scope: list → folder → space → workspace)
+3. Criar mapa `{templateStatusId → realStatusId}` por correspondência de nome
+4. Usar `remapTemplateAutomationConfig` para aplicar o mapa no `action_config`
+5. Inserir automação com IDs corretos
 
 ## Resultado
-- Pesquisar "tráfego" retorna automações com esse termo no título OU no nome do Space
-- Pesquisar "Delta" retorna todas automações do Space "MAP | Delta Soluções"
-- 1 arquivo editado
+As automações aplicadas em massa terão os IDs de status corretos do space destino, permitindo que o motor de automações as execute quando o status da tarefa mudar.
 
