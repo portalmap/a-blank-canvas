@@ -1038,7 +1038,7 @@ function remapAutomation(
     description: automation.description,
     trigger: automation.trigger as AutomationTrigger,
     action_type: automation.action_type as AutomationActionType,
-    action_config: remappedConfig,
+    action_config: remappedConfig as Json,
     scope_type: scopeType,
     scope_id: scopeId,
     enabled: true,
@@ -1114,13 +1114,64 @@ export const useApplyTemplateAutomationsToSpaces = () => {
 
           realLists = [...realLists, ...(listsDirectInSpace || [])];
 
+          // Fetch status template items for this template
+          const { data: spaceTemplate } = await supabase
+            .from('space_templates')
+            .select('id')
+            .eq('id', templateId)
+            .single();
+
+          // Get status_template_items linked to lists in this template
+          const templateListIds = templateLists?.map(l => l.id) || [];
+          const { data: templateListsWithStatus } = await supabase
+            .from('space_template_lists')
+            .select('status_template_id')
+            .eq('template_id', templateId)
+            .not('status_template_id', 'is', null);
+
+          const statusTemplateIds = [...new Set(
+            (templateListsWithStatus || [])
+              .map(l => l.status_template_id)
+              .filter(Boolean) as string[]
+          )];
+
+          let templateStatusItems: { id: string; name: string; template_id: string }[] = [];
+          if (statusTemplateIds.length > 0) {
+            const { data } = await supabase
+              .from('status_template_items')
+              .select('id, name, template_id')
+              .in('template_id', statusTemplateIds);
+            templateStatusItems = data || [];
+          }
+
+          // Fetch real statuses for this space (all scopes)
+          const realListIds = realLists.map(l => l.id);
+          const realFolderIds = realFolders?.map(f => f.id) || [];
+          const allScopeIds = [...realListIds, ...realFolderIds, spaceId];
+
+          const { data: realStatuses } = await supabase
+            .from('statuses')
+            .select('id, name, scope_id, scope_type')
+            .in('scope_id', allScopeIds);
+
+          // Build statusIdMap by matching names
+          const statusIdMap: Record<string, string> = {};
+          for (const templateItem of templateStatusItems) {
+            const matchingReal = (realStatuses || []).find(
+              s => s.name.toLowerCase() === templateItem.name.toLowerCase()
+            );
+            if (matchingReal) {
+              statusIdMap[templateItem.id] = matchingReal.id;
+            }
+          }
+
           // Create ID maps
           const folderIdMap = createFolderMap(templateFolders, realFolders);
           const listIdMap = createListMap(templateLists, realLists);
 
           // 3. Create automations for this space
           for (const automation of templateAutomations) {
-            const remapped = remapAutomation(automation, folderIdMap, listIdMap, spaceId, workspaceId);
+            const remapped = remapAutomation(automation, folderIdMap, listIdMap, statusIdMap, spaceId, workspaceId);
             if (remapped && remapped.scope_id) {
               const { error } = await supabase.from('automations').insert([remapped]);
               if (error) {
