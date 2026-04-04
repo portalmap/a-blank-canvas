@@ -338,7 +338,16 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
                     "mt-2 p-3 rounded-md text-sm whitespace-pre-wrap relative",
                     isResolved ? "bg-muted/30" : "bg-muted/50"
                   )}>
-                    {renderTextWithImagesAndLinks(activity.metadata.content || activity.metadata.comment_content)}
+                    {(() => {
+                      const content = activity.metadata.content || activity.metadata.comment_content || '';
+                      const audioMatch = content.match(/\[audio:(.*?)\]/);
+                      if (audioMatch) {
+                        const audioUrl = audioMatch[1];
+                        const description = content.replace(/\[audio:.*?\]/, '').replace(/^🎤\s*/, '').trim();
+                        return <AudioPlayer src={audioUrl} description={description || undefined} />;
+                      }
+                      return renderTextWithImagesAndLinks(content);
+                    })()}
                     
                     {/* Edit button - only for author */}
                     {canEdit && (
