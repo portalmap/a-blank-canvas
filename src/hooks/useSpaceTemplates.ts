@@ -1129,11 +1129,11 @@ export const useApplyTemplateAutomationsToSpaces = () => {
             .eq('template_id', templateId)
             .not('status_template_id', 'is', null);
 
-          const statusTemplateIds = [...new Set(
+          const statusTemplateIds = Array.from(new Set(
             (templateListsWithStatus || [])
               .map(l => l.status_template_id)
               .filter(Boolean) as string[]
-          )];
+          ));
 
           let templateStatusItems: { id: string; name: string; template_id: string }[] = [];
           if (statusTemplateIds.length > 0) {
