@@ -6,7 +6,8 @@ import { AllTask } from './useAllTasks';
 export type ViewMode = 'assigned' | 'my-spaces';
 
 export type TaskWithAssignees = AllTask & { 
-  assignees: Array<{ id: string; full_name: string | null; avatar_url: string | null }> 
+  assignees: Array<{ id: string; full_name: string | null; avatar_url: string | null }>;
+  followers: Array<{ id: string; full_name: string | null; avatar_url: string | null }>;
 };
 
 export function useFilteredAllTasks(
@@ -202,9 +203,47 @@ export function useFilteredAllTasks(
         return acc;
       }, {} as Record<string, Array<{ id: string; full_name: string | null; avatar_url: string | null }>>);
 
+      // Fetch all followers for these tasks (batched)
+      const allFollowers: { task_id: string; user_id: string }[] = [];
+      for (const chunk of taskChunks) {
+        const { data, error } = await supabase
+          .from('task_followers')
+          .select('task_id, user_id')
+          .in('task_id', chunk);
+        if (error) throw error;
+        if (data) allFollowers.push(...data);
+      }
+
+      // Fetch profiles for followers not already fetched
+      const followerUserIds = [...new Set(allFollowers.map(f => f.user_id))];
+      const missingFollowerIds = followerUserIds.filter(id => !profilesMap[id]);
+      if (missingFollowerIds.length > 0) {
+        const missingChunks: string[][] = [];
+        for (let i = 0; i < missingFollowerIds.length; i += BATCH_SIZE) {
+          missingChunks.push(missingFollowerIds.slice(i, i + BATCH_SIZE));
+        }
+        for (const chunk of missingChunks) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', chunk);
+          if (error) throw error;
+          if (data) data.forEach(p => { profilesMap[p.id] = p; });
+        }
+      }
+
+      // Map followers to tasks
+      const followersByTask = allFollowers.reduce((acc, f) => {
+        if (!acc[f.task_id]) acc[f.task_id] = [];
+        const profile = profilesMap[f.user_id];
+        if (profile) acc[f.task_id].push(profile);
+        return acc;
+      }, {} as Record<string, Array<{ id: string; full_name: string | null; avatar_url: string | null }>>);
+
       return (tasks || []).map(task => ({
         ...task,
         assignees: assigneesByTask[task.id] || [],
+        followers: followersByTask[task.id] || [],
       })) as unknown as TaskWithAssignees[];
     },
     enabled: !!workspaceId && !!user,

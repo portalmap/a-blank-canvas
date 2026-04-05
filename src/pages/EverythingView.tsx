@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, User, Layers } from 'lucide-react';
+import { Search, User, Layers, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,7 @@ import { EverythingTableView } from '@/components/everything/EverythingTableView
 import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
 import { GroupBySelector, GroupByOption } from '@/components/everything/GroupBySelector';
 import { AssigneeFilterPanel } from '@/components/everything/AssigneeFilterPanel';
+import { FollowerFilterPanel } from '@/components/everything/FollowerFilterPanel';
 import { ColumnSelector } from '@/components/tasks/ColumnSelector';
 import { BulkActionsBar } from '@/components/tasks/BulkActionsBar';
 import { useColumnPreferences, DEFAULT_VISIBLE_COLUMNS, DEFAULT_COLUMN_ORDER, ColumnId, SortConfig } from '@/hooks/useColumnPreferences';
@@ -58,6 +59,9 @@ export default function EverythingView() {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [showAssigneePanel, setShowAssigneePanel] = useState(false);
+  const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
+  const [includeNoFollowers, setIncludeNoFollowers] = useState(false);
+  const [showFollowerPanel, setShowFollowerPanel] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
@@ -100,6 +104,30 @@ export default function EverythingView() {
     return {
       assignees: Object.values(stats).sort((a, b) => b.taskCount - a.taskCount),
       unassignedCount,
+    };
+  }, [tasks]);
+
+  // Calculate follower statistics
+  const followerStats = useMemo(() => {
+    const stats: Record<string, { id: string; full_name: string | null; avatar_url: string | null; taskCount: number }> = {};
+    let noFollowerCount = 0;
+
+    tasks.forEach((task) => {
+      if (!task.followers || task.followers.length === 0) {
+        noFollowerCount++;
+      } else {
+        task.followers.forEach((follower) => {
+          if (!stats[follower.id]) {
+            stats[follower.id] = { ...follower, taskCount: 0 };
+          }
+          stats[follower.id].taskCount++;
+        });
+      }
+    });
+
+    return {
+      followers: Object.values(stats).sort((a, b) => b.taskCount - a.taskCount),
+      noFollowerCount,
     };
   }, [tasks]);
 
@@ -157,9 +185,19 @@ export default function EverythingView() {
         }
       }
 
+      // Follower filter
+      if (selectedFollowers.length > 0 || includeNoFollowers) {
+        const hasSelectedFollower = task.followers?.some((f) => selectedFollowers.includes(f.id));
+        const hasNoFollower = !task.followers || task.followers.length === 0;
+        
+        if (!hasSelectedFollower && !(includeNoFollowers && hasNoFollower)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [tasks, searchQuery, filters, selectedAssignees, includeUnassigned, availableStatuses]);
+  }, [tasks, searchQuery, filters, selectedAssignees, includeUnassigned, selectedFollowers, includeNoFollowers, availableStatuses]);
 
   // Apply sorting
   const sortedTasks = useTaskSorting(filteredTasks, sortConfig);
@@ -180,6 +218,14 @@ export default function EverythingView() {
       prev.includes(assigneeId)
         ? prev.filter((id) => id !== assigneeId)
         : [...prev, assigneeId]
+    );
+  };
+
+  const toggleFollower = (followerId: string) => {
+    setSelectedFollowers((prev) =>
+      prev.includes(followerId)
+        ? prev.filter((id) => id !== followerId)
+        : [...prev, followerId]
     );
   };
 
@@ -277,6 +323,20 @@ export default function EverythingView() {
                   </span>
                 )}
               </Button>
+              <Button
+                variant={showFollowerPanel ? 'secondary' : 'outline'}
+                size="sm"
+                className="h-8 gap-2"
+                onClick={() => setShowFollowerPanel(!showFollowerPanel)}
+              >
+                <Eye className="h-4 w-4" />
+                Seguidor
+                {(selectedFollowers.length > 0 || includeNoFollowers) && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-primary text-primary-foreground rounded text-xs">
+                    {selectedFollowers.length + (includeNoFollowers ? 1 : 0)}
+                  </span>
+                )}
+              </Button>
             </div>
           </div>
         </div>
@@ -312,6 +372,19 @@ export default function EverythingView() {
           onToggleAssignee={toggleAssignee}
           onToggleUnassigned={() => setIncludeUnassigned(!includeUnassigned)}
           onClose={() => setShowAssigneePanel(false)}
+        />
+      )}
+
+      {/* Follower Filter Panel */}
+      {showFollowerPanel && (
+        <FollowerFilterPanel
+          followers={followerStats.followers}
+          selectedFollowers={selectedFollowers}
+          noFollowerCount={followerStats.noFollowerCount}
+          includeNoFollowers={includeNoFollowers}
+          onToggleFollower={toggleFollower}
+          onToggleNoFollowers={() => setIncludeNoFollowers(!includeNoFollowers)}
+          onClose={() => setShowFollowerPanel(false)}
         />
       )}
 
