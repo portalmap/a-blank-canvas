@@ -221,6 +221,14 @@ export default function EverythingView() {
     );
   };
 
+  const toggleFollower = (followerId: string) => {
+    setSelectedFollowers((prev) =>
+      prev.includes(followerId)
+        ? prev.filter((id) => id !== followerId)
+        : [...prev, followerId]
+    );
+  };
+
 
   return (
     <div className="flex h-full">
@@ -315,6 +323,20 @@ export default function EverythingView() {
                   </span>
                 )}
               </Button>
+              <Button
+                variant={showFollowerPanel ? 'secondary' : 'outline'}
+                size="sm"
+                className="h-8 gap-2"
+                onClick={() => setShowFollowerPanel(!showFollowerPanel)}
+              >
+                <Eye className="h-4 w-4" />
+                Seguidor
+                {(selectedFollowers.length > 0 || includeNoFollowers) && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-primary text-primary-foreground rounded text-xs">
+                    {selectedFollowers.length + (includeNoFollowers ? 1 : 0)}
+                  </span>
+                )}
+              </Button>
             </div>
           </div>
         </div>
@@ -350,6 +372,19 @@ export default function EverythingView() {
           onToggleAssignee={toggleAssignee}
           onToggleUnassigned={() => setIncludeUnassigned(!includeUnassigned)}
           onClose={() => setShowAssigneePanel(false)}
+        />
+      )}
+
+      {/* Follower Filter Panel */}
+      {showFollowerPanel && (
+        <FollowerFilterPanel
+          followers={followerStats.followers}
+          selectedFollowers={selectedFollowers}
+          noFollowerCount={followerStats.noFollowerCount}
+          includeNoFollowers={includeNoFollowers}
+          onToggleFollower={toggleFollower}
+          onToggleNoFollowers={() => setIncludeNoFollowers(!includeNoFollowers)}
+          onClose={() => setShowFollowerPanel(false)}
         />
       )}
 
