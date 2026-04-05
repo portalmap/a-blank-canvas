@@ -1,50 +1,73 @@
+# Templates de Pastas e Listas em Configurações
 
-# Corrigir lógica OU nas condições de automações com gatilho de tag
+## Resumo
 
-## Problema identificado
+Expandir a aba "Templates" em Configurações para suportar 3 tipos de templates: **Space** (existente), **Pasta** e **Lista**. Cada tipo permite criar modelos reutilizáveis com sua estrutura interna.
 
-A automação `9e529c86` ("Transferência de Criativos > Designer / Editor de Vídeo") tem:
+## Estrutura dos tipos
 
-- **Gatilho**: `on_tag_added`
-- **trigger_config.tag_ids**: `["8fddbcf6"]` → apenas "enviar designer"
-- **Condições**: tag contém "enviar designer" **OU** tag contém "enviar editor de vídeo"
+- **Template de Space**: Space completo com pastas, listas e tarefas (já existe)
+- **Template de Pasta**: Uma pasta com listas e tarefas dentro
+- **Template de Lista**: Uma lista com tarefas dentro
 
-Quando o usuário adiciona a tag "enviar editor de vídeo" a uma tarefa, o motor de automações filtra por `trigger_config.tag_ids` **antes** de avaliar as condições. Como o ID da tag adicionada (`1da76d09` = "enviar editor de vídeo") não está em `tag_ids`, a automação é descartada na linha 1425 do `executeTagAutomations` — as condições OU nunca são sequer avaliadas.
+## Abordagem técnica
 
-O mesmo problema existe na automação `b05b081f` (gatilho `on_status_changed`) — esta funciona porque não tem `tag_ids` no trigger_config.
+Reutilizar as mesmas tabelas existentes (`space_templates`, `space_template_folders`, `space_template_lists`, `space_template_tasks`) adicionando um campo `type` ao `space_templates` para distinguir os 3 tipos.
 
-## Solução
+### 1. Migração de banco de dados
 
-### Arquivo: `src/hooks/useStatusChangeAutomations.ts`
+Adicionar coluna `type` à tabela `space_templates`:
 
-Na função `executeTagAutomations` (linhas 1422-1428), quando a automação possui condições com campo `tag`, ignorar o filtro `trigger_config.tag_ids` e delegar a validação de tags inteiramente às condições:
-
-```typescript
-// Antes (linha 1422-1428):
-const triggerConfig = actionConfig?.trigger_config;
-if (triggerConfig?.tag_ids && Array.isArray(triggerConfig.tag_ids) && triggerConfig.tag_ids.length > 0) {
-  if (!triggerConfig.tag_ids.includes(tagId)) {
-    continue;
-  }
-}
-
-// Depois:
-const triggerConfig = actionConfig?.trigger_config;
-const conditions = actionConfig?.conditions as AutomationCondition[] | undefined;
-const hasTagConditions = conditions?.some(c => c.field === 'tag');
-
-// Se tem condições de tag, delegar a filtragem às condições (suporta OR)
-// Se não tem condições de tag, usar tag_ids do trigger como filtro
-if (!hasTagConditions && triggerConfig?.tag_ids?.length > 0) {
-  if (!triggerConfig.tag_ids.includes(tagId)) {
-    continue;
-  }
-}
+```sql
+ALTER TABLE space_templates 
+  ADD COLUMN type text NOT NULL DEFAULT 'space';
+-- Valores: 'space', 'folder', 'list'
 ```
 
-Isso faz com que automações com condições de tag (incluindo OU) sejam avaliadas independente de qual tag foi adicionada, e as condições decidem se a automação deve executar ou não.
+Para templates do tipo **folder**: cria-se 1 registro em `space_template_folders` (a pasta raiz) + suas listas e tarefas.  
+Para templates do tipo **list**: cria-se 1 registro em `space_template_lists` (a lista raiz) + suas tarefas (sem pastas).
 
-## Resultado
-- Adicionar "enviar editor de vídeo" → condições avaliadas → OU verdadeiro → automação executa
-- Adicionar "enviar designer" → condições avaliadas → OU verdadeiro → automação executa
-- 1 arquivo editado, ~5 linhas alteradas
+### 2. Reorganizar a UI da aba Templates
+
+**`src/components/settings/SpaceTemplateSettings.tsx`**  
+- Adicionar sub-tabs ou seções separadas: "Spaces", "Pastas", "Listas"
+- Cada seção mostra apenas os templates do respectivo tipo
+- Botão "Criar Template" abre seletor de tipo ou cada seção tem seu próprio botão
+
+### 3. Criar editor para template de Pasta
+
+**`src/components/settings/FolderTemplateEditor.tsx`**  
+- Similar ao SpaceTemplateEditor mas simplificado:
+  - Nome da pasta, descrição
+  - Listas dentro da pasta (com status template)
+  - Tarefas dentro de cada lista
+  - Sem a parte de "cor do space" ou múltiplas pastas
+
+### 4. Criar editor para template de Lista
+
+**`src/components/settings/ListTemplateEditor.tsx`**  
+- Ainda mais simples:
+  - Nome da lista, descrição, view padrão, status template
+  - Tarefas dentro da lista
+  - Sem pastas
+
+### 5. Atualizar hooks
+
+**`src/hooks/useSpaceTemplates.ts`**  
+- Adicionar filtro por `type` nos queries existentes
+- Criar hooks `useFolderTemplates`, `useListTemplates` (ou parametrizar o existente)
+- Criar mutations `useCreateFolderTemplate`, `useCreateListTemplate`
+- Criar funções de aplicação: `useApplyFolderTemplate` (cria pasta + listas + tarefas em um Space existente) e `useApplyListTemplate` (cria lista + tarefas em uma pasta ou space existente)
+
+### 6. Integrar aplicação de templates
+
+Quando o usuário cria uma nova pasta ou lista manualmente, oferecer opção de usar template (similar ao que já existe no `CreateSpaceDialog`):
+- Ao criar pasta em um Space → opção de usar template de pasta
+- Ao criar lista em uma pasta/space → opção de usar template de lista
+
+## Arquivos
+
+- **Migração**: 1 SQL (adicionar coluna `type`)
+- **Editados**: `SpaceTemplateSettings.tsx`, `SpaceTemplateList.tsx`, `useSpaceTemplates.ts`
+- **Criados**: `FolderTemplateEditor.tsx`, `ListTemplateEditor.tsx`
+- **Editados depois**: Dialogs de criação de pasta/lista para oferecer opção de template
