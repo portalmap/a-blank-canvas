@@ -68,7 +68,7 @@ export default function EverythingView() {
 
   // Guest always sees only assigned tasks
   const effectiveViewMode = isGuest ? 'assigned' : filters.viewMode;
-  const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined, effectiveViewMode);
+  const { data: tasks = [], isLoading } = useFilteredAllTasks(selectedWorkspaceId ?? undefined, effectiveViewMode, filters.showTransferred);
   const { data: statuses = [] } = useStatuses(selectedWorkspaceId ?? undefined);
   const { data: defaultStatus } = useDefaultStatus(selectedWorkspaceId ?? undefined);
 
