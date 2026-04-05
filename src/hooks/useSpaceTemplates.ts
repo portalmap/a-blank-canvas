@@ -175,6 +175,7 @@ interface CreateSpaceTemplateInput {
   name: string;
   description?: string;
   color?: string;
+  type?: TemplateType;
   folders?: { name: string; description: string | null; order_index: number }[];
   lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number; status_template_id?: string | null }[];
   tasks?: TaskInput[];
