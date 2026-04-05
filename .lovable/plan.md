@@ -1,32 +1,49 @@
 
 
-# Filtro de Data Global no Dashboard
+# Produtividade por tarefa com score 0-200% baseado em tempo real
 
 ## Resumo
 
-Adicionar um seletor de período de análise visível no header do dashboard (fora do popover de filtros) e passar essas datas para todos os cards de produtividade e ranking.
+Atualmente o `useProductivityStats` calcula o score de forma simplificada (antecipada=2pts, em dia=1pt, atrasada=0pts). A proposta é usar a fórmula **produtividade = 200 - percentual_entrega**, clamped entre 0 e 200, para cada tarefa individual. Isso dá granularidade real: quem entrega em 10% do prazo ganha 190%, quem entrega em 150% ganha 50%.
+
+## Fórmula
+
+```text
+percentual_entrega = (tempo_usado / prazo_total) * 100
+produtividade_tarefa = max(0, min(200, 200 - percentual_entrega))
+
+Exemplos:
+  0% entrega → 200% produtividade
+  50% entrega → 150% produtividade
+  100% entrega → 100% produtividade
+  150% entrega → 50% produtividade
+  200%+ entrega → 0% produtividade
+```
 
 ## Alterações
 
-### 1. `src/pages/DashboardView.tsx`
-- Adicionar estado `dateRange: { startDate: Date | null; endDate: Date | null }`
-- Substituir o botão "Filtros" inativo por um componente `DateRangeFilter` (já existe em `src/components/filters/DateRangeFilter.tsx`) ou criar um seletor de período inline no header com presets (7 dias, 30 dias, 3 meses, personalizado)
-- Exibir o período selecionado de forma visível no header (ex: "01/03/2026 — 05/04/2026")
-- Passar `dateRange` como prop ao `DashboardEditor`
+### 1. `src/hooks/useProductivityClassification.ts`
+- Adicionar função `calculateProductivityScore(startDate, dueDate, referenceDate) → number` (0-200)
+- Exportar para uso nos hooks de stats e no indicador visual
 
-### 2. `src/components/dashboards/DashboardEditor.tsx`
-- Receber prop `dateRange: { startDate?: Date; endDate?: Date }`
-- Passar `startDate` e `endDate` aos wrappers `ProductivityCardWrapper` e `ProductivityRankingCardWrapper`
-- Os wrappers repassam para `useProductivityStats` e `useProductivityRanking` (ambos já aceitam `startDate` e `endDate`)
+### 2. `src/hooks/useProductivityStats.ts`
+- Alterar `classifyTask` para usar `start_date` + `due_date` + `completed_at` com a nova fórmula de percentual
+- Alterar `calculateScore` para calcular a **média** dos scores individuais (0-200) de cada tarefa
+- Buscar `start_date` na query de tasks
+- Tarefas sem `start_date` ou `due_date` → score 100 (neutro)
 
-### 3. `src/hooks/useProductivityStats.ts`
-- Verificar se já filtra por `startDate`/`endDate` na query — se não, adicionar `.gte('completed_at', startDate)` e `.lte('completed_at', endDate)`
+### 3. `src/components/tasks/TaskProductivityIndicator.tsx`
+- Exibir no tooltip também o score de produtividade (ex: "150% de produtividade")
 
-### 4. `src/hooks/useProductivityRanking.ts`
-- Mesmo ajuste: garantir que `startDate`/`endDate` filtram as tarefas consultadas
+### 4. `src/components/settings/ProductivitySettings.tsx`
+- Adicionar seção visual explicando a escala 0-200% com exemplos
+- Mostrar a fórmula: "Produtividade = 200% - % do prazo utilizado"
+
+### 5. `src/components/dashboards/cards/ProductivityCard.tsx`
+- Garantir que o score exibido reflita a escala 0-200% corretamente
 
 ## Resultado
-- Período de análise visível e acessível no header do dashboard
-- Todos os cards de produtividade e ranking filtram por esse período
-- 4 arquivos editados
+- Cada tarefa tem um score individual de produtividade de 0% a 200%
+- O score geral é a média dos scores individuais
+- 5 arquivos editados
 
