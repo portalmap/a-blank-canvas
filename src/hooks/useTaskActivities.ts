@@ -222,6 +222,18 @@ export const getActivityLabel = (activity: TaskActivity): string => {
         return `${prefix}moveu a tarefa de "${activity.old_value}" para "${activity.new_value}"`;
       }
       return `${prefix}moveu a tarefa para outra lista`;
+    case 'productivity.classified': {
+      const classLabel = activity.new_value === 'early' ? 'Antecipada' 
+        : activity.new_value === 'on_time' ? 'Em dia' 
+        : 'Atrasada';
+      return `${prefix}tarefa classificada como ${classLabel}`;
+    }
+    case 'productivity.validated': {
+      const valLabel = activity.new_value === 'early' ? 'Antecipada' 
+        : activity.new_value === 'on_time' ? 'Em dia' 
+        : 'Atrasada';
+      return `${prefix}validou a classificação como ${valLabel}`;
+    }
     default:
       return type;
   }
