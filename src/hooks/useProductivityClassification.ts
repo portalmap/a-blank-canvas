@@ -2,27 +2,52 @@ import { useProductivitySettings } from './useProductivitySettings';
 
 export type ProductivityClassification = 'early' | 'on_time' | 'late';
 
+/**
+ * Calcula o percentual de entrega (tempo usado / prazo total * 100)
+ */
+export const calculateDeliveryPercentage = (
+  startDate: string,
+  dueDate: string,
+  referenceDate: Date
+): number => {
+  const start = new Date(startDate + 'T00:00:00');
+  const due = new Date(dueDate + 'T23:59:59');
+  const totalMs = due.getTime() - start.getTime();
+
+  if (totalMs <= 0) return 200; // prazo inválido = máximo atraso
+
+  const usedMs = referenceDate.getTime() - start.getTime();
+  return (usedMs / totalMs) * 100;
+};
+
+/**
+ * Score de produtividade individual: 200 - percentual_entrega, clamped [0, 200]
+ */
+export const calculateProductivityScore = (
+  startDate: string,
+  dueDate: string,
+  referenceDate: Date
+): number => {
+  const deliveryPct = calculateDeliveryPercentage(startDate, dueDate, referenceDate);
+  return Math.max(0, Math.min(200, 200 - deliveryPct));
+};
+
 export const calculateClassification = (
   startDate: string,
   dueDate: string,
   referenceDate: Date,
   earlyThreshold: number = 50,
   onTimeThreshold: number = 100
-): { classification: ProductivityClassification; percentage: number } => {
-  const start = new Date(startDate + 'T00:00:00');
-  const due = new Date(dueDate + 'T23:59:59');
-  const totalMs = due.getTime() - start.getTime();
+): { classification: ProductivityClassification; percentage: number; productivityScore: number } => {
+  const percentage = calculateDeliveryPercentage(startDate, dueDate, referenceDate);
+  const productivityScore = Math.max(0, Math.min(200, 200 - percentage));
 
-  if (totalMs <= 0) {
-    return { classification: 'late', percentage: 100 };
-  }
+  let classification: ProductivityClassification;
+  if (percentage <= earlyThreshold) classification = 'early';
+  else if (percentage <= onTimeThreshold) classification = 'on_time';
+  else classification = 'late';
 
-  const usedMs = referenceDate.getTime() - start.getTime();
-  const percentage = (usedMs / totalMs) * 100;
-
-  if (percentage <= earlyThreshold) return { classification: 'early', percentage };
-  if (percentage <= onTimeThreshold) return { classification: 'on_time', percentage };
-  return { classification: 'late', percentage };
+  return { classification, percentage, productivityScore };
 };
 
 export const getClassificationLabel = (classification: ProductivityClassification): string => {

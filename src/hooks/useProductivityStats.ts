@@ -2,21 +2,20 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { differenceInDays, parseISO, startOfDay } from 'date-fns';
-import { parseLocalDate } from '@/lib/dateUtils';
+import { calculateProductivityScore } from './useProductivityClassification';
 
 export interface ProductivityStats {
-  early: number;           // Antecipadas (7+ dias antes)
-  onTime: number;          // No prazo (até 7 dias antes)
-  late: number;            // Atrasadas
-  noDueDate: number;       // Sem data (conta como no prazo)
-  
-  earlyRate: number;       // Percentual de antecipadas
-  onTimeRate: number;      // Percentual no prazo
-  lateRate: number;        // Percentual atrasadas
-  
-  totalCompleted: number;  // Total analisado
-  productivityScore: number; // 0-200%
+  early: number;
+  onTime: number;
+  late: number;
+  noDueDate: number;
+
+  earlyRate: number;
+  onTimeRate: number;
+  lateRate: number;
+
+  totalCompleted: number;
+  productivityScore: number; // 0-200%, média dos scores individuais
 }
 
 export type ProductivityScope = 'workspace' | 'my_tasks' | 'space' | 'user';
@@ -24,49 +23,46 @@ export type ProductivityScope = 'workspace' | 'my_tasks' | 'space' | 'user';
 interface UseProductivityStatsOptions {
   scope?: ProductivityScope;
   spaceId?: string;
-  userId?: string;        // Deprecated - use userIds
-  userIds?: string[];     // Array de IDs de usuários
+  userId?: string;
+  userIds?: string[];
   startDate?: Date;
   endDate?: Date;
 }
 
 type TaskClassification = 'early' | 'on_time' | 'late' | 'no_due_date';
 
-const classifyTask = (task: { completed_at: string; due_date: string | null }): TaskClassification => {
-  if (!task.due_date) return 'no_due_date';
-  
-  const completedDate = startOfDay(parseISO(task.completed_at));
-  const dueDate = parseLocalDate(task.due_date);
-  
-  if (!dueDate) return 'no_due_date';
-  
-  const dueDateStart = startOfDay(dueDate);
-  const daysDiff = differenceInDays(dueDateStart, completedDate);
-  
-  if (daysDiff >= 7) return 'early';      // 7+ dias antes do vencimento
-  if (daysDiff >= 0) return 'on_time';    // Até o dia do vencimento
-  return 'late';                           // Após vencimento
-};
+const classifyAndScore = (task: {
+  completed_at: string;
+  start_date: string | null;
+  due_date: string | null;
+}): { classification: TaskClassification; score: number } => {
+  if (!task.start_date || !task.due_date) {
+    return { classification: 'no_due_date', score: 100 };
+  }
 
-const calculateScore = (early: number, onTime: number, noDueDate: number, late: number): number => {
-  // Total de tarefas analisadas (inclui sem data como no prazo)
-  const total = early + onTime + noDueDate + late;
-  if (total === 0) return 100;
-  
-  // Antecipada = 2 pontos, No prazo/Sem data = 1 ponto, Atrasada = 0 pontos
-  const points = (early * 2) + (onTime * 1) + (noDueDate * 1) + (late * 0);
-  
-  // Score = pontos obtidos / total de tarefas * 100
-  // Range: 0% (todas atrasadas) a 200% (todas antecipadas)
-  return Math.round((points / total) * 100);
+  const completedDate = new Date(task.completed_at);
+  const score = calculateProductivityScore(task.start_date, task.due_date, completedDate);
+
+  // Classify based on delivery percentage
+  const start = new Date(task.start_date + 'T00:00:00');
+  const due = new Date(task.due_date + 'T23:59:59');
+  const totalMs = due.getTime() - start.getTime();
+
+  if (totalMs <= 0) return { classification: 'late', score };
+
+  const usedMs = completedDate.getTime() - start.getTime();
+  const pct = (usedMs / totalMs) * 100;
+
+  if (pct <= 50) return { classification: 'early', score };
+  if (pct <= 100) return { classification: 'on_time', score };
+  return { classification: 'late', score };
 };
 
 export const useProductivityStats = (options: UseProductivityStatsOptions = {}) => {
   const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
   const { scope = 'workspace', spaceId, userId, userIds, startDate, endDate } = options;
-  
-  // Suporta tanto userId quanto userIds (prioriza userIds)
+
   const effectiveUserIds = userIds || (userId ? [userId] : []);
 
   return useQuery({
@@ -80,11 +76,11 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
         };
       }
 
-      // Build query for completed tasks
       let query = supabase
         .from('tasks')
         .select(`
           id,
+          start_date,
           due_date,
           completed_at,
           list_id,
@@ -97,7 +93,6 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
         .not('completed_at', 'is', null)
         .is('archived_at', null);
 
-      // Apply date filters if provided
       if (startDate) {
         query = query.gte('completed_at', startDate.toISOString());
       }
@@ -106,14 +101,11 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
       }
 
       const { data: tasks, error } = await query;
-
       if (error) throw error;
 
-      // Filter by scope
       let filteredTasks = tasks || [];
-      
+
       if (scope === 'my_tasks' && user?.id) {
-        // Need to fetch task assignees
         const taskIds = filteredTasks.map(t => t.id);
         if (taskIds.length > 0) {
           const { data: assignees } = await supabase
@@ -121,7 +113,7 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
             .select('task_id')
             .eq('user_id', user.id)
             .in('task_id', taskIds);
-          
+
           const myTaskIds = new Set(assignees?.map(a => a.task_id) || []);
           filteredTasks = filteredTasks.filter(t => myTaskIds.has(t.id));
         }
@@ -131,7 +123,6 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
           return list?.space_id === spaceId;
         });
       } else if (scope === 'user' && effectiveUserIds.length > 0) {
-        // Filtrar por usuários específicos (suporta múltiplos)
         const taskIds = filteredTasks.map(t => t.id);
         if (taskIds.length > 0) {
           const { data: assignees } = await supabase
@@ -139,7 +130,7 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
             .select('task_id')
             .in('user_id', effectiveUserIds)
             .in('task_id', taskIds);
-          
+
           const userTaskIds = new Set(assignees?.map(a => a.task_id) || []);
           filteredTasks = filteredTasks.filter(t => userTaskIds.has(t.id));
         } else {
@@ -147,21 +138,24 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
         }
       }
 
-      // Classify tasks
       let early = 0;
       let onTime = 0;
       let late = 0;
       let noDueDate = 0;
+      let totalScore = 0;
 
       filteredTasks.forEach(task => {
         if (!task.completed_at) return;
-        
-        const classification = classifyTask({
+
+        const result = classifyAndScore({
           completed_at: task.completed_at,
+          start_date: task.start_date,
           due_date: task.due_date,
         });
 
-        switch (classification) {
+        totalScore += result.score;
+
+        switch (result.classification) {
           case 'early': early++; break;
           case 'on_time': onTime++; break;
           case 'late': late++; break;
@@ -170,7 +164,9 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
       });
 
       const totalCompleted = early + onTime + late + noDueDate;
-      const productivityScore = calculateScore(early, onTime, noDueDate, late);
+      const productivityScore = totalCompleted > 0
+        ? Math.round(totalScore / totalCompleted)
+        : 100;
 
       return {
         early,
