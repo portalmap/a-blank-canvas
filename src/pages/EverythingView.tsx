@@ -185,9 +185,19 @@ export default function EverythingView() {
         }
       }
 
+      // Follower filter
+      if (selectedFollowers.length > 0 || includeNoFollowers) {
+        const hasSelectedFollower = task.followers?.some((f) => selectedFollowers.includes(f.id));
+        const hasNoFollower = !task.followers || task.followers.length === 0;
+        
+        if (!hasSelectedFollower && !(includeNoFollowers && hasNoFollower)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [tasks, searchQuery, filters, selectedAssignees, includeUnassigned, availableStatuses]);
+  }, [tasks, searchQuery, filters, selectedAssignees, includeUnassigned, selectedFollowers, includeNoFollowers, availableStatuses]);
 
   // Apply sorting
   const sortedTasks = useTaskSorting(filteredTasks, sortConfig);
