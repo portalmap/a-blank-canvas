@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Clock, CheckCircle2, AlertCircle, Calendar } from 'lucide-react';
+import { Loader2, Clock, CheckCircle2, AlertCircle, Calendar, ArrowRightLeft } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ interface UserProductivityDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   startDate?: string;
   endDate?: string;
+  includeTransferred?: boolean;
 }
 
 const getInitials = (name: string): string => {
@@ -87,11 +88,28 @@ const TaskItem = ({ task, onClick }: TaskItemProps) => {
       onClick={onClick}
       className="p-3 rounded-lg border bg-card hover:bg-accent/50 cursor-pointer transition-colors"
     >
-      <p className="font-medium text-sm truncate">{task.title}</p>
+      <div className="flex items-center gap-2">
+        <p className="font-medium text-sm truncate flex-1">{task.title}</p>
+        {task.isTransferred && (
+          <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 shrink-0 flex items-center gap-1">
+            <ArrowRightLeft className="h-3 w-3" />
+            Transferida
+          </Badge>
+        )}
+      </div>
       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3" />
-          {format(parseISO(task.completedAt), 'dd/MM/yyyy', { locale: ptBR })}
+          {task.isTransferred ? (
+            <>
+              <ArrowRightLeft className="h-3 w-3" />
+              {format(parseISO(task.completedAt), 'dd/MM/yyyy', { locale: ptBR })}
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="h-3 w-3" />
+              {format(parseISO(task.completedAt), 'dd/MM/yyyy', { locale: ptBR })}
+            </>
+          )}
         </span>
         {task.dueDate && (
           <span className="flex items-center gap-1">
@@ -120,9 +138,9 @@ const TaskList = ({ tasks, emptyMessage, onTaskClick }: {
 
   return (
     <div className="space-y-2">
-      {tasks.map(task => (
+      {tasks.map((task, index) => (
         <TaskItem 
-          key={task.id} 
+          key={`${task.id}-${task.isTransferred ? 'transferred' : 'current'}-${index}`} 
           task={task} 
           onClick={() => onTaskClick(task.id)}
         />
@@ -137,12 +155,14 @@ const UserProductivityDetailsDialogComponent = ({
   onOpenChange,
   startDate,
   endDate,
+  includeTransferred = false,
 }: UserProductivityDetailsDialogProps) => {
   const navigate = useNavigate();
   const { data, isLoading } = useUserProductivityDetails({
     userId: user?.userId || null,
     startDate,
     endDate,
+    includeTransferred,
   });
 
   const handleTaskClick = (taskId: string) => {
@@ -272,7 +292,7 @@ const UserProductivityDetailsDialogComponent = ({
             {/* Total */}
             <div className="mt-4 pt-3 border-t text-center">
               <Badge variant="outline">
-                Total: {data.summary.total} tarefas concluídas
+                Total: {data.summary.total} tarefas {includeTransferred ? '(inclui transferidas)' : 'concluídas'}
               </Badge>
             </div>
           </div>
