@@ -139,6 +139,17 @@ export const getActivityLabel = (activity: TaskActivity): string => {
   if (activity.activity_type === 'assignee.removed') {
     return `removeu ${activity.old_value || 'um responsável'}`;
   }
+  // Handle productivity classified with transfer context
+  if (activity.activity_type === 'productivity.classified' && activity.metadata?.isTransferred) {
+    const classLabel = activity.new_value === 'early' ? 'Antecipada' 
+      : activity.new_value === 'on_time' ? 'Em dia' 
+      : 'Atrasada';
+    const score = activity.metadata?.productivityScore != null 
+      ? ` (${Math.round(activity.metadata.productivityScore)}%)` 
+      : '';
+    const userName = activity.metadata?.userName || '';
+    return `transferência de ${userName} classificada como ${classLabel}${score}`;
+  }
   if (activity.activity_type === 'attachment.removed') {
     return `removeu o anexo "${activity.old_value || 'arquivo'}"`;
   }
