@@ -1,28 +1,33 @@
 
 
-# Mostrar seguidores reais no diálogo "Seguir Automaticamente"
+# Adicionar filtro de Seguidor no módulo Tudo
 
-## Problema
+## Resumo
 
-O diálogo "Seguir Automaticamente" mostra apenas seguidores criados via automação (buscando na tabela `automations`). Mirian e Amanda foram adicionadas diretamente na tabela `space_followers`, por isso não aparecem na seção "Seguidores atuais".
-
-## Solução
-
-Alterar o `QuickAutomationButtons` para, quando o `actionType` for `auto_add_follower`, buscar e exibir também os seguidores reais da entidade (Space/Folder/List), além dos que vieram de automações.
+Adicionar um botão "Seguidor" ao lado do botão "Responsável" existente, com um painel lateral idêntico que lista os seguidores das tarefas e permite filtrar por eles.
 
 ## Alterações
 
-### `src/components/automations/QuickAutomationButtons.tsx`
+### 1. `src/hooks/useFilteredAllTasks.ts`
+- Após buscar os assignees, buscar também os **followers** de cada tarefa (mesma lógica de batching)
+- Consultar `task_followers` com `task_id` + join com `profiles`
+- Adicionar campo `followers` ao tipo `TaskWithAssignees` (renomear conceptualmente)
 
-1. Importar os hooks de seguidores existentes (`useSpaceFollowers`, `useFolderFollowers`, `useListFollowers`)
-2. Buscar seguidores reais com base no `scopeType` quando o diálogo abre com `auto_add_follower`
-3. Na seção "Seguidores atuais", exibir 2 grupos:
-   - **Seguidores diretos** (da tabela `space_followers`/`folder_followers`/`list_followers`) — com botão de remover que usa os hooks `useRemoveSpaceFollower` etc.
-   - **Seguidores via automação** (já existente) — com botão de remover automação
-4. Permitir adicionar novos seguidores diretos (não apenas via automação) usando os hooks `useAddSpaceFollower` etc.
+### 2. `src/pages/EverythingView.tsx`
+- Adicionar estado `selectedFollowers` e `includeNoFollowers` e `showFollowerPanel`
+- Calcular `followerStats` (igual a `assigneeStats` mas usando `task.followers`)
+- Adicionar filtro de followers no `filteredTasks` (mesma lógica do assignee filter)
+- Adicionar botão "Seguidor" com ícone `Eye` ao lado do botão "Responsável"
+- Renderizar `FollowerFilterPanel` quando aberto
 
-Resultado: o diálogo mostra todos os seguidores independente de como foram adicionados, e permite gerenciá-los de forma unificada.
+### 3. Criar `src/components/everything/FollowerFilterPanel.tsx`
+- Cópia do `AssigneeFilterPanel` adaptada:
+  - Título: "Seguidores"
+  - Opção "Sem seguidor" em vez de "Não atribuído"
+  - Mesma estrutura visual (avatar, nome, contagem, checkbox)
 
-## Arquivos
-- 1 arquivo editado: `src/components/automations/QuickAutomationButtons.tsx`
+## Resultado
+- Botão "Seguidor" aparece ao lado de "Responsável" na toolbar
+- Ao clicar, abre painel lateral listando todos os seguidores com contagem de tarefas
+- Filtrar por seguidor mostra apenas tarefas onde aquele usuário é seguidor
 
