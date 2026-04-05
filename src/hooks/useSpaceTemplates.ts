@@ -189,6 +189,7 @@ export const useCreateSpaceTemplate = () => {
       name,
       description,
       color,
+      type = 'space',
       folders = [],
       lists = [],
       tasks = [],
@@ -204,6 +205,7 @@ export const useCreateSpaceTemplate = () => {
           name,
           description,
           color,
+          type,
         })
         .select()
         .single();
