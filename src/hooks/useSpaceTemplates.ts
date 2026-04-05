@@ -46,6 +46,8 @@ export interface SpaceTemplateTask {
   tag_names: string[] | null;
 }
 
+export type TemplateType = 'space' | 'folder' | 'list';
+
 export interface SpaceTemplate {
   id: string;
   workspace_id: string | null;
@@ -53,6 +55,7 @@ export interface SpaceTemplate {
   name: string;
   description: string | null;
   color: string | null;
+  type: TemplateType;
   created_at: string;
   updated_at: string;
   folders?: SpaceTemplateFolder[];
