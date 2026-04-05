@@ -46,6 +46,8 @@ export interface SpaceTemplateTask {
   tag_names: string[] | null;
 }
 
+export type TemplateType = 'space' | 'folder' | 'list';
+
 export interface SpaceTemplate {
   id: string;
   workspace_id: string | null;
@@ -53,6 +55,7 @@ export interface SpaceTemplate {
   name: string;
   description: string | null;
   color: string | null;
+  type: TemplateType;
   created_at: string;
   updated_at: string;
   folders?: SpaceTemplateFolder[];
@@ -60,16 +63,21 @@ export interface SpaceTemplate {
   tasks?: SpaceTemplateTask[];
 }
 
-// Buscar TODOS os templates (globais)
-export const useSpaceTemplates = () => {
+// Buscar templates por tipo (globais)
+export const useSpaceTemplates = (type?: TemplateType) => {
   return useQuery({
-    queryKey: ['space-templates'],
+    queryKey: ['space-templates', type],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('space_templates')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (type) {
+        query = query.eq('type', type);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as SpaceTemplate[];
     },
@@ -106,16 +114,21 @@ export const useSpaceTemplate = (templateId?: string) => {
   });
 };
 
-// Buscar TODOS os templates com contagens (globais)
-export const useSpaceTemplatesWithStructure = () => {
+// Buscar templates com contagens, filtrado por tipo
+export const useSpaceTemplatesWithStructure = (type?: TemplateType) => {
   return useQuery({
-    queryKey: ['space-templates-structure'],
+    queryKey: ['space-templates-structure', type],
     queryFn: async () => {
-      const { data: templates, error } = await supabase
+      let query = supabase
         .from('space_templates')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (type) {
+        query = query.eq('type', type);
+      }
+
+      const { data: templates, error } = await query;
       if (error) throw error;
 
       const templatesWithCounts = await Promise.all(
@@ -162,6 +175,7 @@ interface CreateSpaceTemplateInput {
   name: string;
   description?: string;
   color?: string;
+  type?: TemplateType;
   folders?: { name: string; description: string | null; order_index: number }[];
   lists?: { folderRefIndex?: number; name: string; description: string | null; default_view: string; order_index: number; status_template_id?: string | null }[];
   tasks?: TaskInput[];
@@ -175,6 +189,7 @@ export const useCreateSpaceTemplate = () => {
       name,
       description,
       color,
+      type = 'space',
       folders = [],
       lists = [],
       tasks = [],
@@ -190,6 +205,7 @@ export const useCreateSpaceTemplate = () => {
           name,
           description,
           color,
+          type,
         })
         .select()
         .single();

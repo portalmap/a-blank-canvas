@@ -19,24 +19,49 @@ import {
 import { 
   useSpaceTemplatesWithStructure, 
   useDeleteSpaceTemplate, 
-  useDuplicateSpaceTemplate 
+  useDuplicateSpaceTemplate,
+  TemplateType 
 } from '@/hooks/useSpaceTemplates';
-import { Plus, MoreHorizontal, Pencil, Copy, Trash2, FolderTree, Loader2, Zap } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Copy, Trash2, FolderTree, Loader2, Zap, Folder, List } from 'lucide-react';
 import { useState } from 'react';
 import { ApplyTemplateAutomationsDialog } from './ApplyTemplateAutomationsDialog';
 
 interface SpaceTemplateListProps {
   onEdit: (templateId: string) => void;
   onCreate: () => void;
+  type?: TemplateType;
 }
 
-export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) => {
-  const { data: templates, isLoading } = useSpaceTemplatesWithStructure();
+const TYPE_LABELS: Record<TemplateType, { singular: string; plural: string; icon: React.ReactNode; empty: string }> = {
+  space: {
+    singular: 'Template de Space',
+    plural: 'Templates de Space',
+    icon: <FolderTree className="h-12 w-12 mx-auto text-muted-foreground mb-3" />,
+    empty: 'Nenhum template de Space criado ainda',
+  },
+  folder: {
+    singular: 'Template de Pasta',
+    plural: 'Templates de Pasta',
+    icon: <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-3" />,
+    empty: 'Nenhum template de Pasta criado ainda',
+  },
+  list: {
+    singular: 'Template de Lista',
+    plural: 'Templates de Lista',
+    icon: <List className="h-12 w-12 mx-auto text-muted-foreground mb-3" />,
+    empty: 'Nenhum template de Lista criado ainda',
+  },
+};
+
+export const SpaceTemplateList = ({ onEdit, onCreate, type = 'space' }: SpaceTemplateListProps) => {
+  const { data: templates, isLoading } = useSpaceTemplatesWithStructure(type);
   const deleteTemplate = useDeleteSpaceTemplate();
   const duplicateTemplate = useDuplicateSpaceTemplate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
   const [applyAutomationsTemplateId, setApplyAutomationsTemplateId] = useState<string | null>(null);
+
+  const labels = TYPE_LABELS[type];
 
   const handleDelete = (templateId: string) => {
     setTemplateToDelete(templateId);
@@ -51,6 +76,16 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
     }
   };
 
+  const renderCounts = (template: { folderCount: number; listCount: number; taskCount: number }) => {
+    if (type === 'list') {
+      return `${template.taskCount} ${template.taskCount === 1 ? 'tarefa' : 'tarefas'}`;
+    }
+    if (type === 'folder') {
+      return `${template.listCount} ${template.listCount === 1 ? 'lista' : 'listas'}, ${template.taskCount} ${template.taskCount === 1 ? 'tarefa' : 'tarefas'}`;
+    }
+    return `${template.folderCount} ${template.folderCount === 1 ? 'pasta' : 'pastas'}, ${template.listCount} ${template.listCount === 1 ? 'lista' : 'listas'}, ${template.taskCount} ${template.taskCount === 1 ? 'tarefa' : 'tarefas'}`;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -62,7 +97,7 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Templates</h3>
+        <h3 className="text-lg font-medium">{labels.plural}</h3>
         <Button onClick={onCreate} size="sm">
           <Plus className="h-4 w-4 mr-2" />
           Criar Template
@@ -71,9 +106,9 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
 
       {templates && templates.length === 0 ? (
         <div className="text-center py-8 border border-dashed rounded-lg">
-          <FolderTree className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+          {labels.icon}
           <p className="text-muted-foreground mb-4">
-            Nenhum template criado ainda
+            {labels.empty}
           </p>
           <Button onClick={onCreate} variant="outline">
             <Plus className="h-4 w-4 mr-2" />
@@ -95,9 +130,7 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
                 <div>
                   <p className="font-medium">{template.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {template.folderCount} {template.folderCount === 1 ? 'pasta' : 'pastas'}, {' '}
-                    {template.listCount} {template.listCount === 1 ? 'lista' : 'listas'}, {' '}
-                    {template.taskCount} {template.taskCount === 1 ? 'tarefa' : 'tarefas'}
+                    {renderCounts(template)}
                   </p>
                 </div>
               </div>
@@ -120,11 +153,15 @@ export const SpaceTemplateList = ({ onEdit, onCreate }: SpaceTemplateListProps) 
                     <Copy className="h-4 w-4 mr-2" />
                     Duplicar
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setApplyAutomationsTemplateId(template.id)}>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Aplicar automações em Spaces
-                  </DropdownMenuItem>
+                  {type === 'space' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setApplyAutomationsTemplateId(template.id)}>
+                        <Zap className="h-4 w-4 mr-2" />
+                        Aplicar automações em Spaces
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={() => handleDelete(template.id)}
