@@ -310,13 +310,16 @@ const ProductivityRankingCardWrapper = ({
   card: DashboardCard; 
   commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean } 
 }) => {
-  const { data: rankingData, isLoading } = useProductivityRanking();
+  const [includeTransferred, setIncludeTransferred] = useState(false);
+  const { data: rankingData, isLoading } = useProductivityRanking({ includeTransferred });
 
   return (
     <ProductivityRankingCard
       {...commonProps}
       data={rankingData || null}
       isLoading={isLoading}
+      includeTransferred={includeTransferred}
+      onToggleTransferred={setIncludeTransferred}
     />
   );
 };
