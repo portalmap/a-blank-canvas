@@ -1,33 +1,30 @@
 
 
-# Adicionar filtro de Seguidor no módulo Tudo
+# Duplicar Template de Automações
 
 ## Resumo
 
-Adicionar um botão "Seguidor" ao lado do botão "Responsável" existente, com um painel lateral idêntico que lista os seguidores das tarefas e permite filtrar por eles.
+Adicionar opção "Duplicar" no menu de contexto do template na tela "Modelos de Automação". Ao duplicar, copia o template inteiro (pastas, listas, tarefas) e todas as automações associadas, remapeando os IDs internos corretamente.
 
 ## Alterações
 
-### 1. `src/hooks/useFilteredAllTasks.ts`
-- Após buscar os assignees, buscar também os **followers** de cada tarefa (mesma lógica de batching)
-- Consultar `task_followers` com `task_id` + join com `profiles`
-- Adicionar campo `followers` ao tipo `TaskWithAssignees` (renomear conceptualmente)
+### 1. `src/hooks/useSpaceTemplates.ts`
+- Criar hook `useDuplicateSpaceTemplate` que:
+  1. Busca o template completo (pastas, listas, tarefas) via `useSpaceTemplate`
+  2. Cria novo template com nome "CLONE - {nome}"
+  3. Insere pastas, listas e tarefas com novos IDs, mantendo mapeamento old→new
+  4. Busca automações do template original (`space_template_automations`)
+  5. Insere automações no novo template, remapeando `folder_ref_id` e `list_ref_id` usando o mapeamento old→new
+  6. Todas as automações duplicadas ficam desativadas (`enabled: false`)
 
-### 2. `src/pages/EverythingView.tsx`
-- Adicionar estado `selectedFollowers` e `includeNoFollowers` e `showFollowerPanel`
-- Calcular `followerStats` (igual a `assigneeStats` mas usando `task.followers`)
-- Adicionar filtro de followers no `filteredTasks` (mesma lógica do assignee filter)
-- Adicionar botão "Seguidor" com ícone `Eye` ao lado do botão "Responsável"
-- Renderizar `FollowerFilterPanel` quando aberto
-
-### 3. Criar `src/components/everything/FollowerFilterPanel.tsx`
-- Cópia do `AssigneeFilterPanel` adaptada:
-  - Título: "Seguidores"
-  - Opção "Sem seguidor" em vez de "Não atribuído"
-  - Mesma estrutura visual (avatar, nome, contagem, checkbox)
+### 2. `src/components/settings/AutomationTemplateList.tsx`
+- Importar `useDuplicateSpaceTemplate` e ícone `Copy`
+- Adicionar prop `onDuplicate` no `TemplateRow`
+- Adicionar item "Duplicar" no `DropdownMenu` (entre "Editar Automações" e "Aplicar em Spaces")
+- Chamar mutation de duplicação ao clicar
 
 ## Resultado
-- Botão "Seguidor" aparece ao lado de "Responsável" na toolbar
-- Ao clicar, abre painel lateral listando todos os seguidores com contagem de tarefas
-- Filtrar por seguidor mostra apenas tarefas onde aquele usuário é seguidor
+- Menu do template mostra 3 opções: Editar Automações, Duplicar, Aplicar em Spaces
+- Ao duplicar, cria cópia completa com automações remapeadas e desativadas
+- 2 arquivos editados
 
