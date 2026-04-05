@@ -63,16 +63,21 @@ export interface SpaceTemplate {
   tasks?: SpaceTemplateTask[];
 }
 
-// Buscar TODOS os templates (globais)
-export const useSpaceTemplates = () => {
+// Buscar templates por tipo (globais)
+export const useSpaceTemplates = (type?: TemplateType) => {
   return useQuery({
-    queryKey: ['space-templates'],
+    queryKey: ['space-templates', type],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('space_templates')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (type) {
+        query = query.eq('type', type);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as SpaceTemplate[];
     },
