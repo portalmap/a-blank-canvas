@@ -114,16 +114,21 @@ export const useSpaceTemplate = (templateId?: string) => {
   });
 };
 
-// Buscar TODOS os templates com contagens (globais)
-export const useSpaceTemplatesWithStructure = () => {
+// Buscar templates com contagens, filtrado por tipo
+export const useSpaceTemplatesWithStructure = (type?: TemplateType) => {
   return useQuery({
-    queryKey: ['space-templates-structure'],
+    queryKey: ['space-templates-structure', type],
     queryFn: async () => {
-      const { data: templates, error } = await supabase
+      let query = supabase
         .from('space_templates')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (type) {
+        query = query.eq('type', type);
+      }
+
+      const { data: templates, error } = await query;
       if (error) throw error;
 
       const templatesWithCounts = await Promise.all(
