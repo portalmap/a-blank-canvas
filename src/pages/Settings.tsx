@@ -9,6 +9,7 @@ import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettin
 import { AutomationTemplateSettings } from "@/components/settings/AutomationTemplateSettings";
 import { ApiSettings } from "@/components/settings/api/ApiSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
+import { ProductivitySettings } from "@/components/settings/ProductivitySettings";
 
 export default function Settings() {
   return (
@@ -21,13 +22,14 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-10 lg:w-[1200px]">
+        <TabsList className="grid w-full grid-cols-11 lg:w-[1320px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="tags">Etiquetas</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="automations">Automações</TabsTrigger>
+          <TabsTrigger value="productivity">Produtividade</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
@@ -56,6 +58,10 @@ export default function Settings() {
 
         <TabsContent value="automations" className="mt-6">
           <AutomationTemplateSettings />
+        </TabsContent>
+
+        <TabsContent value="productivity" className="mt-6">
+          <ProductivitySettings />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
