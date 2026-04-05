@@ -1,46 +1,61 @@
 
 
-# Corrigir mapeamento de status ao aplicar automações em Spaces
+# Corrigir 231 automações com IDs de status de template + prevenir para o futuro
 
-## Problema encontrado
+## Diagnóstico completo
 
-A automação "Transferência do Social Media > Criativos" foi aplicada no space "MAP | MAP Cliente", mas **os IDs de status não foram convertidos**. Os IDs `36745b3b...`, `d3ae2d45...`, etc. são de `status_template_items` — não existem como status reais. Por isso, quando a tarefa muda de status, o motor de automações compara IDs reais (`84159972...` = "Concluído") contra IDs de template inexistentes e nunca encontra correspondência.
+A automação `6ea47c48` ("Transferência do Social Media > Criativos") no Space MAP | MAP Cliente tem os seguintes IDs de status no `action_config`:
 
-**Causa raiz**: A função `remapAutomation` (linha 1007) usada por `useApplyTemplateAutomationsToSpaces` só mapeia `target_list_id` e `scope_id`. Ela **ignora completamente** `trigger_config.from_status_ids`, `trigger_config.to_status_ids` e `actions[].config.status_id`.
+```text
+trigger_config.from_status_ids:
+  d3ae2d45 → "Aguardando" (template b7246826)  ❌ deveria ser 23493088 (real)
+  f5fb5e8d → "A Fazer" (template b7246826)      ❌ deveria ser 02cd91a7
+  66131d04 → "Em Progresso" (template b7246826)  ❌ deveria ser 56149ca6
+  e8466a10 → "Env. Aprovação" (template b7246826)❌ deveria ser 6fe27b5d
+  8bcbc13b → "Concluído" (template b7246826)     ❌ deveria ser 84159972
 
-Já existe uma função `remapTemplateAutomationConfig` (linha 901) que faz exatamente esse mapeamento de status, mas ela só é usada na criação de Space a partir do template — não na aplicação em massa.
+trigger_config.to_status_ids:
+  36745b3b → "Concluído" (template f5475852)     ❌ deveria ser 84159972
+  8bcbc13b → "Concluído" (template b7246826)     ❌ deveria ser 84159972
+
+actions[4].config.status_id (set_status após move_task):
+  46da2d87 → "Aguardando" (template 857a3b08)   ❌ deveria ser 0711eb62
+```
+
+A tarefa "Nova Tarefa" mudou para status `84159972` (Concluído real), mas a automação compara com IDs de template que não existem na tabela `statuses` — logo nunca dispara.
+
+**São 231 automações afetadas** em todo o workspace.
+
+## Causa raiz
+
+A função `useApplyTemplateAutomationsToSpaces` faz o mapeamento de status por nome, mas a lógica não distingue qual template pertence a qual lista. Um template item "Concluído" pode corresponder ao status errado de outra lista. Além disso, para ações que referenciam listas de destino (set_status após move_task), o `status_id` precisa ser mapeado usando os statuses da **lista destino**, não da lista origem.
 
 ## Solução
 
-### Arquivo: `src/hooks/useSpaceTemplates.ts`
+### Parte 1: Corrigir as 231 automações existentes (script de dados)
 
-**1. Na função `useApplyTemplateAutomationsToSpaces` (linha 1100):**
-- Buscar os status do template (via `status_template_items` + `template_id` do space template)
-- Buscar os status reais do space destino
-- Criar um `statusIdMap` mapeando por nome
-- Passar esse mapa para `remapAutomation`
+Criar um script que:
+1. Busca todas as automações com template status IDs no workspace
+2. Para cada automação, identifica o `scope_id` (lista real)
+3. Busca os statuses reais dessa lista
+4. Busca os `status_template_items` referenciados no `action_config`
+5. Cria mapa `{template_id → real_id}` por correspondência de nome
+6. Para ações `set_status` com `target_list_id`, mapeia usando os statuses da lista destino
+7. Atualiza o `action_config` com IDs corrigidos
 
-**2. Na função `remapAutomation` (linha 1007):**
-- Adicionar parâmetro `statusIdMap`
-- Substituir a lógica manual de remap do `action_config` pela chamada a `remapTemplateAutomationConfig` (que já trata `from_status_ids`, `to_status_ids`, `status_id` em ações e condições)
+### Parte 2: Corrigir o mapeamento futuro no código
 
-### Lógica de mapeamento de status
-```text
-Template status_template_items:     Status reais do space destino:
-  "A Fazer" (f5fb5e8d...)        →   "A Fazer" (02cd91a7...)
-  "Em Progresso" (66131d04...)   →   "Em Progresso" (56149ca6...)
-  "Env. Aprovação" (e8466a10...) →   "Env. Aprovação" (6fe27b5d...)
-  "Concluído" (8bcbc13b...)      →   "Concluído" (84159972...)
-```
-Mapeamento feito por **nome** do status, considerando os status da lista de destino (scope) com fallback para status do workspace.
+**Arquivo: `src/hooks/useSpaceTemplates.ts`**
 
-### Fluxo corrigido
-1. Buscar `status_template_items` do template vinculado ao space template
-2. Buscar status reais do space destino (por scope: list → folder → space → workspace)
-3. Criar mapa `{templateStatusId → realStatusId}` por correspondência de nome
-4. Usar `remapTemplateAutomationConfig` para aplicar o mapa no `action_config`
-5. Inserir automação com IDs corretos
+Corrigir a função `useApplyTemplateAutomationsToSpaces` para:
+1. Buscar ALL status template items de TODOS os templates de status usados pelas listas do template
+2. Para cada automação, construir um `statusIdMap` **por lista**: mapear template items do status template da lista fonte → statuses reais da lista real correspondente
+3. Para ações com `target_list_id`, buscar os statuses da lista destino real e mapear separadamente os template items do template da lista destino
+4. Unir todos os mapas em um único `statusIdMap` antes de chamar `remapTemplateAutomationConfig`
 
-## Resultado
-As automações aplicadas em massa terão os IDs de status corretos do space destino, permitindo que o motor de automações as execute quando o status da tarefa mudar.
+A lógica chave é: o mapa precisa cobrir IDs de template de TODAS as listas envolvidas (fonte e destino), cada um mapeado para o status real da lista real correspondente por nome.
+
+## Arquivos alterados
+- `src/hooks/useSpaceTemplates.ts` — corrigir lógica de mapeamento de status multi-lista
+- Script de dados (via insert tool) — corrigir 231 automações existentes
 
