@@ -1423,6 +1423,80 @@ export type Database = {
           },
         ]
       }
+      productivity_settings: {
+        Row: {
+          created_at: string
+          early_threshold_percent: number
+          id: string
+          on_time_threshold_percent: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          early_threshold_percent?: number
+          id?: string
+          on_time_threshold_percent?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          early_threshold_percent?: number
+          id?: string
+          on_time_threshold_percent?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productivity_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productivity_validators: {
+        Row: {
+          created_at: string
+          id: string
+          space_id: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          space_id?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          space_id?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productivity_validators_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productivity_validators_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2049,6 +2123,7 @@ export type Database = {
       task_assignee_history: {
         Row: {
           assigned_at: string
+          classification: string | null
           created_at: string
           due_date: string | null
           id: string
@@ -2059,6 +2134,7 @@ export type Database = {
         }
         Insert: {
           assigned_at?: string
+          classification?: string | null
           created_at?: string
           due_date?: string | null
           id?: string
@@ -2069,6 +2145,7 @@ export type Database = {
         }
         Update: {
           assigned_at?: string
+          classification?: string | null
           created_at?: string
           due_date?: string | null
           id?: string
@@ -2361,6 +2438,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "task_permissions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_productivity_validations: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          notes: string | null
+          original_classification: string
+          task_id: string
+          user_id: string
+          validated_at: string
+          validated_by: string
+          validated_classification: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          notes?: string | null
+          original_classification: string
+          task_id: string
+          user_id: string
+          validated_at?: string
+          validated_by: string
+          validated_classification: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          notes?: string | null
+          original_classification?: string
+          task_id?: string
+          user_id?: string
+          validated_at?: string
+          validated_by?: string
+          validated_classification?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_productivity_validations_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
