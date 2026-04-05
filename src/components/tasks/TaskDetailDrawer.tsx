@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useQueryClient } from '@tanstack/react-query';
 import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
+import { TaskProductivityIndicator } from './TaskProductivityIndicator';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useTask } from '@/hooks/useTask';
 import { SubtaskList } from './SubtaskList';
@@ -160,6 +161,7 @@ export const TaskDetailDrawer = ({ taskId, open, onOpenChange }: TaskDetailDrawe
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Flag className="h-4 w-4" /> Status
+                <TaskProductivityIndicator task={task} />
               </label>
               <Select value={task.status_id} onValueChange={handleStatusChange}>
                 <SelectTrigger>

@@ -283,6 +283,7 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         <div className="space-y-2">
           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Flag className="h-4 w-4" /> Status
+            <TaskProductivityIndicator task={task} />
           </label>
           <Select value={task.status_id} onValueChange={handleStatusChange}>
             <SelectTrigger>
