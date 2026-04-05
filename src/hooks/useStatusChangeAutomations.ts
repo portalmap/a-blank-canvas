@@ -1443,17 +1443,18 @@ export const executeTagAutomations = async (
           if (!conditionsMet) continue;
         }
 
-        // Check for duplicate execution (use tagId as status_id for dedup key)
+        // Check for duplicate execution within 5-second window (prevents double-fire, allows re-trigger)
         const { data: existingExecution } = await supabase
           .from('automation_executions')
           .select('id')
           .eq('automation_id', automation.id)
           .eq('task_id', taskId)
           .eq('status_id', tagId)
+          .gte('executed_at', new Date(Date.now() - 5000).toISOString())
           .maybeSingle();
 
         if (existingExecution) {
-          console.log(`Tag automation ${automation.id} already executed for task ${taskId} with tag ${tagId}`);
+          console.log(`Tag automation ${automation.id} recently executed for task ${taskId} with tag ${tagId}`);
           continue;
         }
 
@@ -1585,17 +1586,18 @@ export const reevaluateConditionAutomations = async (
         const conditionsMet = evaluateConditions(conditions, taskData);
         if (!conditionsMet) continue;
 
-        // Check for duplicate execution
+        // Check for duplicate execution within 5-second window (prevents double-fire, allows re-trigger)
         const { data: existingExecution } = await supabase
           .from('automation_executions')
           .select('id')
           .eq('automation_id', automation.id)
           .eq('task_id', taskId)
           .eq('status_id', task.status_id)
+          .gte('executed_at', new Date(Date.now() - 5000).toISOString())
           .maybeSingle();
 
         if (existingExecution) {
-          console.log(`Automation ${automation.id} already executed for task ${taskId} at status ${task.status_id}`);
+          console.log(`Automation ${automation.id} recently executed for task ${taskId} at status ${task.status_id}`);
           continue;
         }
 
