@@ -2,7 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { differenceInDays, parseISO } from 'date-fns';
+import {
+  calculateDeliveryPercentage,
+  calculateProductivityScore,
+  ProductivityClassification,
+} from './useProductivityClassification';
+import { useProductivitySettings } from './useProductivitySettings';
 
 export interface UserProductivityStats {
   userId: string;
@@ -14,7 +19,6 @@ export interface UserProductivityStats {
   noDueDate: number;
   totalCompleted: number;
   productivityScore: number;
-  // Transferred task counts
   transferredEarly: number;
   transferredOnTime: number;
   transferredLate: number;
@@ -33,204 +37,161 @@ interface UseProductivityRankingOptions {
   includeTransferred?: boolean;
 }
 
-type TaskClassification = 'early' | 'on_time' | 'late' | 'no_due_date';
-
-const classifyTask = (completedAt: string, dueDate: string | null): TaskClassification => {
-  if (!dueDate) return 'no_due_date';
-  
-  const completed = parseISO(completedAt);
-  const due = parseISO(dueDate);
-  const daysBeforeDue = differenceInDays(due, completed);
-  
-  if (daysBeforeDue >= 7) return 'early';
-  if (daysBeforeDue >= 0) return 'on_time';
+const classify = (
+  pct: number,
+  earlyThreshold: number,
+  onTimeThreshold: number
+): ProductivityClassification | 'no_due_date' => {
+  if (pct <= earlyThreshold) return 'early';
+  if (pct <= onTimeThreshold) return 'on_time';
   return 'late';
-};
-
-const classifyTransferred = (unassignedAt: string, dueDate: string | null): TaskClassification => {
-  if (!dueDate) return 'no_due_date';
-  
-  const unassigned = parseISO(unassignedAt);
-  const due = parseISO(dueDate);
-  const daysBeforeDue = differenceInDays(due, unassigned);
-  
-  if (daysBeforeDue >= 7) return 'early';
-  if (daysBeforeDue >= 0) return 'on_time';
-  return 'late';
-};
-
-const calculateScore = (early: number, onTime: number, noDueDate: number, late: number): number => {
-  const total = early + onTime + noDueDate + late;
-  if (total === 0) return 0;
-  
-  const points = (early * 2) + (onTime * 1) + (noDueDate * 1) + (late * 0);
-  return Math.round((points / total) * 100);
 };
 
 export const useProductivityRanking = (options: UseProductivityRankingOptions = {}) => {
   const { user } = useAuth();
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id;
+  const { data: settings } = useProductivitySettings();
+
+  const earlyThreshold = settings?.early_threshold_percent ?? 50;
+  const onTimeThreshold = settings?.on_time_threshold_percent ?? 100;
 
   return useQuery({
-    queryKey: ['productivity-ranking', workspaceId, options.startDate, options.endDate, options.includeTransferred],
+    queryKey: ['productivity-ranking', workspaceId, options.startDate, options.endDate, options.includeTransferred, earlyThreshold, onTimeThreshold],
     queryFn: async (): Promise<ProductivityRankingResult> => {
-      if (!workspaceId) {
-        return { ranking: [], teamAverage: 0, totalTasks: 0 };
-      }
+      if (!workspaceId) return { ranking: [], teamAverage: 0, totalTasks: 0 };
 
-      // 1. Buscar membros do workspace
+      // 1. Members
       const { data: memberRows, error: membersError } = await supabase
         .from('workspace_members')
         .select('user_id')
         .eq('workspace_id', workspaceId);
-
       if (membersError) throw membersError;
-      if (!memberRows || memberRows.length === 0) {
-        return { ranking: [], teamAverage: 0, totalTasks: 0 };
-      }
+      if (!memberRows?.length) return { ranking: [], teamAverage: 0, totalTasks: 0 };
 
       const memberUserIds = memberRows.map(m => m.user_id);
 
-      // 2. Buscar perfis dos membros
+      // 2. Profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
         .in('id', memberUserIds);
-
       if (profilesError) throw profilesError;
-
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-      // 3. Buscar todas as tarefas concluídas do workspace
+      // 3. Completed tasks
       let tasksQuery = supabase
         .from('tasks')
-        .select('id, completed_at, due_date')
+        .select('id, completed_at, due_date, start_date')
         .eq('workspace_id', workspaceId)
         .not('completed_at', 'is', null)
         .is('archived_at', null);
 
-      if (options.startDate) {
-        tasksQuery = tasksQuery.gte('completed_at', options.startDate.toISOString());
-      }
-      if (options.endDate) {
-        tasksQuery = tasksQuery.lte('completed_at', options.endDate.toISOString());
-      }
+      if (options.startDate) tasksQuery = tasksQuery.gte('completed_at', options.startDate.toISOString());
+      if (options.endDate) tasksQuery = tasksQuery.lte('completed_at', options.endDate.toISOString());
 
       const { data: tasks, error: tasksError } = await tasksQuery;
       if (tasksError) throw tasksError;
 
       const taskIds = tasks?.map(t => t.id) || [];
-      
-      // 4. Buscar atribuições atuais
+
+      // 4. Current assignees
       let assignees: { task_id: string; user_id: string }[] = [];
       if (taskIds.length > 0) {
-        const { data: assigneesData, error: assigneesError } = await supabase
+        const { data, error } = await supabase
           .from('task_assignees')
           .select('task_id, user_id')
           .in('task_id', taskIds);
-        if (assigneesError) throw assigneesError;
-        assignees = assigneesData || [];
+        if (error) throw error;
+        assignees = data || [];
       }
 
-      // 5. Buscar histórico de transferências (se habilitado)
-      let transferredHistory: { task_id: string; user_id: string; unassigned_at: string; due_date: string | null }[] = [];
+      // 5. Transfer history
+      let transferredHistory: { task_id: string; user_id: string; assigned_at: string; unassigned_at: string; start_date: string | null; due_date: string | null }[] = [];
       if (options.includeTransferred) {
-        const { data: historyData, error: historyError } = await supabase
+        const { data, error } = await supabase
           .from('task_assignee_history')
-          .select('task_id, user_id, unassigned_at, due_date')
+          .select('task_id, user_id, assigned_at, unassigned_at, start_date, due_date')
           .not('unassigned_at', 'is', null)
           .in('user_id', memberUserIds);
+        if (error) throw error;
 
-        if (historyError) throw historyError;
-        
-        // Filtrar por período se especificado
-        let filtered = historyData || [];
-        if (options.startDate) {
-          filtered = filtered.filter(h => h.unassigned_at && h.unassigned_at >= options.startDate!.toISOString());
-        }
-        if (options.endDate) {
-          filtered = filtered.filter(h => h.unassigned_at && h.unassigned_at <= options.endDate!.toISOString());
-        }
+        let filtered = data || [];
+        if (options.startDate) filtered = filtered.filter(h => h.unassigned_at && h.unassigned_at >= options.startDate!.toISOString());
+        if (options.endDate) filtered = filtered.filter(h => h.unassigned_at && h.unassigned_at <= options.endDate!.toISOString());
         transferredHistory = filtered as typeof transferredHistory;
       }
 
-      // 6. Criar mapa de tarefas por usuário (atuais)
+      // 6. Map tasks by user
       const tasksByUser = new Map<string, typeof tasks>();
-      for (const assignee of assignees) {
-        const task = tasks?.find(t => t.id === assignee.task_id);
+      for (const a of assignees) {
+        const task = tasks?.find(t => t.id === a.task_id);
         if (task) {
-          const userTasks = tasksByUser.get(assignee.user_id) || [];
-          userTasks.push(task);
-          tasksByUser.set(assignee.user_id, userTasks);
+          const arr = tasksByUser.get(a.user_id) || [];
+          arr.push(task);
+          tasksByUser.set(a.user_id, arr);
         }
       }
 
-      // 7. Calcular stats para cada usuário
+      // 7. Calculate per-user stats
       const ranking: UserProductivityStats[] = memberRows.map(member => {
         const userTasks = tasksByUser.get(member.user_id) || [];
         const profile = profileMap.get(member.user_id);
-        
+
         let early = 0, onTime = 0, late = 0, noDueDate = 0;
+        const scores: number[] = [];
 
         for (const task of userTasks) {
           if (!task.completed_at) continue;
-          const classification = classifyTask(task.completed_at, task.due_date);
-          switch (classification) {
-            case 'early': early++; break;
-            case 'on_time': onTime++; break;
-            case 'late': late++; break;
-            case 'no_due_date': noDueDate++; break;
+          if (!task.start_date || !task.due_date) {
+            noDueDate++;
+            scores.push(100);
+            continue;
           }
+          const pct = calculateDeliveryPercentage(task.start_date, task.due_date, new Date(task.completed_at));
+          const cls = classify(pct, earlyThreshold, onTimeThreshold);
+          if (cls === 'early') early++;
+          else if (cls === 'on_time') onTime++;
+          else late++;
+          scores.push(calculateProductivityScore(task.start_date, task.due_date, new Date(task.completed_at)));
         }
 
-        // Transferred tasks
+        // Transferred
         let transferredEarly = 0, transferredOnTime = 0, transferredLate = 0;
         if (options.includeTransferred) {
           const userHistory = transferredHistory.filter(h => h.user_id === member.user_id);
           for (const h of userHistory) {
-            const classification = classifyTransferred(h.unassigned_at, h.due_date);
-            switch (classification) {
-              case 'early': transferredEarly++; break;
-              case 'on_time': transferredOnTime++; break;
-              case 'late': transferredLate++; break;
-            }
+            const sd = h.start_date || h.assigned_at;
+            if (!sd || !h.due_date) continue;
+            const pct = calculateDeliveryPercentage(sd, h.due_date, new Date(h.unassigned_at));
+            const cls = classify(pct, earlyThreshold, onTimeThreshold);
+            if (cls === 'early') transferredEarly++;
+            else if (cls === 'on_time') transferredOnTime++;
+            else transferredLate++;
+            scores.push(calculateProductivityScore(sd, h.due_date, new Date(h.unassigned_at)));
           }
         }
 
-        const totalEarly = early + transferredEarly;
-        const totalOnTime = onTime + transferredOnTime;
-        const totalLate = late + transferredLate;
-        const totalCompleted = totalEarly + totalOnTime + totalLate + noDueDate;
-        const productivityScore = calculateScore(totalEarly, totalOnTime, noDueDate, totalLate);
+        const totalCompleted = early + onTime + late + noDueDate + transferredEarly + transferredOnTime + transferredLate;
+        const productivityScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
 
         return {
           userId: member.user_id,
           userName: profile?.full_name || 'Usuário sem nome',
           avatarUrl: profile?.avatar_url || undefined,
-          early,
-          onTime,
-          late,
-          noDueDate,
+          early, onTime, late, noDueDate,
           totalCompleted,
           productivityScore,
-          transferredEarly,
-          transferredOnTime,
-          transferredLate,
+          transferredEarly, transferredOnTime, transferredLate,
           transferredTotal: transferredEarly + transferredOnTime + transferredLate,
         };
       });
 
-      ranking.sort((a, b) => {
-        if (b.productivityScore !== a.productivityScore) {
-          return b.productivityScore - a.productivityScore;
-        }
-        return b.totalCompleted - a.totalCompleted;
-      });
+      ranking.sort((a, b) => b.productivityScore !== a.productivityScore ? b.productivityScore - a.productivityScore : b.totalCompleted - a.totalCompleted);
 
-      const totalScore = ranking.reduce((sum, r) => sum + r.productivityScore, 0);
+      const totalScore = ranking.reduce((s, r) => s + r.productivityScore, 0);
       const teamAverage = ranking.length > 0 ? Math.round(totalScore / ranking.length) : 0;
-      const totalTasks = ranking.reduce((sum, r) => sum + r.totalCompleted, 0);
+      const totalTasks = ranking.reduce((s, r) => s + r.totalCompleted, 0);
 
       return { ranking, teamAverage, totalTasks };
     },
