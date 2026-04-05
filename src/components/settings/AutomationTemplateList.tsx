@@ -77,6 +77,10 @@ const TemplateRow = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onRename(template.id, template.name)}>
+              <Type className="h-4 w-4 mr-2" />
+              Renomear
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(template.id)}>
               <Pencil className="h-4 w-4 mr-2" />
               Editar Automações
