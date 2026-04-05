@@ -339,6 +339,8 @@ const ProductivityRankingCardWrapper = ({
       isLoading={isLoading}
       includeTransferred={includeTransferred}
       onToggleTransferred={setIncludeTransferred}
+      startDate={dateRange?.startDate?.toISOString()}
+      endDate={dateRange?.endDate?.toISOString()}
     />
   );
 };

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, Settings, Share2, RefreshCw, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,10 +83,14 @@ const DashboardView = () => {
     });
   };
 
+  const queryClient = useQueryClient();
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Simulate refresh delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await queryClient.invalidateQueries({ queryKey: ['productivity-stats'] });
+    await queryClient.invalidateQueries({ queryKey: ['productivity-ranking'] });
+    await queryClient.invalidateQueries({ queryKey: ['user-productivity-details'] });
+    await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     setIsRefreshing(false);
   };
 
