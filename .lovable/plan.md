@@ -1,37 +1,42 @@
 
 
-# Classificar produtividade na transferência de responsável
+# Incluir transferências no card de produtividade + registro completo
 
 ## Problema
 
-Quando um responsável é **removido** (transferido), o sistema:
-- ✅ Registra corretamente no `task_assignee_history` (com `unassigned_at`)
-- ❌ **NÃO** calcula a classificação de produtividade (early/on_time/late) para essa transferência
-- ❌ **NÃO** registra atividade `productivity.classified` no histórico da tarefa
-- ❌ **NÃO** atualiza o campo `classification` no `task_assignee_history`
+1. O card de **Produtividade** não tem a chave "Incluir transferidas" (só o Ranking tem)
+2. A função SQL `get_productivity_stats` só conta tarefas pela `tasks.completed_at` — ignora registros de `task_assignee_history` (transferências). Quando um usuário é transferido, sua contribuição não entra nas métricas de produtividade
+3. A cada transferência, o sistema precisa registrar um "snapshot de conclusão parcial" com data/hora exata, para rastrear ciclos como A→B→A corretamente
 
-A classificação só acontece quando o status muda para "Concluído" (em `TaskMainContent.handleStatusChange`). Transferências são ignoradas.
+## Alterações
 
-Na tarefa em questão, houve 4 trocas de responsável (06:08, 06:18, 06:20) mas nenhuma gerou registro de produtividade.
+### 1. Migration SQL — Atualizar `get_productivity_stats`
+- Quando `p_include_transferred = true`, incluir também registros de `task_assignee_history` onde `unassigned_at IS NOT NULL` (transferências)
+- Para cada registro transferido, usar `assigned_at` como início e `unassigned_at` como referência de entrega, junto com `start_date` e `due_date` do snapshot no histórico
+- Adicionar parâmetro `p_include_transferred boolean DEFAULT false` na função
+- Unir os dois conjuntos (concluídas + transferidas) antes de calcular score/classificação
 
-## Solução
+### 2. `src/hooks/useProductivityStats.ts`
+- Adicionar `includeTransferred?: boolean` nas options
+- Passar `p_include_transferred` na chamada RPC
 
-### `src/components/tasks/TaskAssigneesManager.tsx`
-- No `handleRemoveAssignee`, após remover o responsável:
-  - Buscar a tarefa atual (start_date, due_date) para calcular a classificação
-  - Chamar `calculateClassification` com `now()` como data de referência
-  - Registrar atividade `productivity.classified` com metadata indicando que é transferência (`isTransferred: true`) e o nome do usuário
-  - Atualizar `task_assignee_history` setando `classification` no registro correspondente (via query por `task_id`, `user_id`, ordenado pelo mais recente)
+### 3. `src/components/dashboards/DashboardEditor.tsx` — `ProductivityCardWrapper`
+- Adicionar estado `includeTransferred` (como já existe no `ProductivityRankingCardWrapper`)
+- Passar para `useProductivityStats`
+- Passar toggle para o `ProductivityCard`
 
-### `src/hooks/useTaskActivities.ts`
-- Ajustar o texto de `productivity.classified` para diferenciar quando é transferência vs conclusão (usar metadata `isTransferred`)
+### 4. `src/components/dashboards/cards/ProductivityCard.tsx`
+- Adicionar props `includeTransferred` e `onToggleTransferred`
+- Exibir checkbox/switch "Incluir transferidas" abaixo do breakdown, similar ao que já existe no card de ranking
 
-### `src/components/tasks/TaskActivityItem.tsx`
-- Exibir texto diferenciado para classificações de transferência (ex: "Victor Borges transferiu a tarefa — Antecipada (35%)")
+### 5. `src/components/tasks/TaskAssigneesManager.tsx` — Garantir registro completo
+- No `handleRemoveAssignee`, já existe a lógica de classificação na transferência
+- Garantir que o `task_assignee_history` tenha `classification` preenchido + a data/hora exata em `unassigned_at` (já existe via trigger)
+- O registro de atividade `productivity.classified` com `isTransferred: true` já está implementado — verificar que funciona em cenários A→B→A (múltiplas atribuições do mesmo usuário)
 
 ## Resultado
-- Toda troca de responsável registra a classificação de produtividade
-- O histórico da tarefa mostra a lâmpada colorida para cada transferência
-- O `task_assignee_history.classification` é preenchido tanto em conclusões quanto transferências
-- 3 arquivos editados
+- Card de produtividade mostra toggle "Incluir transferidas"
+- Ao ativar, métricas incluem registros de transferência com score individual
+- Cada transferência gera registro com data/hora para rastreamento completo de ciclos
+- 4 arquivos editados + 1 migration SQL
 
