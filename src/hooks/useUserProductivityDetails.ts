@@ -10,6 +10,8 @@ export interface TaskDetail {
   dueDate: string | null;
   classification: 'early' | 'on_time' | 'late' | 'no_due_date';
   daysFromDue: number | null;
+  isTransferred?: boolean;
+  transferredAt?: string;
 }
 
 export interface UserProductivityDetails {
@@ -31,6 +33,7 @@ interface UseUserProductivityDetailsOptions {
   userId: string | null;
   startDate?: string;
   endDate?: string;
+  includeTransferred?: boolean;
 }
 
 const classifyTask = (completedAt: string, dueDate: string | null): { classification: TaskDetail['classification']; daysFromDue: number | null } => {
@@ -61,43 +64,14 @@ const calculateScore = (early: number, onTime: number, noDueDate: number, late: 
 
 export const useUserProductivityDetails = (options: UseUserProductivityDetailsOptions) => {
   const { activeWorkspace } = useWorkspace();
-  const { userId, startDate, endDate } = options;
+  const { userId, startDate, endDate, includeTransferred } = options;
 
   return useQuery({
-    queryKey: ['user-productivity-details', activeWorkspace?.id, userId, startDate, endDate],
+    queryKey: ['user-productivity-details', activeWorkspace?.id, userId, startDate, endDate, includeTransferred],
     queryFn: async (): Promise<UserProductivityDetails | null> => {
       if (!activeWorkspace?.id || !userId) return null;
 
-      // Buscar tarefas concluídas do usuário
-      let query = supabase
-        .from('tasks')
-        .select(`
-          id,
-          title,
-          completed_at,
-          due_date,
-          task_assignees!inner(user_id)
-        `)
-        .eq('task_assignees.user_id', userId)
-        .not('completed_at', 'is', null)
-        .is('archived_at', null);
-
-      // Filtrar por período se especificado
-      if (startDate) {
-        query = query.gte('completed_at', startDate);
-      }
-      if (endDate) {
-        query = query.lte('completed_at', endDate);
-      }
-
-      const { data: tasks, error } = await query.order('completed_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching user productivity details:', error);
-        throw error;
-      }
-
-      // Filtrar para apenas tarefas do workspace atual
+      // Buscar spaces e listas do workspace
       const spacesQuery = await supabase
         .from('spaces')
         .select('id')
@@ -105,16 +79,15 @@ export const useUserProductivityDetails = (options: UseUserProductivityDetailsOp
 
       const spaceIds = spacesQuery.data?.map(s => s.id) || [];
 
-      // Buscar listas do workspace
       const listsQuery = await supabase
         .from('lists')
-        .select('id, space_id, folder_id')
+        .select('id')
         .or(`space_id.in.(${spaceIds.join(',')}),folder_id.not.is.null`);
 
       const listIds = listsQuery.data?.map(l => l.id) || [];
 
-      // Filtrar tarefas por listas do workspace
-      const tasksWithListQuery = await supabase
+      // Buscar tarefas concluídas do usuário (atribuições atuais)
+      const tasksQuery = await supabase
         .from('tasks')
         .select(`
           id,
@@ -130,9 +103,8 @@ export const useUserProductivityDetails = (options: UseUserProductivityDetailsOp
         .in('list_id', listIds)
         .order('completed_at', { ascending: false });
 
-      let filteredTasks = tasksWithListQuery.data || [];
+      let filteredTasks = tasksQuery.data || [];
 
-      // Aplicar filtros de data
       if (startDate) {
         filteredTasks = filteredTasks.filter(t => t.completed_at && t.completed_at >= startDate);
       }
@@ -140,17 +112,14 @@ export const useUserProductivityDetails = (options: UseUserProductivityDetailsOp
         filteredTasks = filteredTasks.filter(t => t.completed_at && t.completed_at <= endDate);
       }
 
-      // Classificar tarefas
+      // Classificar tarefas atuais
       const earlyTasks: TaskDetail[] = [];
       const onTimeTasks: TaskDetail[] = [];
       const lateTasks: TaskDetail[] = [];
       const noDueDateTasks: TaskDetail[] = [];
 
       for (const task of filteredTasks) {
-        const { classification, daysFromDue } = classifyTask(
-          task.completed_at!,
-          task.due_date
-        );
+        const { classification, daysFromDue } = classifyTask(task.completed_at!, task.due_date);
 
         const taskDetail: TaskDetail = {
           id: task.id,
@@ -159,21 +128,70 @@ export const useUserProductivityDetails = (options: UseUserProductivityDetailsOp
           dueDate: task.due_date,
           classification,
           daysFromDue,
+          isTransferred: false,
         };
 
         switch (classification) {
-          case 'early':
-            earlyTasks.push(taskDetail);
-            break;
-          case 'on_time':
-            onTimeTasks.push(taskDetail);
-            break;
-          case 'late':
-            lateTasks.push(taskDetail);
-            break;
-          case 'no_due_date':
-            noDueDateTasks.push(taskDetail);
-            break;
+          case 'early': earlyTasks.push(taskDetail); break;
+          case 'on_time': onTimeTasks.push(taskDetail); break;
+          case 'late': lateTasks.push(taskDetail); break;
+          case 'no_due_date': noDueDateTasks.push(taskDetail); break;
+        }
+      }
+
+      // Buscar tarefas transferidas (se habilitado)
+      if (includeTransferred) {
+        const { data: historyData } = await supabase
+          .from('task_assignee_history')
+          .select('task_id, unassigned_at, due_date')
+          .eq('user_id', userId)
+          .not('unassigned_at', 'is', null);
+
+        if (historyData && historyData.length > 0) {
+          // Filtrar por período
+          let filteredHistory = historyData;
+          if (startDate) {
+            filteredHistory = filteredHistory.filter(h => h.unassigned_at && h.unassigned_at >= startDate);
+          }
+          if (endDate) {
+            filteredHistory = filteredHistory.filter(h => h.unassigned_at && h.unassigned_at <= endDate);
+          }
+
+          // Buscar títulos das tarefas transferidas
+          const transferredTaskIds = filteredHistory.map(h => h.task_id);
+          const { data: transferredTasks } = await supabase
+            .from('tasks')
+            .select('id, title')
+            .in('id', transferredTaskIds);
+
+          const taskTitleMap = new Map(transferredTasks?.map(t => [t.id, t.title]) || []);
+
+          // Excluir tarefas que já estão na lista atual (ainda é responsável)
+          const currentTaskIds = new Set(filteredTasks.map(t => t.id));
+
+          for (const h of filteredHistory) {
+            if (currentTaskIds.has(h.task_id)) continue;
+
+            const { classification, daysFromDue } = classifyTask(h.unassigned_at!, h.due_date);
+
+            const taskDetail: TaskDetail = {
+              id: h.task_id,
+              title: taskTitleMap.get(h.task_id) || 'Tarefa removida',
+              completedAt: h.unassigned_at!,
+              dueDate: h.due_date,
+              classification,
+              daysFromDue,
+              isTransferred: true,
+              transferredAt: h.unassigned_at!,
+            };
+
+            switch (classification) {
+              case 'early': earlyTasks.push(taskDetail); break;
+              case 'on_time': onTimeTasks.push(taskDetail); break;
+              case 'late': lateTasks.push(taskDetail); break;
+              case 'no_due_date': noDueDateTasks.push(taskDetail); break;
+            }
+          }
         }
       }
 
@@ -182,7 +200,7 @@ export const useUserProductivityDetails = (options: UseUserProductivityDetailsOp
         onTime: onTimeTasks.length,
         late: lateTasks.length,
         noDueDate: noDueDateTasks.length,
-        total: filteredTasks.length,
+        total: earlyTasks.length + onTimeTasks.length + lateTasks.length + noDueDateTasks.length,
         score: calculateScore(earlyTasks.length, onTimeTasks.length, noDueDateTasks.length, lateTasks.length),
       };
 

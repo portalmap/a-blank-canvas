@@ -14,6 +14,11 @@ export interface UserProductivityStats {
   noDueDate: number;
   totalCompleted: number;
   productivityScore: number;
+  // Transferred task counts
+  transferredEarly: number;
+  transferredOnTime: number;
+  transferredLate: number;
+  transferredTotal: number;
 }
 
 export interface ProductivityRankingResult {
@@ -25,6 +30,7 @@ export interface ProductivityRankingResult {
 interface UseProductivityRankingOptions {
   startDate?: Date;
   endDate?: Date;
+  includeTransferred?: boolean;
 }
 
 type TaskClassification = 'early' | 'on_time' | 'late' | 'no_due_date';
@@ -35,6 +41,18 @@ const classifyTask = (completedAt: string, dueDate: string | null): TaskClassifi
   const completed = parseISO(completedAt);
   const due = parseISO(dueDate);
   const daysBeforeDue = differenceInDays(due, completed);
+  
+  if (daysBeforeDue >= 7) return 'early';
+  if (daysBeforeDue >= 0) return 'on_time';
+  return 'late';
+};
+
+const classifyTransferred = (unassignedAt: string, dueDate: string | null): TaskClassification => {
+  if (!dueDate) return 'no_due_date';
+  
+  const unassigned = parseISO(unassignedAt);
+  const due = parseISO(dueDate);
+  const daysBeforeDue = differenceInDays(due, unassigned);
   
   if (daysBeforeDue >= 7) return 'early';
   if (daysBeforeDue >= 0) return 'on_time';
@@ -55,7 +73,7 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
   const workspaceId = activeWorkspace?.id;
 
   return useQuery({
-    queryKey: ['productivity-ranking', workspaceId, options.startDate, options.endDate],
+    queryKey: ['productivity-ranking', workspaceId, options.startDate, options.endDate, options.includeTransferred],
     queryFn: async (): Promise<ProductivityRankingResult> => {
       if (!workspaceId) {
         return { ranking: [], teamAverage: 0, totalTasks: 0 };
@@ -87,11 +105,7 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
       // 3. Buscar todas as tarefas concluídas do workspace
       let tasksQuery = supabase
         .from('tasks')
-        .select(`
-          id,
-          completed_at,
-          due_date
-        `)
+        .select('id, completed_at, due_date')
         .eq('workspace_id', workspaceId)
         .not('completed_at', 'is', null)
         .is('archived_at', null);
@@ -107,36 +121,43 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
       if (tasksError) throw tasksError;
 
       const taskIds = tasks?.map(t => t.id) || [];
-      if (taskIds.length === 0) {
-        const emptyRanking: UserProductivityStats[] = memberRows.map(m => {
-          const profile = profileMap.get(m.user_id);
-          return {
-            userId: m.user_id,
-            userName: profile?.full_name || 'Usuário sem nome',
-            avatarUrl: profile?.avatar_url || undefined,
-            early: 0,
-            onTime: 0,
-            late: 0,
-            noDueDate: 0,
-            totalCompleted: 0,
-            productivityScore: 0,
-          };
-        });
-        return { ranking: emptyRanking, teamAverage: 0, totalTasks: 0 };
+      
+      // 4. Buscar atribuições atuais
+      let assignees: { task_id: string; user_id: string }[] = [];
+      if (taskIds.length > 0) {
+        const { data: assigneesData, error: assigneesError } = await supabase
+          .from('task_assignees')
+          .select('task_id, user_id')
+          .in('task_id', taskIds);
+        if (assigneesError) throw assigneesError;
+        assignees = assigneesData || [];
       }
 
-      // 4. Buscar atribuições de tarefas
-      const { data: assignees, error: assigneesError } = await supabase
-        .from('task_assignees')
-        .select('task_id, user_id')
-        .in('task_id', taskIds);
+      // 5. Buscar histórico de transferências (se habilitado)
+      let transferredHistory: { task_id: string; user_id: string; unassigned_at: string; due_date: string | null }[] = [];
+      if (options.includeTransferred) {
+        const { data: historyData, error: historyError } = await supabase
+          .from('task_assignee_history')
+          .select('task_id, user_id, unassigned_at, due_date')
+          .not('unassigned_at', 'is', null)
+          .in('user_id', memberUserIds);
 
-      if (assigneesError) throw assigneesError;
+        if (historyError) throw historyError;
+        
+        // Filtrar por período se especificado
+        let filtered = historyData || [];
+        if (options.startDate) {
+          filtered = filtered.filter(h => h.unassigned_at && h.unassigned_at >= options.startDate!.toISOString());
+        }
+        if (options.endDate) {
+          filtered = filtered.filter(h => h.unassigned_at && h.unassigned_at <= options.endDate!.toISOString());
+        }
+        transferredHistory = filtered as typeof transferredHistory;
+      }
 
-      // 5. Criar mapa de tarefas por usuário
+      // 6. Criar mapa de tarefas por usuário (atuais)
       const tasksByUser = new Map<string, typeof tasks>();
-      
-      for (const assignee of assignees || []) {
+      for (const assignee of assignees) {
         const task = tasks?.find(t => t.id === assignee.task_id);
         if (task) {
           const userTasks = tasksByUser.get(assignee.user_id) || [];
@@ -145,19 +166,15 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
         }
       }
 
-      // 6. Calcular stats para cada usuário
+      // 7. Calcular stats para cada usuário
       const ranking: UserProductivityStats[] = memberRows.map(member => {
         const userTasks = tasksByUser.get(member.user_id) || [];
         const profile = profileMap.get(member.user_id);
         
-        let early = 0;
-        let onTime = 0;
-        let late = 0;
-        let noDueDate = 0;
+        let early = 0, onTime = 0, late = 0, noDueDate = 0;
 
         for (const task of userTasks) {
           if (!task.completed_at) continue;
-          
           const classification = classifyTask(task.completed_at, task.due_date);
           switch (classification) {
             case 'early': early++; break;
@@ -167,8 +184,25 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
           }
         }
 
-        const totalCompleted = early + onTime + late + noDueDate;
-        const productivityScore = calculateScore(early, onTime, noDueDate, late);
+        // Transferred tasks
+        let transferredEarly = 0, transferredOnTime = 0, transferredLate = 0;
+        if (options.includeTransferred) {
+          const userHistory = transferredHistory.filter(h => h.user_id === member.user_id);
+          for (const h of userHistory) {
+            const classification = classifyTransferred(h.unassigned_at, h.due_date);
+            switch (classification) {
+              case 'early': transferredEarly++; break;
+              case 'on_time': transferredOnTime++; break;
+              case 'late': transferredLate++; break;
+            }
+          }
+        }
+
+        const totalEarly = early + transferredEarly;
+        const totalOnTime = onTime + transferredOnTime;
+        const totalLate = late + transferredLate;
+        const totalCompleted = totalEarly + totalOnTime + totalLate + noDueDate;
+        const productivityScore = calculateScore(totalEarly, totalOnTime, noDueDate, totalLate);
 
         return {
           userId: member.user_id,
@@ -180,10 +214,13 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
           noDueDate,
           totalCompleted,
           productivityScore,
+          transferredEarly,
+          transferredOnTime,
+          transferredLate,
+          transferredTotal: transferredEarly + transferredOnTime + transferredLate,
         };
       });
 
-      // 6. Ordenar por score (desc), depois por total (desc)
       ranking.sort((a, b) => {
         if (b.productivityScore !== a.productivityScore) {
           return b.productivityScore - a.productivityScore;
@@ -191,7 +228,6 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
         return b.totalCompleted - a.totalCompleted;
       });
 
-      // 7. Calcular média da equipe
       const totalScore = ranking.reduce((sum, r) => sum + r.productivityScore, 0);
       const teamAverage = ranking.length > 0 ? Math.round(totalScore / ranking.length) : 0;
       const totalTasks = ranking.reduce((sum, r) => sum + r.totalCompleted, 0);
