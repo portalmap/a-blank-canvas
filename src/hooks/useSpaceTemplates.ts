@@ -1121,13 +1121,11 @@ export const useApplyTemplateAutomationsToSpaces = () => {
             .eq('id', templateId)
             .single();
 
-          // Get status_template_items linked to lists in this template
-          const templateListIds = templateLists?.map(l => l.id) || [];
+          // Get template lists WITH their status_template_id to build per-list status maps
           const { data: templateListsWithStatus } = await supabase
             .from('space_template_lists')
-            .select('status_template_id')
-            .eq('template_id', templateId)
-            .not('status_template_id', 'is', null);
+            .select('id, name, status_template_id')
+            .eq('template_id', templateId);
 
           const statusTemplateIds = Array.from(new Set(
             (templateListsWithStatus || [])
@@ -1135,39 +1133,71 @@ export const useApplyTemplateAutomationsToSpaces = () => {
               .filter(Boolean) as string[]
           ));
 
-          let templateStatusItems: { id: string; name: string; template_id: string }[] = [];
+          let allTemplateStatusItems: { id: string; name: string; template_id: string }[] = [];
           if (statusTemplateIds.length > 0) {
             const { data } = await supabase
               .from('status_template_items')
               .select('id, name, template_id')
               .in('template_id', statusTemplateIds);
-            templateStatusItems = data || [];
+            allTemplateStatusItems = data || [];
           }
 
-          // Fetch real statuses for this space (all scopes)
+          // Fetch real statuses for ALL lists in this space (per-list scope)
           const realListIds = realLists.map(l => l.id);
-          const realFolderIds = realFolders?.map(f => f.id) || [];
-          const allScopeIds = [...realListIds, ...realFolderIds, spaceId];
+          let allRealStatuses: { id: string; name: string; scope_id: string | null; scope_type: string }[] = [];
+          if (realListIds.length > 0) {
+            const { data } = await supabase
+              .from('statuses')
+              .select('id, name, scope_id, scope_type')
+              .in('scope_id', realListIds);
+            allRealStatuses = data || [];
+          }
 
-          const { data: realStatuses } = await supabase
+          // Also fetch space-level and workspace-level statuses as fallback
+          const { data: fallbackStatuses } = await supabase
             .from('statuses')
             .select('id, name, scope_id, scope_type')
-            .in('scope_id', allScopeIds);
-
-          // Build statusIdMap by matching names
-          const statusIdMap: Record<string, string> = {};
-          for (const templateItem of templateStatusItems) {
-            const matchingReal = (realStatuses || []).find(
-              s => s.name.toLowerCase() === templateItem.name.toLowerCase()
-            );
-            if (matchingReal) {
-              statusIdMap[templateItem.id] = matchingReal.id;
-            }
-          }
+            .eq('workspace_id', workspaceId)
+            .in('scope_type', ['space', 'workspace']);
+          const fallbackStatusList = fallbackStatuses || [];
 
           // Create ID maps
           const folderIdMap = createFolderMap(templateFolders, realFolders);
           const listIdMap = createListMap(templateLists, realLists);
+
+          // Build statusIdMap PER LIST: for each template list, map its status template items
+          // to the real statuses of the corresponding real list
+          const statusIdMap: Record<string, string> = {};
+          for (const tList of (templateListsWithStatus || [])) {
+            if (!tList.status_template_id) continue;
+
+            // Template status items for this list's status template
+            const templateItems = allTemplateStatusItems.filter(
+              item => item.template_id === tList.status_template_id
+            );
+
+            // Find the real list that corresponds to this template list
+            const realListId = listIdMap[tList.id];
+
+            // Real statuses for this specific list
+            const realStatusesForList = realListId
+              ? allRealStatuses.filter(s => s.scope_id === realListId)
+              : [];
+
+            for (const templateItem of templateItems) {
+              // Try list-level match first, then fallback to space/workspace
+              const match =
+                realStatusesForList.find(
+                  s => s.name.toLowerCase() === templateItem.name.toLowerCase()
+                ) ||
+                fallbackStatusList.find(
+                  s => s.name.toLowerCase() === templateItem.name.toLowerCase()
+                );
+              if (match) {
+                statusIdMap[templateItem.id] = match.id;
+              }
+            }
+          }
 
           // 3. Create automations for this space
           for (const automation of templateAutomations) {
