@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -24,6 +26,8 @@ interface ProductivityRankingCardProps {
   onExpand?: () => void;
   isLoading?: boolean;
   isExpanded?: boolean;
+  includeTransferred?: boolean;
+  onToggleTransferred?: (value: boolean) => void;
 }
 
 const getMedalIcon = (position: number): string | null => {
@@ -58,10 +62,11 @@ const getInitials = (name: string): string => {
     .slice(0, 2);
 };
 
-const RankingItem = ({ user, position, onSelect }: { 
+const RankingItem = ({ user, position, onSelect, includeTransferred }: { 
   user: UserProductivityStats; 
   position: number;
   onSelect: (user: UserProductivityStats) => void;
+  includeTransferred?: boolean;
 }) => {
   const medal = getMedalIcon(position);
   const progressValue = Math.min(user.productivityScore, 200) / 2;
@@ -74,12 +79,10 @@ const RankingItem = ({ user, position, onSelect }: {
       )}
       onClick={() => onSelect(user)}
     >
-      {/* Posição */}
       <div className="w-8 text-center font-bold text-muted-foreground">
         {medal || position}
       </div>
 
-      {/* Avatar */}
       <Avatar className="h-8 w-8">
         <AvatarImage src={user.avatarUrl} alt={user.userName} />
         <AvatarFallback className="text-xs bg-primary/10 text-primary">
@@ -87,7 +90,6 @@ const RankingItem = ({ user, position, onSelect }: {
         </AvatarFallback>
       </Avatar>
 
-      {/* Nome e breakdown */}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate">{user.userName}</p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -100,13 +102,15 @@ const RankingItem = ({ user, position, onSelect }: {
           {user.late > 0 && (
             <span className="text-red-600 dark:text-red-400">{user.late} atras.</span>
           )}
+          {includeTransferred && user.transferredTotal > 0 && (
+            <span className="text-orange-600 dark:text-orange-400">+{user.transferredTotal} transf.</span>
+          )}
           {user.totalCompleted === 0 && (
             <span>Sem tarefas</span>
           )}
         </div>
       </div>
 
-      {/* Score e barra de progresso */}
       <div className="flex flex-col items-end gap-1 w-24">
         <span className={cn("text-sm font-bold tabular-nums", getScoreColor(user.productivityScore))}>
           {user.productivityScore ?? 0}%
@@ -130,6 +134,8 @@ const ProductivityRankingCardComponent = ({
   onExpand,
   isLoading = false,
   isExpanded = false,
+  includeTransferred = false,
+  onToggleTransferred,
 }: ProductivityRankingCardProps) => {
   const [selectedUser, setSelectedUser] = useState<UserProductivityStats | null>(null);
 
@@ -175,6 +181,21 @@ const ProductivityRankingCardComponent = ({
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col pt-0 overflow-hidden min-h-0">
+        {/* Toggle de tarefas transferidas */}
+        {onToggleTransferred && (
+          <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+            <Switch
+              id="include-transferred"
+              checked={includeTransferred}
+              onCheckedChange={onToggleTransferred}
+              className="scale-90"
+            />
+            <Label htmlFor="include-transferred" className="text-xs text-muted-foreground cursor-pointer">
+              Incluir tarefas transferidas
+            </Label>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -187,7 +208,6 @@ const ProductivityRankingCardComponent = ({
           </div>
         ) : (
           <>
-            {/* Lista de ranking com scroll */}
             <ScrollArea className="flex-1 min-h-0 -mx-2">
               <div className="space-y-1 px-2 pr-4">
                 {data.ranking.map((user, index) => (
@@ -196,12 +216,12 @@ const ProductivityRankingCardComponent = ({
                     user={user} 
                     position={index + 1}
                     onSelect={setSelectedUser}
+                    includeTransferred={includeTransferred}
                   />
                 ))}
               </div>
             </ScrollArea>
 
-            {/* Footer com média da equipe */}
             <div className="flex-shrink-0 mt-3 pt-3 border-t flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">
@@ -224,6 +244,7 @@ const ProductivityRankingCardComponent = ({
       user={selectedUser}
       open={!!selectedUser}
       onOpenChange={(open) => !open && setSelectedUser(null)}
+      includeTransferred={includeTransferred}
     />
     </>
   );
