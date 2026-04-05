@@ -2046,6 +2046,47 @@ export type Database = {
           },
         ]
       }
+      task_assignee_history: {
+        Row: {
+          assigned_at: string
+          created_at: string
+          due_date: string | null
+          id: string
+          start_date: string | null
+          task_id: string
+          unassigned_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          start_date?: string | null
+          task_id: string
+          unassigned_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          start_date?: string | null
+          task_id?: string
+          unassigned_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignee_history_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_assignees: {
         Row: {
           created_at: string
