@@ -79,7 +79,7 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
   const [editAssignee, setEditAssignee] = useState<WorkspaceMember | null>(null);
   
   const Icon = getActivityIcon(activity.activity_type);
-  const iconColorClass = getActivityColor(activity.activity_type);
+  const iconColorClass = getActivityColor(activity.activity_type, activity.metadata);
   const userName = activity.user?.full_name || 'Usuário';
   const userInitial = userName.charAt(0).toUpperCase();
   const isAutomation = activity.metadata?.created_by === 'automation';
