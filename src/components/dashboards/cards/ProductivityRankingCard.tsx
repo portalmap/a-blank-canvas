@@ -28,6 +28,8 @@ interface ProductivityRankingCardProps {
   isExpanded?: boolean;
   includeTransferred?: boolean;
   onToggleTransferred?: (value: boolean) => void;
+  startDate?: string;
+  endDate?: string;
 }
 
 const getMedalIcon = (position: number): string | null => {
@@ -136,6 +138,8 @@ const ProductivityRankingCardComponent = ({
   isExpanded = false,
   includeTransferred = false,
   onToggleTransferred,
+  startDate,
+  endDate,
 }: ProductivityRankingCardProps) => {
   const [selectedUser, setSelectedUser] = useState<UserProductivityStats | null>(null);
 
@@ -245,6 +249,8 @@ const ProductivityRankingCardComponent = ({
       open={!!selectedUser}
       onOpenChange={(open) => !open && setSelectedUser(null)}
       includeTransferred={includeTransferred}
+      startDate={startDate}
+      endDate={endDate}
     />
     </>
   );
