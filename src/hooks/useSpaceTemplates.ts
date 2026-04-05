@@ -521,11 +521,12 @@ export const useDuplicateSpaceTemplate = () => {
       if (!user) throw new Error('Usuário não autenticado');
 
       // Fetch original template with structure
-      const [templateResult, foldersResult, listsResult, tasksResult] = await Promise.all([
+      const [templateResult, foldersResult, listsResult, tasksResult, automationsResult] = await Promise.all([
         supabase.from('space_templates').select('*').eq('id', templateId).single(),
         supabase.from('space_template_folders').select('*').eq('template_id', templateId).order('order_index'),
         supabase.from('space_template_lists').select('*').eq('template_id', templateId).order('order_index'),
         supabase.from('space_template_tasks').select('*').eq('template_id', templateId).order('order_index'),
+        supabase.from('space_template_automations').select('*').eq('template_id', templateId),
       ]);
 
       if (templateResult.error) throw templateResult.error;
@@ -540,6 +541,7 @@ export const useDuplicateSpaceTemplate = () => {
           name: `${original.name} (cópia)`,
           description: original.description,
           color: original.color,
+          type: original.type || 'space',
         })
         .select()
         .single();
@@ -607,10 +609,57 @@ export const useDuplicateSpaceTemplate = () => {
               description: t.description,
               priority: t.priority,
               order_index: t.order_index,
+              start_date_offset: t.start_date_offset,
+              due_date_offset: t.due_date_offset,
+              start_date_recurrence: t.start_date_recurrence,
+              due_date_recurrence: t.due_date_recurrence,
+              status_template_item_id: t.status_template_item_id,
+              estimated_time: t.estimated_time,
+              is_milestone: t.is_milestone,
+              tag_names: t.tag_names,
             }))
           );
 
         if (tasksError) throw tasksError;
+      }
+
+      // Copy automations with ID remapping
+      if (automationsResult.data && automationsResult.data.length > 0) {
+        const remappedAutomations = automationsResult.data.map(a => {
+          // Deep clone action_config and remap IDs
+          const remappedConfig = JSON.parse(JSON.stringify(a.action_config || {}));
+          if (remappedConfig.actions && Array.isArray(remappedConfig.actions)) {
+            remappedConfig.actions = remappedConfig.actions.map((action: { type: string; config?: { target_list_id?: string } }) => {
+              if (action.type === 'move_task' && action.config?.target_list_id) {
+                const oldId = action.config.target_list_id;
+                if (listIdMap[oldId]) {
+                  action.config.target_list_id = listIdMap[oldId];
+                }
+              }
+              return action;
+            });
+          }
+
+          return {
+            template_id: newTemplate.id,
+            description: a.description,
+            trigger: a.trigger,
+            action_type: a.action_type,
+            action_config: remappedConfig,
+            scope_type: a.scope_type,
+            folder_ref_id: a.folder_ref_id ? (folderIdMap[a.folder_ref_id] || null) : null,
+            list_ref_id: a.list_ref_id ? (listIdMap[a.list_ref_id] || null) : null,
+            enabled: false,
+          };
+        });
+
+        const { error: automationsError } = await supabase
+          .from('space_template_automations')
+          .insert(remappedAutomations);
+
+        if (automationsError) {
+          console.error('Error duplicating automations:', automationsError);
+        }
       }
 
       return newTemplate;

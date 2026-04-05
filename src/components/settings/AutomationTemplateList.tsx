@@ -8,10 +8,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useSpaceTemplates } from '@/hooks/useSpaceTemplates';
+import { useSpaceTemplates, useDuplicateSpaceTemplate } from '@/hooks/useSpaceTemplates';
 import { useTemplateAutomations } from '@/hooks/useTemplateAutomations';
 import { ApplyTemplateAutomationsDialog } from './ApplyTemplateAutomationsDialog';
-import { Loader2, MoreHorizontal, Pencil, Zap, Send } from 'lucide-react';
+import { Loader2, MoreHorizontal, Pencil, Zap, Send, Copy } from 'lucide-react';
 
 interface AutomationTemplateListProps {
   onEdit: (templateId: string) => void;
@@ -21,10 +21,12 @@ const TemplateRow = ({
   template,
   onEdit,
   onApply,
+  onDuplicate,
 }: {
   template: { id: string; name: string; color: string | null };
   onEdit: (id: string) => void;
   onApply: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }) => {
   const { data: automations = [] } = useTemplateAutomations(template.id);
   const enabledCount = automations.filter(a => a.enabled).length;
@@ -66,6 +68,10 @@ const TemplateRow = ({
               <Pencil className="h-4 w-4 mr-2" />
               Editar Automações
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDuplicate(template.id)}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicar
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onApply(template.id)}>
               <Send className="h-4 w-4 mr-2" />
@@ -81,6 +87,11 @@ const TemplateRow = ({
 export const AutomationTemplateList = ({ onEdit }: AutomationTemplateListProps) => {
   const { data: templates, isLoading } = useSpaceTemplates();
   const [applyTemplateId, setApplyTemplateId] = useState<string | null>(null);
+  const duplicateTemplate = useDuplicateSpaceTemplate();
+
+  const handleDuplicate = (templateId: string) => {
+    duplicateTemplate.mutate(templateId);
+  };
 
   if (isLoading) {
     return (
@@ -113,6 +124,7 @@ export const AutomationTemplateList = ({ onEdit }: AutomationTemplateListProps) 
             template={template}
             onEdit={onEdit}
             onApply={setApplyTemplateId}
+            onDuplicate={handleDuplicate}
           />
         ))}
       </div>
