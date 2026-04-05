@@ -19,6 +19,7 @@ export interface FilterState {
   priorities: string[];
   tags: string[];
   showCompleted: boolean;
+  showTransferred: boolean;
   viewMode: ViewMode;
 }
 
@@ -44,7 +45,8 @@ export function EverythingFilters({ filters, onChange, availableStatuses, availa
     filters.statuses.length + 
     filters.priorities.length + 
     (filters.tags?.length || 0) +
-    (filters.showCompleted ? 1 : 0);
+    (filters.showCompleted ? 1 : 0) +
+    (filters.showTransferred ? 1 : 0);
 
   const toggleStatus = (statusId: string) => {
     const newStatuses = filters.statuses.includes(statusId)
@@ -74,7 +76,8 @@ export function EverythingFilters({ filters, onChange, availableStatuses, availa
       priorities: [],
       tags: [],
       showCompleted: false,
-      viewMode: filters.viewMode, // Mantém o viewMode atual
+      showTransferred: false,
+      viewMode: filters.viewMode,
     });
   };
 
@@ -230,6 +233,18 @@ export function EverythingFilters({ filters, onChange, availableStatuses, availa
               onCheckedChange={(checked) => onChange({ ...filters, showCompleted: !!checked })}
             />
             <span className="text-sm">Mostrar tarefas concluídas</span>
+          </div>
+
+          {/* Show Transferred Toggle */}
+          <div
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => onChange({ ...filters, showTransferred: !filters.showTransferred })}
+          >
+            <Checkbox
+              checked={filters.showTransferred}
+              onCheckedChange={(checked) => onChange({ ...filters, showTransferred: !!checked })}
+            />
+            <span className="text-sm">Mostrar tarefas transferidas</span>
           </div>
         </div>
       </PopoverContent>

@@ -50,6 +50,7 @@ const ListDetailView = () => {
     priorities: [],
     tags: [],
     showCompleted: true,
+    showTransferred: false,
     viewMode: 'assigned',
   });
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);

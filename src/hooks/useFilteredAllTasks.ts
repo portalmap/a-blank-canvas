@@ -12,12 +12,13 @@ export type TaskWithAssignees = AllTask & {
 
 export function useFilteredAllTasks(
   workspaceId: string | undefined,
-  viewMode: ViewMode = 'assigned'
+  viewMode: ViewMode = 'assigned',
+  showTransferred: boolean = false
 ) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['filtered-all-tasks', workspaceId, user?.id, viewMode],
+    queryKey: ['filtered-all-tasks', workspaceId, user?.id, viewMode, showTransferred],
     queryFn: async () => {
       if (!workspaceId || !user) return [];
 
@@ -105,9 +106,26 @@ export function useFilteredAllTasks(
             .eq('user_id', user.id);
 
           if (assignError) throw assignError;
-          if (!assignments || assignments.length === 0) return [];
+          
+          const assignedIds = assignments?.map(a => a.task_id) || [];
 
-          taskIds = assignments.map(a => a.task_id);
+          // Also include transferred tasks if enabled
+          let transferredIds: string[] = [];
+          if (showTransferred) {
+            const { data: history, error: histError } = await supabase
+              .from('task_assignee_history')
+              .select('task_id')
+              .eq('user_id', user.id)
+              .not('unassigned_at', 'is', null);
+
+            if (histError) throw histError;
+            transferredIds = history?.map(h => h.task_id) || [];
+          }
+
+          const combinedIds = [...new Set([...assignedIds, ...transferredIds])];
+          if (combinedIds.length === 0) return [];
+
+          taskIds = combinedIds;
         }
       }
 
