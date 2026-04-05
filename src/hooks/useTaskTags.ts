@@ -267,6 +267,17 @@ export function useRemoveTaskTag() {
         queryKey: ["task-tag-relations", variables.taskId],
       });
 
+      // Clean up old execution records for this tag so re-adding can trigger again
+      try {
+        await supabase
+          .from('automation_executions')
+          .delete()
+          .eq('task_id', variables.taskId)
+          .eq('status_id', variables.tagId);
+      } catch (err) {
+        console.error('Error cleaning automation executions on tag removal:', err);
+      }
+
       // Execute tag-triggered automations
       try {
         const { data: task } = await supabase
