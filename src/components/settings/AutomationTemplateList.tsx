@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -8,10 +8,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useSpaceTemplates, useDuplicateSpaceTemplate } from '@/hooks/useSpaceTemplates';
 import { useTemplateAutomations } from '@/hooks/useTemplateAutomations';
 import { ApplyTemplateAutomationsDialog } from './ApplyTemplateAutomationsDialog';
-import { Loader2, MoreHorizontal, Pencil, Zap, Send, Copy } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Loader2, MoreHorizontal, Pencil, Zap, Send, Copy, Type } from 'lucide-react';
 
 interface AutomationTemplateListProps {
   onEdit: (templateId: string) => void;
