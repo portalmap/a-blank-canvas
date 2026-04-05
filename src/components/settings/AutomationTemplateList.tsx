@@ -33,11 +33,13 @@ const TemplateRow = ({
   onEdit,
   onApply,
   onDuplicate,
+  onRename,
 }: {
   template: { id: string; name: string; color: string | null };
   onEdit: (id: string) => void;
   onApply: (id: string) => void;
   onDuplicate: (id: string) => void;
+  onRename: (id: string, name: string) => void;
 }) => {
   const { data: automations = [] } = useTemplateAutomations(template.id);
   const enabledCount = automations.filter(a => a.enabled).length;
