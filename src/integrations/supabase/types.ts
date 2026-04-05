@@ -3046,6 +3046,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calc_delivery_pct: {
+        Args: { p_due_date: string; p_reference: string; p_start_date: string }
+        Returns: number
+      }
+      calc_productivity_score: {
+        Args: { p_delivery_pct: number }
+        Returns: number
+      }
       can_create_workspace: { Args: { _user_id: string }; Returns: boolean }
       can_edit_user: {
         Args: { _editor_id: string; _target_user_id: string }
@@ -3089,7 +3097,45 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_productivity_ranking: {
+        Args: {
+          p_early_threshold?: number
+          p_end_date?: string
+          p_include_transferred?: boolean
+          p_on_time_threshold?: number
+          p_start_date?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      get_productivity_stats: {
+        Args: {
+          p_early_threshold?: number
+          p_end_date?: string
+          p_on_time_threshold?: number
+          p_scope?: string
+          p_space_id?: string
+          p_start_date?: string
+          p_user_id?: string
+          p_user_ids?: string[]
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       get_user_id_by_email: { Args: { email: string }; Returns: string }
+      get_user_productivity_details: {
+        Args: {
+          p_early_threshold?: number
+          p_end_date?: string
+          p_include_transferred?: boolean
+          p_limit?: number
+          p_on_time_threshold?: number
+          p_start_date?: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       get_user_workspace_role: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: Database["public"]["Enums"]["workspace_role"]
