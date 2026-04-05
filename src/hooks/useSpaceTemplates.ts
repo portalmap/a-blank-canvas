@@ -1195,9 +1195,7 @@ export const useApplyTemplateAutomationsToSpaces = () => {
             }
           }
 
-          // Create ID maps
-          const folderIdMap = createFolderMap(templateFolders, realFolders);
-          const listIdMap = createListMap(templateLists, realLists);
+          // Create ID maps (already built listIdMap above for status mapping)
 
           // 3. Create automations for this space
           for (const automation of templateAutomations) {
