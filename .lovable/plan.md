@@ -1,28 +1,32 @@
 
 
-# Adicionar filtro "Tarefas transferidas" no EverythingFilters
+# Filtro de Data Global no Dashboard
 
 ## Resumo
 
-Adicionar uma nova opção no popover de filtros (usado em Tudo, Listas, Home) que permite visualizar tarefas que foram transferidas (onde o usuário atual já foi responsável mas não é mais). Isso complementa o sistema de produtividade existente.
+Adicionar um seletor de período de análise visível no header do dashboard (fora do popover de filtros) e passar essas datas para todos os cards de produtividade e ranking.
 
 ## Alterações
 
-### 1. `src/components/everything/EverythingFilters.tsx`
-- Adicionar campo `showTransferred: boolean` ao `FilterState`
-- Adicionar checkbox "Mostrar tarefas transferidas" (ao lado de "Mostrar tarefas concluídas")
-- Incluir no contador de filtros ativos e no `clearFilters`
+### 1. `src/pages/DashboardView.tsx`
+- Adicionar estado `dateRange: { startDate: Date | null; endDate: Date | null }`
+- Substituir o botão "Filtros" inativo por um componente `DateRangeFilter` (já existe em `src/components/filters/DateRangeFilter.tsx`) ou criar um seletor de período inline no header com presets (7 dias, 30 dias, 3 meses, personalizado)
+- Exibir o período selecionado de forma visível no header (ex: "01/03/2026 — 05/04/2026")
+- Passar `dateRange` como prop ao `DashboardEditor`
 
-### 2. `src/hooks/useFilteredAllTasks.ts`
-- Quando `showTransferred` não está ativo, comportamento atual (sem mudança)
-- Quando `showTransferred` está ativo, buscar também tarefas da `task_assignee_history` onde o usuário foi responsável mas já saiu (`unassigned_at IS NOT NULL`), e incluí-las no resultado
+### 2. `src/components/dashboards/DashboardEditor.tsx`
+- Receber prop `dateRange: { startDate?: Date; endDate?: Date }`
+- Passar `startDate` e `endDate` aos wrappers `ProductivityCardWrapper` e `ProductivityRankingCardWrapper`
+- Os wrappers repassam para `useProductivityStats` e `useProductivityRanking` (ambos já aceitam `startDate` e `endDate`)
 
-### 3. Consumidores (`EverythingView.tsx`, `ListDetailView.tsx`, `MyTasksCard.tsx`)
-- Atualizar o `FilterState` inicial para incluir `showTransferred: false`
-- Passar o filtro para o hook de dados, onde o filtro será aplicado
+### 3. `src/hooks/useProductivityStats.ts`
+- Verificar se já filtra por `startDate`/`endDate` na query — se não, adicionar `.gte('completed_at', startDate)` e `.lte('completed_at', endDate)`
+
+### 4. `src/hooks/useProductivityRanking.ts`
+- Mesmo ajuste: garantir que `startDate`/`endDate` filtram as tarefas consultadas
 
 ## Resultado
-- Checkbox "Mostrar tarefas transferidas" aparece no popover de filtros
-- Ao ativar, tarefas que passaram pelo usuário mas foram transferidas aparecem na listagem
+- Período de análise visível e acessível no header do dashboard
+- Todos os cards de produtividade e ranking filtram por esse período
 - 4 arquivos editados
 
