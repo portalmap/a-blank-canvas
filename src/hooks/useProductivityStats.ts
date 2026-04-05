@@ -27,19 +27,20 @@ interface UseProductivityStatsOptions {
   userIds?: string[];
   startDate?: Date;
   endDate?: Date;
+  includeTransferred?: boolean;
 }
 
 export const useProductivityStats = (options: UseProductivityStatsOptions = {}) => {
   const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
   const { data: settings } = useProductivitySettings();
-  const { scope = 'workspace', spaceId, userId, userIds, startDate, endDate } = options;
+  const { scope = 'workspace', spaceId, userId, userIds, startDate, endDate, includeTransferred = false } = options;
 
   const earlyThreshold = settings?.early_threshold_percent ?? 50;
   const onTimeThreshold = settings?.on_time_threshold_percent ?? 100;
 
   return useQuery({
-    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, userIds, userId, user?.id, startDate?.toISOString(), endDate?.toISOString(), earlyThreshold, onTimeThreshold],
+    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, userIds, userId, user?.id, startDate?.toISOString(), endDate?.toISOString(), earlyThreshold, onTimeThreshold, includeTransferred],
     queryFn: async (): Promise<ProductivityStats> => {
       if (!activeWorkspace?.id) {
         return {
@@ -59,6 +60,7 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
         p_user_ids: userIds || null,
         p_early_threshold: earlyThreshold,
         p_on_time_threshold: onTimeThreshold,
+        p_include_transferred: includeTransferred,
       });
 
       if (error) throw error;

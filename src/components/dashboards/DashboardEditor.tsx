@@ -255,6 +255,7 @@ const ProductivityCardWrapper = ({
   dateRange?: DateRangeProps;
 }) => {
   const { activeWorkspace } = useWorkspace();
+  const [includeTransferred, setIncludeTransferred] = useState(false);
   
   // Suporta tanto userIds quanto userId (para compatibilidade)
   const effectiveUserIds = card.config.userIds || (card.config.userId ? [card.config.userId] : undefined);
@@ -265,6 +266,7 @@ const ProductivityCardWrapper = ({
     userIds: effectiveUserIds,
     startDate: dateRange?.startDate,
     endDate: dateRange?.endDate,
+    includeTransferred,
   });
   
   const { data: spaces = [] } = useSpaces(activeWorkspace?.id);
@@ -311,6 +313,8 @@ const ProductivityCardWrapper = ({
       stats={productivityStats || null}
       isLoading={isLoading}
       scopeInfo={scopeInfo}
+      includeTransferred={includeTransferred}
+      onToggleTransferred={setIncludeTransferred}
     />
   );
 };
