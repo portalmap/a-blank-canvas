@@ -140,9 +140,40 @@ export function ProductivitySettings() {
 
           <Separator />
 
+          {/* Fórmula de Produtividade */}
+          <div className="p-4 rounded-lg border bg-muted/50 space-y-3">
+            <p className="text-sm font-medium">📐 Fórmula de Produtividade (0% a 200%)</p>
+            <p className="text-sm text-muted-foreground">
+              <strong>Produtividade = 200% - % do prazo utilizado</strong>
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="p-2 rounded bg-green-500/10 text-center">
+                <p className="font-medium text-green-600">0% entrega</p>
+                <p className="text-muted-foreground">200% produtividade</p>
+              </div>
+              <div className="p-2 rounded bg-green-500/10 text-center">
+                <p className="font-medium text-green-600">50% entrega</p>
+                <p className="text-muted-foreground">150% produtividade</p>
+              </div>
+              <div className="p-2 rounded bg-blue-500/10 text-center">
+                <p className="font-medium text-blue-600">100% entrega</p>
+                <p className="text-muted-foreground">100% produtividade</p>
+              </div>
+              <div className="p-2 rounded bg-red-500/10 text-center">
+                <p className="font-medium text-red-600">200%+ entrega</p>
+                <p className="text-muted-foreground">0% produtividade</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O score geral é a <strong>média</strong> dos scores individuais de cada tarefa concluída.
+            </p>
+          </div>
+
+          <Separator />
+
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              <strong>Como funciona:</strong> O sistema calcula o prazo total (data de início até data de entrega) e verifica em que porcentagem desse prazo a tarefa foi concluída ou transferida.
+              <strong>Classificação visual:</strong> As cores (verde, azul, vermelha) são definidas pelos limites abaixo. O score de produtividade é calculado automaticamente pela fórmula acima.
             </div>
 
             <div className="grid grid-cols-2 gap-4">

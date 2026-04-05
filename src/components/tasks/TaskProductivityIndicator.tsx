@@ -20,7 +20,7 @@ export const TaskProductivityIndicator = ({ task, size = 'sm' }: TaskProductivit
 
   if (!result) return null;
 
-  const { classification, percentage } = result;
+  const { classification, percentage, productivityScore } = result;
   const label = getClassificationLabel(classification);
   const colors = getClassificationColor(classification);
   const sizeClass = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
@@ -34,6 +34,7 @@ export const TaskProductivityIndicator = ({ task, size = 'sm' }: TaskProductivit
         <TooltipContent>
           <p className="font-medium">{label}</p>
           <p className="text-xs text-muted-foreground">{Math.round(percentage)}% do prazo utilizado</p>
+          <p className="text-xs font-medium">{Math.round(productivityScore)}% de produtividade</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
