@@ -1421,7 +1421,12 @@ export const executeTagAutomations = async (
 
         // Check trigger_config.tag_ids filter
         const triggerConfig = actionConfig?.trigger_config;
-        if (triggerConfig?.tag_ids && Array.isArray(triggerConfig.tag_ids) && triggerConfig.tag_ids.length > 0) {
+        const conditions = actionConfig?.conditions as AutomationCondition[] | undefined;
+        const hasTagConditions = conditions?.some(c => c.field === 'tag');
+
+        // Se tem condições de tag, delegar a filtragem às condições (suporta OR)
+        // Se não tem condições de tag, usar tag_ids do trigger como filtro
+        if (!hasTagConditions && triggerConfig?.tag_ids && Array.isArray(triggerConfig.tag_ids) && triggerConfig.tag_ids.length > 0) {
           if (!triggerConfig.tag_ids.includes(tagId)) {
             continue; // This automation is for different tags
           }
