@@ -18,11 +18,17 @@ import { useSpaces } from '@/hooks/useSpaces';
 import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
+interface DateRangeProps {
+  startDate?: Date;
+  endDate?: Date;
+}
+
 interface DashboardEditorProps {
   cards: DashboardCard[];
   stats: any;
   onUpdateCard: (cardId: string, updates: Partial<DashboardCard>) => void;
   onDeleteCard: (cardId: string) => void;
+  dateRange?: DateRangeProps;
 }
 
 const DashboardEditorComponent = ({
@@ -30,6 +36,7 @@ const DashboardEditorComponent = ({
   stats,
   onUpdateCard,
   onDeleteCard,
+  dateRange,
 }: DashboardEditorProps) => {
   const [resizingCardId, setResizingCardId] = useState<string | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
@@ -195,6 +202,7 @@ const DashboardEditorComponent = ({
             key={card.id}
             card={card}
             commonProps={commonProps}
+            dateRange={dateRange}
           />
         );
       case 'productivity_ranking':
@@ -203,6 +211,7 @@ const DashboardEditorComponent = ({
             key={card.id}
             card={card}
             commonProps={commonProps}
+            dateRange={dateRange}
           />
         );
       default:
@@ -238,10 +247,12 @@ const DashboardEditorComponent = ({
 // Wrapper component for ProductivityCard to use hooks
 const ProductivityCardWrapper = ({ 
   card, 
-  commonProps 
+  commonProps,
+  dateRange,
 }: { 
   card: DashboardCard; 
-  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean } 
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean };
+  dateRange?: DateRangeProps;
 }) => {
   const { activeWorkspace } = useWorkspace();
   
@@ -252,6 +263,8 @@ const ProductivityCardWrapper = ({
     scope: card.config.scope || 'workspace',
     spaceId: card.config.spaceId,
     userIds: effectiveUserIds,
+    startDate: dateRange?.startDate,
+    endDate: dateRange?.endDate,
   });
   
   const { data: spaces = [] } = useSpaces(activeWorkspace?.id);
@@ -305,13 +318,19 @@ const ProductivityCardWrapper = ({
 // Wrapper component for ProductivityRankingCard to use hooks
 const ProductivityRankingCardWrapper = ({ 
   card: _card, 
-  commonProps 
+  commonProps,
+  dateRange,
 }: { 
   card: DashboardCard; 
-  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean } 
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean };
+  dateRange?: DateRangeProps;
 }) => {
   const [includeTransferred, setIncludeTransferred] = useState(false);
-  const { data: rankingData, isLoading } = useProductivityRanking({ includeTransferred });
+  const { data: rankingData, isLoading } = useProductivityRanking({ 
+    includeTransferred,
+    startDate: dateRange?.startDate,
+    endDate: dateRange?.endDate,
+  });
 
   return (
     <ProductivityRankingCard

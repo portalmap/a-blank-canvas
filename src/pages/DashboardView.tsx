@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Settings, Share2, RefreshCw, Filter, Pencil, Check, X } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, Share2, RefreshCw, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDashboard, useUpdateDashboard, useDashboardStats, DashboardCard } from '@/hooks/useDashboards';
 import { DashboardEditor } from '@/components/dashboards/DashboardEditor';
 import { AddCardModal } from '@/components/dashboards/AddCardModal';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DateRangeFilter } from '@/components/filters/DateRangeFilter';
 
 const DashboardView = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,11 @@ const DashboardView = () => {
   const [editedName, setEditedName] = useState('');
   const [addCardModalOpen, setAddCardModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dateRange, setDateRange] = useState<{ startDate: Date | undefined; endDate: Date | undefined }>({ startDate: undefined, endDate: undefined });
+
+  const handleDateRangeChange = useCallback((range: { startDate: Date | undefined; endDate: Date | undefined }) => {
+    setDateRange(range);
+  }, []);
 
   const handleBack = () => {
     navigate('/dashboards');
@@ -158,6 +164,7 @@ const DashboardView = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <DateRangeFilter onDateRangeChange={handleDateRangeChange} defaultPeriod="all" />
             <Button
               variant="outline"
               size="sm"
@@ -166,10 +173,6 @@ const DashboardView = () => {
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
               Atualizar
-            </Button>
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
             </Button>
             <Button variant="outline" size="sm">
               <Share2 className="h-4 w-4 mr-2" />
@@ -194,6 +197,7 @@ const DashboardView = () => {
           stats={stats}
           onUpdateCard={handleUpdateCard}
           onDeleteCard={handleDeleteCard}
+          dateRange={dateRange}
         />
       </div>
 
