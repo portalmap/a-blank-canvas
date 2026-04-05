@@ -54,6 +54,7 @@ export default function EverythingView() {
     priorities: [],
     tags: [],
     showCompleted: false,
+    showTransferred: false,
     viewMode: 'assigned',
   });
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
