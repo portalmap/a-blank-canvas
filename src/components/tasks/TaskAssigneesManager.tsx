@@ -8,6 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTaskAssignees, useAddTaskAssignee, useRemoveTaskAssignee } from '@/hooks/useTaskAssignees';
 import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { supabase } from '@/integrations/supabase/client';
+import { calculateClassification, getClassificationLabel } from '@/hooks/useProductivityClassification';
 
 interface TaskAssigneesManagerProps {
   taskId: string;
@@ -57,6 +59,69 @@ export const TaskAssigneesManager = ({ taskId, workspaceId }: TaskAssigneesManag
         fieldName: 'assignee',
         oldValue: assignee.user?.full_name || 'Usuário',
       });
+
+      // Classify productivity for the transferred assignee
+      try {
+        const { data: task } = await supabase
+          .from('tasks')
+          .select('start_date, due_date')
+          .eq('id', taskId)
+          .single();
+
+        if (task?.start_date && task?.due_date) {
+          const { data: settings } = await supabase
+            .from('productivity_settings')
+            .select('early_threshold_percent, on_time_threshold_percent')
+            .eq('workspace_id', workspaceId)
+            .maybeSingle();
+
+          const earlyThreshold = settings?.early_threshold_percent ?? 50;
+          const onTimeThreshold = settings?.on_time_threshold_percent ?? 100;
+          const now = new Date();
+
+          const result = calculateClassification(
+            task.start_date,
+            task.due_date,
+            now,
+            earlyThreshold,
+            onTimeThreshold
+          );
+
+          // Record productivity classification activity
+          await createActivity.mutateAsync({
+            taskId,
+            activityType: 'productivity.classified',
+            fieldName: 'productivity',
+            newValue: result.classification,
+            metadata: {
+              classification: result.classification,
+              percentage: Math.round(result.percentage * 100) / 100,
+              productivityScore: Math.round(result.productivityScore * 100) / 100,
+              isTransferred: true,
+              userName: assignee.user?.full_name || 'Usuário',
+            },
+          });
+
+          // Update task_assignee_history classification
+          const { data: historyRecord } = await supabase
+            .from('task_assignee_history')
+            .select('id')
+            .eq('task_id', taskId)
+            .eq('user_id', assignee.user_id)
+            .order('assigned_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (historyRecord) {
+            await supabase
+              .from('task_assignee_history')
+              .update({ classification: result.classification })
+              .eq('id', historyRecord.id);
+          }
+        }
+      } catch (prodError) {
+        console.error('Erro ao classificar produtividade na transferência:', prodError);
+      }
     } catch (error) {
       console.error('Erro ao remover responsável:', error);
     }
