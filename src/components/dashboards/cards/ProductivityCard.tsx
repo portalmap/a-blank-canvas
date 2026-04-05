@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { MoreVertical, TrendingUp, Star, Zap, Move, Maximize2, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -27,6 +28,8 @@ interface ProductivityCardProps {
   onExpand?: () => void;
   isLoading?: boolean;
   scopeInfo?: ProductivityScopeInfo;
+  includeTransferred?: boolean;
+  onToggleTransferred?: (value: boolean) => void;
 }
 
 const getScoreColor = (score: number): string => {
@@ -60,6 +63,8 @@ const ProductivityCardComponent = ({
   onExpand,
   isLoading = false,
   scopeInfo,
+  includeTransferred,
+  onToggleTransferred,
 }: ProductivityCardProps) => {
   const score = stats?.productivityScore ?? 100;
   const progressPercentage = Math.min((score / 200) * 100, 100);
@@ -188,10 +193,22 @@ const ProductivityCardComponent = ({
               </div>
             </div>
 
+            {/* Toggle transferidas */}
+            {onToggleTransferred && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <span className="text-xs text-muted-foreground">Incluir transferidas</span>
+                <Switch
+                  checked={includeTransferred ?? false}
+                  onCheckedChange={onToggleTransferred}
+                  className="scale-75"
+                />
+              </div>
+            )}
+
             {/* Total */}
-            <div className="pt-2 border-t">
+            <div className={onToggleTransferred ? '' : 'pt-2 border-t'}>
               <p className="text-xs text-muted-foreground text-center">
-                📊 Total: {stats?.totalCompleted ?? 0} tarefas concluídas
+                📊 Total: {stats?.totalCompleted ?? 0} tarefas {includeTransferred ? 'concluídas + transferidas' : 'concluídas'}
               </p>
             </div>
           </div>
