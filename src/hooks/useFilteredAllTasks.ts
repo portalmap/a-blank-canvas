@@ -12,12 +12,13 @@ export type TaskWithAssignees = AllTask & {
 
 export function useFilteredAllTasks(
   workspaceId: string | undefined,
-  viewMode: ViewMode = 'assigned'
+  viewMode: ViewMode = 'assigned',
+  showTransferred: boolean = false
 ) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['filtered-all-tasks', workspaceId, user?.id, viewMode],
+    queryKey: ['filtered-all-tasks', workspaceId, user?.id, viewMode, showTransferred],
     queryFn: async () => {
       if (!workspaceId || !user) return [];
 
