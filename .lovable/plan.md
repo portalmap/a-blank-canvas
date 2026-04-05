@@ -1,36 +1,28 @@
 
 
-# Adicionar Mirian e Amanda como seguidoras em todos os 33 Spaces
+# Mostrar seguidores reais no diálogo "Seguir Automaticamente"
 
-## Dados confirmados
+## Problema
 
-- **mirianvilivas@assessoriamap.com.br** → `5e7a3657-7b0c-4312-ac0d-a129932ba69a`
-- **amandatavares@assessoriamap.com.br** → `8326d4b4-c1ed-4a05-bb4e-f3469e290ca2`
-- **33 Spaces** encontrados (todos com prefixo "MAP |")
-- **0 registros existentes** — nenhuma das duas é seguidora de nenhum Space ainda
+O diálogo "Seguir Automaticamente" mostra apenas seguidores criados via automação (buscando na tabela `automations`). Mirian e Amanda foram adicionadas diretamente na tabela `space_followers`, por isso não aparecem na seção "Seguidores atuais".
 
-## O que será feito
+## Solução
 
-Executar um script SQL que insere 66 registros na tabela `space_followers` (33 Spaces × 2 usuárias), usando `ON CONFLICT DO NOTHING` para segurança.
+Alterar o `QuickAutomationButtons` para, quando o `actionType` for `auto_add_follower`, buscar e exibir também os seguidores reais da entidade (Space/Folder/List), além dos que vieram de automações.
 
-Os triggers de propagação do banco já cuidarão de cascatear as seguidoras para Pastas, Listas e Tarefas dentro de cada Space automaticamente.
+## Alterações
 
-## SQL a executar
+### `src/components/automations/QuickAutomationButtons.tsx`
 
-```sql
-INSERT INTO space_followers (space_id, user_id)
-SELECT s.id, u.id
-FROM spaces s
-CROSS JOIN (
-  VALUES 
-    ('5e7a3657-7b0c-4312-ac0d-a129932ba69a'::uuid),
-    ('8326d4b4-c1ed-4a05-bb4e-f3469e290ca2'::uuid)
-) AS u(id)
-ON CONFLICT DO NOTHING;
-```
+1. Importar os hooks de seguidores existentes (`useSpaceFollowers`, `useFolderFollowers`, `useListFollowers`)
+2. Buscar seguidores reais com base no `scopeType` quando o diálogo abre com `auto_add_follower`
+3. Na seção "Seguidores atuais", exibir 2 grupos:
+   - **Seguidores diretos** (da tabela `space_followers`/`folder_followers`/`list_followers`) — com botão de remover que usa os hooks `useRemoveSpaceFollower` etc.
+   - **Seguidores via automação** (já existente) — com botão de remover automação
+4. Permitir adicionar novos seguidores diretos (não apenas via automação) usando os hooks `useAddSpaceFollower` etc.
 
-## Resultado esperado
-- 66 registros em `space_followers`
-- Propagação automática via triggers para todas as pastas, listas e tarefas existentes
-- Nenhum arquivo de código alterado
+Resultado: o diálogo mostra todos os seguidores independente de como foram adicionados, e permite gerenciá-los de forma unificada.
+
+## Arquivos
+- 1 arquivo editado: `src/components/automations/QuickAutomationButtons.tsx`
 
