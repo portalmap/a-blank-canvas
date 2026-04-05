@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -8,10 +8,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useSpaceTemplates, useDuplicateSpaceTemplate } from '@/hooks/useSpaceTemplates';
 import { useTemplateAutomations } from '@/hooks/useTemplateAutomations';
 import { ApplyTemplateAutomationsDialog } from './ApplyTemplateAutomationsDialog';
-import { Loader2, MoreHorizontal, Pencil, Zap, Send, Copy } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Loader2, MoreHorizontal, Pencil, Zap, Send, Copy, Type } from 'lucide-react';
 
 interface AutomationTemplateListProps {
   onEdit: (templateId: string) => void;
@@ -22,11 +33,13 @@ const TemplateRow = ({
   onEdit,
   onApply,
   onDuplicate,
+  onRename,
 }: {
   template: { id: string; name: string; color: string | null };
   onEdit: (id: string) => void;
   onApply: (id: string) => void;
   onDuplicate: (id: string) => void;
+  onRename: (id: string, name: string) => void;
 }) => {
   const { data: automations = [] } = useTemplateAutomations(template.id);
   const enabledCount = automations.filter(a => a.enabled).length;
@@ -64,6 +77,10 @@ const TemplateRow = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onRename(template.id, template.name)}>
+              <Type className="h-4 w-4 mr-2" />
+              Renomear
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(template.id)}>
               <Pencil className="h-4 w-4 mr-2" />
               Editar Automações
@@ -87,10 +104,33 @@ const TemplateRow = ({
 export const AutomationTemplateList = ({ onEdit }: AutomationTemplateListProps) => {
   const { data: templates, isLoading } = useSpaceTemplates();
   const [applyTemplateId, setApplyTemplateId] = useState<string | null>(null);
+  const [renamingTemplate, setRenamingTemplate] = useState<{ id: string; name: string } | null>(null);
+  const [newName, setNewName] = useState('');
   const duplicateTemplate = useDuplicateSpaceTemplate();
+  const queryClient = useQueryClient();
 
   const handleDuplicate = (templateId: string) => {
     duplicateTemplate.mutate(templateId);
+  };
+
+  const handleRename = (id: string, name: string) => {
+    setRenamingTemplate({ id, name });
+    setNewName(name);
+  };
+
+  const handleSaveRename = async () => {
+    if (!renamingTemplate || !newName.trim()) return;
+    const { error } = await supabase
+      .from('space_templates')
+      .update({ name: newName.trim() })
+      .eq('id', renamingTemplate.id);
+    if (error) {
+      toast.error('Erro ao renomear template');
+    } else {
+      toast.success('Template renomeado');
+      queryClient.invalidateQueries({ queryKey: ['space-templates'] });
+    }
+    setRenamingTemplate(null);
   };
 
   if (isLoading) {
@@ -125,6 +165,7 @@ export const AutomationTemplateList = ({ onEdit }: AutomationTemplateListProps) 
             onEdit={onEdit}
             onApply={setApplyTemplateId}
             onDuplicate={handleDuplicate}
+            onRename={handleRename}
           />
         ))}
       </div>
@@ -138,6 +179,24 @@ export const AutomationTemplateList = ({ onEdit }: AutomationTemplateListProps) 
           templateId={applyTemplateId}
         />
       )}
+
+      <Dialog open={!!renamingTemplate} onOpenChange={(open) => { if (!open) setRenamingTemplate(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Template</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Nome do template"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRename(); }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenamingTemplate(null)}>Cancelar</Button>
+            <Button onClick={handleSaveRename} disabled={!newName.trim()}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
