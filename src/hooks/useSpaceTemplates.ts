@@ -1161,6 +1161,10 @@ export const useApplyTemplateAutomationsToSpaces = () => {
             .in('scope_type', ['space', 'workspace']);
           const fallbackStatusList = fallbackStatuses || [];
 
+          // Create ID maps
+          const folderIdMap = createFolderMap(templateFolders, realFolders);
+          const listIdMap = createListMap(templateLists, realLists);
+
           // Build statusIdMap PER LIST: for each template list, map its status template items
           // to the real statuses of the corresponding real list
           const statusIdMap: Record<string, string> = {};
@@ -1194,8 +1198,6 @@ export const useApplyTemplateAutomationsToSpaces = () => {
               }
             }
           }
-
-          // Create ID maps (already built listIdMap above for status mapping)
 
           // 3. Create automations for this space
           for (const automation of templateAutomations) {
