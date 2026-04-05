@@ -1,55 +1,35 @@
 
-# Templates de Pastas e Listas em Configurações
 
-## Resumo
+# Remover componente manual de Seguidores das páginas de Space, Pasta e Lista
 
-Expandir a aba "Templates" para suportar 3 tipos: **Space** (existente), **Pasta** e **Lista**, reutilizando as mesmas tabelas com um novo campo `type`.
+## Problema
 
-## Abordagem
+O componente "Seguidores do Space/Pasta/Lista" (que permite adicionar seguidores manualmente) está duplicando funcionalidade com o botão "Seguir Automaticamente", que já suporta múltiplos usuários. Isso gera confusão visual.
 
-Reutilizar as tabelas existentes (`space_templates`, `space_template_folders`, `space_template_lists`, `space_template_tasks`) adicionando coluna `type` ao `space_templates`.
+## O que será feito
 
-- **Template de Space**: Space com pastas, listas e tarefas (já existe)
-- **Template de Pasta**: 1 pasta raiz + suas listas e tarefas
-- **Template de Lista**: 1 lista raiz + suas tarefas
+Remover o `EntityFollowersManager` das 3 páginas de nível superior (Space, Pasta, Lista), mantendo apenas o `QuickAutomationButtons` que já cumpre a função. O componente **permanece nas Tarefas**, onde faz sentido gerenciar seguidores individuais manualmente.
 
 ## Alterações
 
-### 1. Migração SQL
-```sql
-ALTER TABLE space_templates ADD COLUMN type text NOT NULL DEFAULT 'space';
--- Valores: 'space', 'folder', 'list'
-```
+### 1. `src/pages/SpaceDetailView.tsx`
+- Remover import de `EntityFollowersManager`
+- Remover o bloco `<EntityFollowersManager>` (linhas 129-133)
 
-### 2. `src/components/settings/SpaceTemplateSettings.tsx`
-- Adicionar sub-tabs: "Spaces", "Pastas", "Listas"
-- Cada sub-tab filtra templates por `type` e abre o editor correto
+### 2. `src/pages/FolderDetailView.tsx`
+- Remover import de `EntityFollowersManager`
+- Remover o bloco `<EntityFollowersManager>` (linhas 108-112)
 
-### 3. `src/components/settings/SpaceTemplateList.tsx`
-- Receber prop `type` para filtrar e exibir contagens relevantes (ex: template de lista mostra apenas tarefas, não pastas)
+### 3. `src/pages/ListDetailView.tsx`
+- Remover import de `EntityFollowersManager`
+- Remover o bloco `<EntityFollowersManager>` (linhas 298-302)
 
-### 4. Criar `src/components/settings/FolderTemplateEditor.tsx`
-- Nome, descrição da pasta
-- Listas dentro (com status template)
-- Tarefas dentro de cada lista
-- Sem cor de space ou múltiplas pastas
+### Não alterados
+- `TaskFollowersManager` e `TaskDetailDrawer` — seguidores manuais continuam disponíveis no nível de tarefa
+- `EntityFollowersManager` — componente mantido no projeto (usado pela tarefa)
+- `QuickAutomationButtons` — permanece em todas as páginas
 
-### 5. Criar `src/components/settings/ListTemplateEditor.tsx`
-- Nome, descrição, view padrão, status template da lista
-- Tarefas dentro da lista
+## Resultado
+- 3 arquivos editados
+- Interface mais limpa sem duplicidade de funcionalidade
 
-### 6. `src/hooks/useSpaceTemplates.ts`
-- Filtrar queries por `type`
-- Criar `useApplyFolderTemplate` (aplica pasta + listas + tarefas em Space existente)
-- Criar `useApplyListTemplate` (aplica lista + tarefas em pasta ou Space)
-- Mutations de criação/edição parametrizadas por tipo
-
-### 7. Integrar nos dialogs de criação
-- Ao criar pasta → opção de usar template de pasta
-- Ao criar lista → opção de usar template de lista
-
-## Arquivos
-- **Migração**: 1 SQL
-- **Editados**: `SpaceTemplateSettings.tsx`, `SpaceTemplateList.tsx`, `useSpaceTemplates.ts`
-- **Criados**: `FolderTemplateEditor.tsx`, `ListTemplateEditor.tsx`
-- **Editados depois**: Dialogs de criação de pasta/lista
