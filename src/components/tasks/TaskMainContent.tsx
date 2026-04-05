@@ -10,6 +10,9 @@ import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
+import { TaskProductivityIndicator } from './TaskProductivityIndicator';
+import { calculateClassification, getClassificationLabel } from '@/hooks/useProductivityClassification';
+import { useProductivitySettings } from '@/hooks/useProductivitySettings';
 import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
@@ -58,6 +61,7 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
   const updateTask = useUpdateTask();
   const createActivity = useCreateTaskActivity();
   const { data: statuses } = useStatusesForScope('list', task.list_id, task.workspace_id);
+  const { data: productivitySettings } = useProductivitySettings();
 
   // Sincroniza descrição quando a tarefa muda
   useEffect(() => {
@@ -130,6 +134,42 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         oldValue: oldStatusName,
         newValue: newStatusName,
       });
+
+      // Classificação de produtividade quando concluído
+      const isDone = newStatus?.name?.toLowerCase() === 'done' || newStatus?.name?.toLowerCase() === 'concluído' || newStatus?.name?.toLowerCase() === 'concluída';
+      if (isDone && task.start_date && task.due_date) {
+        const earlyT = productivitySettings?.early_threshold_percent ?? 50;
+        const onTimeT = productivitySettings?.on_time_threshold_percent ?? 100;
+        const now = new Date();
+        const result = calculateClassification(task.start_date, task.due_date, now, earlyT, onTimeT);
+
+        await createActivity.mutateAsync({
+          taskId,
+          activityType: 'productivity.classified',
+          fieldName: 'classification',
+          oldValue: null,
+          newValue: result.classification,
+          metadata: {
+            classification: result.classification,
+            percentage: Math.round(result.percentage),
+            label: getClassificationLabel(result.classification),
+          },
+        });
+
+        // Atualizar task_assignee_history
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase
+              .from('task_assignee_history')
+              .update({ classification: result.classification, ended_at: now.toISOString() })
+              .eq('task_id', taskId)
+              .is('ended_at', null);
+          }
+        } catch (e) {
+          console.error('Erro ao atualizar histórico de produtividade:', e);
+        }
+      }
 
       // Executar automações de mudança de status
       if (task.status_id !== statusId) {
