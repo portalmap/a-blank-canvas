@@ -1,73 +1,55 @@
+
 # Templates de Pastas e Listas em Configurações
 
 ## Resumo
 
-Expandir a aba "Templates" em Configurações para suportar 3 tipos de templates: **Space** (existente), **Pasta** e **Lista**. Cada tipo permite criar modelos reutilizáveis com sua estrutura interna.
+Expandir a aba "Templates" para suportar 3 tipos: **Space** (existente), **Pasta** e **Lista**, reutilizando as mesmas tabelas com um novo campo `type`.
 
-## Estrutura dos tipos
+## Abordagem
 
-- **Template de Space**: Space completo com pastas, listas e tarefas (já existe)
-- **Template de Pasta**: Uma pasta com listas e tarefas dentro
-- **Template de Lista**: Uma lista com tarefas dentro
+Reutilizar as tabelas existentes (`space_templates`, `space_template_folders`, `space_template_lists`, `space_template_tasks`) adicionando coluna `type` ao `space_templates`.
 
-## Abordagem técnica
+- **Template de Space**: Space com pastas, listas e tarefas (já existe)
+- **Template de Pasta**: 1 pasta raiz + suas listas e tarefas
+- **Template de Lista**: 1 lista raiz + suas tarefas
 
-Reutilizar as mesmas tabelas existentes (`space_templates`, `space_template_folders`, `space_template_lists`, `space_template_tasks`) adicionando um campo `type` ao `space_templates` para distinguir os 3 tipos.
+## Alterações
 
-### 1. Migração de banco de dados
-
-Adicionar coluna `type` à tabela `space_templates`:
-
+### 1. Migração SQL
 ```sql
-ALTER TABLE space_templates 
-  ADD COLUMN type text NOT NULL DEFAULT 'space';
+ALTER TABLE space_templates ADD COLUMN type text NOT NULL DEFAULT 'space';
 -- Valores: 'space', 'folder', 'list'
 ```
 
-Para templates do tipo **folder**: cria-se 1 registro em `space_template_folders` (a pasta raiz) + suas listas e tarefas.  
-Para templates do tipo **list**: cria-se 1 registro em `space_template_lists` (a lista raiz) + suas tarefas (sem pastas).
+### 2. `src/components/settings/SpaceTemplateSettings.tsx`
+- Adicionar sub-tabs: "Spaces", "Pastas", "Listas"
+- Cada sub-tab filtra templates por `type` e abre o editor correto
 
-### 2. Reorganizar a UI da aba Templates
+### 3. `src/components/settings/SpaceTemplateList.tsx`
+- Receber prop `type` para filtrar e exibir contagens relevantes (ex: template de lista mostra apenas tarefas, não pastas)
 
-**`src/components/settings/SpaceTemplateSettings.tsx`**  
-- Adicionar sub-tabs ou seções separadas: "Spaces", "Pastas", "Listas"
-- Cada seção mostra apenas os templates do respectivo tipo
-- Botão "Criar Template" abre seletor de tipo ou cada seção tem seu próprio botão
+### 4. Criar `src/components/settings/FolderTemplateEditor.tsx`
+- Nome, descrição da pasta
+- Listas dentro (com status template)
+- Tarefas dentro de cada lista
+- Sem cor de space ou múltiplas pastas
 
-### 3. Criar editor para template de Pasta
+### 5. Criar `src/components/settings/ListTemplateEditor.tsx`
+- Nome, descrição, view padrão, status template da lista
+- Tarefas dentro da lista
 
-**`src/components/settings/FolderTemplateEditor.tsx`**  
-- Similar ao SpaceTemplateEditor mas simplificado:
-  - Nome da pasta, descrição
-  - Listas dentro da pasta (com status template)
-  - Tarefas dentro de cada lista
-  - Sem a parte de "cor do space" ou múltiplas pastas
+### 6. `src/hooks/useSpaceTemplates.ts`
+- Filtrar queries por `type`
+- Criar `useApplyFolderTemplate` (aplica pasta + listas + tarefas em Space existente)
+- Criar `useApplyListTemplate` (aplica lista + tarefas em pasta ou Space)
+- Mutations de criação/edição parametrizadas por tipo
 
-### 4. Criar editor para template de Lista
-
-**`src/components/settings/ListTemplateEditor.tsx`**  
-- Ainda mais simples:
-  - Nome da lista, descrição, view padrão, status template
-  - Tarefas dentro da lista
-  - Sem pastas
-
-### 5. Atualizar hooks
-
-**`src/hooks/useSpaceTemplates.ts`**  
-- Adicionar filtro por `type` nos queries existentes
-- Criar hooks `useFolderTemplates`, `useListTemplates` (ou parametrizar o existente)
-- Criar mutations `useCreateFolderTemplate`, `useCreateListTemplate`
-- Criar funções de aplicação: `useApplyFolderTemplate` (cria pasta + listas + tarefas em um Space existente) e `useApplyListTemplate` (cria lista + tarefas em uma pasta ou space existente)
-
-### 6. Integrar aplicação de templates
-
-Quando o usuário cria uma nova pasta ou lista manualmente, oferecer opção de usar template (similar ao que já existe no `CreateSpaceDialog`):
-- Ao criar pasta em um Space → opção de usar template de pasta
-- Ao criar lista em uma pasta/space → opção de usar template de lista
+### 7. Integrar nos dialogs de criação
+- Ao criar pasta → opção de usar template de pasta
+- Ao criar lista → opção de usar template de lista
 
 ## Arquivos
-
-- **Migração**: 1 SQL (adicionar coluna `type`)
+- **Migração**: 1 SQL
 - **Editados**: `SpaceTemplateSettings.tsx`, `SpaceTemplateList.tsx`, `useSpaceTemplates.ts`
 - **Criados**: `FolderTemplateEditor.tsx`, `ListTemplateEditor.tsx`
-- **Editados depois**: Dialogs de criação de pasta/lista para oferecer opção de template
+- **Editados depois**: Dialogs de criação de pasta/lista
