@@ -1433,7 +1433,6 @@ export const executeTagAutomations = async (
         }
 
         // Evaluate conditions
-        const conditions = actionConfig?.conditions as AutomationCondition[] | undefined;
         if (conditions && conditions.length > 0) {
           if (!taskData) {
             taskData = await fetchTaskData(taskId);
