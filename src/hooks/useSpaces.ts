@@ -12,6 +12,7 @@ export const useSpaces = (workspaceId?: string) => {
         .from('spaces')
         .select('*')
         .eq('workspace_id', workspaceId)
+        .is('archived_at', null)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -132,6 +133,7 @@ export const useDeleteSpace = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spaces'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-spaces'] });
       toast.success('Space excluído com sucesso!');
     },
     onError: (error: any) => {
@@ -144,6 +146,64 @@ export const useDeleteSpace = () => {
       } else {
         toast.error('Erro ao excluir space');
       }
+    },
+  });
+};
+
+export const useArchivedSpaces = (workspaceId?: string) => {
+  return useQuery({
+    queryKey: ['archived-spaces', workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return [];
+      
+      const { data, error } = await supabase
+        .from('spaces')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!workspaceId,
+  });
+};
+
+export const useArchiveSpace = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (spaceId: string) => {
+      const { error } = await supabase.rpc('archive_space', { p_space_id: spaceId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spaces'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-spaces'] });
+      toast.success('Space arquivado com sucesso!');
+    },
+    onError: () => {
+      toast.error('Erro ao arquivar space');
+    },
+  });
+};
+
+export const useRestoreSpace = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (spaceId: string) => {
+      const { error } = await supabase.rpc('restore_space', { p_space_id: spaceId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spaces'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-spaces'] });
+      toast.success('Space restaurado com sucesso!');
+    },
+    onError: () => {
+      toast.error('Erro ao restaurar space');
     },
   });
 };

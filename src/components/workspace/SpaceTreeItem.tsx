@@ -3,7 +3,7 @@ import { ChevronRight, Circle, MoreHorizontal, Folder, List, Trash2, Pencil, Lin
 import { useNavigate } from "react-router-dom";
 import { useFolders, useCreateFolder } from "@/hooks/useFolders";
 import { useLists, useCreateList } from "@/hooks/useLists";
-import { useSpace, useDeleteSpace, useUpdateSpace } from "@/hooks/useSpaces";
+import { useSpace, useDeleteSpace, useUpdateSpace, useArchiveSpace } from "@/hooks/useSpaces";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
@@ -69,6 +69,7 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderDescription, setNewFolderDescription] = useState('');
   const [newListName, setNewListName] = useState('');
@@ -79,6 +80,7 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
   const createList = useCreateList();
   const deleteSpace = useDeleteSpace();
   const updateSpace = useUpdateSpace();
+  const archiveSpace = useArchiveSpace();
   
   // Filter lists that don't belong to any folder (direct lists)
   const directLists = allLists?.filter(list => !list.folder_id);
@@ -190,7 +192,7 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
                 <Copy className="mr-2 h-4 w-4" />
                 Duplicar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info('Função em desenvolvimento')}>
+              <DropdownMenuItem onClick={() => setIsArchiveDialogOpen(true)}>
                 <Archive className="mr-2 h-4 w-4" />
                 Arquivar
               </DropdownMenuItem>
@@ -346,6 +348,24 @@ export function SpaceTreeItem({ space, isCollapsed }: SpaceTreeItemProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog for archiving space */}
+      <AlertDialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Arquivar Space?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O space será arquivado e ficará oculto na sidebar. Você poderá restaurá-lo depois em "Spaces Arquivados".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => archiveSpace.mutate(space.id)}>
+              Arquivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog for deleting space */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

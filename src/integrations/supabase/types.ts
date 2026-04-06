@@ -1881,6 +1881,7 @@ export type Database = {
       }
       spaces: {
         Row: {
+          archived_at: string | null
           color: string | null
           created_at: string
           description: string | null
@@ -1892,6 +1893,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          archived_at?: string | null
           color?: string | null
           created_at?: string
           description?: string | null
@@ -1903,6 +1905,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          archived_at?: string | null
           color?: string | null
           created_at?: string
           description?: string | null
@@ -3046,6 +3049,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      archive_space: { Args: { p_space_id: string }; Returns: undefined }
       calc_delivery_pct: {
         Args: { p_due_date: string; p_reference: string; p_start_date: string }
         Returns: number
@@ -3185,6 +3189,7 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      restore_space: { Args: { p_space_id: string }; Returns: undefined }
       sync_template_statuses_for_list: {
         Args: {
           p_list_id: string
