@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink, FolderPlus } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink, FolderPlus, Archive } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useTheme } from 'next-themes';
 import mapLogoLight from '@/assets/map-logo-light.png';
@@ -318,6 +318,10 @@ export function AppSidebar() {
                         {isAdmin && (
                           <>
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => navigate('/archived-spaces')}>
+                              <Archive className="h-4 w-4 mr-2" />
+                              Spaces Arquivados
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => navigate('/workspaces')}>
                               <ExternalLink className="h-4 w-4 mr-2" />
                               Detalhes do Workspace

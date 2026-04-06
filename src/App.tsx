@@ -34,6 +34,7 @@ import NotFound from "./pages/NotFound";
 import AcceptInvite from "./pages/AcceptInvite";
 import TaskView from "./pages/TaskView";
 import EverythingView from "./pages/EverythingView";
+import ArchivedSpaces from "./pages/ArchivedSpaces";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
                           <Route path="/documents/:id" element={<GuestBlockedRoute><DocumentView /></GuestBlockedRoute>} />
                           <Route path="/dashboards" element={<GuestBlockedRoute><Dashboards /></GuestBlockedRoute>} />
                           <Route path="/dashboards/:id" element={<GuestBlockedRoute><DashboardView /></GuestBlockedRoute>} />
+                          <Route path="/archived-spaces" element={<AdminRoute><ArchivedSpaces /></AdminRoute>} />
                           <Route path="/automations" element={<AdminRoute><Automations /></AdminRoute>} />
                           <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                           <Route path="*" element={<NotFound />} />
