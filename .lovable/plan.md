@@ -1,42 +1,46 @@
 
+# Arquivar Spaces + Tela de Arquivados
 
-# Incluir transferências no card de produtividade + registro completo
+## Resumo
 
-## Problema
-
-1. O card de **Produtividade** não tem a chave "Incluir transferidas" (só o Ranking tem)
-2. A função SQL `get_productivity_stats` só conta tarefas pela `tasks.completed_at` — ignora registros de `task_assignee_history` (transferências). Quando um usuário é transferido, sua contribuição não entra nas métricas de produtividade
-3. A cada transferência, o sistema precisa registrar um "snapshot de conclusão parcial" com data/hora exata, para rastrear ciclos como A→B→A corretamente
+Adicionar coluna `archived_at` na tabela `spaces`, ativar o botão "Arquivar" no menu do Space, e criar uma tela de Spaces arquivados acessível pelo menu de 3 pontos do Workspace. Na tela de arquivados, admins podem restaurar ou excluir definitivamente.
 
 ## Alterações
 
-### 1. Migration SQL — Atualizar `get_productivity_stats`
-- Quando `p_include_transferred = true`, incluir também registros de `task_assignee_history` onde `unassigned_at IS NOT NULL` (transferências)
-- Para cada registro transferido, usar `assigned_at` como início e `unassigned_at` como referência de entrega, junto com `start_date` e `due_date` do snapshot no histórico
-- Adicionar parâmetro `p_include_transferred boolean DEFAULT false` na função
-- Unir os dois conjuntos (concluídas + transferidas) antes de calcular score/classificação
+### 1. Migration SQL
+- Adicionar coluna `archived_at timestamptz DEFAULT NULL` na tabela `spaces`
+- Criar função `archive_space(p_space_id uuid)` que seta `archived_at = now()`
+- Criar função `restore_space(p_space_id uuid)` que seta `archived_at = NULL`
 
-### 2. `src/hooks/useProductivityStats.ts`
-- Adicionar `includeTransferred?: boolean` nas options
-- Passar `p_include_transferred` na chamada RPC
+### 2. `src/hooks/useSpaces.ts`
+- Filtrar spaces com `archived_at IS NULL` no `useSpaces` (para não mostrar arquivados na sidebar/listagem)
+- Criar hook `useArchivedSpaces(workspaceId)` que busca spaces com `archived_at IS NOT NULL`
+- Criar mutation `useArchiveSpace` (update `archived_at = now()`)
+- Criar mutation `useRestoreSpace` (update `archived_at = null`)
 
-### 3. `src/components/dashboards/DashboardEditor.tsx` — `ProductivityCardWrapper`
-- Adicionar estado `includeTransferred` (como já existe no `ProductivityRankingCardWrapper`)
-- Passar para `useProductivityStats`
-- Passar toggle para o `ProductivityCard`
+### 3. `src/components/workspace/SpaceTreeItem.tsx`
+- Substituir o `toast.info('Função em desenvolvimento')` do botão "Arquivar" por chamada real ao `useArchiveSpace`
+- Adicionar confirmação antes de arquivar
 
-### 4. `src/components/dashboards/cards/ProductivityCard.tsx`
-- Adicionar props `includeTransferred` e `onToggleTransferred`
-- Exibir checkbox/switch "Incluir transferidas" abaixo do breakdown, similar ao que já existe no card de ranking
+### 4. `src/components/AppSidebar.tsx`
+- No menu de 3 pontos do workspace (onde já tem "Trocar", "Novo", "Renomear", etc.), adicionar item "Spaces Arquivados" visível para admins
+- Ao clicar, navegar para `/archived-spaces`
 
-### 5. `src/components/tasks/TaskAssigneesManager.tsx` — Garantir registro completo
-- No `handleRemoveAssignee`, já existe a lógica de classificação na transferência
-- Garantir que o `task_assignee_history` tenha `classification` preenchido + a data/hora exata em `unassigned_at` (já existe via trigger)
-- O registro de atividade `productivity.classified` com `isTransferred: true` já está implementado — verificar que funciona em cenários A→B→A (múltiplas atribuições do mesmo usuário)
+### 5. Criar `src/pages/ArchivedSpaces.tsx`
+- Página listando todos os spaces arquivados do workspace ativo
+- Para cada space: nome, cor, data de arquivamento
+- Botões "Restaurar" e "Excluir definitivamente" — visíveis apenas para admin/proprietário
+- Confirmação antes de excluir definitivamente
+
+### 6. `src/App.tsx`
+- Adicionar rota `/archived-spaces` protegida (admin only)
+
+### 7. `src/pages/SpacesView.tsx`
+- Garantir que a listagem de spaces também filtre `archived_at IS NULL` (caso use query direta)
 
 ## Resultado
-- Card de produtividade mostra toggle "Incluir transferidas"
-- Ao ativar, métricas incluem registros de transferência com score individual
-- Cada transferência gera registro com data/hora para rastreamento completo de ciclos
-- 4 arquivos editados + 1 migration SQL
-
+- Botão "Arquivar" no menu do Space funciona de verdade
+- Menu do workspace ganha opção "Spaces Arquivados"
+- Tela dedicada para ver, restaurar ou excluir permanentemente spaces arquivados
+- Acesso restrito a admin/proprietário
+- ~6 arquivos editados/criados + 1 migration SQL
