@@ -12,6 +12,49 @@ export interface TaskAttachment {
   created_at: string;
 }
 
+// Extrai o path do storage a partir de uma URL pública ou retorna o path se já for relativo
+const extractStoragePath = (fileUrl: string, bucket: string): string => {
+  if (!fileUrl.startsWith('http')) return fileUrl;
+  const marker = `/${bucket}/`;
+  const idx = fileUrl.indexOf(marker);
+  if (idx !== -1) return fileUrl.substring(idx + marker.length);
+  return fileUrl;
+};
+
+// Gera signed URL para um path do storage
+const getSignedUrl = async (bucket: string, path: string): Promise<string> => {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, 3600); // 1 hora
+  if (error || !data?.signedUrl) return '';
+  return data.signedUrl;
+};
+
+// Resolve URLs para uma lista de attachments
+const resolveAttachmentUrls = async (attachments: TaskAttachment[]): Promise<TaskAttachment[]> => {
+  if (!attachments.length) return [];
+  
+  const paths = attachments.map(a => extractStoragePath(a.file_url, 'task-attachments'));
+  
+  const { data, error } = await supabase.storage
+    .from('task-attachments')
+    .createSignedUrls(paths, 3600);
+  
+  if (error || !data) {
+    // Fallback individual
+    return Promise.all(attachments.map(async (a) => {
+      const path = extractStoragePath(a.file_url, 'task-attachments');
+      const url = await getSignedUrl('task-attachments', path);
+      return { ...a, file_url: url || a.file_url };
+    }));
+  }
+  
+  return attachments.map((a, i) => ({
+    ...a,
+    file_url: data[i]?.signedUrl || a.file_url,
+  }));
+};
+
 export const useTaskAttachments = (taskId?: string) => {
   return useQuery({
     queryKey: ['task-attachments', taskId],
@@ -25,7 +68,8 @@ export const useTaskAttachments = (taskId?: string) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as TaskAttachment[];
+      const attachments = data as TaskAttachment[];
+      return resolveAttachmentUrls(attachments);
     },
     enabled: !!taskId,
   });
@@ -35,9 +79,9 @@ export const useTaskAttachments = (taskId?: string) => {
 const sanitizeFileName = (name: string): string => {
   return name
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-zA-Z0-9._-]/g, '_') // Substitui caracteres especiais por "_"
-    .replace(/_+/g, '_'); // Remove underscores duplicados
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_');
 };
 
 export const useUploadAttachment = () => {
@@ -54,29 +98,25 @@ export const useUploadAttachment = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      // Gerar caminho único para o arquivo com nome sanitizado
       const safeName = sanitizeFileName(file.name);
-      const fileName = `${user.id}/${taskId}/${Date.now()}_${safeName}`;
+      const storagePath = `${user.id}/${taskId}/${Date.now()}_${safeName}`;
 
-      // Upload para o storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('task-attachments')
-        .upload(fileName, file);
+        .upload(storagePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Obter URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('task-attachments')
-        .getPublicUrl(fileName);
+      // Gerar signed URL para retorno imediato
+      const signedUrl = await getSignedUrl('task-attachments', storagePath);
 
-      // Inserir registro na tabela
+      // Armazenar o path no banco (não a URL pública)
       const { data, error } = await supabase
         .from('task_attachments')
         .insert({
           task_id: taskId,
           file_name: file.name,
-          file_url: publicUrl,
+          file_url: storagePath,
           file_type: file.type,
           file_size: file.size,
           uploaded_by: user.id,
@@ -85,7 +125,7 @@ export const useUploadAttachment = () => {
         .single();
 
       if (error) throw error;
-      return data as TaskAttachment;
+      return { ...data, file_url: signedUrl || storagePath } as TaskAttachment;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['task-attachments', data.task_id] });
@@ -107,10 +147,9 @@ export const useDeleteAttachment = () => {
       taskId: string;
       fileUrl: string;
     }) => {
-      // Extrair o path do arquivo da URL
-      const urlParts = fileUrl.split('/task-attachments/');
-      if (urlParts.length > 1) {
-        const filePath = urlParts[1];
+      // Extrair o path - pode ser URL completa (legado) ou path relativo (novo)
+      const filePath = extractStoragePath(fileUrl, 'task-attachments');
+      if (filePath) {
         await supabase.storage.from('task-attachments').remove([filePath]);
       }
 
