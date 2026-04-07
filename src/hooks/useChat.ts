@@ -46,6 +46,7 @@ export const useAllChatChannels = () => {
           spaces:linked_space_id (name, color),
           workspace:workspace_id (id, name)
         `)
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
