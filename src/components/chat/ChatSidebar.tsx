@@ -420,6 +420,12 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
         onOpenChange={setShowCreateDialog}
       />
 
+      <DMCreateDialog
+        open={showDMDialog}
+        onOpenChange={setShowDMDialog}
+        onChannelCreated={(channelId) => onSelectChannel(channelId)}
+      />
+
       <AlertDialog open={!!channelToDelete} onOpenChange={(open) => !open && setChannelToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

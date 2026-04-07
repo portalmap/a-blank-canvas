@@ -40,12 +40,12 @@ const Chat = () => {
               <ChatRoom
                 channelId={selectedChannel.id}
                 channelName={selectedChannel.name}
-                channelType={selectedChannel.type as 'space' | 'custom'}
+                channelType={selectedChannel.type as 'space' | 'custom' | 'dm' | 'group_dm'}
                 spaceColor={(selectedChannel as any).spaces?.color}
                 workspaceId={selectedChannel.workspace_id}
                 highlightMessageId={messageParam || undefined}
                 onOpenMembers={
-                  selectedChannel.type === 'custom'
+                  (selectedChannel.type === 'custom' || selectedChannel.type === 'group_dm')
                     ? () => setShowMembersDialog(true)
                     : undefined
                 }
@@ -65,7 +65,7 @@ const Chat = () => {
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      {selectedChannel && selectedChannel.type === 'custom' && (
+      {selectedChannel && (selectedChannel.type === 'custom' || selectedChannel.type === 'group_dm') && (
         <ChannelMembersDialog
           open={showMembersDialog}
           onOpenChange={setShowMembersDialog}
