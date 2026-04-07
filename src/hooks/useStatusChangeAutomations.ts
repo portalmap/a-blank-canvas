@@ -547,6 +547,8 @@ export const executeStatusChangeAutomations = async (
         // Check if automation has multiple actions
         const actionsArray = actionConfig?.actions as Array<{ type: string; config: Record<string, any> }> | undefined;
         
+        const originalListId = info.listId;
+
         if (actionsArray && actionsArray.length > 0) {
           // Execute multiple actions sequentially
           for (const action of actionsArray) {
@@ -555,6 +557,19 @@ export const executeStatusChangeAutomations = async (
         } else {
           // Execute single action (legacy support)
           await executeAction(automation.action_type, info, actionConfig, automationName);
+        }
+
+        // Apply destination list automations AFTER all actions complete
+        if (info.listId !== originalListId) {
+          try {
+            await applyAutomationsToTask({
+              id: info.taskId,
+              workspace_id: info.workspaceId,
+              list_id: info.listId,
+            });
+          } catch (applyError) {
+            console.error('Error applying destination list automations:', applyError);
+          }
         }
         
         result.automationsExecuted++;
@@ -1090,16 +1105,8 @@ const executeMoveTask = async (
 
   console.log(`Task ${info.taskId} moved to list ${targetListId}`);
 
-  // Apply destination list automations (auto-assign, auto-follow, etc.)
-  try {
-    await applyAutomationsToTask({
-      id: info.taskId,
-      workspace_id: info.workspaceId,
-      list_id: targetListId,
-    });
-  } catch (applyError) {
-    console.error('Error applying destination list automations:', applyError);
-  }
+  // NOTE: applyAutomationsToTask is called AFTER all actions complete (not here)
+  // to avoid subsequent actions (like remove_all_assignees) wiping out the newly added assignees
 };
 
 /**
@@ -1477,6 +1484,7 @@ export const executeTagAutomations = async (
 
         // Execute actions (multi or single)
         const actionsArray = actionConfig?.actions as Array<{ type: string; config: Record<string, any> }> | undefined;
+        const originalListId = info.listId;
 
         if (actionsArray && actionsArray.length > 0) {
           for (const action of actionsArray) {
@@ -1484,6 +1492,19 @@ export const executeTagAutomations = async (
           }
         } else {
           await executeAction(automation.action_type, info, actionConfig, automationName);
+        }
+
+        // Apply destination list automations AFTER all actions complete
+        if (info.listId !== originalListId) {
+          try {
+            await applyAutomationsToTask({
+              id: info.taskId,
+              workspace_id: info.workspaceId,
+              list_id: info.listId,
+            });
+          } catch (applyError) {
+            console.error('Error applying destination list automations:', applyError);
+          }
         }
 
         console.log(`Tag automation ${automation.id} executed for task ${taskId} (${event})`);
@@ -1621,6 +1642,7 @@ export const reevaluateConditionAutomations = async (
 
         // Execute actions
         const actionsArray = actionConfig?.actions as Array<{ type: string; config: Record<string, any> }> | undefined;
+        const originalListId = info.listId;
 
         if (actionsArray && actionsArray.length > 0) {
           for (const action of actionsArray) {
@@ -1628,6 +1650,19 @@ export const reevaluateConditionAutomations = async (
           }
         } else {
           await executeAction(automation.action_type, info, actionConfig, automationName);
+        }
+
+        // Apply destination list automations AFTER all actions complete
+        if (info.listId !== originalListId) {
+          try {
+            await applyAutomationsToTask({
+              id: info.taskId,
+              workspace_id: info.workspaceId,
+              list_id: info.listId,
+            });
+          } catch (applyError) {
+            console.error('Error applying destination list automations:', applyError);
+          }
         }
 
         console.log(`Automation ${automation.id} executed via re-evaluation for task ${taskId}`);
