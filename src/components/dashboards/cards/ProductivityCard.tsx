@@ -32,6 +32,13 @@ interface ProductivityCardProps {
   scopeInfo?: ProductivityScopeInfo;
   includeTransferred?: boolean;
   onToggleTransferred?: (value: boolean) => void;
+  // Props for report
+  scope?: ProductivityScope;
+  spaceId?: string;
+  userId?: string;
+  userIds?: string[];
+  startDate?: Date;
+  endDate?: Date;
 }
 
 const getScoreColor = (score: number): string => {
@@ -67,7 +74,25 @@ const ProductivityCardComponent = ({
   scopeInfo,
   includeTransferred,
   onToggleTransferred,
+  scope,
+  spaceId,
+  userId,
+  userIds,
+  startDate,
+  endDate,
 }: ProductivityCardProps) => {
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const { data: report, isLoading: reportLoading } = useProductivityDetailsReport({
+    scope,
+    spaceId,
+    userId,
+    userIds,
+    startDate,
+    endDate,
+    includeTransferred,
+    enabled: reportOpen,
+  });
   const score = stats?.productivityScore ?? 100;
   const progressPercentage = Math.min((score / 200) * 100, 100);
 
