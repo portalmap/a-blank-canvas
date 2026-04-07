@@ -140,6 +140,7 @@ export const useChatMessages = (channelId?: string) => {
         assignee_id: (msg as any).assignee_id || null,
         resolved_at: (msg as any).resolved_at || null,
         resolved_by: (msg as any).resolved_by || null,
+        reply_to: (msg as any).reply_to || null,
         sender: profileMap.get(msg.sender_id) || null,
         assignee: (msg as any).assignee_id ? profileMap.get((msg as any).assignee_id) || null : null,
       }));
@@ -190,6 +191,7 @@ export const useChatMessages = (channelId?: string) => {
               assignee_id: (newMsg as any).assignee_id || null,
               resolved_at: (newMsg as any).resolved_at || null,
               resolved_by: (newMsg as any).resolved_by || null,
+              reply_to: (newMsg as any).reply_to || null,
               sender: profile,
               assignee: assigneeProfile,
             };
@@ -248,11 +250,12 @@ export const useSendMessage = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ channelId, content, assigneeId, attachments }: { 
+    mutationFn: async ({ channelId, content, assigneeId, attachments, replyTo }: { 
       channelId: string; 
       content: string;
       assigneeId?: string;
       attachments?: any[];
+      replyTo?: string;
     }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
@@ -261,6 +264,7 @@ export const useSendMessage = () => {
         sender_id: user.id,
         content,
         assignee_id: assigneeId || null,
+        reply_to: replyTo || null,
       };
 
       if (attachments && attachments.length > 0) {
