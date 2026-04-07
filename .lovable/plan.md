@@ -1,44 +1,48 @@
 
 
-# Corrigir Relatório de Produtividade — Classificação e Transferências
+# Botão "Gerar Relatório" no Card de Produtividade
 
-## Diagnóstico
+## Resumo
 
-Três falhas combinadas fazem o relatório mostrar "0 tarefas":
-
-1. **`get_productivity_stats`** recebe `p_include_transferred` mas nunca o usa — só consulta `task_assignees` (responsável atual)
-2. **Triggers de assignee** (`on_task_assignee_added/removed`) não calculam `classification` — campo é sempre NULL
-3. **Não existe trigger de conclusão** (`tasks.completed_at`) que classifique o registro no `task_assignee_history`
+Adicionar um botão no `ProductivityCard` que abre um dialog com a lista detalhada de tarefas (similar ao `UserProductivityDetailsDialog`), mas adaptado para funcionar com qualquer escopo (workspace, space, my_tasks, user com múltiplos IDs).
 
 ## Alterações
 
-### 1. Migration SQL — Triggers de classificação + Refatorar função RPC
+### 1. Nova RPC SQL: `get_productivity_details_by_scope`
 
-**Trigger na remoção de assignee (transferência)**:
-- Ao fazer `on_task_assignee_removed`, calcular `classification` usando `calc_delivery_pct` e os thresholds do `productivity_settings`
-- Preencher o campo `classification` no `task_assignee_history`
+A RPC `get_user_productivity_details` existente só aceita um único `p_user_id`. Precisamos de uma versão que aceite os mesmos parâmetros de escopo que `get_productivity_stats` (`p_scope`, `p_space_id`, `p_user_ids`) e retorne a lista de tarefas com classificação, datas e indicador de transferência.
 
-**Trigger na conclusão de tarefa**:
-- Criar trigger `on_task_completed` em `tasks` que dispara quando `completed_at` muda de NULL para um valor
-- Para cada registro em `task_assignee_history` do task onde `unassigned_at IS NULL`, preencher `classification` usando `completed_at` como referência
+- Parâmetros: `p_workspace_id`, `p_scope`, `p_space_id`, `p_user_ids`, `p_start_date`, `p_end_date`, `p_include_transferred`, `p_early_threshold`, `p_on_time_threshold`, `p_limit`
+- Retorno: JSON com `tasks[]` (id, title, completedAt, dueDate, classification, daysFromDue, isTransferred, userName) e `summary` (early, onTime, late, noDueDate, total, score)
+- Reutiliza a mesma lógica de `task_assignee_history` já implementada
 
-**Refatorar `get_productivity_stats`**:
-- Quando `p_include_transferred = true`: buscar dados do `task_assignee_history` (tanto concluídas quanto transferidas) em vez de só `tasks + task_assignees`
-- Quando `p_include_transferred = false` (padrão): manter comportamento atual mas usando `task_assignee_history` onde `unassigned_at IS NULL` e a tarefa tem `completed_at`
-- Usar o `classification` já preenchido pela trigger ou calcular inline via `calc_delivery_pct`
+### 2. Hook: `useProductivityDetailsReport.ts`
 
-**Backfill dos dados existentes**:
-- Script que preenche `classification` para todos os registros históricos existentes com base nas datas registradas
+- Novo hook que chama a RPC acima
+- Aceita os mesmos parâmetros do `useProductivityStats` (scope, spaceId, userIds, dateRange, includeTransferred)
+- Ativado sob demanda (enabled controlado por estado)
 
-### 2. Nenhuma alteração de frontend necessária
+### 3. Componente: `ProductivityReportDialog.tsx`
 
-Os hooks e componentes já passam `includeTransferred` e consomem o resultado — o problema é 100% no banco de dados.
+- Dialog expandido (max-w-3xl) com a lista de tarefas agrupadas por classificação (tabs: Adiantadas, No Prazo, Atrasadas, Sem Prazo)
+- Cada item mostra: título da tarefa, nome do responsável, data de conclusão/transferência, classificação, badge "Transferida" quando aplicável
+- Resumo no topo com os totais por categoria
+- Clique na tarefa navega para `/tasks/:id`
+
+### 4. Editar `ProductivityCard.tsx`
+
+- Adicionar botão "Ver Relatório" (ícone `FileText`) no rodapé do card, ao lado do total de tarefas
+- Ao clicar, abre o `ProductivityReportDialog`
+- Passar scope, spaceId, userIds, dateRange e includeTransferred como props
+
+### 5. Editar `DashboardEditor.tsx` (ProductivityCardWrapper)
+
+- Passar as props de escopo (scope, spaceId, userIds, dateRange) para o `ProductivityCard` para que ele possa repassar ao dialog
 
 ## Arquivos
-- 1 migration SQL (triggers + refatorar RPC + backfill)
 
-## Resultado
-- Victor Borges (e qualquer usuário transferido) aparece no relatório com suas contribuições classificadas
-- Tarefas concluídas pelo responsável atual também são classificadas no histórico
-- O toggle "Incluir transferidas" passa a funcionar de verdade
+- 1 migration SQL (nova RPC)
+- 1 novo hook (`useProductivityDetailsReport.ts`)
+- 1 novo componente (`ProductivityReportDialog.tsx`)
+- 2 editados (`ProductivityCard.tsx`, `DashboardEditor.tsx`)
 
