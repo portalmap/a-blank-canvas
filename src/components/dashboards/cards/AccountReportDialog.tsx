@@ -3,11 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { AccountEntry, AccountSpaceEntry, AccountTaskEntry } from '@/hooks/useAccountProductivity';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
+import { ArrowUpRight, CheckCircle2, Clock, AlertTriangle, HelpCircle } from 'lucide-react';
 
 interface AccountReportDialogProps {
   open: boolean;
@@ -17,11 +18,11 @@ interface AccountReportDialogProps {
   tasks: AccountTaskEntry[];
 }
 
-const classificationLabels: Record<string, { label: string; color: string }> = {
-  early: { label: 'Antecipada', color: 'bg-green-500' },
-  on_time: { label: 'No Prazo', color: 'bg-blue-500' },
-  late: { label: 'Atrasada', color: 'bg-red-500' },
-  no_due_date: { label: 'Sem Prazo', color: 'bg-gray-400' },
+const classificationConfig = {
+  early: { label: 'Antecipadas', color: 'text-green-500', bg: 'bg-green-500/10', icon: CheckCircle2, dot: 'bg-green-500' },
+  on_time: { label: 'No Prazo', color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Clock, dot: 'bg-blue-500' },
+  late: { label: 'Atrasadas', color: 'text-red-500', bg: 'bg-red-500/10', icon: AlertTriangle, dot: 'bg-red-500' },
+  no_due_date: { label: 'Sem Prazo', color: 'text-muted-foreground', bg: 'bg-muted', icon: HelpCircle, dot: 'bg-muted-foreground' },
 };
 
 const getScoreColor = (score: number): string => {
@@ -31,6 +32,44 @@ const getScoreColor = (score: number): string => {
   return 'text-red-600 dark:text-red-400';
 };
 
+const TaskRow = ({ task, onNavigate }: { task: AccountTaskEntry; onNavigate: (id: string) => void }) => {
+  const config = classificationConfig[task.classification];
+  const daysFromDue = task.dueDate && task.completedAt
+    ? differenceInCalendarDays(new Date(task.completedAt), new Date(task.dueDate))
+    : null;
+
+  return (
+    <div
+      className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 cursor-pointer transition-colors group"
+      onClick={() => onNavigate(task.id)}
+    >
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2">
+          <div className={cn('h-2 w-2 rounded-full flex-shrink-0', config.dot)} />
+          <span className="text-sm font-medium truncate">{task.title}</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground pl-4">
+          <span>{task.spaceName}</span>
+          {task.completedAt && (
+            <span>
+              Concluída: {format(new Date(task.completedAt), "dd/MM/yy HH:mm", { locale: ptBR })}
+            </span>
+          )}
+          {task.dueDate && (
+            <span>Prazo: {format(new Date(task.dueDate), "dd/MM/yy", { locale: ptBR })}</span>
+          )}
+          {daysFromDue != null && (
+            <span className={cn(daysFromDue > 0 ? 'text-red-500' : 'text-green-500')}>
+              {daysFromDue > 0 ? `+${daysFromDue}d` : `${daysFromDue}d`}
+            </span>
+          )}
+        </div>
+      </div>
+      <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+    </div>
+  );
+};
+
 export const AccountReportDialog = ({
   open,
   onOpenChange,
@@ -38,50 +77,36 @@ export const AccountReportDialog = ({
   spaces,
   tasks,
 }: AccountReportDialogProps) => {
-  const [activeTab, setActiveTab] = useState('spaces');
+  const [activeTab, setActiveTab] = useState('all');
+  const navigate = useNavigate();
+
+  const handleNavigate = (taskId: string) => {
+    onOpenChange(false);
+    navigate(`/tasks/${taskId}`);
+  };
 
   const earlyTasks = tasks.filter(t => t.classification === 'early');
   const onTimeTasks = tasks.filter(t => t.classification === 'on_time');
   const lateTasks = tasks.filter(t => t.classification === 'late');
   const noDueDateTasks = tasks.filter(t => t.classification === 'no_due_date');
 
-  const renderTaskList = (taskList: AccountTaskEntry[]) => {
-    if (taskList.length === 0) {
-      return <p className="text-sm text-muted-foreground text-center py-4">Nenhuma tarefa</p>;
-    }
+  const counts = {
+    early: earlyTasks.length,
+    on_time: onTimeTasks.length,
+    late: lateTasks.length,
+    no_due_date: noDueDateTasks.length,
+  };
 
-    return (
-      <div className="space-y-2">
-        {taskList.map((task) => (
-          <div key={task.id} className="flex items-center justify-between p-2 rounded-lg border">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{task.title}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-muted-foreground">{task.spaceName}</span>
-                {task.dueDate && (
-                  <span className="text-xs text-muted-foreground">
-                    Prazo: {format(new Date(task.dueDate), 'dd/MM/yyyy')}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="text-right ml-2">
-              <span className={cn('text-sm font-bold', getScoreColor(task.productivityScore))}>
-                {task.productivityScore}%
-              </span>
-              <p className="text-xs text-muted-foreground">
-                {task.completedAt && format(new Date(task.completedAt), 'dd/MM', { locale: ptBR })}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+  const tasksByClassification = (cls: string) => {
+    if (cls === 'early') return earlyTasks;
+    if (cls === 'on_time') return onTimeTasks;
+    if (cls === 'late') return lateTasks;
+    return noDueDateTasks;
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
+      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
@@ -105,30 +130,44 @@ export const AccountReportDialog = ({
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="spaces">Spaces</TabsTrigger>
-            <TabsTrigger value="early" className="gap-1">
-              <div className="h-2 w-2 rounded-full bg-green-500" />
-              {earlyTasks.length}
-            </TabsTrigger>
-            <TabsTrigger value="on_time" className="gap-1">
-              <div className="h-2 w-2 rounded-full bg-blue-500" />
-              {onTimeTasks.length}
-            </TabsTrigger>
-            <TabsTrigger value="late" className="gap-1">
-              <div className="h-2 w-2 rounded-full bg-red-500" />
-              {lateTasks.length}
-            </TabsTrigger>
-            <TabsTrigger value="no_due" className="gap-1">
-              <div className="h-2 w-2 rounded-full bg-gray-400" />
-              {noDueDateTasks.length}
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-4 gap-3">
+            {Object.entries(classificationConfig).map(([key, config]) => {
+              const count = counts[key as keyof typeof counts];
+              const Icon = config.icon;
+              return (
+                <div key={key} className={cn('rounded-lg p-3 text-center', config.bg)}>
+                  <Icon className={cn('h-4 w-4 mx-auto mb-1', config.color)} />
+                  <div className={cn('text-xl font-bold', config.color)}>{count}</div>
+                  <div className="text-xs text-muted-foreground">{config.label}</div>
+                </div>
+              );
+            })}
+          </div>
 
-          <ScrollArea className="h-[400px] mt-4">
-            <TabsContent value="spaces" className="mt-0">
-              <div className="space-y-3">
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="w-full justify-start flex-wrap h-auto gap-1">
+              <TabsTrigger value="all">Todas ({tasks.length})</TabsTrigger>
+              <TabsTrigger value="spaces">Spaces ({spaces.length})</TabsTrigger>
+              <TabsTrigger value="early">Antecipadas ({counts.early})</TabsTrigger>
+              <TabsTrigger value="on_time">No Prazo ({counts.on_time})</TabsTrigger>
+              <TabsTrigger value="late">Atrasadas ({counts.late})</TabsTrigger>
+              <TabsTrigger value="no_due_date">Sem Prazo ({counts.no_due_date})</TabsTrigger>
+            </TabsList>
+
+            <div className="flex-1 overflow-y-auto mt-2">
+              <TabsContent value="all" className="m-0 space-y-1">
+                {tasks.map(task => (
+                  <TaskRow key={task.id} task={task} onNavigate={handleNavigate} />
+                ))}
+                {tasks.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">Nenhuma tarefa encontrada.</p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="spaces" className="m-0 space-y-3">
                 {spaces.map((space) => (
                   <div key={space.spaceId} className="p-3 rounded-lg border">
                     <div className="flex items-center justify-between mb-2">
@@ -167,28 +206,23 @@ export const AccountReportDialog = ({
                   </div>
                 ))}
                 {spaces.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum space</p>
+                  <p className="text-center text-muted-foreground py-8">Nenhum space.</p>
                 )}
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="early" className="mt-0">
-              {renderTaskList(earlyTasks)}
-            </TabsContent>
-
-            <TabsContent value="on_time" className="mt-0">
-              {renderTaskList(onTimeTasks)}
-            </TabsContent>
-
-            <TabsContent value="late" className="mt-0">
-              {renderTaskList(lateTasks)}
-            </TabsContent>
-
-            <TabsContent value="no_due" className="mt-0">
-              {renderTaskList(noDueDateTasks)}
-            </TabsContent>
-          </ScrollArea>
-        </Tabs>
+              {['early', 'on_time', 'late', 'no_due_date'].map(cls => (
+                <TabsContent key={cls} value={cls} className="m-0 space-y-1">
+                  {tasksByClassification(cls).map(task => (
+                    <TaskRow key={task.id} task={task} onNavigate={handleNavigate} />
+                  ))}
+                  {tasksByClassification(cls).length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">Nenhuma tarefa nesta categoria.</p>
+                  )}
+                </TabsContent>
+              ))}
+            </div>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
