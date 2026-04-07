@@ -1962,6 +1962,7 @@ export type Database = {
       }
       spaces: {
         Row: {
+          account_user_id: string | null
           archived_at: string | null
           color: string | null
           created_at: string
@@ -1974,6 +1975,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          account_user_id?: string | null
           archived_at?: string | null
           color?: string | null
           created_at?: string
@@ -1986,6 +1988,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          account_user_id?: string | null
           archived_at?: string | null
           color?: string | null
           created_at?: string
@@ -1998,6 +2001,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "spaces_account_user_id_fkey"
+            columns: ["account_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "spaces_status_template_id_fkey"
             columns: ["status_template_id"]
@@ -3273,6 +3283,17 @@ export type Database = {
         Returns: boolean
       }
       expire_old_invitations: { Args: never; Returns: undefined }
+      get_account_productivity_report: {
+        Args: {
+          p_account_user_id?: string
+          p_early_threshold?: number
+          p_end_date?: string
+          p_on_time_threshold?: number
+          p_start_date?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       get_all_users_for_global_owner: {
         Args: never
         Returns: {
