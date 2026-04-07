@@ -1,32 +1,21 @@
 
-# Botão "Relatório" no AccountReportDialog
 
-## Resumo
+# Correção: Navegação para tarefas dando 404
 
-Melhorar o `AccountReportDialog` para incluir um layout de tarefas igual ao `ProductivityReportDialog`: linhas clicáveis que navegam para a tarefa, cards de resumo no topo (com ícones e cores), indicador de dias em relação ao prazo, e visual mais polido.
+## Problema
 
-## Alterações
+Ao clicar nas tarefas nos relatórios, o sistema navega para `/tasks/{id}` (plural), mas a rota definida no App.tsx é `/task/{id}` (singular). Isso causa o erro 404.
 
-### 1. Editar `AccountReportDialog.tsx`
+## Correção
 
-- Adicionar cards de resumo no topo (4 cards: Antecipadas, No Prazo, Atrasadas, Sem Prazo) com ícones e contagens — mesmo estilo do ProductivityReportDialog
-- Substituir o `renderTaskList` atual por um componente `TaskRow` clicável que:
-  - Mostra dot colorido + título
-  - Exibe prazo, data de conclusão, e diferença em dias (`+3d` / `-2d`)
-  - Ao clicar, fecha o dialog e navega para `/tasks/{id}`
-  - Mostra ícone de seta no hover
-- Adicionar tab "Todas" como primeira aba (listando todas as tarefas juntas)
-- Usar `useNavigate` para navegação
+Trocar `/tasks/` por `/task/` em 3 arquivos:
 
-### 2. Nenhuma migration necessária
+1. **`src/components/dashboards/cards/AccountReportDialog.tsx`** (linha 85)
+2. **`src/components/dashboards/cards/UserProductivityDetailsDialog.tsx`** (linha 170)
+3. **`src/components/dashboards/cards/ProductivityReportDialog.tsx`** (linha 75)
 
-Os dados de tarefas já vêm do `get_account_productivity_report` — só precisa melhorar a apresentação.
+Em todos, alterar `navigate(\`/tasks/\${taskId}\`)` para `navigate(\`/task/\${taskId}\`)`.
 
 ## Arquivos
+- 3 editados (correção de 1 linha cada)
 
-- 1 editado: `src/components/dashboards/cards/AccountReportDialog.tsx`
-
-## Resultado
-
-- Ao abrir o relatório de um Account, o usuário vê resumo visual + lista de tarefas clicáveis
-- Cada tarefa é acessível com um clique, igual ao relatório de produtividade individual
