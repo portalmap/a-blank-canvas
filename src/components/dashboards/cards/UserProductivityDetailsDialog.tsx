@@ -167,7 +167,7 @@ const UserProductivityDetailsDialogComponent = ({
 
   const handleTaskClick = (taskId: string) => {
     onOpenChange(false);
-    navigate(`/tasks/${taskId}`);
+    navigate(`/task/${taskId}`);
   };
 
   if (!user) return null;

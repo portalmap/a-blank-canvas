@@ -72,7 +72,7 @@ const ProductivityReportDialogComponent = ({
 
   const handleNavigate = (taskId: string) => {
     onOpenChange(false);
-    navigate(`/tasks/${taskId}`);
+    navigate(`/task/${taskId}`);
   };
 
   const tasksByClassification = (classification: string) =>

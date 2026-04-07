@@ -82,7 +82,7 @@ export const AccountReportDialog = ({
 
   const handleNavigate = (taskId: string) => {
     onOpenChange(false);
-    navigate(`/tasks/${taskId}`);
+    navigate(`/task/${taskId}`);
   };
 
   const earlyTasks = tasks.filter(t => t.classification === 'early');
