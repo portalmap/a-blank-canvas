@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2, MoreHorizontal, Trash2, Mail, Pencil } from 'lucide-react';
+import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2, MoreHorizontal, Trash2, Mail, Pencil, Archive, ArchiveRestore } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { useAllChatChannels, useDeleteChannel, useUpdateChannel } from '@/hooks/useChat';
+import { useAllChatChannels, useDeleteChannel, useUpdateChannel, useArchiveChannel, useUnarchiveChannel, useArchivedChannels } from '@/hooks/useChat';
 import { CreateChannelDialog } from './CreateChannelDialog';
 import { DMCreateDialog } from './DMCreateDialog';
 import { cn } from '@/lib/utils';
@@ -62,12 +62,14 @@ interface ChannelActionsMenuProps {
   channel: ChannelWithWorkspace;
   canDelete: boolean;
   canRename: boolean;
+  canArchive: boolean;
   onDelete: (channel: ChannelWithWorkspace) => void;
   onRename: (channel: ChannelWithWorkspace) => void;
+  onArchive: (channel: ChannelWithWorkspace) => void;
 }
 
-const ChannelActionsMenu = ({ channel, canDelete, canRename, onDelete, onRename }: ChannelActionsMenuProps) => {
-  if (!canDelete && !canRename) return null;
+const ChannelActionsMenu = ({ channel, canDelete, canRename, canArchive, onDelete, onRename, onArchive }: ChannelActionsMenuProps) => {
+  if (!canDelete && !canRename && !canArchive) return null;
 
   return (
     <DropdownMenu>
@@ -86,6 +88,12 @@ const ChannelActionsMenu = ({ channel, canDelete, canRename, onDelete, onRename 
           <DropdownMenuItem onClick={() => onRename(channel)}>
             <Pencil className="h-4 w-4 mr-2" />
             Renomear
+          </DropdownMenuItem>
+        )}
+        {canArchive && (
+          <DropdownMenuItem onClick={() => onArchive(channel)}>
+            <Archive className="h-4 w-4 mr-2" />
+            Arquivar
           </DropdownMenuItem>
         )}
         {canDelete && (
@@ -108,6 +116,9 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   const { user } = useAuth();
   const deleteChannel = useDeleteChannel();
   const updateChannel = useUpdateChannel();
+  const archiveChannel = useArchiveChannel();
+  const unarchiveChannel = useUnarchiveChannel();
+  const { data: archivedChannels } = useArchivedChannels();
   const { data: unreadChannelIds } = useUnreadChannels();
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -117,6 +128,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   const [channelToDelete, setChannelToDelete] = useState<ChannelWithWorkspace | null>(null);
   const [channelToRename, setChannelToRename] = useState<ChannelWithWorkspace | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const { data: profiles } = useAllProfiles();
 
   const isAdminOrOwner = userRole?.isGlobalOwner || userRole?.isOwner || userRole?.isAdmin;
@@ -131,8 +143,11 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   };
 
   const canRenameChannel = (channel: ChannelWithWorkspace) => {
-    // Space channels sync name from the space — don't allow rename
     if (channel.type === 'space') return false;
+    return !!isAdminOrOwner;
+  };
+
+  const canArchiveChannel = (channel: ChannelWithWorkspace) => {
     return !!isAdminOrOwner;
   };
 
@@ -155,6 +170,17 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   const openRenameDialog = (channel: ChannelWithWorkspace) => {
     setChannelToRename(channel);
     setRenameValue(channel.name);
+  };
+
+  const handleArchiveChannel = async (channel: ChannelWithWorkspace) => {
+    await archiveChannel.mutateAsync(channel.id);
+    if (selectedChannelId === channel.id) {
+      onSelectChannel('');
+    }
+  };
+
+  const handleUnarchiveChannel = async (channelId: string) => {
+    await unarchiveChannel.mutateAsync(channelId);
   };
 
   // Group channels by workspace
@@ -234,8 +260,8 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
     return nameA.localeCompare(nameB, 'pt-BR');
   });
 
-  const renderChannelRow = (channel: ChannelWithWorkspace, icon: React.ReactNode) => {
-    const showActions = canDeleteChannel(channel) || canRenameChannel(channel);
+  const renderChannelRow = (channel: ChannelWithWorkspace, icon: React.ReactNode, isArchived = false) => {
+    const showActions = !isArchived && (canDeleteChannel(channel) || canRenameChannel(channel) || canArchiveChannel(channel));
 
     return (
       <div key={channel.id} className="flex items-center group">
@@ -249,7 +275,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
           )}
         >
           {icon}
-          <span className={cn("truncate", unreadChannelIds?.includes(channel.id) && "font-bold text-destructive")}>
+          <span className={cn("truncate", !isArchived && unreadChannelIds?.includes(channel.id) && "font-bold text-destructive")}>
             {channel.type === 'dm' || channel.type === 'group_dm' ? getDMDisplayName(channel) : channel.name}
           </span>
         </button>
@@ -258,12 +284,35 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
             channel={channel}
             canDelete={canDeleteChannel(channel)}
             canRename={canRenameChannel(channel)}
+            canArchive={canArchiveChannel(channel)}
             onDelete={setChannelToDelete}
             onRename={openRenameDialog}
+            onArchive={handleArchiveChannel}
           />
+        )}
+        {isArchived && isAdminOrOwner && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+            onClick={(e) => { e.stopPropagation(); handleUnarchiveChannel(channel.id); }}
+            title="Restaurar canal"
+          >
+            <ArchiveRestore className="h-3.5 w-3.5" />
+          </Button>
         )}
       </div>
     );
+  };
+
+  const getChannelIcon = (channel: ChannelWithWorkspace) => {
+    if (channel.type === 'space') {
+      return <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: (channel as any).spaces?.color || '#6366f1' }} />;
+    }
+    if (channel.type === 'dm' || channel.type === 'group_dm') {
+      return <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />;
+    }
+    return <Hash className="h-3.5 w-3.5 flex-shrink-0" />;
   };
 
   return (
@@ -304,13 +353,35 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                 <CollapsibleContent className="pl-4">
                   {/* Space Channels */}
                   <div className="mt-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleSection(workspaceId, 'spaces'); }}
-                      className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full px-2 py-1"
-                    >
-                      {sections.spaces ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                      SPACES ({spaceChannels.length})
-                    </button>
+                    <div className="flex items-center">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleSection(workspaceId, 'spaces'); }}
+                        className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground flex-1 px-2 py-1"
+                      >
+                        {sections.spaces ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        SPACES ({spaceChannels.length})
+                      </button>
+                      {isAdminOrOwner && archivedChannels && archivedChannels.length > 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 flex-shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setShowArchived(!showArchived)}>
+                              <Archive className="h-4 w-4 mr-2" />
+                              {showArchived ? 'Ocultar arquivados' : 'Ver arquivados'}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                     {sections.spaces && (
                       <div className="mt-0.5 space-y-0.5">
                         {spaceChannels.map((channel) =>
@@ -369,6 +440,23 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                       </div>
                     )}
                   </div>
+
+                  {/* Archived Channels */}
+                  {showArchived && archivedChannels && archivedChannels.filter((c: any) => c.workspace_id === workspaceId).length > 0 && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground px-2 py-1">
+                        <Archive className="h-3 w-3" />
+                        ARQUIVADOS ({archivedChannels.filter((c: any) => c.workspace_id === workspaceId).length})
+                      </div>
+                      <div className="mt-0.5 space-y-0.5 opacity-60">
+                        {archivedChannels
+                          .filter((c: any) => c.workspace_id === workspaceId)
+                          .map((channel: any) =>
+                            renderChannelRow(channel, getChannelIcon(channel), true)
+                          )}
+                      </div>
+                    </div>
+                  )}
                 </CollapsibleContent>
               </Collapsible>
             );
