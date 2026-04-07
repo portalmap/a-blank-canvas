@@ -233,6 +233,11 @@ export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: Chat
           triggerClassName="flex-shrink-0 h-9 w-9"
           side="top"
         />
+        <StickerGallery
+          onStickerSelect={handleStickerSelect}
+          triggerClassName="flex-shrink-0 h-9 w-9"
+          side="top"
+        />
         <Button
           variant="ghost"
           size="icon"
