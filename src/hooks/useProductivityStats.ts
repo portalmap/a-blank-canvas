@@ -18,11 +18,13 @@ export interface ProductivityStats {
   productivityScore: number;
 }
 
-export type ProductivityScope = 'workspace' | 'my_tasks' | 'space' | 'user';
+export type ProductivityScope = 'workspace' | 'my_tasks' | 'space' | 'user' | 'folder' | 'list';
 
 interface UseProductivityStatsOptions {
   scope?: ProductivityScope;
   spaceId?: string;
+  folderId?: string;
+  listId?: string;
   userId?: string;
   userIds?: string[];
   startDate?: Date;
@@ -34,13 +36,13 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
   const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
   const { data: settings } = useProductivitySettings();
-  const { scope = 'workspace', spaceId, userId, userIds, startDate, endDate, includeTransferred = false } = options;
+  const { scope = 'workspace', spaceId, folderId, listId, userId, userIds, startDate, endDate, includeTransferred = false } = options;
 
   const earlyThreshold = settings?.early_threshold_percent ?? 50;
   const onTimeThreshold = settings?.on_time_threshold_percent ?? 100;
 
   return useQuery({
-    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, userIds, userId, user?.id, startDate?.toISOString(), endDate?.toISOString(), earlyThreshold, onTimeThreshold, includeTransferred],
+    queryKey: ['productivity-stats', activeWorkspace?.id, scope, spaceId, folderId, listId, userIds, userId, user?.id, startDate?.toISOString(), endDate?.toISOString(), earlyThreshold, onTimeThreshold, includeTransferred],
     queryFn: async (): Promise<ProductivityStats> => {
       if (!activeWorkspace?.id) {
         return {
@@ -56,12 +58,14 @@ export const useProductivityStats = (options: UseProductivityStatsOptions = {}) 
         p_end_date: endDate?.toISOString() || null,
         p_scope: scope,
         p_space_id: spaceId || null,
+        p_folder_id: folderId || null,
+        p_list_id: listId || null,
         p_user_id: scope === 'my_tasks' ? user?.id || null : userId || null,
         p_user_ids: userIds || null,
         p_early_threshold: earlyThreshold,
         p_on_time_threshold: onTimeThreshold,
         p_include_transferred: includeTransferred,
-      });
+      } as any);
 
       if (error) throw error;
 

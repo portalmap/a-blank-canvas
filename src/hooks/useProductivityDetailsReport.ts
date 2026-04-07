@@ -33,6 +33,8 @@ export interface ProductivityDetailsReport {
 interface UseProductivityDetailsReportOptions {
   scope?: ProductivityScope;
   spaceId?: string;
+  folderId?: string;
+  listId?: string;
   userId?: string;
   userIds?: string[];
   startDate?: Date;
@@ -45,13 +47,13 @@ export const useProductivityDetailsReport = (options: UseProductivityDetailsRepo
   const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
   const { data: settings } = useProductivitySettings();
-  const { scope = 'workspace', spaceId, userId, userIds, startDate, endDate, includeTransferred = false, enabled = false } = options;
+  const { scope = 'workspace', spaceId, folderId, listId, userId, userIds, startDate, endDate, includeTransferred = false, enabled = false } = options;
 
   const earlyThreshold = settings?.early_threshold_percent ?? 50;
   const onTimeThreshold = settings?.on_time_threshold_percent ?? 100;
 
   return useQuery({
-    queryKey: ['productivity-details-report', activeWorkspace?.id, scope, spaceId, userIds, userId, user?.id, startDate?.toISOString(), endDate?.toISOString(), earlyThreshold, onTimeThreshold, includeTransferred],
+    queryKey: ['productivity-details-report', activeWorkspace?.id, scope, spaceId, folderId, listId, userIds, userId, user?.id, startDate?.toISOString(), endDate?.toISOString(), earlyThreshold, onTimeThreshold, includeTransferred],
     queryFn: async (): Promise<ProductivityDetailsReport> => {
       if (!activeWorkspace?.id) {
         return { tasks: [], summary: { early: 0, onTime: 0, late: 0, noDueDate: 0, total: 0 } };
@@ -61,6 +63,8 @@ export const useProductivityDetailsReport = (options: UseProductivityDetailsRepo
         p_workspace_id: activeWorkspace.id,
         p_scope: scope,
         p_space_id: spaceId || null,
+        p_folder_id: folderId || null,
+        p_list_id: listId || null,
         p_user_id: scope === 'my_tasks' ? user?.id || null : userId || null,
         p_user_ids: userIds || null,
         p_start_date: startDate?.toISOString() || null,
