@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useProductivityStats, ProductivityScope } from '@/hooks/useProductivityStats';
 import { useProductivityDetailsReport } from '@/hooks/useProductivityDetailsReport';
-import ProductivityReportDialog from '@/components/dashboards/cards/ProductivityReportDialog';
+import { ProductivityReportDialog } from '@/components/dashboards/cards/ProductivityReportDialog';
 import { TrendingUp, CheckCircle2, Clock, AlertTriangle, HelpCircle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
