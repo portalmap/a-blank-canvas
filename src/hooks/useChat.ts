@@ -536,6 +536,76 @@ export const useDeleteChannel = () => {
   });
 };
 
+export const useArchiveChannel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (channelId: string) => {
+      const { error } = await supabase
+        .from('chat_channels')
+        .update({ archived_at: new Date().toISOString() } as any)
+        .eq('id', channelId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['all-chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-chat-channels'] });
+      toast.success('Canal arquivado com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao arquivar canal');
+      console.error(error);
+    },
+  });
+};
+
+export const useUnarchiveChannel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (channelId: string) => {
+      const { error } = await supabase
+        .from('chat_channels')
+        .update({ archived_at: null } as any)
+        .eq('id', channelId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['all-chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-chat-channels'] });
+      toast.success('Canal restaurado com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao restaurar canal');
+      console.error(error);
+    },
+  });
+};
+
+export const useArchivedChannels = () => {
+  return useQuery({
+    queryKey: ['archived-chat-channels'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chat_channels')
+        .select(`
+          *,
+          spaces:linked_space_id (name, color),
+          workspace:workspace_id (id, name)
+        `)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
 export const useUpdateChatMessage = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
