@@ -1,21 +1,19 @@
 
 
-# Correção: Navegação para tarefas dando 404
+# Emojis Maiores no Chat
 
-## Problema
+## Resumo
 
-Ao clicar nas tarefas nos relatórios, o sistema navega para `/tasks/{id}` (plural), mas a rota definida no App.tsx é `/task/{id}` (singular). Isso causa o erro 404.
+Detectar quando uma mensagem contém **apenas emojis** (sem texto) e renderizá-la com tamanho maior (~dobro). Mensagens mistas (texto + emoji) mantêm o tamanho normal.
 
-## Correção
+## Alteração
 
-Trocar `/tasks/` por `/task/` em 3 arquivos:
+### Editar `src/components/chat/ChatMessageItem.tsx`
 
-1. **`src/components/dashboards/cards/AccountReportDialog.tsx`** (linha 85)
-2. **`src/components/dashboards/cards/UserProductivityDetailsDialog.tsx`** (linha 170)
-3. **`src/components/dashboards/cards/ProductivityReportDialog.tsx`** (linha 75)
-
-Em todos, alterar `navigate(\`/tasks/\${taskId}\`)` para `navigate(\`/task/\${taskId}\`)`.
+1. Criar função `isOnlyEmojis(text)` que verifica se o conteúdo contém apenas emojis (usando regex Unicode)
+2. Na renderização do conteúdo (linha 141), aplicar classe `text-2xl` quando a mensagem for só emojis, mantendo `text-sm` para mensagens normais
 
 ## Arquivos
-- 3 editados (correção de 1 linha cada)
+
+- 1 editado: `ChatMessageItem.tsx`
 
