@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ChatMessageWithSender } from '@/hooks/useChat';
+
+const isOnlyEmojis = (text: string): boolean => {
+  const stripped = text.replace(/\s/g, '');
+  if (!stripped) return false;
+  const emojiRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?)+$/u;
+  return emojiRegex.test(stripped);
+};
 import { ChatAttachments } from './ChatAttachments';
 import { StickerMessage, isStickerMessage } from './stickers/StickerMessage';
 import { useUpdateChatMessage, useResolveChatAssignment } from '@/hooks/useChat';
@@ -138,7 +145,7 @@ export const ChatMessageItem = ({
               }
               return (
                 <>
-                  <p className="text-sm whitespace-pre-wrap break-words">
+                  <p className={cn("whitespace-pre-wrap break-words", isOnlyEmojis(message.content) ? "text-3xl leading-relaxed" : "text-sm")}>
                     {message.content}
                     {isEdited && <span className="text-xs text-muted-foreground ml-1">(editado)</span>}
                   </p>
