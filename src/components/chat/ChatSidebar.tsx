@@ -11,6 +11,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadChannels } from '@/hooks/useChatUnread';
 import { useAllProfiles } from '@/hooks/useAllProfiles';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
