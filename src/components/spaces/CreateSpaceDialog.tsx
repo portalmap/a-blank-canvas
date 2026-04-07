@@ -242,6 +242,36 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
                 ))}
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Account (opcional)</Label>
+              <Select
+                value={accountUserId || 'none'}
+                onValueChange={(v) => setAccountUserId(v === 'none' ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o Account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {members.map((member) => (
+                    <SelectItem key={member.user_id} value={member.user_id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={member.profile?.avatar_url || undefined} />
+                          <AvatarFallback className="text-[10px]">
+                            {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                        {member.profile?.full_name || 'Sem nome'}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Pessoa responsável pela performance geral do space
+              </p>
+            </div>
           </div>
         )}
 
