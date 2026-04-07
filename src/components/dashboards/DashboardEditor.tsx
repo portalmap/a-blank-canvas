@@ -11,12 +11,14 @@ import { PriorityBreakdownCard } from './cards/PriorityBreakdownCard';
 import { NotesCard } from './cards/NotesCard';
 import { ProductivityCard, ProductivityScopeInfo } from './cards/ProductivityCard';
 import { ProductivityRankingCard } from './cards/ProductivityRankingCard';
+import { AccountProductivityCard } from './cards/AccountProductivityCard';
 import { CardResizeDialog } from './CardResizeDialog';
 import { ExpandedCardDialog } from './ExpandedCardDialog';
 import { LayoutDashboard } from 'lucide-react';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useAccountProductivity } from '@/hooks/useAccountProductivity';
 
 interface DateRangeProps {
   startDate?: Date;
@@ -208,6 +210,15 @@ const DashboardEditorComponent = ({
       case 'productivity_ranking':
         return (
           <ProductivityRankingCardWrapper
+            key={card.id}
+            card={card}
+            commonProps={commonProps}
+            dateRange={dateRange}
+          />
+        );
+      case 'account_productivity':
+        return (
+          <AccountProductivityCardWrapper
             key={card.id}
             card={card}
             commonProps={commonProps}
