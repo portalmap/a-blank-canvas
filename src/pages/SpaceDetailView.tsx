@@ -22,6 +22,7 @@ import { Loader2, Plus, FolderOpen, List, ChevronRight, Pencil, FileText, UserCh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
+import ScopeProductivityCard from '@/components/dashboard/ScopeProductivityCard';
 
 const SpaceDetailView = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -233,6 +234,8 @@ const SpaceDetailView = () => {
       </Card>
 
       <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
+
+      <ScopeProductivityCard scope="space" spaceId={spaceId} />
 
       <Tabs defaultValue="folders" className="w-full">
         <TabsList>

@@ -17,6 +17,7 @@ import { TaskListView } from '@/components/views/TaskListView';
 import { TaskKanbanView } from '@/components/views/TaskKanbanView';
 import { TaskSprintView } from '@/components/views/TaskSprintView';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
+import ScopeProductivityCard from '@/components/dashboard/ScopeProductivityCard';
 
 import { GroupBySelector, GroupByOption } from '@/components/everything/GroupBySelector';
 import { EverythingFilters, FilterState } from '@/components/everything/EverythingFilters';
@@ -293,6 +294,8 @@ const ListDetailView = () => {
             />
           </div>
         </div>
+
+        <ScopeProductivityCard scope="list" listId={listId} />
 
         <div className="flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-4">

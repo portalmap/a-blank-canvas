@@ -16,6 +16,7 @@ import { Loader2, Plus, List, FolderOpen, ChevronRight } from 'lucide-react';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import DateRangeFilter from '@/components/filters/DateRangeFilter';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
+import ScopeProductivityCard from '@/components/dashboard/ScopeProductivityCard';
 
 
 const FolderDetailView = () => {
@@ -123,6 +124,8 @@ const FolderDetailView = () => {
         isLoading={statsLoading}
         filterComponent={<DateRangeFilter onDateRangeChange={handleDateRangeChange} />}
       />
+
+      <ScopeProductivityCard scope="folder" folderId={folderId} />
 
       {listsLoading ? (
         <div className="flex justify-center py-8">
