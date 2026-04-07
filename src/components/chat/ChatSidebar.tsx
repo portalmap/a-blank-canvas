@@ -143,7 +143,6 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   };
 
   const canRenameChannel = (channel: ChannelWithWorkspace) => {
-    if (channel.type === 'space') return false;
     return !!isAdminOrOwner;
   };
 
