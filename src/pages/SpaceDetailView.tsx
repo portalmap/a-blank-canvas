@@ -185,6 +185,53 @@ const SpaceDetailView = () => {
         </CardContent>
       </Card>
 
+      {/* Account do Space */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserCheck className="h-4 w-4" />
+            Account
+          </CardTitle>
+          <CardDescription>
+            Responsável geral por todas as tarefas deste space
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <Select
+              value={currentSpace.account_user_id || 'none'}
+              onValueChange={(value) => {
+                updateSpace.mutate({
+                  id: currentSpace.id,
+                  name: currentSpace.name,
+                  accountUserId: value === 'none' ? null : value,
+                });
+              }}
+            >
+              <SelectTrigger className="w-[280px]">
+                <SelectValue placeholder="Selecione o Account..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhum</SelectItem>
+                {members.map((member) => (
+                  <SelectItem key={member.user_id} value={member.user_id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage src={member.profile?.avatar_url || undefined} />
+                        <AvatarFallback className="text-[10px]">
+                          {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      {member.profile?.full_name || 'Sem nome'}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
 
       <Tabs defaultValue="folders" className="w-full">
