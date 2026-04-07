@@ -1,9 +1,9 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { MoreVertical, TrendingUp, Star, Zap, Move, Maximize2, Trash2 } from 'lucide-react';
+import { MoreVertical, TrendingUp, Star, Zap, Move, Maximize2, Trash2, FileText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ProductivityStats, ProductivityScope } from '@/hooks/useProductivityStats';
+import { useProductivityDetailsReport } from '@/hooks/useProductivityDetailsReport';
+import { ProductivityReportDialog } from './ProductivityReportDialog';
 import { cn } from '@/lib/utils';
 
 export interface ProductivityScopeInfo {
@@ -30,6 +32,13 @@ interface ProductivityCardProps {
   scopeInfo?: ProductivityScopeInfo;
   includeTransferred?: boolean;
   onToggleTransferred?: (value: boolean) => void;
+  // Props for report
+  scope?: ProductivityScope;
+  spaceId?: string;
+  userId?: string;
+  userIds?: string[];
+  startDate?: Date;
+  endDate?: Date;
 }
 
 const getScoreColor = (score: number): string => {
@@ -65,7 +74,25 @@ const ProductivityCardComponent = ({
   scopeInfo,
   includeTransferred,
   onToggleTransferred,
+  scope,
+  spaceId,
+  userId,
+  userIds,
+  startDate,
+  endDate,
 }: ProductivityCardProps) => {
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const { data: report, isLoading: reportLoading } = useProductivityDetailsReport({
+    scope,
+    spaceId,
+    userId,
+    userIds,
+    startDate,
+    endDate,
+    includeTransferred,
+    enabled: reportOpen,
+  });
   const score = stats?.productivityScore ?? 100;
   const progressPercentage = Math.min((score / 200) * 100, 100);
 
@@ -205,15 +232,32 @@ const ProductivityCardComponent = ({
               </div>
             )}
 
-            {/* Total */}
-            <div className={onToggleTransferred ? '' : 'pt-2 border-t'}>
-              <p className="text-xs text-muted-foreground text-center">
+            {/* Total + Report button */}
+            <div className={cn('flex items-center justify-between', onToggleTransferred ? '' : 'pt-2 border-t')}>
+              <p className="text-xs text-muted-foreground">
                 📊 Total: {stats?.totalCompleted ?? 0} tarefas {includeTransferred ? 'concluídas + transferidas' : 'concluídas'}
               </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs"
+                onClick={() => setReportOpen(true)}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Relatório
+              </Button>
             </div>
           </div>
         )}
       </CardContent>
+
+      <ProductivityReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        report={report || null}
+        isLoading={reportLoading}
+        title={`Relatório — ${title}`}
+      />
     </Card>
   );
 };

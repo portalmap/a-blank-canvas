@@ -3101,6 +3101,22 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_productivity_details_by_scope: {
+        Args: {
+          p_early_threshold?: number
+          p_end_date?: string
+          p_include_transferred?: boolean
+          p_limit?: number
+          p_on_time_threshold?: number
+          p_scope?: string
+          p_space_id?: string
+          p_start_date?: string
+          p_user_id?: string
+          p_user_ids?: string[]
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       get_productivity_ranking: {
         Args: {
           p_early_threshold?: number

@@ -315,6 +315,11 @@ const ProductivityCardWrapper = ({
       scopeInfo={scopeInfo}
       includeTransferred={includeTransferred}
       onToggleTransferred={setIncludeTransferred}
+      scope={card.config.scope || 'workspace'}
+      spaceId={card.config.spaceId}
+      userIds={effectiveUserIds}
+      startDate={dateRange?.startDate}
+      endDate={dateRange?.endDate}
     />
   );
 };
