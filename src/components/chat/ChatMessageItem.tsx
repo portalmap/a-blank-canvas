@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ChatMessageWithSender } from '@/hooks/useChat';
 import { ChatAttachments } from './ChatAttachments';
+import { StickerMessage, isStickerMessage } from './stickers/StickerMessage';
 import { useUpdateChatMessage, useResolveChatAssignment } from '@/hooks/useChat';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
@@ -130,11 +131,21 @@ export const ChatMessageItem = ({
           </div>
         ) : (
           <>
-            <p className="text-sm whitespace-pre-wrap break-words">
-              {message.content}
-              {isEdited && <span className="text-xs text-muted-foreground ml-1">(editado)</span>}
-            </p>
-            <ChatAttachments attachments={message.attachments as any[] || []} />
+            {(() => {
+              const stickerId = isStickerMessage(message.content);
+              if (stickerId) {
+                return <StickerMessage stickerId={stickerId} />;
+              }
+              return (
+                <>
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {message.content}
+                    {isEdited && <span className="text-xs text-muted-foreground ml-1">(editado)</span>}
+                  </p>
+                  <ChatAttachments attachments={message.attachments as any[] || []} />
+                </>
+              );
+            })()}
 
             {hasAssignment && (
               <div className="flex items-center gap-2 mt-1 text-xs text-primary">

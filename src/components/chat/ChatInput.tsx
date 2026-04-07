@@ -10,6 +10,8 @@ import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
+import { StickerGallery } from './stickers/StickerGallery';
+import { useRecordStickerUsage, type Sticker } from '@/hooks/useStickers';
 import { toast } from 'sonner';
 
 interface ChatInputProps {
@@ -29,6 +31,16 @@ export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: Chat
   const sendMessage = useSendMessage();
   const createNotification = useCreateNotification();
   const { uploadFiles } = useUploadChatAttachments();
+  const recordStickerUsage = useRecordStickerUsage();
+
+  const handleStickerSelect = async (sticker: Sticker) => {
+    await sendMessage.mutateAsync({
+      channelId,
+      content: `[sticker:${sticker.id}]`,
+      replyTo,
+    });
+    recordStickerUsage.mutate(sticker.id);
+  };
 
   const getDisplayName = (member: WorkspaceMember) => {
     const fullName = member.profile?.full_name;
@@ -218,6 +230,11 @@ export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: Chat
               setContent(prev => prev + emoji);
             }
           }}
+          triggerClassName="flex-shrink-0 h-9 w-9"
+          side="top"
+        />
+        <StickerGallery
+          onStickerSelect={handleStickerSelect}
           triggerClassName="flex-shrink-0 h-9 w-9"
           side="top"
         />
