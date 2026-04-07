@@ -56,9 +56,11 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   const { data: unreadChannelIds } = useUnreadChannels();
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDMDialog, setShowDMDialog] = useState(false);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({});
-  const [expandedSections, setExpandedSections] = useState<Record<string, { spaces: boolean; custom: boolean }>>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, { spaces: boolean; custom: boolean; dms: boolean }>>({});
   const [channelToDelete, setChannelToDelete] = useState<ChannelWithWorkspace | null>(null);
+  const { data: profiles } = useAllProfiles();
 
   const canCreateChannel = userRole?.workspaceRole === 'admin' || userRole?.workspaceRole === 'member';
 
