@@ -11,15 +11,6 @@ import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelec
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { toast } from 'sonner';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useSendMessage } from '@/hooks/useChat';
-import { useCreateNotification } from '@/hooks/useNotifications';
-import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
-import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
-import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
-import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
-import { toast } from 'sonner';
 
 interface ChatInputProps {
   channelId: string;
