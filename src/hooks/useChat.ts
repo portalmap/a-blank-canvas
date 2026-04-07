@@ -87,6 +87,8 @@ export interface ChatMessageWithSender {
   assignee_id: string | null;
   resolved_at: string | null;
   resolved_by: string | null;
+  reply_to: string | null;
+  reply_count?: number;
   sender: {
     id: string;
     full_name: string | null;
