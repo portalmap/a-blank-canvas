@@ -66,10 +66,16 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskStartDate, setNewTaskStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [newName, setNewName] = useState('');
 
   const handleCreateTask = async () => {
     if (!activeWorkspace || !newTaskTitle.trim() || !statuses || statuses.length === 0) return;
+
+    if (!newTaskStartDate || !newTaskDueDate) {
+      return;
+    }
 
     const defaultStatus = statuses.find(s => s.is_default) || statuses[0];
 
@@ -79,10 +85,14 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
       statusId: defaultStatus.id,
       title: newTaskTitle,
       description: newTaskDescription,
+      startDate: newTaskStartDate,
+      dueDate: newTaskDueDate,
     });
 
     setNewTaskTitle('');
     setNewTaskDescription('');
+    setNewTaskStartDate(new Date().toISOString().split('T')[0]);
+    setNewTaskDueDate('');
     setIsTaskDialogOpen(false);
     navigate(`/list/${list.id}`);
   };
@@ -194,6 +204,26 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
                 placeholder="Descreva os detalhes da tarefa"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="task-start-date">Data de Início *</Label>
+                <Input
+                  id="task-start-date"
+                  type="date"
+                  value={newTaskStartDate}
+                  onChange={(e) => setNewTaskStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="task-due-date">Data de Entrega *</Label>
+                <Input
+                  id="task-due-date"
+                  type="date"
+                  value={newTaskDueDate}
+                  onChange={(e) => setNewTaskDueDate(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
@@ -201,7 +231,7 @@ export function ListTreeItem({ list }: ListTreeItemProps) {
             </Button>
             <Button 
               onClick={handleCreateTask} 
-              disabled={!newTaskTitle.trim() || createTask.isPending}
+              disabled={!newTaskTitle.trim() || !newTaskStartDate || !newTaskDueDate || createTask.isPending}
             >
               Criar Tarefa
             </Button>

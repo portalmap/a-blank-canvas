@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge, PriorityBadge } from '@/components/ui/badge-variant';
-import { Calendar, Clock, Flag, X } from 'lucide-react';
+import { Calendar, Clock, Flag, X, Lock } from 'lucide-react';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useStatusesForScope } from '@/hooks/useStatuses';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
@@ -14,6 +14,7 @@ import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomatio
 import { TaskProductivityIndicator } from './TaskProductivityIndicator';
 import { calculateClassification, getClassificationLabel } from '@/hooks/useProductivityClassification';
 import { useProductivitySettings } from '@/hooks/useProductivitySettings';
+import { useUserRole } from '@/hooks/useUserRole';
 import { SubtaskList } from './SubtaskList';
 import { TaskChecklists } from './TaskChecklists';
 import { TaskAttachmentsList } from './TaskAttachmentsList';
@@ -22,6 +23,7 @@ import { TaskTagsSelector } from './TaskTagsSelector';
 import { TaskFollowersManager } from './TaskFollowersManager';
 import { TaskRecurrenceConfig } from './TaskRecurrenceConfig';
 import { SimpleRichTextEditor } from '@/components/documents/editor';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { startOfDay, isBefore, isEqual } from 'date-fns';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -63,6 +65,8 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
   const createActivity = useCreateTaskActivity();
   const { data: statuses } = useStatusesForScope('list', task.list_id, task.workspace_id);
   const { data: productivitySettings } = useProductivitySettings();
+  const { data: userRole } = useUserRole();
+  const canEditDates = userRole?.isAdmin || userRole?.isOwner || userRole?.isGlobalOwner;
 
   // Sincroniza descrição quando a tarefa muda
   useEffect(() => {
@@ -326,6 +330,7 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
         <div className="space-y-2">
           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Calendar className="h-4 w-4" /> Data de Início
+            {!canEditDates && <Tooltip><TooltipTrigger><Lock className="h-3 w-3" /></TooltipTrigger><TooltipContent>Apenas admins e proprietários podem alterar datas</TooltipContent></Tooltip>}
           </label>
           <div className="relative">
             <Input 
@@ -333,8 +338,9 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
               value={task.start_date || ''} 
               onChange={handleStartDateChange}
               className="pr-8"
+              disabled={!canEditDates}
             />
-            {task.start_date && (
+            {task.start_date && canEditDates && (
               <Button
                 type="button"
                 variant="ghost"
@@ -364,6 +370,7 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
             isOverdue ? "text-destructive" : "text-muted-foreground"
           )}>
             <Clock className="h-4 w-4" /> Data de Entrega
+            {!canEditDates && <Tooltip><TooltipTrigger><Lock className="h-3 w-3" /></TooltipTrigger><TooltipContent>Apenas admins e proprietários podem alterar datas</TooltipContent></Tooltip>}
           </label>
           <div className="relative">
             <Input 
@@ -371,8 +378,9 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
               value={task.due_date || ''} 
               onChange={handleDueDateChange}
               className={cn("pr-8", isOverdue && "border-destructive")}
+              disabled={!canEditDates}
             />
-            {task.due_date && (
+            {task.due_date && canEditDates && (
               <Button
                 type="button"
                 variant="ghost"
