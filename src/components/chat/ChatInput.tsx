@@ -15,9 +15,10 @@ interface ChatInputProps {
   channelId: string;
   channelName: string;
   workspaceId?: string;
+  replyTo?: string;
 }
 
-export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProps) => {
+export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: ChatInputProps) => {
   const [content, setContent] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<WorkspaceMember | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -93,6 +94,7 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
         content: trimmedContent || (attachments ? '📎 Anexo' : ''),
         assigneeId,
         attachments,
+        replyTo,
       });
 
       if (selectedAssignee && workspaceId && result.hasAssignee) {
