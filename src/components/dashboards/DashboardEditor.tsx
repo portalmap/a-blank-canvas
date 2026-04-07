@@ -365,4 +365,30 @@ const ProductivityRankingCardWrapper = ({
   );
 };
 
+// Wrapper component for AccountProductivityCard to use hooks
+const AccountProductivityCardWrapper = ({
+  card: _card,
+  commonProps,
+  dateRange,
+}: {
+  card: DashboardCard;
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean };
+  dateRange?: DateRangeProps;
+}) => {
+  const { data, isLoading } = useAccountProductivity({
+    startDate: dateRange?.startDate,
+    endDate: dateRange?.endDate,
+  });
+
+  return (
+    <AccountProductivityCard
+      {...commonProps}
+      data={data || null}
+      isLoading={isLoading}
+      startDate={dateRange?.startDate}
+      endDate={dateRange?.endDate}
+    />
+  );
+};
+
 export const DashboardEditor = memo(DashboardEditorComponent);
