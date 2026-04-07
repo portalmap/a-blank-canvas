@@ -1,86 +1,44 @@
 
 
-# Plano de Segurança — 3 Itens + Recomendações Adicionais
+# Corrigir Relatório de Produtividade — Classificação e Transferências
 
-## Contexto
+## Diagnóstico
 
-- **Item 1 (HIBP)**: Já realizado pelo usuário — nenhuma ação necessária.
-- **Item 2 (Políticas RLS permissivas)**: 5 políticas com `true` encontradas em 3 tabelas.
-- **Item 3 (space_templates exposto)**: Tabela acessível ao público sem autenticação.
+Três falhas combinadas fazem o relatório mostrar "0 tarefas":
 
----
+1. **`get_productivity_stats`** recebe `p_include_transferred` mas nunca o usa — só consulta `task_assignees` (responsável atual)
+2. **Triggers de assignee** (`on_task_assignee_added/removed`) não calculam `classification` — campo é sempre NULL
+3. **Não existe trigger de conclusão** (`tasks.completed_at`) que classifique o registro no `task_assignee_history`
 
-## Item 2 — Corrigir políticas RLS permissivas
+## Alterações
 
-### Tabelas afetadas e diagnóstico
+### 1. Migration SQL — Triggers de classificação + Refatorar função RPC
 
-| Tabela | Política | Problema |
-|---|---|---|
-| `notifications` | INSERT `WITH CHECK (true)` | Qualquer pessoa pode inserir notificações para qualquer usuário |
-| `webhook_deliveries` | INSERT `WITH CHECK (true)`, UPDATE `USING (true)` | Escritas abertas ao público |
-| `webhook_inbox` | INSERT `WITH CHECK (true)`, UPDATE `USING (true)` | Escritas abertas ao público |
+**Trigger na remoção de assignee (transferência)**:
+- Ao fazer `on_task_assignee_removed`, calcular `classification` usando `calc_delivery_pct` e os thresholds do `productivity_settings`
+- Preencher o campo `classification` no `task_assignee_history`
 
-### Solução
+**Trigger na conclusão de tarefa**:
+- Criar trigger `on_task_completed` em `tasks` que dispara quando `completed_at` muda de NULL para um valor
+- Para cada registro em `task_assignee_history` do task onde `unassigned_at IS NULL`, preencher `classification` usando `completed_at` como referência
 
-Essas tabelas de `notifications`, `webhook_deliveries` e `webhook_inbox` recebem writes de Edge Functions (que usam `service_role_key`). A role `service_role` já **bypassa RLS automaticamente**. Portanto, as políticas permissivas para `{public}` são desnecessárias.
+**Refatorar `get_productivity_stats`**:
+- Quando `p_include_transferred = true`: buscar dados do `task_assignee_history` (tanto concluídas quanto transferidas) em vez de só `tasks + task_assignees`
+- Quando `p_include_transferred = false` (padrão): manter comportamento atual mas usando `task_assignee_history` onde `unassigned_at IS NULL` e a tarefa tem `completed_at`
+- Usar o `classification` já preenchido pela trigger ou calcular inline via `calc_delivery_pct`
 
-**Migration SQL:**
-- Dropar as 5 políticas permissivas
-- Recriar com restrição a `authenticated` + validação de pertencimento ao workspace:
-  - `notifications` INSERT: `WITH CHECK (user_id = auth.uid())` — apenas o próprio sistema via service_role insere para outros
-  - `webhook_deliveries` INSERT/UPDATE: restringir para `service_role` only (dropar a policy e não recriar — service_role já bypassa)
-  - `webhook_inbox` INSERT/UPDATE: mesmo tratamento
+**Backfill dos dados existentes**:
+- Script que preenche `classification` para todos os registros históricos existentes com base nas datas registradas
 
----
+### 2. Nenhuma alteração de frontend necessária
 
-## Item 3 — Restringir `space_templates`
+Os hooks e componentes já passam `includeTransferred` e consomem o resultado — o problema é 100% no banco de dados.
 
-### Problema
+## Arquivos
+- 1 migration SQL (triggers + refatorar RPC + backfill)
 
-A política SELECT usa role `{public}` e permite `workspace_id IS NULL` — templates globais ficam visíveis sem autenticação.
-
-### Solução
-
-**Migration SQL:**
-- Dropar a política SELECT atual
-- Recriar exigindo `auth.uid() IS NOT NULL` (apenas `authenticated`):
-  ```
-  USING (
-    auth.uid() IS NOT NULL
-    AND (
-      workspace_id IS NULL
-      OR EXISTS (SELECT 1 FROM workspace_members WHERE ...)
-    )
-  )
-  ```
-- Alterar as demais políticas (INSERT, UPDATE, DELETE) de `{public}` para `TO authenticated`
-
----
-
-## Recomendações adicionais de segurança
-
-Após análise completa das 68 tabelas:
-
-1. **Todas as políticas usam role `{public}` em vez de `TO authenticated`** — Isso significa que tokens anônimos (anon key) podem tentar operações. Recomendo migrar gradualmente todas as políticas para `TO authenticated` onde aplicável.
-
-2. **`profiles` SELECT usa `USING (true)`** — Qualquer pessoa autenticada vê todos os perfis (nome, telefone, bio, avatar). Considerar restringir a membros do mesmo workspace.
-
-3. **`api_tokens` armazena token em texto** — O campo `token` está em plain text. Idealmente deveria armazenar apenas o hash e mostrar o token uma vez ao criar.
-
-4. **Edge Functions sem JWT verification** — Funções como `webhooks-inbound` e `api-gateway` podem não verificar JWT. Verificar se `verify_jwt = false` está configurado apenas onde necessário.
-
-5. **Buckets de storage públicos** — `task-attachments` e `chat-attachments` são públicos. Qualquer pessoa com o URL pode acessar arquivos. Considerar tornar privados com políticas de acesso.
-
----
-
-## Arquivos alterados
-
-- 1 migration SQL (dropar e recriar ~8 políticas RLS)
-- 0 arquivos frontend (as queries continuam funcionando pois os usuários já são autenticados)
-
-## Prioridade de execução
-
-1. Corrigir `space_templates` (item 3) — risco alto
-2. Corrigir `notifications`, `webhook_*` (item 2) — risco médio
-3. Recomendações adicionais — melhorias graduais
+## Resultado
+- Victor Borges (e qualquer usuário transferido) aparece no relatório com suas contribuições classificadas
+- Tarefas concluídas pelo responsável atual também são classificadas no histórico
+- O toggle "Incluir transferidas" passa a funcionar de verdade
 
