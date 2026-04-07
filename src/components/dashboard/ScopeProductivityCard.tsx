@@ -45,6 +45,8 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
     folderId,
     listId,
     includeTransferred,
+    startDate,
+    endDate,
     enabled: reportOpen,
   });
 
