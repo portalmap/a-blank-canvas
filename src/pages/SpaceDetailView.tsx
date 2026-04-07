@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useSpace } from '@/hooks/useSpaces';
+import { useSpace, useUpdateSpace } from '@/hooks/useSpaces';
 import { useFolders, useCreateFolder } from '@/hooks/useFolders';
 import { useLists, useCreateList } from '@/hooks/useLists';
 import { useTaskStats } from '@/hooks/useTaskStats';
+import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { Loader2, Plus, FolderOpen, List, ChevronRight, Pencil, FileText } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Loader2, Plus, FolderOpen, List, ChevronRight, Pencil, FileText, UserCheck, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
@@ -30,9 +33,11 @@ const SpaceDetailView = () => {
   const { data: folders, isLoading: foldersLoading } = useFolders(spaceId);
   const { data: lists, isLoading: listsLoading } = useLists({ spaceId });
   const { data: taskStats, isLoading: statsLoading } = useTaskStats({ type: 'space', id: spaceId });
+  const { data: members = [] } = useWorkspaceMembers(activeWorkspace?.id);
   
   const createFolder = useCreateFolder();
   const createList = useCreateList();
+  const updateSpace = useUpdateSpace();
 
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
   const [isListDialogOpen, setIsListDialogOpen] = useState(false);
