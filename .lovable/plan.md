@@ -1,70 +1,22 @@
 
 
-# Card de Produtividade em Space, Pasta e Lista
+# Filtro de Datas no Card de Produtividade (Space/Pasta/Lista)
 
 ## Resumo
 
-Adicionar um card de produtividade (score, antecipadas, no prazo, atrasadas, sem prazo) nas páginas de detalhe de **Space**, **Pasta** e **Lista**, usando a mesma lógica de cálculo existente. Requer estender as RPCs do banco para suportar os escopos `folder` e `list`.
+Adicionar o componente `DateRangeFilter` já existente ao `ScopeProductivityCard`, com período padrão "Mês Atual". As datas selecionadas serão passadas tanto para o `useProductivityStats` quanto para o `useProductivityDetailsReport`.
 
-## Alterações
+## Alteração
 
-### 1. Migration SQL — Estender RPCs
+### Editar `src/components/dashboard/ScopeProductivityCard.tsx`
 
-Adicionar parâmetros `p_folder_id` e `p_list_id` às duas funções:
-- **`get_productivity_stats`**: adicionar filtros `AND (p_scope != 'folder' OR l.folder_id = p_folder_id)` e `AND (p_scope != 'list' OR t.list_id = p_list_id)` em ambas CTEs (completed_tasks e transferred_tasks)
-- **`get_productivity_details_by_scope`**: mesma lógica de filtro para folder e list
-
-Os escopos aceitos passam a ser: `workspace`, `space`, `folder`, `list`, `my_tasks`, `user`.
-
-### 2. Editar `src/hooks/useProductivityStats.ts`
-
-- Adicionar `folder` e `list` ao tipo `ProductivityScope`
-- Adicionar `folderId` e `listId` às opções do hook
-- Passar `p_folder_id` e `p_list_id` na chamada RPC
-
-### 3. Editar `src/hooks/useProductivityDetailsReport.ts`
-
-- Adicionar `folderId` e `listId` às opções
-- Passar os novos parâmetros na chamada RPC
-
-### 4. Novo componente: `src/components/dashboard/ScopeProductivityCard.tsx`
-
-Card compacto e autônomo que:
-- Recebe `scope`, `spaceId`, `folderId` ou `listId`
-- Usa `useProductivityStats` internamente
-- Exibe: score principal + 4 mini-indicadores (antecipadas, no prazo, atrasadas, sem prazo)
-- Botão "Relatório" que abre o `ProductivityReportDialog` com os dados detalhados
-- Toggle para incluir tarefas transferidas
-- Visual similar ao ProductivityCard do dashboard, mas sem menu de delete/resize
-
-### 5. Editar `src/pages/SpaceDetailView.tsx`
-
-- Importar `ScopeProductivityCard`
-- Adicionar abaixo do `TaskStatsDashboard` existente:
-  ```
-  <ScopeProductivityCard scope="space" spaceId={spaceId} />
-  ```
-
-### 6. Editar `src/pages/FolderDetailView.tsx`
-
-- Importar `ScopeProductivityCard`
-- Adicionar abaixo do `TaskStatsDashboard`:
-  ```
-  <ScopeProductivityCard scope="folder" folderId={folderId} />
-  ```
-
-### 7. Editar `src/pages/ListDetailView.tsx`
-
-- Importar `ScopeProductivityCard`
-- Adicionar na área do cabeçalho (antes da listagem de tarefas):
-  ```
-  <ScopeProductivityCard scope="list" listId={listId} />
-  ```
+1. Importar `DateRangeFilter` de `@/components/filters/DateRangeFilter` e `useCallback` do React
+2. Adicionar estado `startDate` e `endDate`, inicializados com o mês atual (`startOfMonth(new Date())` e `new Date()`)
+3. Criar callback `handleDateRangeChange` para atualizar os estados
+4. Renderizar o `DateRangeFilter` no header do card (entre o título e os controles de Transferidas/Relatório), com `defaultPeriod="current-month"`
+5. Passar `startDate` e `endDate` para ambos os hooks (`useProductivityStats` e `useProductivityDetailsReport`)
 
 ## Arquivos
 
-- 1 migration SQL (atualizar 2 RPCs)
-- 2 hooks editados (`useProductivityStats.ts`, `useProductivityDetailsReport.ts`)
-- 1 novo componente (`ScopeProductivityCard.tsx`)
-- 3 páginas editadas (`SpaceDetailView.tsx`, `FolderDetailView.tsx`, `ListDetailView.tsx`)
+- 1 editado: `src/components/dashboard/ScopeProductivityCard.tsx`
 
