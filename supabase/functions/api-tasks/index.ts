@@ -212,14 +212,20 @@ Deno.serve(async (req) => {
 
     console.log(`Final status resolved: ${statusId} for list ${listId}`);
 
+    // Default dates if not provided (today + 7 days)
+    const today = new Date().toISOString().split('T')[0];
+    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const finalStartDate = payload.start_date || today;
+    const finalDueDate = payload.due_date || nextWeek;
+
     // Create the task
     const { data: task, error: taskError } = await supabase
       .from("tasks")
       .insert({
         title: payload.title,
         description: payload.description || null,
-        due_date: payload.due_date || null,
-        start_date: payload.start_date || null,
+        due_date: finalDueDate,
+        start_date: finalStartDate,
         priority: payload.priority || "medium",
         list_id: listId,
         status_id: statusId,
