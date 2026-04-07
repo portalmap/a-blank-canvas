@@ -336,6 +336,7 @@ export type Database = {
           edited_at: string | null
           id: string
           read_at: string | null
+          reply_to: string | null
           resolved_at: string | null
           resolved_by: string | null
           sender_id: string
@@ -350,6 +351,7 @@ export type Database = {
           edited_at?: string | null
           id?: string
           read_at?: string | null
+          reply_to?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           sender_id: string
@@ -364,6 +366,7 @@ export type Database = {
           edited_at?: string | null
           id?: string
           read_at?: string | null
+          reply_to?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           sender_id?: string
@@ -374,6 +377,84 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_pinned_messages: {
+        Row: {
+          channel_id: string
+          id: string
+          message_id: string
+          pinned_at: string
+          pinned_by: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          message_id: string
+          pinned_at?: string
+          pinned_by: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          message_id?: string
+          pinned_at?: string
+          pinned_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_pinned_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_pinned_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -3318,6 +3399,8 @@ export type Database = {
         | "project"
         | "custom"
         | "space"
+        | "dm"
+        | "group_dm"
       list_view: "list" | "kanban" | "sprint"
       permission_role: "viewer" | "commenter" | "editor"
       status_scope: "workspace" | "space" | "folder" | "list"
@@ -3503,7 +3586,15 @@ export const Constants = {
         "on_task_unblocked",
       ],
       chat_channel_role: ["owner", "member"],
-      chat_channel_type: ["client", "department", "project", "custom", "space"],
+      chat_channel_type: [
+        "client",
+        "department",
+        "project",
+        "custom",
+        "space",
+        "dm",
+        "group_dm",
+      ],
       list_view: ["list", "kanban", "sprint"],
       permission_role: ["viewer", "commenter", "editor"],
       status_scope: ["workspace", "space", "folder", "list"],
