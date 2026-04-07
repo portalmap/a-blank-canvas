@@ -9,15 +9,17 @@ import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
 import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
+import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { toast } from 'sonner';
 
 interface ChatInputProps {
   channelId: string;
   channelName: string;
   workspaceId?: string;
+  replyTo?: string;
 }
 
-export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProps) => {
+export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: ChatInputProps) => {
   const [content, setContent] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<WorkspaceMember | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -93,6 +95,7 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
         content: trimmedContent || (attachments ? '📎 Anexo' : ''),
         assigneeId,
         attachments,
+        replyTo,
       });
 
       if (selectedAssignee && workspaceId && result.hasAssignee) {
@@ -198,6 +201,25 @@ export const ChatInput = ({ channelId, channelName, workspaceId }: ChatInputProp
           multiple
           onChange={handleFilesSelected}
           className="hidden"
+        />
+        <EmojiPickerPopover
+          onEmojiSelect={(emoji) => {
+            const el = textareaRef.current;
+            if (el) {
+              const start = el.selectionStart;
+              const end = el.selectionEnd;
+              const newContent = content.slice(0, start) + emoji + content.slice(end);
+              setContent(newContent);
+              setTimeout(() => {
+                el.selectionStart = el.selectionEnd = start + emoji.length;
+                el.focus();
+              }, 0);
+            } else {
+              setContent(prev => prev + emoji);
+            }
+          }}
+          triggerClassName="flex-shrink-0 h-9 w-9"
+          side="top"
         />
         <Button
           variant="ghost"

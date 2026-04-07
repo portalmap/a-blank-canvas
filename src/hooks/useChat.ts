@@ -87,6 +87,8 @@ export interface ChatMessageWithSender {
   assignee_id: string | null;
   resolved_at: string | null;
   resolved_by: string | null;
+  reply_to: string | null;
+  reply_count?: number;
   sender: {
     id: string;
     full_name: string | null;
@@ -138,6 +140,7 @@ export const useChatMessages = (channelId?: string) => {
         assignee_id: (msg as any).assignee_id || null,
         resolved_at: (msg as any).resolved_at || null,
         resolved_by: (msg as any).resolved_by || null,
+        reply_to: (msg as any).reply_to || null,
         sender: profileMap.get(msg.sender_id) || null,
         assignee: (msg as any).assignee_id ? profileMap.get((msg as any).assignee_id) || null : null,
       }));
@@ -188,6 +191,7 @@ export const useChatMessages = (channelId?: string) => {
               assignee_id: (newMsg as any).assignee_id || null,
               resolved_at: (newMsg as any).resolved_at || null,
               resolved_by: (newMsg as any).resolved_by || null,
+              reply_to: (newMsg as any).reply_to || null,
               sender: profile,
               assignee: assigneeProfile,
             };
@@ -246,11 +250,12 @@ export const useSendMessage = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ channelId, content, assigneeId, attachments }: { 
+    mutationFn: async ({ channelId, content, assigneeId, attachments, replyTo }: { 
       channelId: string; 
       content: string;
       assigneeId?: string;
       attachments?: any[];
+      replyTo?: string;
     }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
@@ -259,6 +264,7 @@ export const useSendMessage = () => {
         sender_id: user.id,
         content,
         assignee_id: assigneeId || null,
+        reply_to: replyTo || null,
       };
 
       if (attachments && attachments.length > 0) {
@@ -552,6 +558,148 @@ export const useUpdateChatMessage = () => {
     onError: (error) => {
       toast.error('Erro ao editar mensagem');
       console.error(error);
+    },
+  });
+};
+
+export const useThreadMessages = (parentMessageId?: string) => {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['chat-thread', parentMessageId],
+    queryFn: async (): Promise<ChatMessageWithSender[]> => {
+      if (!parentMessageId) return [];
+
+      const { data: messages, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('reply_to', parentMessageId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (!messages || messages.length === 0) return [];
+
+      const userIds = [...new Set([
+        ...messages.map(m => m.sender_id),
+        ...messages.map(m => (m as any).assignee_id).filter(Boolean),
+      ])];
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      return messages.map(msg => ({
+        ...msg,
+        edited_at: (msg as any).edited_at || null,
+        edit_count: (msg as any).edit_count || 0,
+        assignee_id: (msg as any).assignee_id || null,
+        resolved_at: (msg as any).resolved_at || null,
+        resolved_by: (msg as any).resolved_by || null,
+        reply_to: (msg as any).reply_to || null,
+        sender: profileMap.get(msg.sender_id) || null,
+        assignee: (msg as any).assignee_id ? profileMap.get((msg as any).assignee_id) || null : null,
+      }));
+    },
+    enabled: !!parentMessageId,
+  });
+
+  // Realtime for thread
+  useEffect(() => {
+    if (!parentMessageId) return;
+
+    const channel = supabase
+      .channel(`chat-thread-${parentMessageId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' && (payload.new as any).reply_to === parentMessageId) {
+            queryClient.invalidateQueries({ queryKey: ['chat-thread', parentMessageId] });
+            // Also update reply count in parent channel
+            queryClient.invalidateQueries({ queryKey: ['chat-messages'] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [parentMessageId, queryClient]);
+
+  return query;
+};
+
+export const useCreateDM = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ memberIds, workspaceId }: { memberIds: string[]; workspaceId: string }) => {
+      if (!user?.id) throw new Error('Não autenticado');
+
+      const isDM = memberIds.length === 1;
+      const channelType = isDM ? 'dm' : 'group_dm';
+
+      // For 1:1 DM, check if already exists
+      if (isDM) {
+        const otherId = memberIds[0];
+        const { data: existingChannels } = await supabase
+          .from('chat_channels')
+          .select('id')
+          .eq('workspace_id', workspaceId)
+          .eq('type', 'dm');
+
+        if (existingChannels) {
+          for (const ch of existingChannels) {
+            const { data: members } = await supabase
+              .from('chat_channel_members')
+              .select('user_id')
+              .eq('channel_id', ch.id);
+
+            const memberUserIds = members?.map(m => m.user_id) || [];
+            if (memberUserIds.length === 2 && memberUserIds.includes(user.id) && memberUserIds.includes(otherId)) {
+              return ch;
+            }
+          }
+        }
+      }
+
+      // Create channel
+      const { data: channel, error } = await supabase
+        .from('chat_channels')
+        .insert({
+          workspace_id: workspaceId,
+          name: channelType === 'dm' ? 'DM' : 'Grupo',
+          type: channelType as any,
+          created_by_user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add all members including self
+      const allMembers = [...new Set([user.id, ...memberIds])];
+      const { error: membersError } = await supabase
+        .from('chat_channel_members')
+        .insert(allMembers.map(uid => ({
+          channel_id: channel.id,
+          user_id: uid,
+          role: uid === user.id ? 'owner' as const : 'member' as const,
+        })));
+
+      if (membersError) throw membersError;
+
+      return channel;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+    },
+    onError: () => {
+      toast.error('Erro ao criar conversa');
     },
   });
 };

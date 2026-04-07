@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
-import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2, MoreHorizontal, Trash2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAllChatChannels, useDeleteChannel } from '@/hooks/useChat';
 import { CreateChannelDialog } from './CreateChannelDialog';
+import { DMCreateDialog } from './DMCreateDialog';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadChannels } from '@/hooks/useChatUnread';
+import { useAllProfiles } from '@/hooks/useAllProfiles';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,9 +56,11 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
   const { data: unreadChannelIds } = useUnreadChannels();
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDMDialog, setShowDMDialog] = useState(false);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({});
-  const [expandedSections, setExpandedSections] = useState<Record<string, { spaces: boolean; custom: boolean }>>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, { spaces: boolean; custom: boolean; dms: boolean }>>({});
   const [channelToDelete, setChannelToDelete] = useState<ChannelWithWorkspace | null>(null);
+  const { data: profiles } = useAllProfiles();
 
   const canCreateChannel = userRole?.workspaceRole === 'admin' || userRole?.workspaceRole === 'member';
 
@@ -93,6 +97,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
       workspace: WorkspaceInfo;
       spaceChannels: ChannelWithWorkspace[];
       customChannels: ChannelWithWorkspace[];
+      dmChannels: ChannelWithWorkspace[];
     }> = {};
 
     channels.forEach((channel: any) => {
@@ -104,18 +109,20 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
           workspace: workspaceInfo,
           spaceChannels: [],
           customChannels: [],
+          dmChannels: [],
         };
-        // Auto-expand workspaces by default
         if (expandedWorkspaces[workspaceId] === undefined) {
           setExpandedWorkspaces(prev => ({ ...prev, [workspaceId]: true }));
         }
         if (!expandedSections[workspaceId]) {
-          setExpandedSections(prev => ({ ...prev, [workspaceId]: { spaces: true, custom: true } }));
+          setExpandedSections(prev => ({ ...prev, [workspaceId]: { spaces: true, custom: true, dms: true } }));
         }
       }
 
       if (channel.type === 'space') {
         grouped[workspaceId].spaceChannels.push(channel);
+      } else if (channel.type === 'dm' || channel.type === 'group_dm') {
+        grouped[workspaceId].dmChannels.push(channel);
       } else {
         grouped[workspaceId].customChannels.push(channel);
       }
@@ -143,7 +150,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
     }));
   };
 
-  const toggleSection = (workspaceId: string, section: 'spaces' | 'custom') => {
+  const toggleSection = (workspaceId: string, section: 'spaces' | 'custom' | 'dms') => {
     setExpandedSections(prev => ({
       ...prev,
       [workspaceId]: {
@@ -151,6 +158,14 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
         [section]: !prev[workspaceId]?.[section],
       },
     }));
+  };
+
+  const getDMDisplayName = (channel: ChannelWithWorkspace) => {
+    // For DMs, show the other person's name
+    // We need channel members - for now use channel name or profiles
+    if (!profiles || !user) return channel.name;
+    // We'll show the channel name as fallback
+    return channel.name;
   };
 
   if (isLoading) {
@@ -199,9 +214,9 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
           )}
 
           {workspaceIds.map((workspaceId) => {
-            const { workspace, spaceChannels, customChannels } = channelsByWorkspace[workspaceId];
+            const { workspace, spaceChannels, customChannels, dmChannels } = channelsByWorkspace[workspaceId];
             const isWorkspaceExpanded = expandedWorkspaces[workspaceId] !== false;
-            const sections = expandedSections[workspaceId] || { spaces: true, custom: true };
+            const sections = expandedSections[workspaceId] || { spaces: true, custom: true, dms: true };
 
             return (
               <Collapsible
@@ -343,6 +358,56 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                       </div>
                     )}
                   </div>
+
+                  {/* DM Channels */}
+                  <div className="mt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSection(workspaceId, 'dms');
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full px-2 py-1"
+                    >
+                      {sections.dms ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                      MENSAGENS DIRETAS ({dmChannels.length})
+                    </button>
+
+                    {sections.dms && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {dmChannels.map((channel) => (
+                          <button
+                            key={channel.id}
+                            onClick={() => onSelectChannel(channel.id)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                              selectedChannelId === channel.id
+                                ? "bg-primary/10 text-primary"
+                                : "hover:bg-muted text-foreground"
+                            )}
+                          >
+                            <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                            <span className={cn("truncate", unreadChannelIds?.includes(channel.id) && "font-bold text-destructive")}>
+                              {getDMDisplayName(channel)}
+                            </span>
+                          </button>
+                        ))}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowDMDialog(true)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Nova mensagem
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
             );
@@ -353,6 +418,12 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
       <CreateChannelDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
+      />
+
+      <DMCreateDialog
+        open={showDMDialog}
+        onOpenChange={setShowDMDialog}
+        onChannelCreated={(channelId) => onSelectChannel(channelId)}
       />
 
       <AlertDialog open={!!channelToDelete} onOpenChange={(open) => !open && setChannelToDelete(null)}>
