@@ -65,6 +65,8 @@ export const TaskMainContent = ({ task }: TaskMainContentProps) => {
   const createActivity = useCreateTaskActivity();
   const { data: statuses } = useStatusesForScope('list', task.list_id, task.workspace_id);
   const { data: productivitySettings } = useProductivitySettings();
+  const { data: userRole } = useUserRole();
+  const canEditDates = userRole?.isAdmin || userRole?.isOwner || userRole?.isGlobalOwner;
 
   // Sincroniza descrição quando a tarefa muda
   useEffect(() => {
