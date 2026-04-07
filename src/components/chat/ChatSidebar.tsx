@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react';
-import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Hash, Plus, MessageCircle, ChevronDown, ChevronRight, Loader2, Building2, MoreHorizontal, Trash2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAllChatChannels, useDeleteChannel } from '@/hooks/useChat';
 import { CreateChannelDialog } from './CreateChannelDialog';
+import { DMCreateDialog } from './DMCreateDialog';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadChannels } from '@/hooks/useChatUnread';
-import {
+import { useAllProfiles } from '@/hooks/useAllProfiles';
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
