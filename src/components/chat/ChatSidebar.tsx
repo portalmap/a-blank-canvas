@@ -150,7 +150,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
     }));
   };
 
-  const toggleSection = (workspaceId: string, section: 'spaces' | 'custom') => {
+  const toggleSection = (workspaceId: string, section: 'spaces' | 'custom' | 'dms') => {
     setExpandedSections(prev => ({
       ...prev,
       [workspaceId]: {
@@ -158,6 +158,14 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
         [section]: !prev[workspaceId]?.[section],
       },
     }));
+  };
+
+  const getDMDisplayName = (channel: ChannelWithWorkspace) => {
+    // For DMs, show the other person's name
+    // We need channel members - for now use channel name or profiles
+    if (!profiles || !user) return channel.name;
+    // We'll show the channel name as fallback
+    return channel.name;
   };
 
   if (isLoading) {
