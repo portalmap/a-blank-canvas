@@ -1,145 +1,122 @@
 
-
-# Upgrade do Chat — Itens 1 a 7
+# Upgrade do Chat — Itens 8 e 9: Figurinhas + Criador
 
 ## Resumo
 
-Implementar 7 recursos no módulo de chat: reações com emoji, threads, pesquisa de mensagens, fixar mensagens, DMs, grupos de DM, e emoji picker completo (estilo WhatsApp).
+Implementar sistema completo de figurinhas no chat: galeria organizada em pacotes, upload de imagens como stickers, envio no chat, e um criador de figurinhas no browser com recorte, redimensionamento e texto.
+
+---
+
+## Item 8 — Sistema de Figurinhas
+
+### O que faz
+- Usuários podem enviar figurinhas nas mensagens do chat (como WhatsApp)
+- Galeria de figurinhas acessível por botão ao lado do input
+- Figurinhas organizadas em **pacotes** (ex: "Emojis animados", "Memes do time")
+- Qualquer membro pode fazer upload de imagens (PNG/WebP) como figurinhas
+- Figurinhas ficam disponíveis para todo o workspace
+- Aba "Recentes" mostra as últimas figurinhas usadas pelo usuário
+
+### Banco de dados
+
+**`sticker_packs`** — pacotes de figurinhas
+- `id`, `workspace_id`, `name`, `description`, `cover_url`, `created_by`, `created_at`
+
+**`stickers`** — figurinhas individuais
+- `id`, `pack_id FK sticker_packs`, `workspace_id`, `name`, `image_url` (path no storage), `created_by`, `created_at`
+
+**`sticker_usage`** — registro de uso para "Recentes"
+- `id`, `sticker_id FK stickers`, `user_id`, `used_at`
+
+### Storage
+- Bucket `stickers` (privado, signed URLs) para armazenar as imagens
+
+### Componentes
+
+1. **`StickerGallery.tsx`** — Popover/Sheet com abas: Recentes | Pacotes | Todos
+2. **`StickerPackCard.tsx`** — Card de um pacote com preview das figurinhas
+3. **`StickerUploadDialog.tsx`** — Dialog para upload de imagem + selecionar/criar pacote
+4. **`StickerMessage.tsx`** — Renderização de uma figurinha enviada no chat (imagem maior que emoji, sem balão de texto)
+
+### Hook
+- **`useStickers.ts`** — CRUD de pacotes e stickers, busca recentes, registro de uso
+
+### Integração
+- `ChatInput.tsx` — botão de figurinha ao lado do emoji picker
+- `ChatMessageItem.tsx` — detectar mensagem tipo sticker e renderizar `StickerMessage`
+- Mensagem com sticker: `content` = `[sticker:ID]` (formato especial parseado no render)
+
+---
+
+## Item 9 — Criador de Figurinhas no Browser
+
+### O que faz
+- Editor visual dentro de um Dialog para criar figurinhas a partir de imagens
+- Funcionalidades:
+  - **Upload de imagem** base (foto, screenshot, etc.)
+  - **Recorte** (crop) livre ou circular
+  - **Redimensionar** para caber no formato padrão (512x512)
+  - **Adicionar texto** sobre a imagem (com cor, tamanho, posição)
+  - **Rotação** da imagem
+  - **Preview** em tempo real
+  - **Salvar** como figurinha em um pacote existente ou novo
+
+### Tecnologia
+- Usa **Canvas API** nativo do browser (sem dependências extras pesadas)
+- Componente `<canvas>` para manipulação da imagem
+- Controles com sliders e inputs do shadcn/ui
+
+### Componentes
+
+1. **`StickerCreatorDialog.tsx`** — Dialog principal com o editor
+2. **`StickerCanvas.tsx`** — Componente canvas com a imagem editável
+3. **`StickerTextOverlay.tsx`** — Controles para adicionar/editar texto sobre a imagem
+4. **`StickerCropControls.tsx`** — Controles de recorte e redimensionamento
+
+### Fluxo
+1. Usuário clica "Criar figurinha" na galeria
+2. Faz upload de uma imagem base
+3. Recorta, redimensiona, adiciona texto se quiser
+4. Clica "Salvar" → imagem final é exportada do canvas como PNG
+5. Upload automático para o bucket `stickers`
+6. Figurinha fica disponível na galeria do workspace
 
 ---
 
 ## Migration SQL (1 migration)
 
-### Novas tabelas
-
-**`chat_reactions`** — reações com emoji nas mensagens
-- `id uuid PK`, `message_id uuid FK chat_messages`, `user_id uuid FK profiles`, `emoji text NOT NULL`, `created_at timestamptz`
-- Unique constraint em `(message_id, user_id, emoji)`
-- RLS: SELECT/INSERT/DELETE para membros do workspace via canal
-
-**`chat_pinned_messages`** — mensagens fixadas
-- `id uuid PK`, `message_id uuid FK chat_messages UNIQUE`, `channel_id uuid FK chat_channels`, `pinned_by uuid FK profiles`, `pinned_at timestamptz`
-- RLS: SELECT para membros, INSERT/DELETE para admins + criador do canal
-
-### Alterações em tabelas existentes
-
-**`chat_messages`** — adicionar coluna:
-- `reply_to uuid REFERENCES chat_messages(id) ON DELETE SET NULL` — para threads
-
-**`chat_channel_type` enum** — adicionar valores:
-- `'dm'` e `'group_dm'`
-
-### Realtime
-- `ALTER PUBLICATION supabase_realtime ADD TABLE chat_reactions;`
-
-### RLS para todas as novas tabelas e operações
+- Criar tabelas `sticker_packs`, `stickers`, `sticker_usage`
+- Criar bucket `stickers` (privado)
+- RLS: membros do workspace podem ver/criar/usar figurinhas
+- RLS: apenas o criador ou admin pode deletar figurinha/pacote
 
 ---
 
-## Arquivos a criar/editar
+## Arquivos
 
-### Novos componentes (6 arquivos)
+### Novos (9 arquivos)
+1. `src/components/chat/stickers/StickerGallery.tsx`
+2. `src/components/chat/stickers/StickerPackCard.tsx`
+3. `src/components/chat/stickers/StickerUploadDialog.tsx`
+4. `src/components/chat/stickers/StickerMessage.tsx`
+5. `src/components/chat/stickers/StickerCreatorDialog.tsx`
+6. `src/components/chat/stickers/StickerCanvas.tsx`
+7. `src/components/chat/stickers/StickerTextOverlay.tsx`
+8. `src/components/chat/stickers/StickerCropControls.tsx`
+9. `src/hooks/useStickers.ts`
 
-1. **`src/components/chat/EmojiPickerPopover.tsx`**
-   - Integra biblioteca `emoji-mart` (ou `@emoji-mart/react`) com popover
-   - Usado tanto para reações quanto para inserir emoji no input
-
-2. **`src/components/chat/MessageReactions.tsx`**
-   - Exibe reações agrupadas por emoji com contagem e tooltip de quem reagiu
-   - Botão "+" para adicionar reação, clique numa reação existente para toggle
-
-3. **`src/components/chat/ThreadPanel.tsx`**
-   - Painel lateral (ou sheet) que abre ao clicar "Responder em fio"
-   - Lista respostas da thread + input próprio
-   - Header mostra mensagem original
-
-4. **`src/components/chat/ChatSearchDialog.tsx`**
-   - Dialog com input de busca, filtro por canal opcional
-   - Resultados com preview da mensagem, autor, data
-   - Clique navega ao canal + scroll até a mensagem (highlight)
-
-5. **`src/components/chat/PinnedMessagesSheet.tsx`**
-   - Sheet/popover no header do canal listando mensagens fixadas
-   - Botão "Desafixar" para admins
-
-6. **`src/components/chat/DMCreateDialog.tsx`**
-   - Seletor de usuário(s) para criar DM ou grupo de DM
-   - Para DM 1:1, verifica se já existe canal entre os dois usuários antes de criar
-
-### Novos hooks (3 arquivos)
-
-7. **`src/hooks/useChatReactions.ts`**
-   - `useMessageReactions(messageId)` — busca reações
-   - `useToggleReaction()` — adiciona ou remove reação
-   - Realtime subscription para atualizar reações em tempo real
-
-8. **`src/hooks/useChatSearch.ts`**
-   - `useChatSearch(query, channelId?)` — busca full-text em `chat_messages.content`
-   - Usa `ilike` ou `to_tsvector/to_tsquery` para busca
-
-9. **`src/hooks/useChatPins.ts`**
-   - `usePinnedMessages(channelId)` — lista fixados
-   - `usePinMessage()` / `useUnpinMessage()` — mutations
-
-### Arquivos editados (5 arquivos)
-
-10. **`src/components/chat/ChatMessageItem.tsx`**
-    - Adicionar botões no hover: reagir (emoji), responder em fio, fixar
-    - Renderizar `<MessageReactions>` abaixo do conteúdo
-    - Mostrar indicador de thread ("N respostas") quando `reply_count > 0`
-    - Indicador de "fixada" (📌) quando a mensagem está fixada
-
-11. **`src/components/chat/ChatRoom.tsx`**
-    - Adicionar botão de busca e botão de fixados no header
-    - Integrar `ThreadPanel` (painel lateral que abre ao clicar em thread)
-    - Filtrar mensagens: não mostrar replies inline (só no ThreadPanel)
-    - Atualizar `channelType` para aceitar `'dm' | 'group_dm'` também
-
-12. **`src/components/chat/ChatSidebar.tsx`**
-    - Adicionar seção "MENSAGENS DIRETAS" abaixo de "PERSONALIZADOS"
-    - Filtrar canais `dm` e `group_dm` para essa seção
-    - Exibir nome/avatar do outro usuário em DMs (não o nome do canal)
-    - Botão "Nova mensagem" para abrir `DMCreateDialog`
-
-13. **`src/components/chat/ChatInput.tsx`**
-    - Adicionar botão de emoji picker ao lado do input
-    - Inserir emoji selecionado na posição do cursor
-
-14. **`src/hooks/useChat.ts`**
-    - Adicionar `reply_to` no `ChatMessageWithSender` type
-    - Atualizar `useSendMessage` para aceitar `replyTo` opcional
-    - Adicionar `useThreadMessages(parentMessageId)` — busca replies de uma mensagem
-    - Atualizar `useAllChatChannels` para incluir DMs
-    - Adicionar `useCreateDM()` — cria canal tipo `dm` ou `group_dm`
-    - Adicionar `reply_count` via subquery ou campo calculado
-
-### Dependências (package.json)
-
-15. Instalar `@emoji-mart/react` e `@emoji-mart/data` para o emoji picker completo com emojis Unicode (mesmos do WhatsApp)
-
----
-
-## Detalhes técnicos importantes
-
-**Threads**: Mensagens com `reply_to` preenchido são "replies" e não aparecem no feed principal do canal. Apenas a mensagem pai aparece, com indicador "N respostas — clique para ver". O `ThreadPanel` abre ao lado como um sheet.
-
-**DMs**: Um canal `dm` tem exatamente 2 membros em `chat_channel_members`. O nome exibido na sidebar é o nome do outro participante (não do canal). Antes de criar, verificar se já existe um canal `dm` entre os dois usuários.
-
-**Pesquisa**: Usar `ilike '%query%'` inicialmente. Se performance for problema, criar índice GIN com `to_tsvector`.
-
-**Fixar**: Apenas admins do workspace ou criador do canal podem fixar/desafixar.
-
-**Emoji picker**: `emoji-mart` fornece todos os emojis Unicode com skin tones, categorias, busca — mesmo set usado pelo WhatsApp.
+### Editados (3 arquivos)
+10. `src/components/chat/ChatInput.tsx` — botão de figurinha
+11. `src/components/chat/ChatMessageItem.tsx` — render de sticker
+12. `src/hooks/useChatAttachments.ts` — suporte a signed URLs do bucket stickers
 
 ---
 
 ## Resultado
 
-- Mensagens podem receber reações com emoji (toggle, agrupadas)
-- Threads reduzem ruído nos canais
-- Busca full-text no histórico de mensagens
-- Mensagens podem ser fixadas no canal
-- DMs 1:1 e em grupo funcionam pela sidebar
-- Emoji picker completo no input e nas reações
-- ~14 arquivos novos/editados + 1 migration SQL + 2 dependências npm
-
+- Figurinhas enviadas no chat como imagens grandes (estilo WhatsApp)
+- Galeria organizada com pacotes, busca e recentes
+- Qualquer membro pode criar figurinhas diretamente no browser
+- Editor com recorte, texto e preview em tempo real
+- Zero dependências extras (Canvas API nativo)
+- ~12 arquivos novos/editados + 1 migration SQL
