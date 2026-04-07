@@ -232,15 +232,32 @@ const ProductivityCardComponent = ({
               </div>
             )}
 
-            {/* Total */}
-            <div className={onToggleTransferred ? '' : 'pt-2 border-t'}>
-              <p className="text-xs text-muted-foreground text-center">
+            {/* Total + Report button */}
+            <div className={cn('flex items-center justify-between', onToggleTransferred ? '' : 'pt-2 border-t')}>
+              <p className="text-xs text-muted-foreground">
                 📊 Total: {stats?.totalCompleted ?? 0} tarefas {includeTransferred ? 'concluídas + transferidas' : 'concluídas'}
               </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs"
+                onClick={() => setReportOpen(true)}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Relatório
+              </Button>
             </div>
           </div>
         )}
       </CardContent>
+
+      <ProductivityReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        report={report || null}
+        isLoading={reportLoading}
+        title={`Relatório — ${title}`}
+      />
     </Card>
   );
 };
