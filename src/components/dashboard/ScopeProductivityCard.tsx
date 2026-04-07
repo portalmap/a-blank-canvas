@@ -74,12 +74,13 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
     <>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-base flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Produtividade
             </CardTitle>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <DateRangeFilter onDateRangeChange={handleDateRangeChange} defaultPeriod="current-month" />
               <div className="flex items-center gap-1.5">
                 <Switch
                   id="scope-transferred"
