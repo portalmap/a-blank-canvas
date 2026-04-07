@@ -5,8 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSpaceTemplatesWithStructure, useApplySpaceTemplate } from '@/hooks/useSpaceTemplates';
 import { useCreateSpace } from '@/hooks/useSpaces';
+import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 import { Loader2, FolderPlus, FileStack, Check, ArrowLeft } from 'lucide-react';
 
 interface CreateSpaceDialogProps {
@@ -30,11 +33,13 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
   const [spaceName, setSpaceName] = useState('');
   const [spaceDescription, setSpaceDescription] = useState('');
   const [spaceColor, setSpaceColor] = useState('#6366f1');
+  const [accountUserId, setAccountUserId] = useState<string | null>(null);
 
   // Busca TODOS os templates globais
   const { data: templates } = useSpaceTemplatesWithStructure();
   const createSpace = useCreateSpace();
   const applyTemplate = useApplySpaceTemplate();
+  const { data: members = [] } = useWorkspaceMembers(workspaceId);
 
   const selectedTemplate = templates?.find(t => t.id === selectedTemplateId);
 
@@ -44,6 +49,7 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
     setSpaceName('');
     setSpaceDescription('');
     setSpaceColor('#6366f1');
+    setAccountUserId(null);
   };
 
   const handleClose = () => {
@@ -94,6 +100,7 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
           name: spaceName,
           description: spaceDescription || undefined,
           color: spaceColor,
+          accountUserId,
         });
       }
 
@@ -234,6 +241,36 @@ export const CreateSpaceDialog = ({ open, onOpenChange, workspaceId }: CreateSpa
                   />
                 ))}
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Account (opcional)</Label>
+              <Select
+                value={accountUserId || 'none'}
+                onValueChange={(v) => setAccountUserId(v === 'none' ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o Account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {members.map((member) => (
+                    <SelectItem key={member.user_id} value={member.user_id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={member.profile?.avatar_url || undefined} />
+                          <AvatarFallback className="text-[10px]">
+                            {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                        {member.profile?.full_name || 'Sem nome'}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Pessoa responsável pela performance geral do space
+              </p>
             </div>
           </div>
         )}

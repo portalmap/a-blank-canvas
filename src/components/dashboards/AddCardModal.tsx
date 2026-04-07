@@ -112,6 +112,14 @@ const cardTypes: CardTypeConfig[] = [
     hasScope: false,
   },
   {
+    id: 'account_productivity',
+    name: 'Account',
+    description: 'Ranking de Accounts por produtividade',
+    icon: TrendingUp,
+    category: 'Métricas',
+    hasScope: false,
+  },
+  {
     id: 'notes',
     name: 'Notas',
     description: 'Texto livre para anotações',

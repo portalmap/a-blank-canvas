@@ -11,12 +11,14 @@ import { PriorityBreakdownCard } from './cards/PriorityBreakdownCard';
 import { NotesCard } from './cards/NotesCard';
 import { ProductivityCard, ProductivityScopeInfo } from './cards/ProductivityCard';
 import { ProductivityRankingCard } from './cards/ProductivityRankingCard';
+import { AccountProductivityCard } from './cards/AccountProductivityCard';
 import { CardResizeDialog } from './CardResizeDialog';
 import { ExpandedCardDialog } from './ExpandedCardDialog';
 import { LayoutDashboard } from 'lucide-react';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useAccountProductivity } from '@/hooks/useAccountProductivity';
 
 interface DateRangeProps {
   startDate?: Date;
@@ -214,6 +216,15 @@ const DashboardEditorComponent = ({
             dateRange={dateRange}
           />
         );
+      case 'account_productivity':
+        return (
+          <AccountProductivityCardWrapper
+            key={card.id}
+            card={card}
+            commonProps={commonProps}
+            dateRange={dateRange}
+          />
+        );
       default:
         return null;
     }
@@ -350,6 +361,32 @@ const ProductivityRankingCardWrapper = ({
       onToggleTransferred={setIncludeTransferred}
       startDate={dateRange?.startDate?.toISOString()}
       endDate={dateRange?.endDate?.toISOString()}
+    />
+  );
+};
+
+// Wrapper component for AccountProductivityCard to use hooks
+const AccountProductivityCardWrapper = ({
+  card: _card,
+  commonProps,
+  dateRange,
+}: {
+  card: DashboardCard;
+  commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean };
+  dateRange?: DateRangeProps;
+}) => {
+  const { data, isLoading } = useAccountProductivity({
+    startDate: dateRange?.startDate,
+    endDate: dateRange?.endDate,
+  });
+
+  return (
+    <AccountProductivityCard
+      {...commonProps}
+      data={data || null}
+      isLoading={isLoading}
+      startDate={dateRange?.startDate}
+      endDate={dateRange?.endDate}
     />
   );
 };
