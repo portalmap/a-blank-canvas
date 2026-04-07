@@ -196,19 +196,38 @@ const ListDetailView = () => {
     });
   };
 
+  const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskStartDate, setNewTaskStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+
   const handleCreateTask = async () => {
     if (!activeWorkspace || !listId || !defaultStatus) return;
+
+    if (!newTaskTitle.trim()) {
+      return;
+    }
+
+    if (!newTaskStartDate || !newTaskDueDate) {
+      return;
+    }
 
     const newTask = await createTask.mutateAsync({
       workspaceId: activeWorkspace.id,
       listId,
       statusId: defaultStatus.id,
-      title: 'Nova Tarefa',
+      title: newTaskTitle.trim(),
       description: null,
       priority: 'medium',
+      startDate: newTaskStartDate,
+      dueDate: newTaskDueDate,
     });
 
     if (newTask) {
+      setNewTaskTitle('');
+      setNewTaskStartDate(new Date().toISOString().split('T')[0]);
+      setNewTaskDueDate('');
+      setIsCreateTaskDialogOpen(false);
       setSelectedTaskIdForDrawer(newTask.id);
       setIsDrawerOpen(true);
     }
