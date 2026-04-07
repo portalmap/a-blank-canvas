@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { startOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useProductivityStats, ProductivityScope } from '@/hooks/useProductivityStats';
 import { useProductivityDetailsReport } from '@/hooks/useProductivityDetailsReport';
 import { ProductivityReportDialog } from '@/components/dashboards/cards/ProductivityReportDialog';
+import { DateRangeFilter } from '@/components/filters/DateRangeFilter';
 import { TrendingUp, CheckCircle2, Clock, AlertTriangle, HelpCircle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +21,13 @@ interface ScopeProductivityCardProps {
 const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProductivityCardProps) => {
   const [includeTransferred, setIncludeTransferred] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date());
+
+  const handleDateRangeChange = useCallback((range: { startDate: Date | undefined; endDate: Date | undefined }) => {
+    setStartDate(range.startDate);
+    setEndDate(range.endDate);
+  }, []);
 
   const { data: stats, isLoading } = useProductivityStats({
     scope,
@@ -26,6 +35,8 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
     folderId,
     listId,
     includeTransferred,
+    startDate,
+    endDate,
   });
 
   const { data: report, isLoading: reportLoading } = useProductivityDetailsReport({
@@ -34,6 +45,8 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
     folderId,
     listId,
     includeTransferred,
+    startDate,
+    endDate,
     enabled: reportOpen,
   });
 
@@ -61,12 +74,13 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
     <>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-base flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Produtividade
             </CardTitle>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <DateRangeFilter onDateRangeChange={handleDateRangeChange} defaultPeriod="current-month" />
               <div className="flex items-center gap-1.5">
                 <Switch
                   id="scope-transferred"
