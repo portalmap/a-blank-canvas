@@ -9,6 +9,16 @@ import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
 import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
 import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
+import { EmojiPickerPopover } from './EmojiPickerPopover';
+import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useSendMessage } from '@/hooks/useChat';
+import { useCreateNotification } from '@/hooks/useNotifications';
+import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
+import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
+import { CommentAssigneeSelector } from '@/components/tasks/CommentAssigneeSelector';
+import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { toast } from 'sonner';
 
 interface ChatInputProps {
@@ -200,6 +210,25 @@ export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: Chat
           multiple
           onChange={handleFilesSelected}
           className="hidden"
+        />
+        <EmojiPickerPopover
+          onEmojiSelect={(emoji) => {
+            const el = textareaRef.current;
+            if (el) {
+              const start = el.selectionStart;
+              const end = el.selectionEnd;
+              const newContent = content.slice(0, start) + emoji + content.slice(end);
+              setContent(newContent);
+              setTimeout(() => {
+                el.selectionStart = el.selectionEnd = start + emoji.length;
+                el.focus();
+              }, 0);
+            } else {
+              setContent(prev => prev + emoji);
+            }
+          }}
+          triggerClassName="flex-shrink-0 h-9 w-9"
+          side="top"
         />
         <Button
           variant="ghost"
