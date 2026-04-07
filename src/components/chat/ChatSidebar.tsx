@@ -214,9 +214,9 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
           )}
 
           {workspaceIds.map((workspaceId) => {
-            const { workspace, spaceChannels, customChannels } = channelsByWorkspace[workspaceId];
+            const { workspace, spaceChannels, customChannels, dmChannels } = channelsByWorkspace[workspaceId];
             const isWorkspaceExpanded = expandedWorkspaces[workspaceId] !== false;
-            const sections = expandedSections[workspaceId] || { spaces: true, custom: true };
+            const sections = expandedSections[workspaceId] || { spaces: true, custom: true, dms: true };
 
             return (
               <Collapsible
