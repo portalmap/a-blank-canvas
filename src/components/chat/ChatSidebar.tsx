@@ -97,6 +97,7 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
       workspace: WorkspaceInfo;
       spaceChannels: ChannelWithWorkspace[];
       customChannels: ChannelWithWorkspace[];
+      dmChannels: ChannelWithWorkspace[];
     }> = {};
 
     channels.forEach((channel: any) => {
@@ -108,18 +109,20 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
           workspace: workspaceInfo,
           spaceChannels: [],
           customChannels: [],
+          dmChannels: [],
         };
-        // Auto-expand workspaces by default
         if (expandedWorkspaces[workspaceId] === undefined) {
           setExpandedWorkspaces(prev => ({ ...prev, [workspaceId]: true }));
         }
         if (!expandedSections[workspaceId]) {
-          setExpandedSections(prev => ({ ...prev, [workspaceId]: { spaces: true, custom: true } }));
+          setExpandedSections(prev => ({ ...prev, [workspaceId]: { spaces: true, custom: true, dms: true } }));
         }
       }
 
       if (channel.type === 'space') {
         grouped[workspaceId].spaceChannels.push(channel);
+      } else if (channel.type === 'dm' || channel.type === 'group_dm') {
+        grouped[workspaceId].dmChannels.push(channel);
       } else {
         grouped[workspaceId].customChannels.push(channel);
       }
