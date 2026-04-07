@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { FileIcon, Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileIcon, Download, Loader2 } from 'lucide-react';
 import { ChatImageDialog } from './ChatImageDialog';
 import { AudioPlayer } from '@/components/audio/AudioPlayer';
 import type { ChatAttachment } from '@/hooks/useChatAttachments';
+import { resolveChatAttachmentUrls } from '@/hooks/useChatAttachments';
 
 interface ChatAttachmentsProps {
   attachments: (ChatAttachment & { description?: string })[];
@@ -19,13 +20,41 @@ const formatSize = (bytes: number) => {
 
 export const ChatAttachments = ({ attachments }: ChatAttachmentsProps) => {
   const [previewImage, setPreviewImage] = useState<ChatAttachment | null>(null);
+  const [resolved, setResolved] = useState<(ChatAttachment & { description?: string })[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!attachments || attachments.length === 0) {
+      setResolved([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    
+    resolveChatAttachmentUrls(attachments).then((result) => {
+      if (!cancelled) {
+        // Re-attach description
+        setResolved(result.map((r, i) => ({ ...r, description: attachments[i]?.description })));
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setResolved(attachments);
+        setLoading(false);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [attachments]);
 
   if (!attachments || attachments.length === 0) return null;
+  if (loading) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />;
 
   return (
     <>
       <div className="flex flex-wrap gap-2 mt-1">
-        {attachments.map((att, i) =>
+        {resolved.map((att, i) =>
           isAudio(att.file_type) ? (
             <AudioPlayer key={i} src={att.file_url} description={att.description} />
           ) : isImage(att.file_type) ? (
