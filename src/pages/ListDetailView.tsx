@@ -333,7 +333,7 @@ const ListDetailView = () => {
               scopeId={listId!}
               scopeName={currentList.name}
             />
-            <Button onClick={handleCreateTask} disabled={createTask.isPending || !defaultStatus}>
+            <Button onClick={() => setIsCreateTaskDialogOpen(true)} disabled={createTask.isPending || !defaultStatus}>
               {createTask.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -463,6 +463,59 @@ const ListDetailView = () => {
         defaultStatusId={defaultStatus?.id}
         onClearSelection={() => setSelectedTaskIds([])}
       />
+      <Dialog open={isCreateTaskDialogOpen} onOpenChange={setIsCreateTaskDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Nova Tarefa</DialogTitle>
+            <DialogDescription>
+              Preencha o título e as datas obrigatórias para criar a tarefa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-task-title">Título *</Label>
+              <Input
+                id="new-task-title"
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                placeholder="Ex: Implementar autenticação"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-task-start">Data de Início *</Label>
+                <Input
+                  id="new-task-start"
+                  type="date"
+                  value={newTaskStartDate}
+                  onChange={(e) => setNewTaskStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-task-due">Data de Entrega *</Label>
+                <Input
+                  id="new-task-due"
+                  type="date"
+                  value={newTaskDueDate}
+                  onChange={(e) => setNewTaskDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateTaskDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateTask}
+              disabled={!newTaskTitle.trim() || !newTaskStartDate || !newTaskDueDate || createTask.isPending}
+            >
+              {createTask.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Criar Tarefa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
