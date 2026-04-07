@@ -358,6 +358,56 @@ export const ChatSidebar = ({ selectedChannelId, onSelectChannel }: ChatSidebarP
                       </div>
                     )}
                   </div>
+
+                  {/* DM Channels */}
+                  <div className="mt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSection(workspaceId, 'dms');
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full px-2 py-1"
+                    >
+                      {sections.dms ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                      MENSAGENS DIRETAS ({dmChannels.length})
+                    </button>
+
+                    {sections.dms && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {dmChannels.map((channel) => (
+                          <button
+                            key={channel.id}
+                            onClick={() => onSelectChannel(channel.id)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                              selectedChannelId === channel.id
+                                ? "bg-primary/10 text-primary"
+                                : "hover:bg-muted text-foreground"
+                            )}
+                          >
+                            <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                            <span className={cn("truncate", unreadChannelIds?.includes(channel.id) && "font-bold text-destructive")}>
+                              {getDMDisplayName(channel)}
+                            </span>
+                          </button>
+                        ))}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowDMDialog(true)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Nova mensagem
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
             );
