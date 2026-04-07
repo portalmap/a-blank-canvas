@@ -471,6 +471,30 @@ export const useRemoveChannelMember = () => {
   });
 };
 
+export const useUpdateChannel = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from('chat_channels')
+        .update({ name, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['all-chat-channels'] });
+      toast.success('Canal renomeado com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao renomear canal');
+      console.error(error);
+    },
+  });
+};
+
 export const useDeleteChannel = () => {
   const queryClient = useQueryClient();
 
