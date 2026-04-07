@@ -1,9 +1,9 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { MoreVertical, TrendingUp, Star, Zap, Move, Maximize2, Trash2 } from 'lucide-react';
+import { MoreVertical, TrendingUp, Star, Zap, Move, Maximize2, Trash2, FileText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ProductivityStats, ProductivityScope } from '@/hooks/useProductivityStats';
+import { useProductivityDetailsReport } from '@/hooks/useProductivityDetailsReport';
+import { ProductivityReportDialog } from './ProductivityReportDialog';
 import { cn } from '@/lib/utils';
 
 export interface ProductivityScopeInfo {
