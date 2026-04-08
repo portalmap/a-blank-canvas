@@ -9,7 +9,7 @@ async function resolveAttachmentUrls(supabase: any, attachments: any[]) {
   const paths = toResolve.map((a: any) => a.file_url);
   const { data: signed } = await supabase.storage
     .from('task-attachments')
-    .createSignedUrls(paths, 3600);
+    .createSignedUrls(paths, 1296000);
 
   if (signed) {
     toResolve.forEach((a: any, i: number) => {
@@ -1294,7 +1294,7 @@ async function handleAttachments(supabase: any, method: string, id: string | nul
         if (data && data.file_url && !data.file_url.startsWith('http')) {
           const { data: signed } = await supabase.storage
             .from('task-attachments')
-            .createSignedUrl(data.file_url, 3600);
+            .createSignedUrl(data.file_url, 1296000);
           if (signed?.signedUrl) data.file_url = signed.signedUrl;
         }
         return { data };
