@@ -1,97 +1,38 @@
 
-# Correção da duplicidade e da falta de atribuição nas automações
 
-## Diagnóstico
+# Correção: Portal não carrega imagens das tarefas
 
-Do I know what the issue is? Sim.
+## Causa
 
-O problema principal não é mais o gatilho da automação de destino. Ele já está correto.
+A mudança recente no `useTaskAttachments.ts` passou a salvar **paths relativos** no campo `file_url` (ex: `userId/taskId/file.jpg`) em vez de URLs públicas completas. O frontend resolve isso com signed URLs, mas a **API Gateway** retorna o path cru — o Portal tenta usar como URL e falha.
 
-### O que confirmei
-- A tarefa `de29ae2b-e3f5-40ef-a100-2a48846fe4b6` está hoje na lista `Plan. de Criativos | Accerth`.
-- A automação de autoatribuição dessa lista existe e já tem:
-  - `trigger: on_task_created`
-  - `or_triggers: [on_task_added_here, on_task_moved_here]`
-- Mesmo assim, a tarefa termina sem responsável.
+## Correção
 
-### Evidência do erro real
-No histórico dessa tarefa, a mesma automação:
-`Automação para enviar demanda do Designer > Social Media`
+### Editar `supabase/functions/api-gateway/index.ts`
 
-rodou 2 vezes seguidas:
+**1. Criar helper `resolveAttachmentUrls`** — recebe o client Supabase e um array de attachments, gera signed URLs (1h) para cada `file_url` que não começa com `http`. Attachments antigos com URL completa ficam intactos.
 
-```text
-23:50:13 task.moved
-23:50:15 task.moved
-23:50:19 assignees.cleared
-23:50:21 assignees.cleared
-```
+**2. Criar helper `resolveTasksAttachments`** — wrapper que percorre um array de tarefas e aplica o helper acima no campo `task_attachments` de cada uma.
 
-Ou seja:
-- a automação de origem está disparando em duplicidade
-- ela limpa os responsáveis 2 vezes
-- a atribuição da lista destino acaba sendo anulada pela segunda execução
+**3. Aplicar nos 4 pontos que retornam attachments:**
 
-## Causa técnica
+| Endpoint | Linha aprox. | O que fazer |
+|---|---|---|
+| `GET /tasks/:id` | 444 | Resolver `data.task_attachments` antes de retornar |
+| `GET /tasks?tag_name=...` | 495 | Resolver attachments do array `tasks` antes de retornar |
+| `GET /attachments` (por id) | 1261 | Resolver o `file_url` do attachment individual |
+| `GET /attachments` (por task_id) | 1269 | Resolver `file_url` de cada attachment do array |
 
-Em `src/hooks/useStatusChangeAutomations.ts`:
+**Nota:** A listagem padrão `GET /tasks` (linha 499) **não inclui** `task_attachments` no select, então não precisa de alteração.
 
-- `executeTagAutomations` e `reevaluateConditionAutomations` já têm proteção contra execução duplicada recente
-- `executeStatusChangeAutomations` não tem essa proteção antes de executar
-- ele só grava em `automation_executions` depois, e ainda assim apenas em alguns casos
+## O que NÃO muda
 
-Isso permite duas execuções concorrentes da mesma automação de status.
+- Nenhum outro endpoint ou função é alterado
+- Attachments com URL completa (legado) continuam funcionando
+- Nenhuma alteração no Portal MAP
+- Nenhuma alteração no frontend do Flow
 
-## O que vou ajustar
+## Arquivo
 
-### 1. Blindar `executeStatusChangeAutomations` contra execução dupla
-Editar `src/hooks/useStatusChangeAutomations.ts` para:
+- 1 editado: `supabase/functions/api-gateway/index.ts`
 
-- criar uma chave de execução por:
-  - `automation_id`
-  - `task_id`
-  - `newStatusId`
-- verificar se a mesma automação já foi executada nos últimos segundos
-- registrar a execução antes de rodar a sequência
-- pular a segunda chamada quando ela for duplicada
-
-Isso resolve em todas as áreas que mudam status, porque todas passam por esse mesmo executor.
-
-### 2. Padronizar a deduplicação entre todos os caminhos de automação
-No mesmo arquivo, consolidar a mesma regra para:
-- `executeStatusChangeAutomations`
-- `executeTagAutomations`
-- `reevaluateConditionAutomations`
-
-Assim a proteção fica consistente, e não depende de um fluxo ter guarda e outro não.
-
-### 3. Garantir que a automação de entrada continue no final
-Manter a chamada de `applyAutomationsToTask(...)` só depois que a cadeia da automação terminar.
-
-Isso preserva a ordem correta:
-```text
-mover -> ajustar campos -> limpar antigos -> aplicar automações da lista destino
-```
-
-### 4. Fortalecer a aplicação de automações de entrada
-Editar `src/hooks/useApplyAutomations.ts` para deixar o fluxo mais seguro:
-- tratar apenas as automações de entrada relevantes
-- garantir que autoatribuição rode no fechamento do fluxo
-- adicionar logs/retorno mais claros para diferenciar:
-  - “não havia automação aplicável”
-  - “automação encontrou usuário”
-  - “atribuição foi aplicada”
-
-## Arquivos
-
-- `src/hooks/useStatusChangeAutomations.ts`
-- `src/hooks/useApplyAutomations.ts`
-
-## Resultado esperado
-
-Depois da correção:
-
-- a automação “Enviar demanda do Designer > Social Media” não vai mais rodar 2 vezes
-- `assignees.cleared` não vai mais aparecer duplicado
-- ao entrar na lista destino, o responsável da lista será aplicado corretamente
-- a correção valerá para todas as áreas que disparam automações por status
