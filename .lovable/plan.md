@@ -1,38 +1,27 @@
 
 
-# Correção: Portal não carrega imagens das tarefas
+# Alterar expiração de signed URLs de 1h para 15 dias
 
-## Causa
+## Resumo
 
-A mudança recente no `useTaskAttachments.ts` passou a salvar **paths relativos** no campo `file_url` (ex: `userId/taskId/file.jpg`) em vez de URLs públicas completas. O frontend resolve isso com signed URLs, mas a **API Gateway** retorna o path cru — o Portal tenta usar como URL e falha.
+Trocar todos os `3600` (1 hora) por `1296000` (15 dias = 15 × 24 × 3600) nas chamadas `createSignedUrl` e `createSignedUrls` em todos os arquivos do projeto.
 
-## Correção
+## Alterações
 
-### Editar `supabase/functions/api-gateway/index.ts`
+### 1. `src/hooks/useTaskAttachments.ts` (linhas 28 e 41)
+- `createSignedUrl(path, 3600)` → `createSignedUrl(path, 1296000)`
+- `createSignedUrls(paths, 3600)` → `createSignedUrls(paths, 1296000)`
 
-**1. Criar helper `resolveAttachmentUrls`** — recebe o client Supabase e um array de attachments, gera signed URLs (1h) para cada `file_url` que não começa com `http`. Attachments antigos com URL completa ficam intactos.
+### 2. `src/hooks/useChatAttachments.ts` (linhas 25, 38, 73)
+- Três ocorrências de `3600` → `1296000`
 
-**2. Criar helper `resolveTasksAttachments`** — wrapper que percorre um array de tarefas e aplica o helper acima no campo `task_attachments` de cada uma.
+### 3. `src/hooks/useStickers.ts` (linhas 29, 70, 105)
+- Três ocorrências de `3600` → `1296000`
 
-**3. Aplicar nos 4 pontos que retornam attachments:**
+### 4. `supabase/functions/api-gateway/index.ts` (linhas 12 e 1297)
+- Duas ocorrências de `3600` → `1296000`
 
-| Endpoint | Linha aprox. | O que fazer |
-|---|---|---|
-| `GET /tasks/:id` | 444 | Resolver `data.task_attachments` antes de retornar |
-| `GET /tasks?tag_name=...` | 495 | Resolver attachments do array `tasks` antes de retornar |
-| `GET /attachments` (por id) | 1261 | Resolver o `file_url` do attachment individual |
-| `GET /attachments` (por task_id) | 1269 | Resolver `file_url` de cada attachment do array |
+## Arquivos
 
-**Nota:** A listagem padrão `GET /tasks` (linha 499) **não inclui** `task_attachments` no select, então não precisa de alteração.
-
-## O que NÃO muda
-
-- Nenhum outro endpoint ou função é alterado
-- Attachments com URL completa (legado) continuam funcionando
-- Nenhuma alteração no Portal MAP
-- Nenhuma alteração no frontend do Flow
-
-## Arquivo
-
-- 1 editado: `supabase/functions/api-gateway/index.ts`
+- 4 editados: `useTaskAttachments.ts`, `useChatAttachments.ts`, `useStickers.ts`, `api-gateway/index.ts`
 
