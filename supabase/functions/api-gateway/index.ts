@@ -1,5 +1,34 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Helper: resolve relative file_url paths to signed URLs
+async function resolveAttachmentUrls(supabase: any, attachments: any[]) {
+  if (!attachments?.length) return attachments;
+  const toResolve = attachments.filter((a: any) => a.file_url && !a.file_url.startsWith('http'));
+  if (toResolve.length === 0) return attachments;
+
+  const paths = toResolve.map((a: any) => a.file_url);
+  const { data: signed } = await supabase.storage
+    .from('task-attachments')
+    .createSignedUrls(paths, 3600);
+
+  if (signed) {
+    toResolve.forEach((a: any, i: number) => {
+      if (signed[i]?.signedUrl) a.file_url = signed[i].signedUrl;
+    });
+  }
+  return attachments;
+}
+
+async function resolveTasksAttachments(supabase: any, tasks: any[]) {
+  if (!tasks?.length) return tasks;
+  for (const task of tasks) {
+    if (task.task_attachments?.length) {
+      await resolveAttachmentUrls(supabase, task.task_attachments);
+    }
+  }
+  return tasks;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -441,6 +470,9 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           .eq("lists.workspace_id", workspaceId)
           .single();
         if (error) return { error: error.message, status: 404 };
+        if (data.task_attachments?.length) {
+          await resolveAttachmentUrls(supabase, data.task_attachments);
+        }
         return { data };
       } else {
         // Check if filtering by tag_name - special handling for Portal integration
@@ -492,6 +524,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           
           const { data: tasks, error: tasksError } = await taskQuery.order("created_at", { ascending: false });
           if (tasksError) return { error: tasksError.message, status: 400 };
+          await resolveTasksAttachments(supabase, tasks || []);
           return { data: tasks || [] };
         }
         
@@ -1258,6 +1291,12 @@ async function handleAttachments(supabase: any, method: string, id: string | nul
           .eq("id", id)
           .single();
         if (error) return { error: error.message, status: 404 };
+        if (data && data.file_url && !data.file_url.startsWith('http')) {
+          const { data: signed } = await supabase.storage
+            .from('task-attachments')
+            .createSignedUrl(data.file_url, 3600);
+          if (signed?.signedUrl) data.file_url = signed.signedUrl;
+        }
         return { data };
       } else {
         const { data, error } = await supabase
@@ -1266,6 +1305,7 @@ async function handleAttachments(supabase: any, method: string, id: string | nul
           .eq("task_id", query.task_id)
           .order("created_at", { ascending: false });
         if (error) return { error: error.message, status: 400 };
+        await resolveAttachmentUrls(supabase, data || []);
         return { data };
       }
     case "POST":
