@@ -69,14 +69,20 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
       return automation.scope_id && scopeIds.includes(automation.scope_id);
     });
 
+    console.log(`[applyAutomationsToTask] Task ${task.id} in list ${task.list_id}: found ${applicableAutomations.length} applicable automations out of ${automations.length} total`);
+
     // 6. Apply each automation
     for (const automation of applicableAutomations) {
       const actionConfig = automation.action_config as Record<string, any> | null;
+      const automationDesc = automation.description || automation.id.slice(0, 8);
 
       if (automation.action_type === 'auto_assign_user') {
         // Support both user_ids (array) and legacy user_id (string)
         const userIds = actionConfig?.user_ids || (actionConfig?.user_id ? [actionConfig.user_id] : []);
-        if (!userIds.length) continue;
+        if (!userIds.length) {
+          console.log(`[applyAutomationsToTask] Automation "${automationDesc}" has no user_ids, skipping`);
+          continue;
+        }
         
         // Add each assignee with source tracking
         for (const userId of userIds) {
@@ -91,6 +97,9 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
 
           if (!assignError) {
             result.assigneesAdded++;
+            console.log(`[applyAutomationsToTask] ✓ Assigned user ${userId} to task ${task.id} via "${automationDesc}"`);
+          } else {
+            console.error(`[applyAutomationsToTask] ✗ Failed to assign user ${userId}:`, assignError);
           }
         }
       } else if (automation.action_type === 'remove_all_assignees') {
@@ -99,6 +108,7 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
           .from('task_assignees')
           .delete()
           .eq('task_id', task.id);
+        console.log(`[applyAutomationsToTask] Cleared all assignees from task ${task.id} via "${automationDesc}"`);
       } else if (automation.action_type === 'auto_add_follower') {
         // Support both user_ids (array) and legacy user_id (string)
         const userIds = actionConfig?.user_ids || (actionConfig?.user_id ? [actionConfig.user_id] : []);
@@ -117,6 +127,7 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
 
           if (!followError) {
             result.followersAdded++;
+            console.log(`[applyAutomationsToTask] ✓ Added follower ${userId} to task ${task.id} via "${automationDesc}"`);
           }
         }
       }

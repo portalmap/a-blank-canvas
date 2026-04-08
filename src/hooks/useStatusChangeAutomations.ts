@@ -542,6 +542,28 @@ export const executeStatusChangeAutomations = async (
           }
         }
 
+        // === DEDUPLICATION GUARD (5-second window) ===
+        const { data: existingExecution } = await supabase
+          .from('automation_executions')
+          .select('id')
+          .eq('automation_id', automation.id)
+          .eq('task_id', info.taskId)
+          .eq('status_id', info.newStatusId)
+          .gte('executed_at', new Date(Date.now() - 5000).toISOString())
+          .maybeSingle();
+
+        if (existingExecution) {
+          console.log(`Status automation ${automation.id} recently executed for task ${info.taskId}, skipping duplicate`);
+          continue;
+        }
+
+        // Record execution BEFORE running actions to prevent concurrent duplicates
+        await supabase.from('automation_executions').insert({
+          automation_id: automation.id,
+          task_id: info.taskId,
+          status_id: info.newStatusId,
+        });
+
         const automationName = automation.description || `Automação ${automation.id.slice(0, 8)}`;
         
         // Check if automation has multiple actions
@@ -561,6 +583,7 @@ export const executeStatusChangeAutomations = async (
 
         // Apply destination list automations AFTER all actions complete
         if (info.listId !== originalListId) {
+          console.log(`Task moved from list ${originalListId} to ${info.listId}, applying destination automations...`);
           try {
             await applyAutomationsToTask({
               id: info.taskId,
@@ -573,19 +596,6 @@ export const executeStatusChangeAutomations = async (
         }
         
         result.automationsExecuted++;
-
-        // Record execution for duplicate prevention (only for automations with conditions)
-        if (conditions && conditions.length > 0) {
-          try {
-            await supabase.from('automation_executions').insert({
-              automation_id: automation.id,
-              task_id: info.taskId,
-              status_id: info.newStatusId,
-            });
-          } catch (execErr) {
-            console.error('Error recording automation execution:', execErr);
-          }
-        }
 
         if (automation.action_type === 'create_subtask' || 
             actionsArray?.some(a => a.type === 'create_subtask')) {
