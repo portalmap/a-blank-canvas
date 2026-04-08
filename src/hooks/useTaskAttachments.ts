@@ -25,7 +25,7 @@ const extractStoragePath = (fileUrl: string, bucket: string): string => {
 const getSignedUrl = async (bucket: string, path: string): Promise<string> => {
   const { data, error } = await supabase.storage
     .from(bucket)
-    .createSignedUrl(path, 3600); // 1 hora
+    .createSignedUrl(path, 1296000); // 15 dias
   if (error || !data?.signedUrl) return '';
   return data.signedUrl;
 };
@@ -38,7 +38,7 @@ const resolveAttachmentUrls = async (attachments: TaskAttachment[]): Promise<Tas
   
   const { data, error } = await supabase.storage
     .from('task-attachments')
-    .createSignedUrls(paths, 3600);
+    .createSignedUrls(paths, 1296000);
   
   if (error || !data) {
     // Fallback individual
