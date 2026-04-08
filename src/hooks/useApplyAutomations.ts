@@ -69,6 +69,8 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
       return automation.scope_id && scopeIds.includes(automation.scope_id);
     });
 
+    console.log(`[applyAutomationsToTask] Task ${task.id} in list ${task.list_id}: found ${applicableAutomations.length} applicable automations out of ${automations.length} total`);
+
     // 6. Apply each automation
     for (const automation of applicableAutomations) {
       const actionConfig = automation.action_config as Record<string, any> | null;
