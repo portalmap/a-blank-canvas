@@ -132,7 +132,6 @@ export const applyAutomationsToTask = async (task: TaskInfo): Promise<ApplyAutom
         }
       }
     }
-    }
 
     return result;
   } catch (error) {
