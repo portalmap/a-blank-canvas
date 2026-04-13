@@ -1,27 +1,55 @@
 
 
-# Alterar expiração de signed URLs de 1h para 15 dias
+# Correção: Botão Send transbordando no chat
 
-## Resumo
+## Problema
 
-Trocar todos os `3600` (1 hora) por `1296000` (15 dias = 15 × 24 × 3600) nas chamadas `createSignedUrl` e `createSignedUrls` em todos os arquivos do projeto.
+Os 6 botões de ação + textarea estão na mesma linha (`flex`). Em painéis estreitos ou com ThreadPanel aberto, o botão Send (último da fila) é empurrado para fora da área visível.
 
-## Alterações
+## Correção
 
-### 1. `src/hooks/useTaskAttachments.ts` (linhas 28 e 41)
-- `createSignedUrl(path, 3600)` → `createSignedUrl(path, 1296000)`
-- `createSignedUrls(paths, 3600)` → `createSignedUrls(paths, 1296000)`
+### Editar `src/components/chat/ChatInput.tsx`
 
-### 2. `src/hooks/useChatAttachments.ts` (linhas 25, 38, 73)
-- Três ocorrências de `3600` → `1296000`
+Reorganizar o bloco das linhas 197-267 de uma linha horizontal para duas linhas verticais:
 
-### 3. `src/hooks/useStickers.ts` (linhas 29, 70, 105)
-- Três ocorrências de `3600` → `1296000`
+**Linha 1**: Textarea (largura total)
+**Linha 2**: Botões de ação à esquerda + botão Send à direita
 
-### 4. `supabase/functions/api-gateway/index.ts` (linhas 12 e 1297)
-- Duas ocorrências de `3600` → `1296000`
+```tsx
+<div className="flex flex-col gap-2">
+  <Textarea
+    ref={textareaRef}
+    value={content}
+    onChange={...}
+    onKeyDown={handleKeyDown}
+    placeholder={`Mensagem em #${channelName}`}
+    className="min-h-[44px] max-h-[200px] resize-none w-full"
+    style={{ overflowY: 'hidden' }}
+  />
+  <input ref={fileInputRef} type="file" multiple onChange={handleFilesSelected} className="hidden" />
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-1">
+      <EmojiPickerPopover ... />
+      <StickerGallery ... />
+      <Button variant="ghost" size="icon" ...><Paperclip /></Button>
+      <AudioRecorderButton ... />
+      <CommentAssigneeSelector ... />
+    </div>
+    <Button onClick={handleSubmit} size="icon" ...>
+      <Send />
+    </Button>
+  </div>
+</div>
+```
 
-## Arquivos
+Remover a dica "Pressione Enter para enviar" (linhas 265-267) para economizar espaço vertical.
 
-- 4 editados: `useTaskAttachments.ts`, `useChatAttachments.ts`, `useStickers.ts`, `api-gateway/index.ts`
+## O que NAO muda
+
+- Nenhuma logica de envio, upload, atribuicao ou stickers
+- Apenas reorganizacao visual dos elementos existentes
+
+## Arquivo
+
+- 1 editado: `src/components/chat/ChatInput.tsx`
 
