@@ -1,46 +1,27 @@
 
 
-# Correção: Botões do chat input invisíveis
+# Alterar expiração de signed URLs de 1h para 15 dias
 
-## Problema
+## Resumo
 
-Os botões de ação (emoji, sticker, anexo, audio, atribuir, enviar) estão no DOM mas invisíveis. O `ResizablePanel` aplica `overflow: hidden` internamente, e o layout horizontal (`flex gap-2`) faz a div dos botões ser empurrada para fora da área visível quando o painel é estreito.
+Trocar todos os `3600` (1 hora) por `1296000` (15 dias = 15 × 24 × 3600) nas chamadas `createSignedUrl` e `createSignedUrls` em todos os arquivos do projeto.
 
-## Correção
+## Alterações
 
-Mudar o layout do `ChatInput` para empilhar verticalmente: textarea em cima, botões em uma barra de ferramentas abaixo. Isso elimina a competição por espaço horizontal.
+### 1. `src/hooks/useTaskAttachments.ts` (linhas 28 e 41)
+- `createSignedUrl(path, 3600)` → `createSignedUrl(path, 1296000)`
+- `createSignedUrls(paths, 3600)` → `createSignedUrls(paths, 1296000)`
 
-### Editar `src/components/chat/ChatInput.tsx`
+### 2. `src/hooks/useChatAttachments.ts` (linhas 25, 38, 73)
+- Três ocorrências de `3600` → `1296000`
 
-Trocar o layout de:
-```
-[  Textarea  ] [ emoji sticker clip audio assign send ]
-```
+### 3. `src/hooks/useStickers.ts` (linhas 29, 70, 105)
+- Três ocorrências de `3600` → `1296000`
 
-Para:
-```
-[  Textarea (full width)                              ]
-[ emoji | sticker | clip | audio | assign ]    [ Send ]
-```
+### 4. `supabase/functions/api-gateway/index.ts` (linhas 12 e 1297)
+- Duas ocorrências de `3600` → `1296000`
 
-Estrutura:
-```tsx
-<div className="flex flex-col gap-2">
-  <Textarea className="min-h-[44px] max-h-[200px] resize-none w-full" />
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-1">
-      {/* emoji, sticker, clip, audio, assign */}
-    </div>
-    <Button size="icon">  {/* Send */}
-      <Send />
-    </Button>
-  </div>
-</div>
-```
+## Arquivos
 
-Remover a dica "Pressione Enter..." pois já é comportamento padrão e ocupa espaço.
-
-## Arquivo
-
-- 1 editado: `src/components/chat/ChatInput.tsx`
+- 4 editados: `useTaskAttachments.ts`, `useChatAttachments.ts`, `useStickers.ts`, `api-gateway/index.ts`
 
