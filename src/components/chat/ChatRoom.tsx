@@ -114,13 +114,13 @@ export const ChatRoom = ({
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 p-4 min-w-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : topLevelMessages.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-hidden">
               {topLevelMessages.map((message, index) => {
                 const prevMessage = topLevelMessages[index - 1];
                 const showAvatar = !prevMessage ||
