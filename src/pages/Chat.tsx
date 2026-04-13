@@ -35,7 +35,7 @@ const Chat = () => {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={80}>
-          <div className="flex-1 flex flex-col h-full">
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
             {selectedChannel ? (
               <ChatRoom
                 channelId={selectedChannel.id}
