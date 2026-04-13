@@ -113,7 +113,7 @@ export const ChatMessageItem = ({
         </Avatar>
       )}
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 max-w-[110ch]">
         {showAvatar && (
           <div className="flex items-baseline gap-2 mb-0.5">
             <span className="font-medium text-sm">{senderName}</span>
