@@ -1,55 +1,40 @@
 
-
-# Correção: Botão Send transbordando no chat
+# Correção: Texto longo no chat não quebra linha e transborda
 
 ## Problema
 
-Os 6 botões de ação + textarea estão na mesma linha (`flex`). Em painéis estreitos ou com ThreadPanel aberto, o botão Send (último da fila) é empurrado para fora da área visível.
+Mensagens com textos longos (sem espaços naturais, URLs, ou parágrafos muito extensos) não quebram corretamente. O conteúdo transborda horizontalmente, empurrando elementos para fora da área visível — incluindo o botão de envio.
+
+## Causa
+
+Em layouts `flex`, um item não encolhe abaixo do tamanho do seu conteúdo a menos que tenha `min-w-0` ou `overflow-hidden`. Vários containers na cadeia não possuem essa restrição.
 
 ## Correção
 
-### Editar `src/components/chat/ChatInput.tsx`
+### Editar `src/components/chat/ChatRoom.tsx`
 
-Reorganizar o bloco das linhas 197-267 de uma linha horizontal para duas linhas verticais:
+1. Linha 88 — container raiz do ChatRoom:
+   - De: `flex-1 flex h-full`
+   - Para: `flex-1 flex h-full min-w-0`
 
-**Linha 1**: Textarea (largura total)
-**Linha 2**: Botões de ação à esquerda + botão Send à direita
+2. Linha 89 — container interno da coluna:
+   - De: `flex-1 flex flex-col h-full`
+   - Para: `flex-1 flex flex-col h-full min-w-0`
 
-```tsx
-<div className="flex flex-col gap-2">
-  <Textarea
-    ref={textareaRef}
-    value={content}
-    onChange={...}
-    onKeyDown={handleKeyDown}
-    placeholder={`Mensagem em #${channelName}`}
-    className="min-h-[44px] max-h-[200px] resize-none w-full"
-    style={{ overflowY: 'hidden' }}
-  />
-  <input ref={fileInputRef} type="file" multiple onChange={handleFilesSelected} className="hidden" />
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-1">
-      <EmojiPickerPopover ... />
-      <StickerGallery ... />
-      <Button variant="ghost" size="icon" ...><Paperclip /></Button>
-      <AudioRecorderButton ... />
-      <CommentAssigneeSelector ... />
-    </div>
-    <Button onClick={handleSubmit} size="icon" ...>
-      <Send />
-    </Button>
-  </div>
-</div>
-```
+### Editar `src/components/chat/ChatMessageItem.tsx`
 
-Remover a dica "Pressione Enter para enviar" (linhas 265-267) para economizar espaço vertical.
+3. Linha 148 — parágrafo do texto da mensagem:
+   - De: `whitespace-pre-wrap break-words`
+   - Para: `whitespace-pre-wrap break-words break-all overflow-hidden`
 
-## O que NAO muda
+   O `break-all` garante que textos sem espaços (URLs, strings longas) também quebrem. O `overflow-hidden` é uma proteção extra.
 
-- Nenhuma logica de envio, upload, atribuicao ou stickers
-- Apenas reorganizacao visual dos elementos existentes
+### Editar `src/pages/Chat.tsx`
 
-## Arquivo
+4. Adicionar `overflow-hidden` no container do ResizablePanel que contém o ChatRoom (linha 42):
+   - De: `flex-1 flex flex-col h-full`
+   - Para: `flex-1 flex flex-col h-full overflow-hidden`
 
-- 1 editado: `src/components/chat/ChatInput.tsx`
+## Arquivos
 
+- 3 editados: `ChatRoom.tsx`, `ChatMessageItem.tsx`, `Chat.tsx`
