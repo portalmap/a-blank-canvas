@@ -145,7 +145,7 @@ export const ChatMessageItem = ({
               }
               return (
                 <>
-                  <p className={cn("whitespace-pre-wrap break-words overflow-hidden", isOnlyEmojis(message.content) ? "text-3xl leading-relaxed" : "text-sm")}>", isOnlyEmojis(message.content) ? "text-3xl leading-relaxed" : "text-sm")}>", isOnlyEmojis(message.content) ? "text-3xl leading-relaxed" : "text-sm")}>
+                  <p className={cn("whitespace-pre-wrap break-words overflow-hidden", isOnlyEmojis(message.content) ? "text-3xl leading-relaxed" : "text-sm")}>
                     {message.content}
                     {isEdited && <span className="text-xs text-muted-foreground ml-1">(editado)</span>}
                   </p>
