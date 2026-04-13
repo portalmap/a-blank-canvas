@@ -1,39 +1,85 @@
 
+# Ajuste proposto: limitar a largura visual da mensagem a ~110 caracteres
 
-# Correção: Texto do chat não quebra linha — fica em linha reta
+## Diagnóstico
 
-## Problema
+Sim, essa é uma boa direção.
 
-O texto das mensagens não está quebrando para a próxima linha. Ele continua em linha reta e a parte que não cabe simplesmente some (cortada pelo `overflow-hidden`) ou fica escondida.
+O problema não é o texto “não saber quebrar”. O problema é que a área da mensagem ainda está deixando o conteúdo se espalhar demais na horizontal. Então, em vez de depender só da largura do chat e do sidebar, podemos dar um limite fixo para o bloco da mensagem.
 
-## Causa
+Assim, a lógica fica:
+- a mensagem nunca tenta ocupar uma linha “infinita”
+- se houver espaço de sobra, ela para em uma largura confortável
+- se o sidebar ou a thread apertarem a área, ela continua respeitando o espaço menor
+- o texto desce inteiro para a linha de baixo, sem cortar palavra no meio
 
-O `ScrollArea` (Radix) e o container de mensagens (`div.space-y-4`) não possuem restrição de largura. Mesmo com `min-w-0` nos containers acima, o conteúdo dentro do ScrollArea pode se expandir horizontalmente sem limite. O `break-words` só funciona quando o container tem uma largura máxima definida.
+Importante: isso não deve limitar a quantidade de texto salva, nem cortar conteúdo. É só um limite visual de largura.
 
-## Correção
+## O que vou implementar
 
-### 1. `src/components/chat/ChatRoom.tsx` — linha 117
+### 1. `src/components/chat/ChatMessageItem.tsx`
+Aplicar um limite visual ao conteúdo textual da mensagem usando algo como:
 
-Adicionar `min-w-0` ao ScrollArea para que ele respeite a largura do pai:
+- `w-full`
+- `max-w-[110ch]`
+- `min-w-0`
 
-- De: `<ScrollArea className="flex-1 p-4">`
-- Para: `<ScrollArea className="flex-1 p-4 min-w-0">`
+A ideia é colocar esse limite no bloco que contém:
+- texto
+- anexos
+- reações
+- indicador de thread
+- status de atribuição
 
-### 2. `src/components/chat/ChatRoom.tsx` — linha 123
+Sem mexer:
+- nos botões de hover
+- na caixa de escrever mensagem
+- nos botões já funcionando no header/composer
 
-Adicionar `overflow-hidden` ao container de mensagens para forçar o texto a quebrar:
+### 2. Manter a quebra correta das palavras
+No texto da mensagem, manter a estratégia de:
+- preservar espaços e quebras naturais
+- quebrar linha sem partir palavra comum ao meio
+- nunca voltar para `break-all`
 
-- De: `<div className="space-y-4">`
-- Para: `<div className="space-y-4 overflow-hidden">`
+Ou seja: o texto desce inteiro para a próxima linha quando não couber.
 
-### 3. `src/components/chat/ChatMessageItem.tsx` — linha 148
+### 3. Validar também no painel lateral de thread
+Como a thread reduz ainda mais a largura disponível, o mesmo limite precisa funcionar lá também.
 
-Remover `overflow-hidden` do `<p>` (a proteção agora está no container pai):
+Se necessário, o ajuste estrutural já existente em:
+- `src/components/chat/ChatRoom.tsx`
+- `src/components/chat/ThreadPanel.tsx`
 
-- De: `"whitespace-pre-wrap break-words overflow-hidden"`
-- Para: `"whitespace-pre-wrap break-words"`
+será mantido, mas sem alterar layout de botões nem input.
 
-## Arquivos
+## Resultado esperado
 
-- 2 editados: `ChatRoom.tsx`, `ChatMessageItem.tsx`
+Depois disso:
+- com o sidebar aberto, a mensagem para de se esticar demais
+- com a thread aberta, ela continua quebrando corretamente
+- palavras comuns permanecem inteiras
+- mensagens longas ficam mais legíveis
+- nada é truncado nem “apagado”; só muda a largura visual do bloco
 
+## Observação importante
+
+“110 caracteres” aqui será tratado como largura visual aproximada (`110ch`), não como contagem exata de letras. Isso é melhor porque:
+- não altera o texto salvo
+- não injeta quebra artificial dentro da mensagem
+- funciona de forma responsiva conforme o espaço real disponível
+
+## Arquivos envolvidos
+
+- `src/components/chat/ChatMessageItem.tsx`
+- possível ajuste fino em `src/components/chat/ChatRoom.tsx`
+- possível ajuste fino em `src/components/chat/ThreadPanel.tsx`
+
+## Detalhe técnico
+
+A implementação ideal não é “quebrar a string a cada 110 caracteres”, porque isso pode:
+- separar frases em lugares ruins
+- quebrar links, nomes ou sequências especiais
+- criar um comportamento artificial
+
+O melhor é limitar a largura visual do bloco da mensagem com `max-w-[110ch]`, deixando o navegador descer o texto naturalmente quando faltar espaço.
