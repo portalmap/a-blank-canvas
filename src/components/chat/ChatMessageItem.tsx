@@ -100,7 +100,7 @@ export const ChatMessageItem = ({
     <div
       id={`chat-msg-${message.id}`}
       className={cn(
-        "flex gap-3 group relative rounded-md px-1 -mx-1 transition-colors duration-1000",
+        "flex gap-3 group relative rounded-md px-1 -mx-1 transition-colors duration-1000 max-w-full min-w-0",
         !showAvatar && "pl-10",
         isHighlighted && "animate-highlight-fade",
         isPinned && "border-l-2 border-primary/40 pl-2"

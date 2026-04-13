@@ -39,7 +39,7 @@ export const ThreadPanel = ({ parentMessage, channelId, channelName, workspaceId
       </div>
 
       {/* Parent message */}
-      <div className="p-4 border-b bg-muted/20">
+      <div className="p-4 border-b bg-muted/20 min-w-0 max-w-full overflow-hidden">
         <ChatMessageItem
           message={parentMessage}
           showAvatar={true}
@@ -49,13 +49,13 @@ export const ThreadPanel = ({ parentMessage, channelId, channelName, workspaceId
       </div>
 
       {/* Replies */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4 min-w-0 [&_[data-radix-scroll-area-viewport]>div]:!block [&_[data-radix-scroll-area-viewport]>div]:!w-full">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : replies && replies.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-3 w-full max-w-full">
             <p className="text-xs text-muted-foreground">{replies.length} resposta{replies.length !== 1 ? 's' : ''}</p>
             {replies.map((reply, index) => {
               const prev = replies[index - 1];
