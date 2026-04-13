@@ -194,7 +194,7 @@ export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: Chat
         </div>
       )}
 
-      <div className="flex gap-2 items-end">
+      <div className="flex flex-col gap-2">
         <Textarea
           ref={textareaRef}
           value={content}
@@ -204,7 +204,7 @@ export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: Chat
           }}
           onKeyDown={handleKeyDown}
           placeholder={`Mensagem em #${channelName}`}
-          className="min-h-[44px] max-h-[200px] resize-none"
+          className="min-h-[44px] max-h-[200px] resize-none w-full"
           style={{ overflowY: 'hidden' }}
         />
         <input
@@ -214,57 +214,58 @@ export const ChatInput = ({ channelId, channelName, workspaceId, replyTo }: Chat
           onChange={handleFilesSelected}
           className="hidden"
         />
-        <EmojiPickerPopover
-          onEmojiSelect={(emoji) => {
-            const el = textareaRef.current;
-            if (el) {
-              const start = el.selectionStart;
-              const end = el.selectionEnd;
-              const newContent = content.slice(0, start) + emoji + content.slice(end);
-              setContent(newContent);
-              setTimeout(() => {
-                el.selectionStart = el.selectionEnd = start + emoji.length;
-                el.focus();
-              }, 0);
-            } else {
-              setContent(prev => prev + emoji);
-            }
-          }}
-          triggerClassName="flex-shrink-0 h-9 w-9"
-          side="top"
-        />
-        <StickerGallery
-          onStickerSelect={handleStickerSelect}
-          triggerClassName="flex-shrink-0 h-9 w-9"
-          side="top"
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="flex-shrink-0"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-        <AudioRecorderButton onAudioReady={handleAudioReady} disabled={isUploading} />
-        <CommentAssigneeSelector
-          workspaceId={workspaceId}
-          selectedAssignee={selectedAssignee}
-          onSelect={setSelectedAssignee}
-        />
-        <Button
-          onClick={handleSubmit}
-          disabled={(!content.trim() && pendingFiles.length === 0) || sendMessage.isPending || isUploading}
-          size="icon"
-          className="flex-shrink-0"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <EmojiPickerPopover
+              onEmojiSelect={(emoji) => {
+                const el = textareaRef.current;
+                if (el) {
+                  const start = el.selectionStart;
+                  const end = el.selectionEnd;
+                  const newContent = content.slice(0, start) + emoji + content.slice(end);
+                  setContent(newContent);
+                  setTimeout(() => {
+                    el.selectionStart = el.selectionEnd = start + emoji.length;
+                    el.focus();
+                  }, 0);
+                } else {
+                  setContent(prev => prev + emoji);
+                }
+              }}
+              triggerClassName="flex-shrink-0 h-9 w-9"
+              side="top"
+            />
+            <StickerGallery
+              onStickerSelect={handleStickerSelect}
+              triggerClassName="flex-shrink-0 h-9 w-9"
+              side="top"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="flex-shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <AudioRecorderButton onAudioReady={handleAudioReady} disabled={isUploading} />
+            <CommentAssigneeSelector
+              workspaceId={workspaceId}
+              selectedAssignee={selectedAssignee}
+              onSelect={setSelectedAssignee}
+            />
+          </div>
+          <Button
+            onClick={handleSubmit}
+            disabled={(!content.trim() && pendingFiles.length === 0) || sendMessage.isPending || isUploading}
+            size="icon"
+            className="flex-shrink-0"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground mt-1">
-        Pressione Enter para enviar, Shift+Enter para nova linha
-      </p>
     </div>
   );
 };
