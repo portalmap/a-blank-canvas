@@ -1,36 +1,44 @@
 
 
-# Correção: Botão de envio sumindo no chat
+# Correção: Botões do chat input invisíveis
 
 ## Problema
 
-A barra de input do chat tem 6 ícones + textarea. Em painéis estreitos, o botão Send é empurrado para fora da área visível.
+Os botões de ação (emoji, sticker, anexo, audio, atribuir, enviar) estão no DOM mas invisíveis. O `ResizablePanel` aplica `overflow: hidden` internamente, e o layout horizontal (`flex gap-2`) faz a div dos botões ser empurrada para fora da área visível quando o painel é estreito.
 
 ## Correção
 
+Mudar o layout do `ChatInput` para empilhar verticalmente: textarea em cima, botões em uma barra de ferramentas abaixo. Isso elimina a competição por espaço horizontal.
+
 ### Editar `src/components/chat/ChatInput.tsx`
 
-1. **Envolver os botões de ação em um container `flex-shrink-0`** para garantir que nunca encolham
-2. **Limitar o textarea com `min-w-0 flex-1`** para que ele ceda espaço aos botões, não o contrário
-3. **Agrupar os botões em um wrapper com `flex flex-shrink-0 gap-1`** para que fiquem sempre visíveis como bloco
-
-A estrutura passaria de:
+Trocar o layout de:
 ```
-<div flex gap-2>
-  <Textarea />
-  <Emoji /> <Sticker /> <Clip /> <Audio /> <Assign /> <Send />
-</div>
+[  Textarea  ] [ emoji sticker clip audio assign send ]
 ```
 
 Para:
 ```
-<div flex gap-2>
-  <Textarea className="min-w-0 flex-1" />
-  <div className="flex items-end gap-1 flex-shrink-0">
-    <Emoji /> <Sticker /> <Clip /> <Audio /> <Assign /> <Send />
+[  Textarea (full width)                              ]
+[ emoji | sticker | clip | audio | assign ]    [ Send ]
+```
+
+Estrutura:
+```tsx
+<div className="flex flex-col gap-2">
+  <Textarea className="min-h-[44px] max-h-[200px] resize-none w-full" />
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-1">
+      {/* emoji, sticker, clip, audio, assign */}
+    </div>
+    <Button size="icon">  {/* Send */}
+      <Send />
+    </Button>
   </div>
 </div>
 ```
+
+Remover a dica "Pressione Enter..." pois já é comportamento padrão e ocupa espaço.
 
 ## Arquivo
 
