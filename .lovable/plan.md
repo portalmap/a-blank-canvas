@@ -1,27 +1,38 @@
 
 
-# Alterar expiração de signed URLs de 1h para 15 dias
+# Correção: Botão de envio sumindo no chat
 
-## Resumo
+## Problema
 
-Trocar todos os `3600` (1 hora) por `1296000` (15 dias = 15 × 24 × 3600) nas chamadas `createSignedUrl` e `createSignedUrls` em todos os arquivos do projeto.
+A barra de input do chat tem 6 ícones + textarea. Em painéis estreitos, o botão Send é empurrado para fora da área visível.
 
-## Alterações
+## Correção
 
-### 1. `src/hooks/useTaskAttachments.ts` (linhas 28 e 41)
-- `createSignedUrl(path, 3600)` → `createSignedUrl(path, 1296000)`
-- `createSignedUrls(paths, 3600)` → `createSignedUrls(paths, 1296000)`
+### Editar `src/components/chat/ChatInput.tsx`
 
-### 2. `src/hooks/useChatAttachments.ts` (linhas 25, 38, 73)
-- Três ocorrências de `3600` → `1296000`
+1. **Envolver os botões de ação em um container `flex-shrink-0`** para garantir que nunca encolham
+2. **Limitar o textarea com `min-w-0 flex-1`** para que ele ceda espaço aos botões, não o contrário
+3. **Agrupar os botões em um wrapper com `flex flex-shrink-0 gap-1`** para que fiquem sempre visíveis como bloco
 
-### 3. `src/hooks/useStickers.ts` (linhas 29, 70, 105)
-- Três ocorrências de `3600` → `1296000`
+A estrutura passaria de:
+```
+<div flex gap-2>
+  <Textarea />
+  <Emoji /> <Sticker /> <Clip /> <Audio /> <Assign /> <Send />
+</div>
+```
 
-### 4. `supabase/functions/api-gateway/index.ts` (linhas 12 e 1297)
-- Duas ocorrências de `3600` → `1296000`
+Para:
+```
+<div flex gap-2>
+  <Textarea className="min-w-0 flex-1" />
+  <div className="flex items-end gap-1 flex-shrink-0">
+    <Emoji /> <Sticker /> <Clip /> <Audio /> <Assign /> <Send />
+  </div>
+</div>
+```
 
-## Arquivos
+## Arquivo
 
-- 4 editados: `useTaskAttachments.ts`, `useChatAttachments.ts`, `useStickers.ts`, `api-gateway/index.ts`
+- 1 editado: `src/components/chat/ChatInput.tsx`
 
