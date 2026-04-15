@@ -26,7 +26,7 @@ export interface Sticker {
 }
 
 const getStickerSignedUrl = async (path: string): Promise<string> => {
-  const { data } = await supabase.storage.from('stickers').createSignedUrl(path, 1296000);
+  const { data } = await supabase.storage.from('stickers').createSignedUrl(path, 3888000);
   return data?.signedUrl || path;
 };
 
@@ -67,7 +67,7 @@ export const useStickers = (packId?: string) => {
       const stickers = data as Sticker[];
       const paths = stickers.map(s => s.image_url);
       if (paths.length > 0) {
-        const { data: signedData } = await supabase.storage.from('stickers').createSignedUrls(paths, 1296000);
+        const { data: signedData } = await supabase.storage.from('stickers').createSignedUrls(paths, 3888000);
         if (signedData) {
           stickers.forEach((s, i) => { s.signed_url = signedData[i]?.signedUrl || s.image_url; });
         }
@@ -102,7 +102,7 @@ export const useRecentStickers = () => {
       if (!stickers) return [];
 
       const paths = stickers.map(s => s.image_url);
-      const { data: signedData } = await supabase.storage.from('stickers').createSignedUrls(paths, 1296000);
+      const { data: signedData } = await supabase.storage.from('stickers').createSignedUrls(paths, 3888000);
       const stickerMap = new Map(stickers.map((s, i) => [s.id, { ...s, signed_url: signedData?.[i]?.signedUrl || s.image_url } as Sticker]));
 
       // Return in order of usage

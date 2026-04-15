@@ -22,7 +22,7 @@ export const getChatAttachmentSignedUrl = async (fileUrl: string): Promise<strin
   const path = extractStoragePath(fileUrl, 'chat-attachments');
   const { data, error } = await supabase.storage
     .from('chat-attachments')
-    .createSignedUrl(path, 1296000);
+    .createSignedUrl(path, 3888000);
   if (error || !data?.signedUrl) return fileUrl;
   return data.signedUrl;
 };
@@ -35,7 +35,7 @@ export const resolveChatAttachmentUrls = async (attachments: ChatAttachment[]): 
   
   const { data, error } = await supabase.storage
     .from('chat-attachments')
-    .createSignedUrls(paths, 1296000);
+    .createSignedUrls(paths, 3888000);
   
   if (error || !data) {
     // Fallback: retornar como está
@@ -70,7 +70,7 @@ export const useUploadChatAttachments = () => {
       // Gerar signed URL
       const { data: signedData } = await supabase.storage
         .from('chat-attachments')
-        .createSignedUrl(storagePath, 1296000);
+        .createSignedUrl(storagePath, 3888000);
 
       results.push({
         file_name: file.name,
