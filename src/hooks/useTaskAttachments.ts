@@ -125,7 +125,7 @@ export const useUploadAttachment = () => {
         .single();
 
       if (error) throw error;
-      return { ...data, file_url: signedUrl || storagePath } as TaskAttachment;
+      return { ...data, file_url: signedUrl || storagePath, storage_path: storagePath } as TaskAttachment & { storage_path: string };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['task-attachments', data.task_id] });

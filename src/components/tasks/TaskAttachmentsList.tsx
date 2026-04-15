@@ -24,6 +24,8 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
     for (const file of Array.from(files)) {
       try {
         const uploaded = await uploadAttachment.mutateAsync({ taskId, file });
+        // Extrair o storage path (não a signed URL) para salvar no metadata
+        const storagePath = (uploaded as any).storage_path || uploaded.file_url;
         await createActivity.mutateAsync({
           taskId,
           activityType: 'attachment.added',
@@ -33,7 +35,8 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
             file_name: uploaded.file_name,
             file_type: uploaded.file_type,
             file_size: uploaded.file_size,
-            file_url: uploaded.file_url,
+            file_url: storagePath,
+            storage_path: storagePath,
           },
         });
         toast.success(`Anexo "${file.name}" adicionado!`);
