@@ -244,7 +244,7 @@ export const useCreateTask = () => {
         task_id: data.id,
         user_id: user.id,
         activity_type: 'task.created',
-        metadata: { created_by: 'user' },
+        metadata: { created_by: 'user', created_at_date: data.created_at },
       });
 
       // Aplicar automações (responsáveis e seguidores automáticos)

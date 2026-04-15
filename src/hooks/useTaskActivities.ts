@@ -162,8 +162,17 @@ export const getActivityLabel = (activity: TaskActivity): string => {
   const prefix = isAutomation && automationName ? `[${automationName}] ` : '';
   
   switch (type) {
-    case 'task.created':
+    case 'task.created': {
+      const createdDate = activity.metadata?.created_at_date;
+      if (createdDate) {
+        const formatted = new Date(createdDate).toLocaleDateString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+        return `${prefix}criou esta tarefa em ${formatted}`;
+      }
       return `${prefix}criou esta tarefa`;
+    }
     case 'status.changed':
       return `${prefix}alterou o status de "${activity.old_value || 'Sem status'}" para "${activity.new_value}"`;
     case 'priority.changed':
