@@ -29,6 +29,71 @@ import { renderTextWithImagesAndLinks } from '@/lib/linkify';
 import { CommentAssigneeSelector } from './CommentAssigneeSelector';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 
+// Extrai o path do storage a partir de uma URL pública ou retorna o path se já for relativo
+const extractStoragePath = (fileUrl: string): string => {
+  if (!fileUrl.startsWith('http')) return fileUrl;
+  const marker = '/task-attachments/';
+  const idx = fileUrl.indexOf(marker);
+  if (idx !== -1) return fileUrl.substring(idx + marker.length);
+  // Tentar extrair de signed URL (tem o path após /object/sign/task-attachments/)
+  const signMarker = '/object/sign/task-attachments/';
+  const signIdx = fileUrl.indexOf(signMarker);
+  if (signIdx !== -1) {
+    const pathWithQuery = fileUrl.substring(signIdx + signMarker.length);
+    return pathWithQuery.split('?')[0];
+  }
+  return fileUrl;
+};
+
+// Componente separado para resolver signed URLs em previews de anexo no histórico
+const AttachmentPreviewInActivity = ({ metadata }: { metadata: any }) => {
+  const [resolvedUrl, setResolvedUrl] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const resolve = async () => {
+      const storagePath = metadata.storage_path || extractStoragePath(metadata.file_url);
+      if (!storagePath || storagePath.startsWith('http')) {
+        // Fallback: usar a URL direta (pode estar expirada)
+        setResolvedUrl(metadata.file_url);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.storage
+        .from('task-attachments')
+        .createSignedUrl(storagePath, 3888000);
+      setResolvedUrl(data?.signedUrl || metadata.file_url);
+      setLoading(false);
+    };
+    resolve();
+  }, [metadata.file_url, metadata.storage_path]);
+
+  if (loading) return null;
+
+  return (
+    <div className="mt-2">
+      {metadata.file_type?.startsWith('image/') ? (
+        <img
+          src={resolvedUrl}
+          alt={metadata.file_name || 'Anexo'}
+          className="h-20 w-20 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity border border-border"
+          onClick={() => window.open(resolvedUrl, '_blank')}
+        />
+      ) : (
+        <a
+          href={resolvedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+        >
+          <Paperclip className="h-3 w-3" />
+          {metadata.file_name}
+        </a>
+      )}
+    </div>
+  );
+};
+
 interface TaskActivityItemProps {
   activity: TaskActivity;
   taskId?: string;
