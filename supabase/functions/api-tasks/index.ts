@@ -245,6 +245,17 @@ Deno.serve(async (req) => {
 
     console.log("Task created:", task.id);
 
+    // Register task.created activity for history
+    await supabase.from('task_activities').insert({
+      task_id: task.id,
+      user_id: tokenData.created_by,
+      activity_type: 'task.created',
+      metadata: {
+        created_by: 'api',
+        created_at_date: task.created_at,
+      },
+    });
+
     // Handle attachment if provided
     if (payload.attachment_url) {
       const { error: attachmentError } = await supabase
