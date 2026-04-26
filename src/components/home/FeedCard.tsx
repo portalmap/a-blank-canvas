@@ -11,12 +11,18 @@ import { FeedPostItem } from './FeedPostItem';
 import { toast } from 'sonner';
 
 export function FeedCard() {
-  const { 
-    posts, 
-    isLoading, 
-    createPost, 
-    isCreating, 
+  const {
+    posts,
+    isLoading,
+    canCreatePost,
+    isAdmin,
+    createPost,
+    isCreating,
     toggleReaction,
+    addComment,
+    isAddingComment,
+    deletePost,
+    deleteComment,
   } = useFeedPosts();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -39,15 +45,27 @@ export function FeedCard() {
     }
   };
 
-  const handleComment = (postId: string) => {
-    toast.info('Funcionalidade de comentários em breve');
+  const handleAddComment = async (postId: string, content: string) => {
+    await addComment({ postId, content });
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    await deletePost(postId);
+  };
+
+  const handleDeleteComment = async (commentId: string, postId: string) => {
+    await deleteComment({ commentId, postId });
   };
 
   const EmptyState = () => (
     <div className="text-center py-6 text-muted-foreground">
       <Rss className="h-10 w-10 mx-auto mb-2 opacity-50" />
       <p className="text-sm font-medium">Nenhuma publicação ainda</p>
-      <p className="text-xs">Seja o primeiro a compartilhar algo!</p>
+      <p className="text-xs">
+        {canCreatePost
+          ? 'Seja o primeiro a compartilhar algo!'
+          : 'Aguarde uma publicação dos administradores.'}
+      </p>
     </div>
   );
 
@@ -57,8 +75,12 @@ export function FeedCard() {
         <FeedPostItem
           key={post.id}
           post={post}
+          isAdmin={isAdmin}
           onReact={handleReact}
-          onComment={handleComment}
+          onAddComment={handleAddComment}
+          onDeletePost={handleDeletePost}
+          onDeleteComment={handleDeleteComment}
+          isAddingComment={isAddingComment}
         />
       ))}
     </div>
@@ -89,11 +111,10 @@ export function FeedCard() {
           </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 gap-3 pt-0">
-          <CreatePostDialog 
-            onSubmit={handleCreatePost} 
-            isSubmitting={isCreating} 
-          />
-          
+          {canCreatePost && (
+            <CreatePostDialog onSubmit={handleCreatePost} isSubmitting={isCreating} />
+          )}
+
           <ScrollArea className="flex-1">
             {isLoading ? (
               <div className="flex items-center justify-center py-6">
@@ -116,12 +137,11 @@ export function FeedCard() {
               Feed
             </DialogTitle>
           </DialogHeader>
-          
-          <CreatePostDialog 
-            onSubmit={handleCreatePost} 
-            isSubmitting={isCreating} 
-          />
-          
+
+          {canCreatePost && (
+            <CreatePostDialog onSubmit={handleCreatePost} isSubmitting={isCreating} />
+          )}
+
           <ScrollArea className="flex-1 max-h-[65vh]">
             {posts.length === 0 ? <EmptyState /> : <PostsList />}
           </ScrollArea>
