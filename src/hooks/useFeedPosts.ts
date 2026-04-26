@@ -21,17 +21,63 @@ export interface FeedPost {
   user_has_reacted: boolean;
 }
 
+export interface FeedComment {
+  id: string;
+  post_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  author: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
 export function useFeedPosts() {
   const { user } = useAuth();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
+
+  // Determines if current user can create/delete-any in this workspace
+  const permissionsQuery = useQuery({
+    queryKey: ['feed-permissions', activeWorkspace?.id, user?.id],
+    queryFn: async () => {
+      if (!user?.id || !activeWorkspace?.id) {
+        return { canCreatePost: false, isAdmin: false };
+      }
+
+      // Workspace admin?
+      const { data: membership } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', activeWorkspace.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const isWorkspaceAdmin = membership?.role === 'admin';
+
+      // System admin (global_owner / owner)?
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const isSystemAdmin = !!roles?.some(
+        (r) => r.role === 'global_owner' || r.role === 'owner'
+      );
+
+      const isAdmin = isWorkspaceAdmin || isSystemAdmin;
+      return { canCreatePost: isAdmin, isAdmin };
+    },
+    enabled: !!user?.id && !!activeWorkspace?.id,
+  });
 
   const postsQuery = useQuery({
     queryKey: ['feed-posts', activeWorkspace?.id],
     queryFn: async () => {
       if (!activeWorkspace?.id) return [];
 
-      // Fetch posts with author profile
       const { data: posts, error: postsError } = await supabase
         .from('feed_posts')
         .select(`
@@ -49,50 +95,44 @@ export function useFeedPosts() {
       if (postsError) throw postsError;
       if (!posts || posts.length === 0) return [];
 
-      // Get unique author IDs
-      const authorIds = [...new Set(posts.map(p => p.author_id))];
-      
-      // Fetch profiles for all authors
+      const authorIds = [...new Set(posts.map((p) => p.author_id))];
+
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
         .in('id', authorIds);
 
-      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profilesMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
-      // Fetch reactions count per post
       const { data: reactionsCounts } = await supabase
         .from('feed_post_reactions')
         .select('post_id')
-        .in('post_id', posts.map(p => p.id));
+        .in('post_id', posts.map((p) => p.id));
 
       const reactionsCountMap = new Map<string, number>();
-      reactionsCounts?.forEach(r => {
+      reactionsCounts?.forEach((r) => {
         reactionsCountMap.set(r.post_id, (reactionsCountMap.get(r.post_id) || 0) + 1);
       });
 
-      // Fetch comments count per post
       const { data: commentsCounts } = await supabase
         .from('feed_post_comments')
         .select('post_id')
-        .in('post_id', posts.map(p => p.id));
+        .in('post_id', posts.map((p) => p.id));
 
       const commentsCountMap = new Map<string, number>();
-      commentsCounts?.forEach(c => {
+      commentsCounts?.forEach((c) => {
         commentsCountMap.set(c.post_id, (commentsCountMap.get(c.post_id) || 0) + 1);
       });
 
-      // Fetch user's reactions
       const { data: userReactions } = await supabase
         .from('feed_post_reactions')
         .select('post_id')
         .eq('user_id', user?.id || '')
-        .in('post_id', posts.map(p => p.id));
+        .in('post_id', posts.map((p) => p.id));
 
-      const userReactedPosts = new Set(userReactions?.map(r => r.post_id) || []);
+      const userReactedPosts = new Set(userReactions?.map((r) => r.post_id) || []);
 
-      // Combine all data
-      return posts.map(post => ({
+      return posts.map((post) => ({
         ...post,
         author: profilesMap.get(post.author_id) || null,
         reactions_count: reactionsCountMap.get(post.id) || 0,
@@ -131,23 +171,20 @@ export function useFeedPosts() {
     mutationFn: async (postId: string) => {
       if (!user?.id) throw new Error('Usuário não encontrado');
 
-      // Check if user already reacted
       const { data: existingReaction } = await supabase
         .from('feed_post_reactions')
         .select('id')
         .eq('post_id', postId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (existingReaction) {
-        // Remove reaction
         const { error } = await supabase
           .from('feed_post_reactions')
           .delete()
           .eq('id', existingReaction.id);
         if (error) throw error;
       } else {
-        // Add reaction
         const { error } = await supabase
           .from('feed_post_reactions')
           .insert({
@@ -180,8 +217,34 @@ export function useFeedPosts() {
       if (error) throw error;
       return data;
     },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['feed-posts', activeWorkspace?.id] });
+      queryClient.invalidateQueries({ queryKey: ['feed-comments', variables.postId] });
+    },
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const { error } = await supabase.from('feed_posts').delete().eq('id', postId);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed-posts', activeWorkspace?.id] });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async ({ commentId, postId }: { commentId: string; postId: string }) => {
+      const { error } = await supabase
+        .from('feed_post_comments')
+        .delete()
+        .eq('id', commentId);
+      if (error) throw error;
+      return { postId };
+    },
+    onSuccess: ({ postId }) => {
+      queryClient.invalidateQueries({ queryKey: ['feed-posts', activeWorkspace?.id] });
+      queryClient.invalidateQueries({ queryKey: ['feed-comments', postId] });
     },
   });
 
@@ -189,9 +252,44 @@ export function useFeedPosts() {
     posts: postsQuery.data || [],
     isLoading: postsQuery.isLoading,
     error: postsQuery.error,
+    canCreatePost: permissionsQuery.data?.canCreatePost ?? false,
+    isAdmin: permissionsQuery.data?.isAdmin ?? false,
     createPost: createPostMutation.mutateAsync,
     isCreating: createPostMutation.isPending,
     toggleReaction: toggleReactionMutation.mutateAsync,
     addComment: addCommentMutation.mutateAsync,
+    isAddingComment: addCommentMutation.isPending,
+    deletePost: deletePostMutation.mutateAsync,
+    deleteComment: deleteCommentMutation.mutateAsync,
   };
+}
+
+export function usePostComments(postId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['feed-comments', postId],
+    queryFn: async (): Promise<FeedComment[]> => {
+      const { data: comments, error } = await supabase
+        .from('feed_post_comments')
+        .select('id, post_id, author_id, content, created_at')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (!comments || comments.length === 0) return [];
+
+      const authorIds = [...new Set(comments.map((c) => c.author_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', authorIds);
+
+      const profilesMap = new Map(profiles?.map((p) => [p.id, p]) || []);
+
+      return comments.map((c) => ({
+        ...c,
+        author: profilesMap.get(c.author_id) || null,
+      }));
+    },
+    enabled: enabled && !!postId,
+  });
 }
