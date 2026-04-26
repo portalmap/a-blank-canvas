@@ -1,70 +1,83 @@
 
 
-# Registrar atividade de criação de tarefa com data e hora
+## Diagnóstico honesto
 
-## Problema identificado
+Encontrei dois problemas reais e uma confusão que precisa ser esclarecida:
 
-Existem **dois pontos** onde tarefas são criadas:
+### 1. Comentários "não funcionam" — motivo real
+Não é um bug de RLS. A função de adicionar comentário **simplesmente nunca foi construída na interface**. O botão atual chama `onComment` que só dispara um toast `"Funcionalidade de comentários em breve"`. A mutation `addComment` já existe no hook, mas nada na UI a usa. Não há campo de texto para digitar comentário, nem listagem de comentários existentes.
 
-1. **Frontend** (`src/hooks/useTasks.ts`) — registra a atividade `task.created`, mas sem incluir a data/hora de criação no metadata.
-2. **API Gateway** (`supabase/functions/api-tasks/index.ts`) — usado pelo Portal MAP — **não registra nenhuma atividade** `task.created`.
+### 2. RLS de criação de post hoje
+A política atual permite que **qualquer membro do workspace** crie post no feed. Para restringir a "admin acima" (admin do workspace + global_owner + owner), preciso alterar a policy de INSERT de `feed_posts`.
 
-A tarefa do screenshot (criada em 08/04 via Portal MAP) não tem registro de criação porque veio pela API.
+### 3. Esclarecimento importante sobre "admin acima"
+No sistema existem dois níveis distintos de admin:
+- **Workspace admin** (tabela `workspace_members.role = 'admin'`) — admin daquele workspace específico
+- **System admin** (tabela `user_roles.role IN ('global_owner','owner')`) — admin global do sistema
 
-## Solução
+Vou interpretar "admin acima" como: **workspace admin + global_owner + owner**. Se você quis dizer apenas global_owner/owner (excluindo admin de workspace), me avisa antes de aprovar.
 
-### 1. `supabase/functions/api-tasks/index.ts`
-Após criar a tarefa com sucesso (linha ~246), inserir a atividade:
+---
 
-```typescript
-await supabase.from('task_activities').insert({
-  task_id: task.id,
-  user_id: tokenData.created_by,
-  activity_type: 'task.created',
-  metadata: {
-    created_by: 'api',
-    created_at_date: task.created_at,
-  },
-});
+## Plano de implementação
+
+### Backend (migration SQL)
+
+**1. Atualizar policy de INSERT em `feed_posts`** — restringir criação a admin do workspace OU system admin (global_owner/owner):
+```sql
+DROP POLICY "Members can create feed posts" ON feed_posts;
+CREATE POLICY "Only admins can create feed posts" ON feed_posts FOR INSERT
+  WITH CHECK (
+    author_id = auth.uid() AND (
+      is_workspace_admin(auth.uid(), workspace_id)
+      OR is_system_admin(auth.uid())
+    )
+  );
 ```
 
-Isso garante que tarefas criadas pelo Portal MAP tenham registro no histórico.
-
-### 2. `src/hooks/useTasks.ts`
-Enriquecer o metadata do insert existente (linha ~243-248) para incluir a data de criação:
-
-```typescript
-metadata: {
-  created_by: 'user',
-  created_at_date: data.created_at,
-},
+**2. Adicionar policy de DELETE para admins em `feed_posts`** (mantendo a do autor):
+```sql
+CREATE POLICY "Admins can delete any feed post" ON feed_posts FOR DELETE
+  USING (
+    is_workspace_admin(auth.uid(), workspace_id)
+    OR is_system_admin(auth.uid())
+  );
 ```
 
-### 3. `src/hooks/useTaskActivities.ts`
-Atualizar o label do `task.created` para mostrar a data e hora:
-
-```typescript
-case 'task.created': {
-  const createdDate = activity.metadata?.created_at_date;
-  if (createdDate) {
-    const formatted = new Date(createdDate).toLocaleDateString('pt-BR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-    return `${prefix}criou esta tarefa em ${formatted}`;
-  }
-  return `${prefix}criou esta tarefa`;
-}
+**3. Adicionar policy de DELETE para admins em `feed_post_comments`** (mantendo a do autor):
+```sql
+CREATE POLICY "Admins can delete any comment" ON feed_post_comments FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM feed_posts p
+      WHERE p.id = feed_post_comments.post_id
+        AND (is_workspace_admin(auth.uid(), p.workspace_id) OR is_system_admin(auth.uid()))
+    )
+  );
 ```
 
-### Impacto no Portal MAP
-Nenhum impacto negativo — apenas adiciona um INSERT extra na tabela `task_activities` após a criação. O fluxo existente continua funcionando normalmente.
+### Frontend
 
-## Arquivos alterados
+**4. `useFeedPosts.ts`** — adicionar:
+- `canCreatePost` (boolean) — verifica se usuário atual é admin do workspace OU system admin via `workspace_members` + `user_roles`
+- `deletePost(postId)` mutation
+- `deleteComment(commentId)` mutation
+- `usePostComments(postId)` query separada (lazy load, só busca quando expande comentários) com join em `profiles`
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/api-tasks/index.ts` | Adicionar registro de atividade `task.created` |
-| `src/hooks/useTasks.ts` | Incluir `created_at_date` no metadata |
-| `src/hooks/useTaskActivities.ts` | Exibir data/hora no label de criação |
+**5. `FeedCard.tsx`** — esconder/desabilitar `CreatePostDialog` quando `!canCreatePost`. Para não-admins, sequer renderiza o botão "Nova publicação".
+
+**6. `FeedPostItem.tsx`** — refatorar para:
+- Ícone de lixeira (DropdownMenu de 3 pontinhos) no canto superior direito do post, visível apenas para autor OU admin/system admin. Confirmação via AlertDialog antes de excluir.
+- Clique em "comentar" expande/recolhe seção de comentários inline (state local `isCommentsOpen`).
+- Seção de comentários: lista existentes com avatar+nome+texto+timestamp, cada comentário com lixeira para autor/admin, e um campo de input no rodapé com botão "Enviar".
+
+### O que não muda
+- Curtidas continuam funcionando exatamente como hoje.
+- Visualização do feed (SELECT) continua aberta a todos os membros do workspace.
+- Posts já existentes ficam intactos.
+
+### Edge cases
+- Post sem comentários → mostra "Seja o primeiro a comentar" no painel expandido.
+- Usuário comum tentando publicar → nem vê o campo (UI) e, se forçar via API, RLS bloqueia (defesa em profundidade).
+- Excluir post → comentários e reações são apagadas em cascata? **Preciso verificar se há ON DELETE CASCADE** nas FKs de `feed_post_comments.post_id` e `feed_post_reactions.post_id`. Se não houver, incluo `ON DELETE CASCADE` na migration.
 
