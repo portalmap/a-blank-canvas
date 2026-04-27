@@ -3,15 +3,32 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkspaces, useDefaultWorkspace, useSetDefaultWorkspace } from "@/hooks/useWorkspaces";
+import { AvatarUpload } from "./AvatarUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 export function UserProfile() {
   const { user } = useAuth();
   const [email] = useState(user?.email || "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string>("");
   const { data: workspaces } = useWorkspaces();
   const { data: defaultWorkspaceId } = useDefaultWorkspace();
   const setDefaultWorkspace = useSetDefaultWorkspace();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("profiles")
+      .select("avatar_url, full_name")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setAvatarUrl(data?.avatar_url || null);
+        setFullName(data?.full_name || user.email || "");
+      });
+  }, [user?.id]);
 
   const handleDefaultWorkspaceChange = (value: string) => {
     setDefaultWorkspace.mutate(value === "__none__" ? null : value);
