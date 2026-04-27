@@ -42,7 +42,22 @@ export function UserProfile() {
           Gerencie suas informações pessoais
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {user?.id && (
+          <div className="flex flex-col items-center gap-2 pb-2 border-b">
+            <AvatarUpload
+              userId={user.id}
+              currentUrl={avatarUrl}
+              fullName={fullName}
+              size={96}
+              onChange={(url) => setAvatarUrl(url)}
+            />
+            <p className="text-xs text-muted-foreground">
+              JPG, PNG ou WEBP — até 3 MB
+            </p>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input 
