@@ -250,10 +250,13 @@ export function UserEditDialog({
           )}
           
           <div className="flex justify-center">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={user.avatarUrl} alt={fullName} />
-              <AvatarFallback>{fullName[0]?.toUpperCase()}</AvatarFallback>
-            </Avatar>
+            <AvatarUpload
+              userId={user.id}
+              currentUrl={user.avatarUrl}
+              fullName={fullName}
+              size={80}
+              useAdminRpc={user.id !== currentUserId}
+            />
           </div>
 
           <div className="space-y-2">
