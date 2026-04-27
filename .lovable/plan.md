@@ -1,37 +1,39 @@
-## Objetivo
+## Problema
 
-Permitir que os círculos de perfil (avatares) na lista de membros em `/settings` (e em todo o sistema, já que o componente `Avatar` é reutilizado) exibam fotos reais. Hoje o `UserCard` já está preparado para renderizar a imagem (`AvatarImage src={avatarUrl}`), mas **nunca há `avatar_url` salvo** porque não existe nenhuma tela para fazer upload da foto. As iniciais aparecem apenas como fallback.
+A `BulkActionsBar` usa `fixed bottom-4 left-1/2` e fica sobreposta à última linha da lista de tarefas, atrapalhando a visualização e o clique nos itens finais.
 
-## O que será feito
+## Solução
 
-### 1. Backend — bucket de fotos de perfil
-- Criar bucket público `avatars` no storage (público para evitar URL assinada e cache problemático em <img>).
-- Políticas de storage:
-  - Leitura: pública (qualquer pessoa autenticada pode ver fotos de perfis).
-  - Upload/Update/Delete: o próprio usuário pode mexer só nos seus arquivos (path = `{user_id}/...`).
-  - Admins/Proprietários do workspace podem fazer upload/substituir foto de **qualquer** usuário (atende ao caso de admin subir foto pelos membros que não vão fazer sozinhos).
+Combinar duas correções complementares para resolver definitivamente, sem afetar outras funcionalidades:
 
-### 2. Componente novo: `AvatarUpload`
-- Pequeno componente reutilizável que mostra o avatar atual + botão "Alterar foto" e "Remover".
-- Faz upload para `avatars/{user_id}/avatar-{timestamp}.{ext}` (timestamp evita cache do navegador).
-- Atualiza `profiles.avatar_url` com a URL pública.
-- Validação: só imagens (jpg/png/webp), máx ~3 MB, redimensiona client-side se >1024px (canvas) para manter o storage leve.
+### 1. Padding inferior dinâmico na lista (correção principal)
+Quando houver tarefas selecionadas, adicionar um `padding-bottom` extra (~80px) ao container da `TaskListView` (e demais views afetadas, como Kanban/Sprint, se aplicável). Isso garante que a última linha sempre tenha espaço para rolar acima da barra — mesmo se o usuário não mover a barra.
 
-### 3. Onde será integrado
-- **`UserProfile.tsx`** (aba "Meu perfil" em /settings): cada usuário gerencia a própria foto.
-- **`UserEditDialog.tsx`** (admin editando outro usuário): admin pode subir foto pelo membro. Já tem `<Avatar>` no topo do dialog — vira `AvatarUpload` quando o editor for admin.
+- Arquivo: `src/components/views/TaskListView.tsx` (e equivalentes onde a barra aparece)
+- Receber prop opcional `hasBulkSelection: boolean` ou aplicar via `pb-24` condicional já no `ListDetailView.tsx` que renderiza a barra.
 
-### 4. Exibição
-Nada a fazer no `UserCard` — assim que `profiles.avatar_url` estiver preenchido, o círculo passa a mostrar a foto automaticamente. O mesmo vale para todos os outros pontos do sistema que já leem `avatar_url` (chat, comentários, responsáveis, etc.).
+### 2. Tornar a barra arrastável (move horizontal/vertical)
+Adicionar uma "alça" (handle, ícone `GripVertical`) à esquerda da barra que permita arrastar livremente para qualquer posição da tela usando mouse/touch.
+
+- Arquivo: `src/components/tasks/BulkActionsBar.tsx`
+- Implementação leve com `useState` para `position {x, y}` + listeners `mousemove`/`mouseup` (sem dependências externas).
+- Posição inicial: centralizada em baixo (comportamento atual).
+- Limites: clamp dentro da `window` para não sumir da tela.
+- Persistir a posição em `sessionStorage` para não resetar a cada seleção dentro da mesma sessão.
+- Cursor `grab` na alça e `grabbing` durante o arrasto.
+
+### 3. Detalhe visual
+- Adicionar `shadow-xl` e leve `backdrop-blur` para melhorar a leitura quando sobrepor conteúdo.
+- Manter o botão `X` para fechar a seleção.
 
 ## Pontos técnicos
 
-- Bucket público é a escolha correta aqui: avatares aparecem em chat, kanban, listas — gerar URL assinada para cada um seria caro e quebraria cache.
-- Path com `user_id/` na raiz é obrigatório para as policies funcionarem (`auth.uid()::text = (storage.foldername(name))[1]`).
-- Adicionar `?v={timestamp}` na URL quando salvar, para forçar refresh imediato após troca.
-- `useAllProfiles`, `useWorkspaceMembers`, `useTaskAssignees` etc. já retornam `avatar_url` — sem mudanças neles.
+- Não há mudanças no banco de dados.
+- Nenhuma regra de negócio (status, responsáveis, datas, exclusão em massa) é alterada.
+- Mudanças isoladas em 2 arquivos (`BulkActionsBar.tsx` e `ListDetailView.tsx`), sem impacto em automações, produtividade, chat ou feed.
 
-## O que NÃO muda
-- Regras de permissão existentes (feed, tasks, chat, automações) — intactas.
-- Nenhuma alteração nos hooks de produtividade, automações ou estrutura do workspace.
-- Iniciais continuam como fallback quando o usuário não tem foto.
+## Resultado esperado
+
+- A última linha sempre fica visível/clicável (graças ao padding extra).
+- Caso o usuário queira ainda mais espaço, basta arrastar a barra para outro canto da tela.
+- A posição escolhida é lembrada durante a sessão.

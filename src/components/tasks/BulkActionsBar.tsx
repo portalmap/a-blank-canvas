@@ -1,11 +1,11 @@
-import { X, Archive, Trash2, Copy, FolderInput, Tag, Calendar, Users, CircleDot } from "lucide-react";
+import { X, Archive, Trash2, Copy, FolderInput, Tag, Calendar, Users, CircleDot, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBulkPopover } from "./bulk-actions/StatusBulkPopover";
 import { AssigneeBulkPopover } from "./bulk-actions/AssigneeBulkPopover";
 import { DatesBulkPopover } from "./bulk-actions/DatesBulkPopover";
 import { TagsBulkPopover } from "./bulk-actions/TagsBulkPopover";
 import { ConfirmBulkDeleteDialog } from "./bulk-actions/ConfirmBulkDeleteDialog";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   useBulkArchiveTasks,
   useBulkCopyTasks,
@@ -21,6 +21,8 @@ interface BulkActionsBarProps {
   defaultStatusId?: string;
 }
 
+const STORAGE_KEY = "bulk-actions-bar-position";
+
 export function BulkActionsBar({
   selectedTaskIds,
   workspaceId,
@@ -33,6 +35,85 @@ export function BulkActionsBar({
   const archiveTasks = useBulkArchiveTasks();
   const copyTasks = useBulkCopyTasks();
   const { user } = useAuth();
+
+  const barRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const dragState = useRef<{ offsetX: number; offsetY: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const clampPosition = useCallback((x: number, y: number) => {
+    const el = barRef.current;
+    const w = el?.offsetWidth ?? 600;
+    const h = el?.offsetHeight ?? 50;
+    const maxX = window.innerWidth - w - 8;
+    const maxY = window.innerHeight - h - 8;
+    return {
+      x: Math.max(8, Math.min(x, maxX)),
+      y: Math.max(8, Math.min(y, maxY)),
+    };
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    const el = barRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragState.current = {
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    };
+    setIsDragging(true);
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: PointerEvent) => {
+      if (!dragState.current) return;
+      const next = clampPosition(
+        e.clientX - dragState.current.offsetX,
+        e.clientY - dragState.current.offsetY
+      );
+      setPosition(next);
+    };
+    const onUp = () => {
+      setIsDragging(false);
+      dragState.current = null;
+      try {
+        if (position) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(position));
+      } catch {}
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [isDragging, clampPosition, position]);
+
+  // Keep persisted position whenever it changes after a drag
+  useEffect(() => {
+    if (!isDragging && position) {
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(position));
+      } catch {}
+    }
+  }, [position, isDragging]);
+
+  // Re-clamp on window resize
+  useEffect(() => {
+    const onResize = () => {
+      setPosition((prev) => (prev ? clampPosition(prev.x, prev.y) : prev));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clampPosition]);
 
   if (selectedTaskIds.length === 0) return null;
 
@@ -57,11 +138,33 @@ export function BulkActionsBar({
     );
   };
 
+  const positionedStyle: React.CSSProperties = position
+    ? { top: position.y, left: position.x, bottom: "auto", transform: "none" }
+    : { bottom: "1rem", left: "50%", transform: "translateX(-50%)" };
+
   return (
     <>
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <div className="flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-2">
-          <span className="text-sm font-medium whitespace-nowrap">
+      <div
+        ref={barRef}
+        className="fixed z-50"
+        style={positionedStyle}
+      >
+        <div
+          className={`flex items-center gap-2 bg-background/95 backdrop-blur border rounded-lg shadow-xl px-2 py-2 ${
+            isDragging ? "select-none" : ""
+          }`}
+        >
+          <div
+            onPointerDown={handlePointerDown}
+            className={`flex items-center justify-center h-8 w-6 rounded hover:bg-muted ${
+              isDragging ? "cursor-grabbing" : "cursor-grab"
+            }`}
+            title="Arraste para mover"
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
+
+          <span className="text-sm font-medium whitespace-nowrap pl-1">
             {selectedTaskIds.length} tarefa(s) selecionada(s)
           </span>
           
@@ -165,6 +268,9 @@ export function BulkActionsBar({
           </Button>
         </div>
       </div>
+
+      {/* Spacer to prevent the bar from covering the last row when in default position */}
+      <div aria-hidden className="h-24 w-full" />
 
       <ConfirmBulkDeleteDialog
         open={showDeleteDialog}
