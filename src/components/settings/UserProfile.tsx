@@ -3,15 +3,32 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkspaces, useDefaultWorkspace, useSetDefaultWorkspace } from "@/hooks/useWorkspaces";
+import { AvatarUpload } from "./AvatarUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 export function UserProfile() {
   const { user } = useAuth();
   const [email] = useState(user?.email || "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string>("");
   const { data: workspaces } = useWorkspaces();
   const { data: defaultWorkspaceId } = useDefaultWorkspace();
   const setDefaultWorkspace = useSetDefaultWorkspace();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("profiles")
+      .select("avatar_url, full_name")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setAvatarUrl(data?.avatar_url || null);
+        setFullName(data?.full_name || user.email || "");
+      });
+  }, [user?.id]);
 
   const handleDefaultWorkspaceChange = (value: string) => {
     setDefaultWorkspace.mutate(value === "__none__" ? null : value);
@@ -25,7 +42,22 @@ export function UserProfile() {
           Gerencie suas informações pessoais
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {user?.id && (
+          <div className="flex flex-col items-center gap-2 pb-2 border-b">
+            <AvatarUpload
+              userId={user.id}
+              currentUrl={avatarUrl}
+              fullName={fullName}
+              size={96}
+              onChange={(url) => setAvatarUrl(url)}
+            />
+            <p className="text-xs text-muted-foreground">
+              JPG, PNG ou WEBP — até 3 MB
+            </p>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input 

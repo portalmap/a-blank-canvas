@@ -3456,6 +3456,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_user_avatar_as_admin: {
+        Args: { new_avatar_url: string; target_user_id: string }
+        Returns: boolean
+      }
       update_user_profile_as_admin: {
         Args: {
           new_bio?: string

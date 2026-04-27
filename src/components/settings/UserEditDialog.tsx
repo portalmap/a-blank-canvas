@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarUpload } from "./AvatarUpload";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -250,10 +250,13 @@ export function UserEditDialog({
           )}
           
           <div className="flex justify-center">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={user.avatarUrl} alt={fullName} />
-              <AvatarFallback>{fullName[0]?.toUpperCase()}</AvatarFallback>
-            </Avatar>
+            <AvatarUpload
+              userId={user.id}
+              currentUrl={user.avatarUrl}
+              fullName={fullName}
+              size={80}
+              useAdminRpc={user.id !== currentUserId}
+            />
           </div>
 
           <div className="space-y-2">
