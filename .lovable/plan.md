@@ -1,37 +1,39 @@
 ## Objetivo
 
-Permitir que os círculos de perfil (avatares) na lista de membros em `/settings` (e em todo o sistema, já que o componente `Avatar` é reutilizado) exibam fotos reais. Hoje o `UserCard` já está preparado para renderizar a imagem (`AvatarImage src={avatarUrl}`), mas **nunca há `avatar_url` salvo** porque não existe nenhuma tela para fazer upload da foto. As iniciais aparecem apenas como fallback.
+Tornar o card "Produtividade" (exibido no topo das views de Lista/Pasta/Space) recolhível, para que ocupe pouco espaço por padrão e possa ser expandido sob demanda quando o usuário quiser analisar os dados.
 
-## O que será feito
+## Comportamento proposto
 
-### 1. Backend — bucket de fotos de perfil
-- Criar bucket público `avatars` no storage (público para evitar URL assinada e cache problemático em <img>).
-- Políticas de storage:
-  - Leitura: pública (qualquer pessoa autenticada pode ver fotos de perfis).
-  - Upload/Update/Delete: o próprio usuário pode mexer só nos seus arquivos (path = `{user_id}/...`).
-  - Admins/Proprietários do workspace podem fazer upload/substituir foto de **qualquer** usuário (atende ao caso de admin subir foto pelos membros que não vão fazer sozinhos).
+**Estado padrão: recolhido (compacto)**
+- Mostra apenas uma linha fina com:
+  - Ícone de Produtividade + título "Produtividade"
+  - Score (ex: `46%`) em destaque colorido
+  - Mini resumo inline: `0 antecipadas · 0 no prazo · 1 atrasada · 0 sem prazo`
+  - Botão chevron (▾) à direita para expandir
+- Sem filtros, sem switch "Transferidas", sem botão "Relatório" visíveis nesse modo.
 
-### 2. Componente novo: `AvatarUpload`
-- Pequeno componente reutilizável que mostra o avatar atual + botão "Alterar foto" e "Remover".
-- Faz upload para `avatars/{user_id}/avatar-{timestamp}.{ext}` (timestamp evita cache do navegador).
-- Atualiza `profiles.avatar_url` com a URL pública.
-- Validação: só imagens (jpg/png/webp), máx ~3 MB, redimensiona client-side se >1024px (canvas) para manter o storage leve.
+**Estado expandido**
+- Mostra exatamente o conteúdo atual (filtro de período, switch Transferidas, botão Relatório, score grande, 4 cards coloridos de indicadores e contador de tarefas concluídas).
+- Botão chevron (▴) para recolher.
 
-### 3. Onde será integrado
-- **`UserProfile.tsx`** (aba "Meu perfil" em /settings): cada usuário gerencia a própria foto.
-- **`UserEditDialog.tsx`** (admin editando outro usuário): admin pode subir foto pelo membro. Já tem `<Avatar>` no topo do dialog — vira `AvatarUpload` quando o editor for admin.
+**Persistência**
+- A preferência (recolhido/expandido) é salva em `localStorage` por escopo (chave tipo `productivity-card-collapsed:{scope}:{listId|folderId|spaceId|workspace}`) para que cada lista/pasta lembre da escolha do usuário.
+- Padrão inicial para novos usuários: **recolhido**.
 
-### 4. Exibição
-Nada a fazer no `UserCard` — assim que `profiles.avatar_url` estiver preenchido, o círculo passa a mostrar a foto automaticamente. O mesmo vale para todos os outros pontos do sistema que já leem `avatar_url` (chat, comentários, responsáveis, etc.).
+## Arquivos afetados
 
-## Pontos técnicos
+- `src/components/dashboard/ScopeProductivityCard.tsx` — único arquivo a modificar.
+  - Adicionar estado `collapsed` com leitura/gravação em `localStorage`.
+  - Renderização condicional: header compacto vs. header + corpo completo atual.
+  - Usar `ChevronDown`/`ChevronUp` do `lucide-react` em um `Button` ghost.
 
-- Bucket público é a escolha correta aqui: avatares aparecem em chat, kanban, listas — gerar URL assinada para cada um seria caro e quebraria cache.
-- Path com `user_id/` na raiz é obrigatório para as policies funcionarem (`auth.uid()::text = (storage.foldername(name))[1]`).
-- Adicionar `?v={timestamp}` na URL quando salvar, para forçar refresh imediato após troca.
-- `useAllProfiles`, `useWorkspaceMembers`, `useTaskAssignees` etc. já retornam `avatar_url` — sem mudanças neles.
+## Detalhes técnicos
 
-## O que NÃO muda
-- Regras de permissão existentes (feed, tasks, chat, automações) — intactas.
-- Nenhuma alteração nos hooks de produtividade, automações ou estrutura do workspace.
-- Iniciais continuam como fallback quando o usuário não tem foto.
+- Não alterar hooks (`useProductivityStats`, `useProductivityDetailsReport`) — os dados continuam sendo buscados normalmente para que o resumo inline funcione mesmo recolhido.
+- O `ProductivityReportDialog` continua disponível pelo botão "Relatório" no modo expandido (sem mudança).
+- Sem migração de banco, sem mudança em outras telas/cards do módulo de Dashboards.
+
+## Fora do escopo
+
+- Cards do módulo `/dashboards` (esses já têm dialog próprio de expansão).
+- Mudanças visuais nos indicadores quando expandido.
