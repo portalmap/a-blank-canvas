@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { startOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { useProductivityStats, ProductivityScope } from '@/hooks/useProductivity
 import { useProductivityDetailsReport } from '@/hooks/useProductivityDetailsReport';
 import { ProductivityReportDialog } from '@/components/dashboards/cards/ProductivityReportDialog';
 import { DateRangeFilter } from '@/components/filters/DateRangeFilter';
-import { TrendingUp, CheckCircle2, Clock, AlertTriangle, HelpCircle, FileText } from 'lucide-react';
+import { TrendingUp, CheckCircle2, Clock, AlertTriangle, HelpCircle, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ScopeProductivityCardProps {
@@ -23,6 +23,19 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
   const [reportOpen, setReportOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
+
+  const storageKey = `productivity-card-collapsed:${scope}:${listId || folderId || spaceId || 'workspace'}`;
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage.getItem(storageKey);
+    return stored === null ? true : stored === '1';
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(storageKey, collapsed ? '1' : '0');
+    } catch {}
+  }, [collapsed, storageKey]);
 
   const handleDateRangeChange = useCallback((range: { startDate: Date | undefined; endDate: Date | undefined }) => {
     setStartDate(range.startDate);
@@ -63,10 +76,63 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="py-6">
-          <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Carregando produtividade...</div>
+        <CardContent className="py-3">
+          <div className="h-6 flex items-center justify-center text-muted-foreground text-sm">Carregando produtividade...</div>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (collapsed) {
+    return (
+      <>
+        <Card>
+          <CardContent className="py-2 px-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 text-sm font-medium">
+                  <TrendingUp className="h-4 w-4" />
+                  Produtividade
+                </div>
+                <span className={cn('text-base font-bold', scoreColor)}>{score}%</span>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                    {stats?.early ?? 0}
+                  </span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-blue-500" />
+                    {stats?.onTime ?? 0}
+                  </span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3 text-red-500" />
+                    {stats?.late ?? 0}
+                  </span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <HelpCircle className="h-3 w-3" />
+                    {stats?.noDueDate ?? 0}
+                  </span>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setCollapsed(false)} className="h-7 px-2">
+                <span className="text-xs mr-1">Expandir</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <ProductivityReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          report={report ?? null}
+          isLoading={reportLoading}
+          title="Relatório de Produtividade"
+        />
+      </>
     );
   }
 
@@ -95,6 +161,9 @@ const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProduc
               <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
                 <FileText className="h-3.5 w-3.5 mr-1" />
                 Relatório
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setCollapsed(true)} className="h-8 px-2">
+                <ChevronUp className="h-4 w-4" />
               </Button>
             </div>
           </div>
