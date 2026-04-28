@@ -218,6 +218,25 @@ const invalidateAutomationQueries = (queryClient: QueryClient, taskId: string) =
 };
 
 /**
+ * Compute Nth weekday of a month. ordinal: 1..4 for first..fourth, -1 for last.
+ * weekday: 0 (Sun) .. 6 (Sat)
+ */
+const computeWeekdayOrdinal = (year: number, month: number, ordinal: number, weekday: number): Date => {
+  if (ordinal === -1) {
+    // last weekday of month
+    const lastDay = new Date(year, month + 1, 0);
+    const diff = (lastDay.getDay() - weekday + 7) % 7;
+    return new Date(year, month, lastDay.getDate() - diff);
+  }
+  const first = new Date(year, month, 1);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  let day = 1 + offset + (Math.max(1, ordinal) - 1) * 7;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  if (day > lastDay) day -= 7; // fallback to last available occurrence
+  return new Date(year, month, day);
+};
+
+/**
  * Calculate next dates based on recurrence config
  */
 const calculateNextDates = (
@@ -264,6 +283,9 @@ const calculateNextDates = (
       if (mode === 'first_day') nextDate.setDate(1);
       else if (mode === 'last_day') { nextDate.setMonth(nextDate.getMonth() + 1); nextDate.setDate(0); }
       else if (mode === 'specific_day') nextDate.setDate(Math.min(config.day_of_month || 1, 28));
+      else if (mode === 'weekday_ordinal') {
+        nextDate = computeWeekdayOrdinal(nextDate.getFullYear(), nextDate.getMonth(), config.weekday_ordinal ?? 1, dayOfWeekMap[config.weekday || 'monday']);
+      }
       break;
     }
     case 'quarterly': {
@@ -272,6 +294,9 @@ const calculateNextDates = (
       if (mode2 === 'first_day') nextDate.setDate(1);
       else if (mode2 === 'last_day') { nextDate.setMonth(nextDate.getMonth() + 1); nextDate.setDate(0); }
       else if (mode2 === 'specific_day') nextDate.setDate(Math.min(config.day_of_month || 1, 28));
+      else if (mode2 === 'weekday_ordinal') {
+        nextDate = computeWeekdayOrdinal(nextDate.getFullYear(), nextDate.getMonth(), config.weekday_ordinal ?? 1, dayOfWeekMap[config.weekday || 'monday']);
+      }
       break;
     }
   }

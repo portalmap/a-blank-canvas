@@ -1,106 +1,53 @@
-## Melhorias no Feed do módulo Início
+## Adicionar recorrência por "ordinal do dia da semana" (ex.: toda 1ª segunda-feira do mês)
 
-Mantém a estrutura atual (card no Início + diálogo expandido) e adiciona criação rica de posts, organização por abas/busca, e visual mais limpo inspirado na referência.
+Hoje a recorrência mensal/trimestral só permite **Primeiro dia**, **Último dia** ou **Dia específico** (número 1–31). Vamos adicionar um novo modo **"Dia da semana"** que combina uma **ordem** (1ª, 2ª, 3ª, 4ª ou Última) com um **dia da semana** (segunda a domingo). Funciona para frequência **Mensal** e **Trimestral**.
 
-### 1. Banco de dados (migration única)
+### Onde aparece (UI)
 
-Alterações na tabela `feed_posts`:
-- `content_format text not null default 'markdown'` (`plain` | `markdown`)
-- `tags text[] not null default '{}'`
-- `is_pinned boolean not null default false`
-- `pinned_at timestamptz`
-- `edited_at timestamptz`
-- `attachments jsonb not null default '[]'` — array de objetos
-- Trigger `before update`: se `content`/`title`/`tags`/`attachments` mudarem, seta `edited_at = now()`.
-- Trigger `before update` em `is_pinned`: ajusta `pinned_at` automaticamente.
-- Índices: `(workspace_id, is_pinned desc, created_at desc)` e GIN em `tags`.
+**1. Tarefas — `TaskRecurrenceConfig.tsx`**
+- No campo **"Dia do período"**, adicionar uma 4ª opção: **"Dia da semana específico"**.
+- Quando selecionada, exibir 2 selects lado a lado:
+  - **Ordem**: Primeira / Segunda / Terceira / Quarta / Última
+  - **Dia da semana**: Segunda / Terça / ... / Domingo
+- Ex.: "Primeira" + "Segunda-feira" → toda 1ª segunda do mês.
 
-Estrutura de cada item em `attachments` (JSONB):
-```text
-{ "kind": "image" | "file" | "doc_link",
-  "storage_path": "...",        // image/file
-  "name": "...", "mime": "...", "size": 123,
-  "document_id": "...", "title": "..." // doc_link (Flow)
+**2. Automações — `ActionConfigForm.tsx`**
+- Mesma opção adicionada ao bloco mensal/trimestral da ação de recorrência, mantendo paridade com a UI da tarefa.
+
+### Mudanças de dados (sem migração SQL)
+
+A coluna `recurrence_config` já é `JSONB` livre — basta estender o shape:
+
+```ts
+interface RecurrenceConfig {
+  // ... campos atuais
+  monthly_mode?: 'first_day' | 'last_day' | 'specific_day' | 'weekday_ordinal'; // NOVO valor
+  weekday_ordinal?: 1 | 2 | 3 | 4 | -1; // -1 = última
+  weekday?: 'monday' | 'tuesday' | ... | 'sunday';
 }
 ```
 
-Novo bucket privado `feed-attachments` (mesmo padrão de `task-attachments`):
-- RLS: insert/select restrito a membros do workspace dono do post (via path `workspace_id/post_id/...`).
-- Acesso via signed URL (15 dias), padrão já adotado no projeto.
+Configs antigas continuam funcionando (compatível).
 
-RLS de `feed_posts` ganha permissão de UPDATE para o autor (apenas título, conteúdo, tags, attachments, content_format) e admins do workspace.
+### Lógica de cálculo — `useStatusChangeAutomations.ts` (`calculateNextDates`)
 
-### 2. Hook `useFeedPosts`
+Adicionar tratamento do modo `weekday_ordinal` nos cases `monthly` e `quarterly`:
 
-- `createPost` aceita `{ title?, content, content_format, tags, attachments }`.
-- Novo `updatePost({ id, title?, content?, tags?, attachments?, content_format? })`.
-- Novo `togglePin(postId)` (apenas admin).
-- `postsQuery` ordena por `is_pinned desc, created_at desc` e devolve novos campos.
-- Novo `useFeedPostReactors(postId, enabled)` — devolve até 5 perfis (avatar + nome) para a lista de "quem curtiu".
+1. Avançar para o mês alvo (atual + 1 para mensal, +3 para trimestral).
+2. Se `ordinal >= 1`: começar no dia 1 do mês, achar o primeiro `weekday`, somar `(ordinal - 1) * 7` dias. Se cair fora do mês, manter no último válido.
+3. Se `ordinal === -1` (última): começar no último dia do mês e voltar até achar o `weekday`.
+4. Aplicar `skip_weekends` apenas quando o weekday escolhido for útil (não desloca sábado/domingo escolhido propositalmente — vamos ignorar `skip_weekends` neste modo para evitar conflito).
 
-### 3. UI — `FeedCard`
+### Arquivos a editar
 
-- Header: ícone Rss + "Feed" + busca compacta + botão expandir.
-- Abas (`Tabs`): **Recentes** | **Fixados** | **Meus posts** (filtro client-side sobre o array já carregado).
-- Campo de busca filtra por título, conteúdo e tags (case-insensitive).
-- Estado vazio adaptado por aba.
-- Botão "Nova publicação" abre o `CreatePostDialog` aprimorado.
+- `src/components/tasks/TaskRecurrenceConfig.tsx` — novo modo + campos de ordem/dia da semana.
+- `src/components/automations/advanced/ActionConfigForm.tsx` — mesma opção no editor de automações.
+- `src/hooks/useStatusChangeAutomations.ts` — função `calculateNextDates` com lógica do ordinal.
 
-### 4. `CreatePostDialog` (refatorado)
+### Memória
 
-- Campos: Título (opcional), editor com **markdown leve** + preview alternável (toggle "Escrever / Visualizar").
-- Toolbar minimalista: **B**, *I*, lista, link → insere sintaxe markdown na textarea.
-- Renderização via `react-markdown` + `remark-gfm` (já adicionar deps).
-- Seletor de **tags** (chips com sugestões fixas: `Comunicado`, `RH`, `Eventos`, `Produto`, `Avisos`; usuário pode digitar nova).
-- Anexos:
-  - **Imagens**: múltiplas, preview em grid 2 colunas.
-  - **Arquivos**: lista com nome + tamanho.
-  - **Link a documento do Flow**: combobox que busca em `documents` do workspace (filtra por nome). Insere chip "📄 Nome do documento" que vira link interno (`/documents/:id`).
-  - Hiperlink externo: tratado nativamente pelo markdown.
-- Mesmo dialog é reutilizado para **edição** (recebe `initialPost`).
+Atualizar `mem://features/automations/advanced-recurrence-logic` para registrar o novo modo `weekday_ordinal`.
 
-### 5. `FeedPostItem` (visual mais limpo)
+### Resultado esperado
 
-- Cabeçalho: avatar 10×10, nome em negrito, cargo/função se disponível, data relativa, selo `Fixado` quando aplicável, selo `editado` ao lado da data quando `edited_at` existir.
-- Conteúdo: título maior, corpo renderizado com `react-markdown`. Links internos para `/documents/:id` e `/task/:id` viram navegação SPA.
-- **Galeria de imagens**: grid responsivo (1, 2 ou 3+ com "ver mais"). Clique abre lightbox simples.
-- **Anexo de arquivo**: card com ícone PDF/genérico, nome, tamanho e botão download (signed URL).
-- **Doc do Flow**: card compacto com ícone FileText e link para o documento.
-- **Tags**: badges abaixo do conteúdo.
-- Ações: Curtir (Heart) | Comentar (MessageCircle) | Salvar (Bookmark, opcional futuro). Contador formatado (`1.2k`).
-- **Curtidas com avatares**: ao lado do contador, stack de até 3 avatares dos primeiros que curtiram (popover mostra lista completa).
-- Menu `MoreVertical`: **Editar** (autor + admin), **Fixar/Desafixar** (admin), **Excluir** (autor + admin).
-
-### 6. Renderer markdown seguro
-
-Componente `FeedContent` que usa `react-markdown` + `remark-gfm` com whitelist de elementos. Override de `<a>`:
-- `/documents/:id` e `/task/:id` → `<Link>` do react-router.
-- Externos → `target="_blank" rel="noopener"`.
-
-### 7. Detalhes técnicos
-
-- Dependências novas: `react-markdown`, `remark-gfm`.
-- Bucket signed URLs: helper `getFeedAttachmentUrl(path)` reutilizando padrão de `task-attachments`.
-- Upload acontece no submit do dialog: cria post → faz upload → atualiza `attachments` no post (ou usa upload prévio em caminho temporário e move; vamos usar upload prévio para simplicidade, com path `workspace_id/<uuid>/<filename>`).
-- Lightbox: componente leve já existente no projeto se houver, senão `Dialog` com `<img>`.
-- Performance: a query principal não traz `attachments` grandes além do JSON; signed URLs são gerados sob demanda no item.
-- Realtime opcional: não incluir agora para manter escopo.
-
-### Arquivos afetados / criados
-
-Criados:
-- `supabase/migrations/<timestamp>_feed_enhancements.sql`
-- `src/components/home/FeedContent.tsx` (markdown renderer)
-- `src/components/home/FeedAttachments.tsx` (galeria + arquivos + doc links)
-- `src/components/home/FeedPostTabs.tsx` (abas + busca)
-- `src/components/home/DocumentLinkPicker.tsx` (combobox para docs do Flow)
-- `src/components/home/FeedReactorsPopover.tsx`
-- `src/lib/feedAttachments.ts` (helpers de upload + signed URL)
-
-Editados:
-- `src/components/home/FeedCard.tsx` — abas, busca, integração com edição.
-- `src/components/home/FeedPostItem.tsx` — novo layout, tags, anexos, edit/pin, selo "editado", avatares de curtidas.
-- `src/components/home/CreatePostDialog.tsx` — editor markdown, tags, anexos, modo edição.
-- `src/hooks/useFeedPosts.ts` — `updatePost`, `togglePin`, novos campos, `useFeedPostReactors`.
-
-Sem mudanças em outras áreas do app.
+Usuário poderá configurar "toda primeira segunda-feira do mês", "toda terceira quinta-feira do mês", "toda última sexta do mês" etc., tanto em tarefas recorrentes quanto em ações de automação de recorrência, sem quebrar nenhuma configuração existente.

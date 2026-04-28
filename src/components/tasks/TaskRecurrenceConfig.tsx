@@ -15,8 +15,10 @@ import { cn } from '@/lib/utils';
 interface RecurrenceConfig {
   recurrence_type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
   day_of_week?: string;
-  monthly_mode?: 'first_day' | 'last_day' | 'specific_day';
+  monthly_mode?: 'first_day' | 'last_day' | 'specific_day' | 'weekday_ordinal';
   day_of_month?: number;
+  weekday_ordinal?: 1 | 2 | 3 | 4 | -1;
+  weekday?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
   trigger_on_status_id: string;
   skip_weekends: boolean;
   repeat_forever: boolean;
@@ -53,6 +55,15 @@ const MONTHLY_MODES = [
   { value: 'first_day', label: 'Primeiro dia' },
   { value: 'last_day', label: 'Último dia' },
   { value: 'specific_day', label: 'Dia específico' },
+  { value: 'weekday_ordinal', label: 'Dia da semana específico' },
+];
+
+const ORDINALS = [
+  { value: '1', label: 'Primeira' },
+  { value: '2', label: 'Segunda' },
+  { value: '3', label: 'Terceira' },
+  { value: '4', label: 'Quarta' },
+  { value: '-1', label: 'Última' },
 ];
 
 export const TaskRecurrenceConfig = ({ taskId, listId, workspaceId, recurrenceConfig }: TaskRecurrenceConfigProps) => {
@@ -215,6 +226,36 @@ export const TaskRecurrenceConfig = ({ taskId, listId, workspaceId, recurrenceCo
                 onChange={(e) => updateConfig({ day_of_month: parseInt(e.target.value) || 1 })}
                 className="mt-1.5"
               />
+            )}
+            {config.monthly_mode === 'weekday_ordinal' && (
+              <div className="grid grid-cols-2 gap-2 mt-1.5">
+                <Select
+                  value={String(config.weekday_ordinal ?? 1)}
+                  onValueChange={(v) => updateConfig({ weekday_ordinal: parseInt(v) as RecurrenceConfig['weekday_ordinal'] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ordem..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORDINALS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={config.weekday || 'monday'}
+                  onValueChange={(v) => updateConfig({ weekday: v as RecurrenceConfig['weekday'] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Dia..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DAYS_OF_WEEK.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
         )}

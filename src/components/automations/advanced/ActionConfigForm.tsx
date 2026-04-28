@@ -605,6 +605,7 @@ export const ActionConfigForm = ({
                         <SelectItem value="first_day">Primeiro dia do período</SelectItem>
                         <SelectItem value="last_day">Último dia do período</SelectItem>
                         <SelectItem value="specific_day">Dia específico</SelectItem>
+                        <SelectItem value="weekday_ordinal">Dia da semana específico</SelectItem>
                       </SelectContent>
                     </Select>
                     
@@ -621,6 +622,38 @@ export const ActionConfigForm = ({
                         placeholder="Ex: 15"
                         className="mt-2"
                       />
+                    )}
+                    {config.monthly_mode === 'weekday_ordinal' && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <Select
+                          value={String(config.weekday_ordinal ?? 1)}
+                          onValueChange={(v) => handleFieldChange('weekday_ordinal', parseInt(v))}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Ordem..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Primeira</SelectItem>
+                            <SelectItem value="2">Segunda</SelectItem>
+                            <SelectItem value="3">Terceira</SelectItem>
+                            <SelectItem value="4">Quarta</SelectItem>
+                            <SelectItem value="-1">Última</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={config.weekday || 'monday'}
+                          onValueChange={(v) => handleFieldChange('weekday', v)}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Dia..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monday">Segunda-feira</SelectItem>
+                            <SelectItem value="tuesday">Terça-feira</SelectItem>
+                            <SelectItem value="wednesday">Quarta-feira</SelectItem>
+                            <SelectItem value="thursday">Quinta-feira</SelectItem>
+                            <SelectItem value="friday">Sexta-feira</SelectItem>
+                            <SelectItem value="saturday">Sábado</SelectItem>
+                            <SelectItem value="sunday">Domingo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     )}
                   </div>
                 )}
