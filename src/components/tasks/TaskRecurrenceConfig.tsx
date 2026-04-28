@@ -15,8 +15,10 @@ import { cn } from '@/lib/utils';
 interface RecurrenceConfig {
   recurrence_type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
   day_of_week?: string;
-  monthly_mode?: 'first_day' | 'last_day' | 'specific_day';
+  monthly_mode?: 'first_day' | 'last_day' | 'specific_day' | 'weekday_ordinal';
   day_of_month?: number;
+  weekday_ordinal?: 1 | 2 | 3 | 4 | -1;
+  weekday?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
   trigger_on_status_id: string;
   skip_weekends: boolean;
   repeat_forever: boolean;
@@ -53,6 +55,15 @@ const MONTHLY_MODES = [
   { value: 'first_day', label: 'Primeiro dia' },
   { value: 'last_day', label: 'Último dia' },
   { value: 'specific_day', label: 'Dia específico' },
+  { value: 'weekday_ordinal', label: 'Dia da semana específico' },
+];
+
+const ORDINALS = [
+  { value: '1', label: 'Primeira' },
+  { value: '2', label: 'Segunda' },
+  { value: '3', label: 'Terceira' },
+  { value: '4', label: 'Quarta' },
+  { value: '-1', label: 'Última' },
 ];
 
 export const TaskRecurrenceConfig = ({ taskId, listId, workspaceId, recurrenceConfig }: TaskRecurrenceConfigProps) => {
