@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     // Validate token
     const { data: tokenData, error: tokenError } = await supabase
       .from("api_tokens")
-      .select("workspace_id, is_active, expires_at")
+      .select("id, name, workspace_id, is_active, expires_at")
       .eq("token", token)
       .single();
 
