@@ -65,6 +65,8 @@ interface CreatePostDialogProps {
   onOpenChange?: (open: boolean) => void;
   /** Esconde o trigger padrão (útil quando aberto externamente). */
   hideTrigger?: boolean;
+  /** Estilo do trigger: 'bar' (padrão) com avatar e placeholder, 'compact' apenas botão. */
+  triggerVariant?: 'bar' | 'compact';
 }
 
 export function CreatePostDialog({
@@ -74,6 +76,7 @@ export function CreatePostDialog({
   open: controlledOpen,
   onOpenChange,
   hideTrigger,
+  triggerVariant = 'bar',
 }: CreatePostDialogProps) {
   const { user } = useAuth();
   const { activeWorkspace } = useWorkspace();
