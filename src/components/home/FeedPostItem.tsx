@@ -103,7 +103,8 @@ export function FeedPostItem({
       await onAddComment(post.id, text);
       setCommentText('');
     } catch (e) {
-      toast.error('Erro ao enviar comentário');
+      const message = e instanceof Error ? e.message : 'Erro ao enviar comentário';
+      toast.error(message);
       console.error(e);
     }
   };
