@@ -269,9 +269,6 @@ export function BulkActionsBar({
         </div>
       </div>
 
-      {/* Spacer to prevent the bar from covering the last row when in default position */}
-      <div aria-hidden className="h-24 w-full" />
-
       <ConfirmBulkDeleteDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
