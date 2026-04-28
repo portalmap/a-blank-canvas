@@ -1,51 +1,62 @@
-## Liberar comentários do feed para todos os usuários
+## Objetivo
 
-### Diagnóstico
+Criar, dentro de **Documentos → Wikis**, a estrutura completa "Base de Conhecimento" igual à do ClickUp da segunda imagem, com pastas, subpáginas e emojis/ícones — todos os documentos vazios para você preencher depois.
 
-O componente `FeedPostItem.tsx` já mostra a área de comentário (`Textarea` + botão de enviar) para qualquer usuário autenticado — não há gate no frontend.
+## O que será criado
 
-A causa do problema é a **RLS policy** atual em `feed_post_comments`:
+Estrutura na seção **Wikis** do workspace ativo:
 
-```sql
-"Users can create comments" (INSERT)
-WITH CHECK:
-  EXISTS (
-    SELECT 1 FROM feed_posts p
-    JOIN workspace_members wm ON wm.workspace_id = p.workspace_id
-    WHERE p.id = post_id AND wm.user_id = auth.uid()
-  )
-  AND author_id = auth.uid()
+```text
+📚 Base de Conhecimento (pasta wiki raiz)
+├── 🎨 Cultura MAP                    (doc)
+├── 🏆 Desafios G4 SKILLS             (doc)
+├── 👋 Entrei para MAP e agora?       (pasta)
+│   └── 📷 PLAYBOOK DE FOTO PARA PERFIL
+├── 🔥 Boas Práticas MAP              (pasta)
+│   ├── 📄 Knowledge Article 1
+│   └── 📄 Knowledge Article 2
+├── 📂 Playbooks Processos            (pasta)
+│   ├── 📕 Playbook de Onboarding Completo
+│   └── 📗 Playbook de Check-in
+├── 📂 Playbooks Funções              (pasta)
+│   ├── 📘 Playbook Account Manager
+│   ├── 📘 Playbook do Gestor de Tráfego
+│   ├── 📘 Playbook do Social Media
+│   ├── 📘 Playbook do Designer
+│   ├── 📘 Playbook do Editor de Vídeos
+│   └── 📘 Playbook do Customer Success
+└── 📁 Processos Operacionais         (pasta)
+    ├── 📝 Linha Editorial
+    ├── 💵 Mídias Pagas
+    ├── 🎬 Designer / Edição de Vídeo
+    ├── 🎨 Criação de Criativos - Social Media
+    ├── 🎯 Gerenciamento de Demandas
+    └── 🗺️ Jornada Completa do Cliente
 ```
 
-Ela exige que quem comenta seja membro registrado em `workspace_members` do workspace do post. Qualquer usuário autenticado fora desse vínculo (ou com cache de sessão sem membership atualizada) recebe erro silencioso da RLS, e nada é inserido — exatamente o sintoma "ninguém consegue comentar".
+Total: **1 pasta raiz + 6 subpastas + 21 documentos**, todos vazios e marcados como wiki.
 
-A policy de SELECT também filtra por membership, então usuários que não fossem membros nem veriam os posts — mas o problema relatado é específico de comentar.
+## Como será feito (técnico)
 
-### Plano
+A estrutura de dados (`document_folders` + `documents`) já suporta:
+- Hierarquia infinita via `parent_folder_id`
+- Documentos dentro de pastas via `folder_id`
+- Emojis customizados por documento (`emoji`)
+- Marcação como wiki (`is_wiki = true`) — herda permissões já existentes (visível para todos os membros do workspace)
 
-1. **Migração de banco** (`supabase/migrations/`) — substituir a policy de INSERT por uma versão mais permissiva, mantendo apenas o requisito mínimo de segurança (`author_id = auth.uid()`):
+**Passos:**
 
-   ```sql
-   DROP POLICY IF EXISTS "Users can create comments" ON public.feed_post_comments;
+1. **Descobrir o workspace alvo** — query rápida pra pegar o `workspace_id` ativo (existe só um na conta) e o `user_id` do owner como `created_by_user_id`.
+2. **Inserir tudo via SQL seed** numa única migração:
+   - Cria a pasta raiz `Base de Conhecimento` com `is_wiki=true`, `parent_folder_id=null`.
+   - Cria as 6 subpastas referenciando a raiz.
+   - Cria os 21 documentos com `is_wiki=true`, `content='{}'`, `emoji` apropriado e `folder_id` correto.
+3. Documentos soltos (Cultura MAP, Desafios G4 SKILLS) vão direto na pasta raiz `Base de Conhecimento` (sem subpasta).
 
-   CREATE POLICY "Authenticated users can create comments"
-   ON public.feed_post_comments
-   FOR INSERT
-   TO authenticated
-   WITH CHECK (author_id = auth.uid());
-   ```
+**Observação sobre emojis das pastas:** o componente `DocFolderTreeItem` hoje usa um ícone fixo de pasta colorida — os emojis específicos de pasta (🔥, 👋, 📂) ficam visíveis apenas nos documentos. Se quiser emojis também nas pastas, posso adicionar um campo `emoji` em `document_folders` num próximo passo (não incluído aqui pra manter o escopo do "popular conteúdo").
 
-   Assim, qualquer usuário autenticado consegue comentar, contanto que assine o comentário com o próprio `auth.uid()` (proteção contra impersonação).
+## Fora do escopo
 
-2. **Mostrar erro real no UI** — em `src/components/home/FeedPostItem.tsx`, ajustar `handleSubmitComment` para exibir a mensagem do erro do Supabase no toast, em vez de um genérico "Erro ao enviar comentário". Isso ajuda a diagnosticar futuros bloqueios de RLS rapidamente.
-
-### Considerações
-
-- As policies de **SELECT**, **DELETE de autor** e **DELETE de admin** ficam inalteradas — apenas o INSERT é liberado.
-- A obrigatoriedade `author_id = auth.uid()` garante que ninguém pode comentar se passando por outro usuário.
-- Não há mudança visual no feed; o usuário simplesmente passa a conseguir comentar.
-
-### Arquivos afetados
-
-- nova migração SQL em `supabase/migrations/`
-- `src/components/home/FeedPostItem.tsx` (apenas a mensagem de erro do toast)
+- Conteúdo dos documentos (ficam vazios)
+- Mudanças de UI na sidebar
+- Permissões customizadas (usa o padrão de wiki = todos do workspace veem)
