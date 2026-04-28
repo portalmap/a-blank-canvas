@@ -3385,39 +3385,23 @@ export type Database = {
         }
         Returns: Json
       }
-      get_productivity_stats:
-        | {
-            Args: {
-              p_early_threshold?: number
-              p_end_date?: string
-              p_include_transferred?: boolean
-              p_on_time_threshold?: number
-              p_scope?: string
-              p_space_id?: string
-              p_start_date?: string
-              p_user_id?: string
-              p_user_ids?: string[]
-              p_workspace_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_early_threshold?: number
-              p_end_date?: string
-              p_folder_id?: string
-              p_include_transferred?: boolean
-              p_list_id?: string
-              p_on_time_threshold?: number
-              p_scope?: string
-              p_space_id?: string
-              p_start_date?: string
-              p_user_id?: string
-              p_user_ids?: string[]
-              p_workspace_id: string
-            }
-            Returns: Json
-          }
+      get_productivity_stats: {
+        Args: {
+          p_early_threshold?: number
+          p_end_date?: string
+          p_folder_id?: string
+          p_include_transferred?: boolean
+          p_list_id?: string
+          p_on_time_threshold?: number
+          p_scope?: string
+          p_space_id?: string
+          p_start_date?: string
+          p_user_id?: string
+          p_user_ids?: string[]
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       get_user_id_by_email: { Args: { email: string }; Returns: string }
       get_user_productivity_details: {
         Args: {
