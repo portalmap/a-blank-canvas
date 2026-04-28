@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     // Validate token
     const { data: tokenData, error: tokenError } = await supabase
       .from("api_tokens")
-      .select("workspace_id, is_active, expires_at")
+      .select("id, name, workspace_id, is_active, expires_at")
       .eq("token", token)
       .single();
 
@@ -125,10 +125,10 @@ Deno.serve(async (req) => {
         result = await handleLists(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams);
         break;
       case "tasks":
-        result = await handleTasks(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams);
+        result = await handleTasks(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams, tokenInfo);
         break;
       case "subtasks":
-        result = await handleSubtasks(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams);
+        result = await handleSubtasks(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams, tokenInfo);
         break;
       case "statuses":
         result = await handleStatuses(supabase, req.method, resourceId, workspaceId, await parseBody(req), queryParams);
@@ -452,7 +452,7 @@ async function handleLists(supabase: any, method: string, id: string | null, wor
 }
 
 // ============ TASKS ============
-async function handleTasks(supabase: any, method: string, id: string | null, workspaceId: string, body: any, query: any) {
+async function handleTasks(supabase: any, method: string, id: string | null, workspaceId: string, body: any, query: any, tokenInfo?: any) {
   switch (method) {
     case "GET":
       if (id) {
@@ -700,6 +700,9 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
           metadata: {
             created_by: "api",
             source: "api-gateway",
+            api_token_id: tokenInfo?.id || null,
+            api_token_name: tokenInfo?.name || null,
+            integration_label: "Social Flow",
             created_at_date: newTask.created_at,
           },
         });
@@ -752,7 +755,7 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
 }
 
 // ============ SUBTASKS ============
-async function handleSubtasks(supabase: any, method: string, id: string | null, workspaceId: string, body: any, query: any) {
+async function handleSubtasks(supabase: any, method: string, id: string | null, workspaceId: string, body: any, query: any, tokenInfo?: any) {
   switch (method) {
     case "GET":
       if (!query.parent_id && !id) return { error: "Parâmetro 'parent_id' é obrigatório", status: 400 };
@@ -896,6 +899,9 @@ async function handleSubtasks(supabase: any, method: string, id: string | null, 
           metadata: {
             created_by: "api",
             source: "api-gateway",
+            api_token_id: tokenInfo?.id || null,
+            api_token_name: tokenInfo?.name || null,
+            integration_label: "Social Flow",
             is_subtask: true,
             parent_id: body.parent_id,
             created_at_date: newSubtask.created_at,
