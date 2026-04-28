@@ -1,53 +1,54 @@
-## Adicionar recorrência por "ordinal do dia da semana" (ex.: toda 1ª segunda-feira do mês)
+## Registrar atividade "Tarefa criada" para tarefas geradas via API (GCSM)
 
-Hoje a recorrência mensal/trimestral só permite **Primeiro dia**, **Último dia** ou **Dia específico** (número 1–31). Vamos adicionar um novo modo **"Dia da semana"** que combina uma **ordem** (1ª, 2ª, 3ª, 4ª ou Última) com um **dia da semana** (segunda a domingo). Funciona para frequência **Mensal** e **Trimestral**.
+### Diagnóstico
 
-### Onde aparece (UI)
+Você está correto. O Gerador de Criativos (GCSM) cria as tarefas chamando a edge function **`api-gateway`** (`POST /tasks`). Esse handler insere a tarefa em `tasks`, mas **não grava** o registro `task.created` em `task_activities` — diferente da função `api-tasks`, que faz esse insert. Por isso o feed "Atividade" da tarefa aparece com **0 registros**.
 
-**1. Tarefas — `TaskRecurrenceConfig.tsx`**
-- No campo **"Dia do período"**, adicionar uma 4ª opção: **"Dia da semana específico"**.
-- Quando selecionada, exibir 2 selects lado a lado:
-  - **Ordem**: Primeira / Segunda / Terceira / Quarta / Última
-  - **Dia da semana**: Segunda / Terça / ... / Domingo
-- Ex.: "Primeira" + "Segunda-feira" → toda 1ª segunda do mês.
+A criação de **subtarefas** via `api-gateway` (`POST /subtasks`) também tem o mesmo problema.
 
-**2. Automações — `ActionConfigForm.tsx`**
-- Mesma opção adicionada ao bloco mensal/trimestral da ação de recorrência, mantendo paridade com a UI da tarefa.
+### Correções
 
-### Mudanças de dados (sem migração SQL)
+**1. `supabase/functions/api-gateway/index.ts` — `handleTasks` (POST)**
 
-A coluna `recurrence_config` já é `JSONB` livre — basta estender o shape:
-
+Após o insert bem-sucedido em `tasks`, gravar:
 ```ts
-interface RecurrenceConfig {
-  // ... campos atuais
-  monthly_mode?: 'first_day' | 'last_day' | 'specific_day' | 'weekday_ordinal'; // NOVO valor
-  weekday_ordinal?: 1 | 2 | 3 | 4 | -1; // -1 = última
-  weekday?: 'monday' | 'tuesday' | ... | 'sunday';
-}
+await supabase.from("task_activities").insert({
+  task_id: newTask.id,
+  user_id: creatorUserId,
+  activity_type: "task.created",
+  metadata: {
+    created_by: "api",
+    source: "api-gateway",
+    created_at_date: newTask.created_at,
+  },
+});
 ```
 
-Configs antigas continuam funcionando (compatível).
+**2. `supabase/functions/api-gateway/index.ts` — `handleSubtasks` (POST)**
 
-### Lógica de cálculo — `useStatusChangeAutomations.ts` (`calculateNextDates`)
+Mesma lógica após o insert da subtarefa, usando `subtaskCreatorUserId`.
 
-Adicionar tratamento do modo `weekday_ordinal` nos cases `monthly` e `quarterly`:
+Falhas no insert da atividade não devem derrubar a criação da tarefa (try/catch silencioso com log).
 
-1. Avançar para o mês alvo (atual + 1 para mensal, +3 para trimestral).
-2. Se `ordinal >= 1`: começar no dia 1 do mês, achar o primeiro `weekday`, somar `(ordinal - 1) * 7` dias. Se cair fora do mês, manter no último válido.
-3. Se `ordinal === -1` (última): começar no último dia do mês e voltar até achar o `weekday`.
-4. Aplicar `skip_weekends` apenas quando o weekday escolhido for útil (não desloca sábado/domingo escolhido propositalmente — vamos ignorar `skip_weekends` neste modo para evitar conflito).
+### Backfill retroativo (tarefas antigas do GCSM)
 
-### Arquivos a editar
+Migration única que insere `task.created` em `task_activities` para todas as tarefas que **ainda não possuem** esse registro, usando `tasks.created_at` e `tasks.created_by_user_id`. Cobre a tarefa POST 13 da imagem e qualquer outra anterior.
 
-- `src/components/tasks/TaskRecurrenceConfig.tsx` — novo modo + campos de ordem/dia da semana.
-- `src/components/automations/advanced/ActionConfigForm.tsx` — mesma opção no editor de automações.
-- `src/hooks/useStatusChangeAutomations.ts` — função `calculateNextDates` com lógica do ordinal.
-
-### Memória
-
-Atualizar `mem://features/automations/advanced-recurrence-logic` para registrar o novo modo `weekday_ordinal`.
+```sql
+INSERT INTO public.task_activities (task_id, user_id, activity_type, metadata, created_at)
+SELECT t.id, t.created_by_user_id, 'task.created',
+       jsonb_build_object('backfilled', true, 'created_at_date', t.created_at),
+       t.created_at
+FROM public.tasks t
+WHERE t.created_by_user_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM public.task_activities a
+    WHERE a.task_id = t.id AND a.activity_type = 'task.created'
+  );
+```
 
 ### Resultado esperado
 
-Usuário poderá configurar "toda primeira segunda-feira do mês", "toda terceira quinta-feira do mês", "toda última sexta do mês" etc., tanto em tarefas recorrentes quanto em ações de automação de recorrência, sem quebrar nenhuma configuração existente.
+- Toda nova tarefa/subtarefa criada pelo GCSM (ou qualquer integração via api-gateway) passa a registrar imediatamente "Tarefa criada" no feed de Atividade.
+- Tarefas antigas sem o registro recebem retroativamente a entrada com a data correta de criação.
+- Nenhum impacto em fluxos existentes; criação manual já registrava normalmente.

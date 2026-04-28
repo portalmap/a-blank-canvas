@@ -691,6 +691,22 @@ async function handleTasks(supabase: any, method: string, id: string | null, wor
         .single();
       if (createError) return { error: createError.message, status: 400 };
 
+      // Register task.created activity for history (visible in the Activity feed)
+      try {
+        await supabase.from("task_activities").insert({
+          task_id: newTask.id,
+          user_id: creatorUserId,
+          activity_type: "task.created",
+          metadata: {
+            created_by: "api",
+            source: "api-gateway",
+            created_at_date: newTask.created_at,
+          },
+        });
+      } catch (e) {
+        console.warn("[api-gateway] Failed to register task.created activity:", e);
+      }
+
       // Handle attachment if provided
       if (body.attachment_url) {
         await supabase.from("task_attachments").insert({
