@@ -1080,40 +1080,58 @@ export type Database = {
       }
       feed_posts: {
         Row: {
+          attachments: Json
           author_id: string
           content: string
+          content_format: string
           created_at: string
+          edited_at: string | null
           id: string
+          is_pinned: boolean
           linked_folder_id: string | null
           linked_list_id: string | null
           linked_space_id: string | null
           linked_task_id: string | null
+          pinned_at: string | null
+          tags: string[]
           title: string | null
           visibility: string
           workspace_id: string
         }
         Insert: {
+          attachments?: Json
           author_id: string
           content: string
+          content_format?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          is_pinned?: boolean
           linked_folder_id?: string | null
           linked_list_id?: string | null
           linked_space_id?: string | null
           linked_task_id?: string | null
+          pinned_at?: string | null
+          tags?: string[]
           title?: string | null
           visibility?: string
           workspace_id: string
         }
         Update: {
+          attachments?: Json
           author_id?: string
           content?: string
+          content_format?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          is_pinned?: boolean
           linked_folder_id?: string | null
           linked_list_id?: string | null
           linked_space_id?: string | null
           linked_task_id?: string | null
+          pinned_at?: string | null
+          tags?: string[]
           title?: string | null
           visibility?: string
           workspace_id?: string
