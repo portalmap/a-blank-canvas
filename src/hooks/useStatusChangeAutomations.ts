@@ -218,6 +218,25 @@ const invalidateAutomationQueries = (queryClient: QueryClient, taskId: string) =
 };
 
 /**
+ * Compute Nth weekday of a month. ordinal: 1..4 for first..fourth, -1 for last.
+ * weekday: 0 (Sun) .. 6 (Sat)
+ */
+const computeWeekdayOrdinal = (year: number, month: number, ordinal: number, weekday: number): Date => {
+  if (ordinal === -1) {
+    // last weekday of month
+    const lastDay = new Date(year, month + 1, 0);
+    const diff = (lastDay.getDay() - weekday + 7) % 7;
+    return new Date(year, month, lastDay.getDate() - diff);
+  }
+  const first = new Date(year, month, 1);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  let day = 1 + offset + (Math.max(1, ordinal) - 1) * 7;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  if (day > lastDay) day -= 7; // fallback to last available occurrence
+  return new Date(year, month, day);
+};
+
+/**
  * Calculate next dates based on recurrence config
  */
 const calculateNextDates = (
