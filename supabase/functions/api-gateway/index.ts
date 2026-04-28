@@ -886,6 +886,25 @@ async function handleSubtasks(supabase: any, method: string, id: string | null, 
         .select()
         .single();
       if (createError) return { error: createError.message, status: 400 };
+
+      // Register task.created activity for the subtask (visible in the Activity feed)
+      try {
+        await supabase.from("task_activities").insert({
+          task_id: newSubtask.id,
+          user_id: subtaskCreatorUserId,
+          activity_type: "task.created",
+          metadata: {
+            created_by: "api",
+            source: "api-gateway",
+            is_subtask: true,
+            parent_id: body.parent_id,
+            created_at_date: newSubtask.created_at,
+          },
+        });
+      } catch (e) {
+        console.warn("[api-gateway] Failed to register subtask task.created activity:", e);
+      }
+
       return { data: newSubtask, status: 201 };
     case "PUT":
       if (!id) return { error: "ID da subtarefa é obrigatório", status: 400 };
