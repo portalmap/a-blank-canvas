@@ -187,6 +187,13 @@ export function FeedCard() {
           <Search className="h-4 w-4" />
         </Button>
       )}
+      {canCreatePost && (
+        <CreatePostDialog
+          onSubmit={handleCreatePost}
+          isSubmitting={isCreating}
+          triggerVariant="compact"
+        />
+      )}
     </div>
   );
 
