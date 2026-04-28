@@ -227,6 +227,36 @@ export const TaskRecurrenceConfig = ({ taskId, listId, workspaceId, recurrenceCo
                 className="mt-1.5"
               />
             )}
+            {config.monthly_mode === 'weekday_ordinal' && (
+              <div className="grid grid-cols-2 gap-2 mt-1.5">
+                <Select
+                  value={String(config.weekday_ordinal ?? 1)}
+                  onValueChange={(v) => updateConfig({ weekday_ordinal: parseInt(v) as RecurrenceConfig['weekday_ordinal'] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ordem..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORDINALS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={config.weekday || 'monday'}
+                  onValueChange={(v) => updateConfig({ weekday: v as RecurrenceConfig['weekday'] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Dia..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DAYS_OF_WEEK.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         )}
 
