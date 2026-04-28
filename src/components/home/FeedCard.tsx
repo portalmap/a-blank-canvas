@@ -222,10 +222,6 @@ export function FeedCard() {
           </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 gap-3 pt-0">
-          {canCreatePost && (
-            <CreatePostDialog onSubmit={handleCreatePost} isSubmitting={isCreating} />
-          )}
-
           <Filters compact />
 
           <ScrollArea className="flex-1">
