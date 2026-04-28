@@ -65,6 +65,8 @@ interface CreatePostDialogProps {
   onOpenChange?: (open: boolean) => void;
   /** Esconde o trigger padrão (útil quando aberto externamente). */
   hideTrigger?: boolean;
+  /** Estilo do trigger: 'bar' (padrão) com avatar e placeholder, 'compact' apenas botão. */
+  triggerVariant?: 'bar' | 'compact';
 }
 
 export function CreatePostDialog({
@@ -74,6 +76,7 @@ export function CreatePostDialog({
   open: controlledOpen,
   onOpenChange,
   hideTrigger,
+  triggerVariant = 'bar',
 }: CreatePostDialogProps) {
   const { user } = useAuth();
   const { activeWorkspace } = useWorkspace();
@@ -228,18 +231,25 @@ export function CreatePostDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       {!hideTrigger && (
         <DialogTrigger asChild>
-          <button className="flex items-center gap-3 w-full p-2 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors text-left">
-            <Avatar className="h-8 w-8 shrink-0">
-              <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                {getInitials(profile?.full_name)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="flex-1 text-sm text-muted-foreground">
-              Nova publicação...
-            </span>
-            <Plus className="h-4 w-4 text-muted-foreground" />
-          </button>
+          {triggerVariant === 'compact' ? (
+            <Button variant="default" size="sm" className="h-8 gap-1.5">
+              <Plus className="h-4 w-4" />
+              Publicar
+            </Button>
+          ) : (
+            <button className="flex items-center gap-3 w-full p-2 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors text-left">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarImage src={profile?.avatar_url || undefined} />
+                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                  {getInitials(profile?.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="flex-1 text-sm text-muted-foreground">
+                Nova publicação...
+              </span>
+              <Plus className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
         </DialogTrigger>
       )}
 

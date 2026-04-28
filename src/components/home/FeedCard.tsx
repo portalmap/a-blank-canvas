@@ -187,6 +187,13 @@ export function FeedCard() {
           <Search className="h-4 w-4" />
         </Button>
       )}
+      {canCreatePost && (
+        <CreatePostDialog
+          onSubmit={handleCreatePost}
+          isSubmitting={isCreating}
+          triggerVariant="compact"
+        />
+      )}
     </div>
   );
 
@@ -215,10 +222,6 @@ export function FeedCard() {
           </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 gap-3 pt-0">
-          {canCreatePost && (
-            <CreatePostDialog onSubmit={handleCreatePost} isSubmitting={isCreating} />
-          )}
-
           <Filters compact />
 
           <ScrollArea className="flex-1">
@@ -243,10 +246,6 @@ export function FeedCard() {
               Feed
             </DialogTitle>
           </DialogHeader>
-
-          {canCreatePost && (
-            <CreatePostDialog onSubmit={handleCreatePost} isSubmitting={isCreating} />
-          )}
 
           <Filters />
 
