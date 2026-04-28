@@ -1,5 +1,5 @@
 import { BubbleMenu } from '@tiptap/react/menus';
-import type { Editor } from '@tiptap/react';
+import { Editor } from '@tiptap/core';
 import { useState } from 'react';
 import { 
   Bold, Italic, Underline, Strikethrough, Code, Link2, 
