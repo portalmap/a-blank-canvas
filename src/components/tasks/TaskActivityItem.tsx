@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   UserCheck,
   Paperclip,
-  Pencil
+  Pencil,
+  Plug
 } from 'lucide-react';
 import { TaskActivity, getActivityLabel, useCreateTaskActivity, useUpdateActivityMetadata } from '@/hooks/useTaskActivities';
 import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } from '@/hooks/useTaskComments';
@@ -150,6 +151,8 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
   const userInitial = userName.charAt(0).toUpperCase();
   const isAutomation = activity.metadata?.created_by === 'automation';
   const isPortal = activity.metadata?.created_by === 'portal';
+  const integrationLabel = activity.metadata?.integration_label as string | undefined;
+  const isIntegration = !isAutomation && !isPortal && !!integrationLabel;
   
   const { user } = useAuth();
   const { data: comments } = useTaskComments(taskId);
@@ -291,6 +294,8 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
         <div className={cn("p-1.5 rounded-full", iconColorClass)}>
           {isAutomation ? (
             <Zap className="h-3.5 w-3.5" />
+          ) : isIntegration ? (
+            <Plug className="h-3.5 w-3.5" />
           ) : (
             <Icon className="h-3.5 w-3.5" />
           )}
@@ -301,10 +306,16 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2">
-          <Avatar className="h-6 w-6 flex-shrink-0">
-            <AvatarImage src={activity.user?.avatar_url || undefined} />
-            <AvatarFallback className="text-xs">{userInitial}</AvatarFallback>
-          </Avatar>
+          {isIntegration ? (
+            <div className="h-6 w-6 flex-shrink-0 rounded-full bg-emerald-500/10 flex items-center justify-center">
+              <Plug className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+          ) : (
+            <Avatar className="h-6 w-6 flex-shrink-0">
+              <AvatarImage src={activity.user?.avatar_url || undefined} />
+              <AvatarFallback className="text-xs">{userInitial}</AvatarFallback>
+            </Avatar>
+          )}
           
           <div className="flex-1 min-w-0">
             <p className="text-sm">
@@ -320,6 +331,12 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
                     🌐 Portal MAP
                   </span>{' '}
                 </>
+              ) : isIntegration ? (
+                <>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    🔌 Integração "{integrationLabel}"
+                  </span>{' '}
+                </>
               ) : (
                 <span className="font-medium">{userName}</span>
               )}{' '}
@@ -327,7 +344,7 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
                 {getActivityLabel(activity)}
               </span>
             </p>
-            
+
             {/* Assignment badge */}
             {activity.activity_type === 'assignment.created' && activity.metadata?.assignee_name && (
               <div className={cn(
