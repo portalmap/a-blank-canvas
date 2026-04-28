@@ -252,6 +252,9 @@ export function CreatePostDialog({
           )}
         </DialogTrigger>
       )}
+
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar publicação' : 'Nova publicação'}</DialogTitle>
         </DialogHeader>
 
