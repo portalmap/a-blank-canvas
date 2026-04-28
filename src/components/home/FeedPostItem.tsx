@@ -4,13 +4,25 @@ import { ptBR } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Heart, MessageCircle, MoreVertical, Trash2, Send, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Heart,
+  MessageCircle,
+  MoreVertical,
+  Trash2,
+  Send,
+  Loader2,
+  Pin,
+  PinOff,
+  Pencil,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -26,6 +38,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePostComments } from '@/hooks/useFeedPosts';
 import { toast } from 'sonner';
 import type { FeedPost } from '@/hooks/useFeedPosts';
+import { FeedContent } from './FeedContent';
+import { FeedAttachments } from './FeedAttachments';
+import { FeedReactorsPopover } from './FeedReactorsPopover';
+import { CreatePostDialog, type CreatePostDialogValue } from './CreatePostDialog';
+import { formatCount } from '@/lib/feedAttachments';
 
 interface FeedPostItemProps {
   post: FeedPost;
@@ -34,7 +51,10 @@ interface FeedPostItemProps {
   onAddComment: (postId: string, content: string) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
   onDeleteComment: (commentId: string, postId: string) => Promise<void>;
+  onUpdatePost: (postId: string, data: CreatePostDialogValue) => Promise<void>;
+  onTogglePin: (postId: string, isPinned: boolean) => Promise<void>;
   isAddingComment: boolean;
+  isUpdating: boolean;
 }
 
 const getInitials = (name: string | null) => {
@@ -49,13 +69,17 @@ export function FeedPostItem({
   onAddComment,
   onDeletePost,
   onDeleteComment,
+  onUpdatePost,
+  onTogglePin,
   isAddingComment,
+  isUpdating,
 }: FeedPostItemProps) {
   const { user } = useAuth();
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [confirmDeletePost, setConfirmDeletePost] = useState(false);
   const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const { data: comments = [], isLoading: isLoadingComments } = usePostComments(
     post.id,
@@ -67,7 +91,10 @@ export function FeedPostItem({
     locale: ptBR,
   });
 
-  const canDeletePost = isAdmin || post.author_id === user?.id;
+  const isAuthor = post.author_id === user?.id;
+  const canDeletePost = isAdmin || isAuthor;
+  const canEditPost = isAdmin || isAuthor;
+  const canPin = isAdmin;
 
   const handleSubmitComment = async () => {
     const text = commentText.trim();
@@ -105,8 +132,23 @@ export function FeedPostItem({
     }
   };
 
+  const handleTogglePin = async () => {
+    try {
+      await onTogglePin(post.id, !post.is_pinned);
+      toast.success(post.is_pinned ? 'Publicação desafixada' : 'Publicação fixada');
+    } catch (e) {
+      toast.error('Erro ao alterar fixação');
+      console.error(e);
+    }
+  };
+
   return (
-    <div className="border border-border rounded-lg p-4 bg-card hover:bg-accent/30 transition-colors">
+    <article
+      className={cn(
+        'border border-border rounded-lg p-4 bg-card transition-colors',
+        post.is_pinned && 'border-primary/40 bg-primary/[0.02]'
+      )}
+    >
       {/* Header */}
       <div className="flex items-start gap-3">
         <Avatar className="h-10 w-10 shrink-0">
@@ -117,24 +159,48 @@ export function FeedPostItem({
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-foreground truncate">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-foreground truncate">
               {post.author?.full_name || 'Usuário'}
             </span>
-            <span className="text-xs text-muted-foreground shrink-0">{timeAgo}</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs text-muted-foreground">{timeAgo}</span>
+            {post.edited_at && (
+              <span className="text-xs text-muted-foreground italic">(editado)</span>
+            )}
+            {post.is_pinned && (
+              <Badge variant="secondary" className="gap-1 text-[10px] py-0 h-5">
+                <Pin className="h-3 w-3" /> Fixado
+              </Badge>
+            )}
           </div>
 
-          <div className="mt-2">
-            {post.title && (
-              <h3 className="font-semibold text-foreground mb-1">{post.title}</h3>
-            )}
-            <p className="text-foreground/90 whitespace-pre-wrap break-words">
-              {post.content}
-            </p>
+          {post.title && (
+            <h3 className="font-semibold text-base text-foreground mt-2">{post.title}</h3>
+          )}
+
+          <div className="mt-1.5">
+            <FeedContent content={post.content} format={post.content_format} />
           </div>
+
+          <FeedAttachments attachments={post.attachments} />
+
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {post.tags.map((t) => (
+                <Badge
+                  key={t}
+                  variant="outline"
+                  className="text-[10px] py-0 h-5 text-primary border-primary/30"
+                >
+                  #{t}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
-        {canDeletePost && (
+        {(canDeletePost || canEditPost || canPin) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
@@ -142,44 +208,76 @@ export function FeedPostItem({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setConfirmDeletePost(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir publicação
-              </DropdownMenuItem>
+              {canEditPost && (
+                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+              {canPin && (
+                <DropdownMenuItem onClick={handleTogglePin}>
+                  {post.is_pinned ? (
+                    <>
+                      <PinOff className="h-4 w-4 mr-2" /> Desafixar
+                    </>
+                  ) : (
+                    <>
+                      <Pin className="h-4 w-4 mr-2" /> Fixar
+                    </>
+                  )}
+                </DropdownMenuItem>
+              )}
+              {canDeletePost && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => setConfirmDeletePost(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir publicação
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-4 mt-4 pl-13">
+      <div className="flex items-center gap-1 mt-3 ml-13 pl-0">
         <Button
           variant="ghost"
           size="sm"
           className={cn(
-            'gap-2 text-muted-foreground hover:text-primary',
+            'gap-1.5 text-muted-foreground hover:text-primary h-8',
             post.user_has_reacted && 'text-primary'
           )}
           onClick={() => onReact(post.id)}
         >
           <Heart className={cn('h-4 w-4', post.user_has_reacted && 'fill-current')} />
-          <span>{post.reactions_count || ''}</span>
+          <span className="text-xs font-medium">{formatCount(post.reactions_count)}</span>
         </Button>
+
+        {post.reactions_count > 0 && (
+          <FeedReactorsPopover
+            postId={post.id}
+            count={post.reactions_count}
+            className="ml-0 mr-2"
+          />
+        )}
 
         <Button
           variant="ghost"
           size="sm"
           className={cn(
-            'gap-2 text-muted-foreground hover:text-primary',
+            'gap-1.5 text-muted-foreground hover:text-primary h-8',
             isCommentsOpen && 'text-primary'
           )}
           onClick={() => setIsCommentsOpen((v) => !v)}
         >
           <MessageCircle className="h-4 w-4" />
-          <span>{post.comments_count || ''}</span>
+          <span className="text-xs font-medium">{formatCount(post.comments_count)}</span>
         </Button>
       </div>
 
@@ -238,7 +336,6 @@ export function FeedPostItem({
             </div>
           )}
 
-          {/* Add comment */}
           <div className="flex items-end gap-2 pt-1">
             <Textarea
               placeholder="Escreva um comentário..."
@@ -268,6 +365,32 @@ export function FeedPostItem({
         </div>
       )}
 
+      {/* Edit dialog */}
+      {isEditing && (
+        <CreatePostDialog
+          hideTrigger
+          open={isEditing}
+          onOpenChange={setIsEditing}
+          isSubmitting={isUpdating}
+          initialPost={{
+            title: post.title,
+            content: post.content,
+            content_format: post.content_format,
+            tags: post.tags,
+            attachments: post.attachments,
+          }}
+          onSubmit={async (data) => {
+            try {
+              await onUpdatePost(post.id, data);
+              toast.success('Publicação atualizada');
+            } catch (e) {
+              toast.error('Erro ao atualizar');
+              console.error(e);
+            }
+          }}
+        />
+      )}
+
       {/* Delete post confirmation */}
       <AlertDialog open={confirmDeletePost} onOpenChange={setConfirmDeletePost}>
         <AlertDialogContent>
@@ -290,7 +413,6 @@ export function FeedPostItem({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete comment confirmation */}
       <AlertDialog
         open={!!confirmDeleteCommentId}
         onOpenChange={(open) => !open && setConfirmDeleteCommentId(null)}
@@ -298,9 +420,7 @@ export function FeedPostItem({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir comentário?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -315,6 +435,6 @@ export function FeedPostItem({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </article>
   );
 }

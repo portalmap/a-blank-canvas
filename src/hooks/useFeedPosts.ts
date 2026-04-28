@@ -2,11 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import type { FeedAttachment } from '@/lib/feedAttachments';
 
 export interface FeedPost {
   id: string;
   title: string | null;
   content: string;
+  content_format: 'plain' | 'markdown';
+  tags: string[];
+  is_pinned: boolean;
+  pinned_at: string | null;
+  edited_at: string | null;
+  attachments: FeedAttachment[];
   created_at: string;
   author_id: string;
   workspace_id: string;
@@ -34,12 +41,28 @@ export interface FeedComment {
   } | null;
 }
 
+export interface CreatePostInput {
+  title?: string;
+  content: string;
+  content_format?: 'plain' | 'markdown';
+  tags?: string[];
+  attachments?: FeedAttachment[];
+}
+
+export interface UpdatePostInput {
+  id: string;
+  title?: string | null;
+  content?: string;
+  content_format?: 'plain' | 'markdown';
+  tags?: string[];
+  attachments?: FeedAttachment[];
+}
+
 export function useFeedPosts() {
   const { user } = useAuth();
   const { activeWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
 
-  // Determines if current user can create/delete-any in this workspace
   const permissionsQuery = useQuery({
     queryKey: ['feed-permissions', activeWorkspace?.id, user?.id],
     queryFn: async () => {
@@ -47,7 +70,6 @@ export function useFeedPosts() {
         return { canCreatePost: false, isAdmin: false };
       }
 
-      // Workspace admin?
       const { data: membership } = await supabase
         .from('workspace_members')
         .select('role')
@@ -57,7 +79,6 @@ export function useFeedPosts() {
 
       const isWorkspaceAdmin = membership?.role === 'admin';
 
-      // System admin (global_owner / owner)?
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
@@ -80,16 +101,11 @@ export function useFeedPosts() {
 
       const { data: posts, error: postsError } = await supabase
         .from('feed_posts')
-        .select(`
-          id,
-          title,
-          content,
-          created_at,
-          author_id,
-          workspace_id,
-          visibility
-        `)
+        .select(
+          'id, title, content, content_format, tags, is_pinned, pinned_at, edited_at, attachments, created_at, author_id, workspace_id, visibility'
+        )
         .eq('workspace_id', activeWorkspace.id)
+        .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (postsError) throw postsError;
@@ -104,10 +120,12 @@ export function useFeedPosts() {
 
       const profilesMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
+      const postIds = posts.map((p) => p.id);
+
       const { data: reactionsCounts } = await supabase
         .from('feed_post_reactions')
         .select('post_id')
-        .in('post_id', posts.map((p) => p.id));
+        .in('post_id', postIds);
 
       const reactionsCountMap = new Map<string, number>();
       reactionsCounts?.forEach((r) => {
@@ -117,7 +135,7 @@ export function useFeedPosts() {
       const { data: commentsCounts } = await supabase
         .from('feed_post_comments')
         .select('post_id')
-        .in('post_id', posts.map((p) => p.id));
+        .in('post_id', postIds);
 
       const commentsCountMap = new Map<string, number>();
       commentsCounts?.forEach((c) => {
@@ -128,12 +146,15 @@ export function useFeedPosts() {
         .from('feed_post_reactions')
         .select('post_id')
         .eq('user_id', user?.id || '')
-        .in('post_id', posts.map((p) => p.id));
+        .in('post_id', postIds);
 
       const userReactedPosts = new Set(userReactions?.map((r) => r.post_id) || []);
 
       return posts.map((post) => ({
         ...post,
+        content_format: (post.content_format as 'plain' | 'markdown') || 'markdown',
+        tags: post.tags || [],
+        attachments: (post.attachments as unknown as FeedAttachment[]) || [],
         author: profilesMap.get(post.author_id) || null,
         reactions_count: reactionsCountMap.get(post.id) || 0,
         comments_count: commentsCountMap.get(post.id) || 0,
@@ -144,16 +165,20 @@ export function useFeedPosts() {
   });
 
   const createPostMutation = useMutation({
-    mutationFn: async ({ title, content }: { title?: string; content: string }) => {
-      if (!user?.id || !activeWorkspace?.id) throw new Error('Usuário ou workspace não encontrado');
+    mutationFn: async (input: CreatePostInput) => {
+      if (!user?.id || !activeWorkspace?.id)
+        throw new Error('Usuário ou workspace não encontrado');
 
       const { data, error } = await supabase
         .from('feed_posts')
         .insert({
           author_id: user.id,
           workspace_id: activeWorkspace.id,
-          title: title || null,
-          content,
+          title: input.title || null,
+          content: input.content,
+          content_format: input.content_format || 'markdown',
+          tags: input.tags || [],
+          attachments: (input.attachments || []) as unknown as never,
           visibility: 'workspace',
         })
         .select()
@@ -161,6 +186,36 @@ export function useFeedPosts() {
 
       if (error) throw error;
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed-posts', activeWorkspace?.id] });
+    },
+  });
+
+  const updatePostMutation = useMutation({
+    mutationFn: async ({ id, ...input }: UpdatePostInput) => {
+      const update: Record<string, unknown> = {};
+      if (input.title !== undefined) update.title = input.title;
+      if (input.content !== undefined) update.content = input.content;
+      if (input.content_format !== undefined) update.content_format = input.content_format;
+      if (input.tags !== undefined) update.tags = input.tags;
+      if (input.attachments !== undefined) update.attachments = input.attachments;
+
+      const { error } = await supabase.from('feed_posts').update(update).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed-posts', activeWorkspace?.id] });
+    },
+  });
+
+  const togglePinMutation = useMutation({
+    mutationFn: async ({ id, is_pinned }: { id: string; is_pinned: boolean }) => {
+      const { error } = await supabase
+        .from('feed_posts')
+        .update({ is_pinned })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed-posts', activeWorkspace?.id] });
@@ -187,16 +242,13 @@ export function useFeedPosts() {
       } else {
         const { error } = await supabase
           .from('feed_post_reactions')
-          .insert({
-            post_id: postId,
-            user_id: user.id,
-            type: 'like',
-          });
+          .insert({ post_id: postId, user_id: user.id, type: 'like' });
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_d, postId) => {
       queryClient.invalidateQueries({ queryKey: ['feed-posts', activeWorkspace?.id] });
+      queryClient.invalidateQueries({ queryKey: ['feed-reactors', postId] });
     },
   });
 
@@ -206,11 +258,7 @@ export function useFeedPosts() {
 
       const { data, error } = await supabase
         .from('feed_post_comments')
-        .insert({
-          post_id: postId,
-          author_id: user.id,
-          content,
-        })
+        .insert({ post_id: postId, author_id: user.id, content })
         .select()
         .single();
 
@@ -256,6 +304,9 @@ export function useFeedPosts() {
     isAdmin: permissionsQuery.data?.isAdmin ?? false,
     createPost: createPostMutation.mutateAsync,
     isCreating: createPostMutation.isPending,
+    updatePost: updatePostMutation.mutateAsync,
+    isUpdating: updatePostMutation.isPending,
+    togglePin: togglePinMutation.mutateAsync,
     toggleReaction: toggleReactionMutation.mutateAsync,
     addComment: addCommentMutation.mutateAsync,
     isAddingComment: addCommentMutation.isPending,
