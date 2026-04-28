@@ -247,10 +247,6 @@ export function FeedCard() {
             </DialogTitle>
           </DialogHeader>
 
-          {canCreatePost && (
-            <CreatePostDialog onSubmit={handleCreatePost} isSubmitting={isCreating} />
-          )}
-
           <Filters />
 
           <ScrollArea className="flex-1 max-h-[65vh]">
