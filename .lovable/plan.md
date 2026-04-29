@@ -1,62 +1,86 @@
-## Objetivo
+## Diagnóstico
 
-Criar, dentro de **Documentos → Wikis**, a estrutura completa "Base de Conhecimento" igual à do ClickUp da segunda imagem, com pastas, subpáginas e emojis/ícones — todos os documentos vazios para você preencher depois.
+Existiam 18 documentos reais com conteúdo (criados em fev/2026) dentro das pastas antigas (`Entrei na MAP e agora?`, `Playbook Processos`, `Playbook Funções`, `Processos Operacionais`) no workspace principal `f37fdcb3...`.
 
-## O que será criado
+A seed da última etapa criou pastas duplicadas e 21 documentos vazios em ambos os workspaces (`f37fdcb3...` e `b233069a...`), além da nova raiz `Base de Conhecimento`. Sim — dá pra consertar 100% reusando os documentos reais.
 
-Estrutura na seção **Wikis** do workspace ativo:
+## O que será feito
+
+### 1. Apagar todos os 21 documentos vazios criados pela seed
+Todos os docs com `content = '{}'` criados em `2026-04-28 16:49:25` serão removidos (são exatamente os da seed).
+
+### 2. Apagar as pastas duplicadas/extras criadas pela seed
+- Apagar a estrutura inteira (raiz + 5 subpastas) do workspace `b233069a...` (workspace secundário, todas as subpastas estão vazias agora).
+- No workspace principal `f37fdcb3...`, apagar as 4 subpastas vazias da seed: `Entrei para MAP e agora?`, `Boas Práticas MAP`, `Playbooks Processos`, `Playbooks Funções`, `Processos Operacionais` (`be54ebfb`, `5bbae926`, `1dd8dbb7`, `dd6fac2a`, `75cea5b3`).
+- **Manter** a raiz `Base de Conhecimento` (`55f28035...`) — ela vai ser o "guarda-chuva" das pastas antigas que já têm conteúdo.
+
+### 3. Adotar as 4 pastas antigas (que já têm conteúdo) como filhas de "Base de Conhecimento"
+Setar `parent_folder_id = 55f28035...` (Base de Conhecimento) nestas pastas existentes:
+- `ec863e41...` — **Entrei na MAP e agora?** (1 doc real: Playbook de Foto para o Perfil)
+- `7ae9d9b7...` — **Playbook Processos** (4 docs reais: Onboarding, Check-in, Offboarding 30d, Offboarding imediato)
+- `cf180001...` — **Playbook Funções** (6 docs reais: Account Manager, Gestor Tráfego, Social Media, Designer, Editor de Vídeos, Customer Success)
+- `2a7aab4b...` — **Processos Operacionais** (7 docs reais: Linha Editorial, Mídias Pagas, Design/Edição de Vídeo, Criação de Criativos, Gerenciamento de Demandas, Jornada Completa do Cliente, Boas Práticas para Briefing)
+
+### 4. Mover os 2 docs reais soltos para a raiz
+- `Desafio G4 Skills` (`391785bc...`, sem folder) → `folder_id = 55f28035...`
+- O doc `Cultura MAP` original não existe com conteúdo — só o vazio da seed (será excluído). Se quiser, posso criar um vazio depois ou você cria manualmente.
+
+## Resultado final
 
 ```text
-📚 Base de Conhecimento (pasta wiki raiz)
-├── 🎨 Cultura MAP                    (doc)
-├── 🏆 Desafios G4 SKILLS             (doc)
-├── 👋 Entrei para MAP e agora?       (pasta)
-│   └── 📷 PLAYBOOK DE FOTO PARA PERFIL
-├── 🔥 Boas Práticas MAP              (pasta)
-│   ├── 📄 Knowledge Article 1
-│   └── 📄 Knowledge Article 2
-├── 📂 Playbooks Processos            (pasta)
-│   ├── 📕 Playbook de Onboarding Completo
-│   └── 📗 Playbook de Check-in
-├── 📂 Playbooks Funções              (pasta)
-│   ├── 📘 Playbook Account Manager
-│   ├── 📘 Playbook do Gestor de Tráfego
-│   ├── 📘 Playbook do Social Media
-│   ├── 📘 Playbook do Designer
-│   ├── 📘 Playbook do Editor de Vídeos
-│   └── 📘 Playbook do Customer Success
-└── 📁 Processos Operacionais         (pasta)
-    ├── 📝 Linha Editorial
-    ├── 💵 Mídias Pagas
-    ├── 🎬 Designer / Edição de Vídeo
-    ├── 🎨 Criação de Criativos - Social Media
-    ├── 🎯 Gerenciamento de Demandas
-    └── 🗺️ Jornada Completa do Cliente
+📚 Base de Conhecimento (raiz)
+├── 🏆 Desafio G4 Skills                    (real, com conteúdo)
+├── 📁 Entrei na MAP e agora?
+│   └── 📋 Playbook de Foto para o Perfil
+├── 📁 Playbook Processos
+│   ├── 📒 Playbook de Onboarding Completo
+│   ├── 📒 Playbook de Check-in
+│   ├── 📒 Offboarding (30 dias)
+│   └── 📒 Offbording (imediato)
+├── 📁 Playbook Funções
+│   ├── 📑 Playbook Account Manager
+│   ├── 📑 Playbook Gestor de Tráfego Pago
+│   ├── 📑 Playbook Social Media
+│   ├── 📑 Playbook Designer
+│   ├── 📑 Playbook Editor de Vídeos
+│   └── 📑 Playbook Customer Sucess
+└── 📁 Processos Operacionais
+    ├── 📌 Linha Editorial
+    ├── 🎯 Mídias Pagas
+    ├── 💡 Design / Edição de Vídeo
+    ├── 📎 Criação de Criativos
+    ├── 🔖 Gerenciamento de Demandas
+    ├── 🚀 Jornada Completa do Cliente
+    └── ⭐ Boas Práticas para Criação de Briefing
 ```
 
-Total: **1 pasta raiz + 6 subpastas + 21 documentos**, todos vazios e marcados como wiki.
+Total: 1 raiz + 4 subpastas + 19 documentos reais com conteúdo preservado.
 
-## Como será feito (técnico)
+## Como será executado (técnico)
 
-A estrutura de dados (`document_folders` + `documents`) já suporta:
-- Hierarquia infinita via `parent_folder_id`
-- Documentos dentro de pastas via `folder_id`
-- Emojis customizados por documento (`emoji`)
-- Marcação como wiki (`is_wiki = true`) — herda permissões já existentes (visível para todos os membros do workspace)
+Tudo via operações de banco (DELETE + UPDATE), nenhum arquivo de código será alterado:
 
-**Passos:**
+```sql
+-- Apagar docs vazios da seed
+DELETE FROM documents WHERE created_at = '2026-04-28 16:49:25.054271+00' AND content::text = '{}';
 
-1. **Descobrir o workspace alvo** — query rápida pra pegar o `workspace_id` ativo (existe só um na conta) e o `user_id` do owner como `created_by_user_id`.
-2. **Inserir tudo via SQL seed** numa única migração:
-   - Cria a pasta raiz `Base de Conhecimento` com `is_wiki=true`, `parent_folder_id=null`.
-   - Cria as 6 subpastas referenciando a raiz.
-   - Cria os 21 documentos com `is_wiki=true`, `content='{}'`, `emoji` apropriado e `folder_id` correto.
-3. Documentos soltos (Cultura MAP, Desafios G4 SKILLS) vão direto na pasta raiz `Base de Conhecimento` (sem subpasta).
+-- Apagar subpastas vazias no workspace principal e estrutura toda do secundário
+DELETE FROM document_folders WHERE id IN (
+  'be54ebfb...', '5bbae926...', '1dd8dbb7...', 'dd6fac2a...', '75cea5b3...',
+  '8a365815...', 'd483e0ca...', '1af778cc...', '77dd0e91...', '78882ca6...', '8d90e798...'
+);
 
-**Observação sobre emojis das pastas:** o componente `DocFolderTreeItem` hoje usa um ícone fixo de pasta colorida — os emojis específicos de pasta (🔥, 👋, 📂) ficam visíveis apenas nos documentos. Se quiser emojis também nas pastas, posso adicionar um campo `emoji` em `document_folders` num próximo passo (não incluído aqui pra manter o escopo do "popular conteúdo").
+-- Anexar pastas antigas à raiz Base de Conhecimento
+UPDATE document_folders 
+SET parent_folder_id = '55f28035-3425-442c-bf12-156952451f0d'
+WHERE id IN ('ec863e41...', '7ae9d9b7...', 'cf180001...', '2a7aab4b...');
+
+-- Mover Desafio G4 Skills para a raiz
+UPDATE documents SET folder_id = '55f28035-3425-442c-bf12-156952451f0d' 
+WHERE id = '391785bc-4aca-44bc-a418-3cc04397b767';
+```
 
 ## Fora do escopo
-
-- Conteúdo dos documentos (ficam vazios)
-- Mudanças de UI na sidebar
-- Permissões customizadas (usa o padrão de wiki = todos do workspace veem)
+- Renomear pastas existentes (mantenho os nomes originais que você já tinha: `Playbook Processos`, `Playbook Funções`, etc.)
+- Recriar `Cultura MAP` vazio — me avisa se quiser
+- Mexer no workspace secundário `b233069a...` além de limpar a seed dele
