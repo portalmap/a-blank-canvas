@@ -1,86 +1,112 @@
-## Diagnóstico
+# Migração Lovable Cloud → Supabase externo
 
-Existiam 18 documentos reais com conteúdo (criados em fev/2026) dentro das pastas antigas (`Entrei na MAP e agora?`, `Playbook Processos`, `Playbook Funções`, `Processos Operacionais`) no workspace principal `f37fdcb3...`.
+Importante: o projeto **atual** continuará vinculado ao Lovable Cloud (não é possível desconectar). A estratégia abaixo cria um **clone** apontando para um Supabase próprio, em um **novo projeto Lovable**.
 
-A seed da última etapa criou pastas duplicadas e 21 documentos vazios em ambos os workspaces (`f37fdcb3...` e `b233069a...`), além da nova raiz `Base de Conhecimento`. Sim — dá pra consertar 100% reusando os documentos reais.
+## Visão geral em 6 fases
 
-## O que será feito
-
-### 1. Apagar todos os 21 documentos vazios criados pela seed
-Todos os docs com `content = '{}'` criados em `2026-04-28 16:49:25` serão removidos (são exatamente os da seed).
-
-### 2. Apagar as pastas duplicadas/extras criadas pela seed
-- Apagar a estrutura inteira (raiz + 5 subpastas) do workspace `b233069a...` (workspace secundário, todas as subpastas estão vazias agora).
-- No workspace principal `f37fdcb3...`, apagar as 4 subpastas vazias da seed: `Entrei para MAP e agora?`, `Boas Práticas MAP`, `Playbooks Processos`, `Playbooks Funções`, `Processos Operacionais` (`be54ebfb`, `5bbae926`, `1dd8dbb7`, `dd6fac2a`, `75cea5b3`).
-- **Manter** a raiz `Base de Conhecimento` (`55f28035...`) — ela vai ser o "guarda-chuva" das pastas antigas que já têm conteúdo.
-
-### 3. Adotar as 4 pastas antigas (que já têm conteúdo) como filhas de "Base de Conhecimento"
-Setar `parent_folder_id = 55f28035...` (Base de Conhecimento) nestas pastas existentes:
-- `ec863e41...` — **Entrei na MAP e agora?** (1 doc real: Playbook de Foto para o Perfil)
-- `7ae9d9b7...` — **Playbook Processos** (4 docs reais: Onboarding, Check-in, Offboarding 30d, Offboarding imediato)
-- `cf180001...` — **Playbook Funções** (6 docs reais: Account Manager, Gestor Tráfego, Social Media, Designer, Editor de Vídeos, Customer Success)
-- `2a7aab4b...` — **Processos Operacionais** (7 docs reais: Linha Editorial, Mídias Pagas, Design/Edição de Vídeo, Criação de Criativos, Gerenciamento de Demandas, Jornada Completa do Cliente, Boas Práticas para Briefing)
-
-### 4. Mover os 2 docs reais soltos para a raiz
-- `Desafio G4 Skills` (`391785bc...`, sem folder) → `folder_id = 55f28035...`
-- O doc `Cultura MAP` original não existe com conteúdo — só o vazio da seed (será excluído). Se quiser, posso criar um vazio depois ou você cria manualmente.
-
-## Resultado final
-
-```text
-📚 Base de Conhecimento (raiz)
-├── 🏆 Desafio G4 Skills                    (real, com conteúdo)
-├── 📁 Entrei na MAP e agora?
-│   └── 📋 Playbook de Foto para o Perfil
-├── 📁 Playbook Processos
-│   ├── 📒 Playbook de Onboarding Completo
-│   ├── 📒 Playbook de Check-in
-│   ├── 📒 Offboarding (30 dias)
-│   └── 📒 Offbording (imediato)
-├── 📁 Playbook Funções
-│   ├── 📑 Playbook Account Manager
-│   ├── 📑 Playbook Gestor de Tráfego Pago
-│   ├── 📑 Playbook Social Media
-│   ├── 📑 Playbook Designer
-│   ├── 📑 Playbook Editor de Vídeos
-│   └── 📑 Playbook Customer Sucess
-└── 📁 Processos Operacionais
-    ├── 📌 Linha Editorial
-    ├── 🎯 Mídias Pagas
-    ├── 💡 Design / Edição de Vídeo
-    ├── 📎 Criação de Criativos
-    ├── 🔖 Gerenciamento de Demandas
-    ├── 🚀 Jornada Completa do Cliente
-    └── ⭐ Boas Práticas para Criação de Briefing
+```
+[1] Provisionar          [2] Exportar schema       [3] Exportar dados
+    Supabase próprio  →      (DDL + funções)    →     (pg_dump --data)
+                                                          ↓
+[6] Cutover DNS      ←   [5] Edge functions     ←   [4] Restaurar no
+    e usuários               + secrets               novo Supabase
 ```
 
-Total: 1 raiz + 4 subpastas + 19 documentos reais com conteúdo preservado.
+---
 
-## Como será executado (técnico)
+## Fase 1 — Provisionar destino
 
-Tudo via operações de banco (DELETE + UPDATE), nenhum arquivo de código será alterado:
+1. Criar conta/projeto em supabase.com (região igual à atual para minimizar latência).
+2. Anotar: `Project URL`, `anon key`, `service_role key`, senha do Postgres.
+3. Criar projeto novo no Lovable **sem** Lovable Cloud e conectá-lo ao Supabase próprio.
 
-```sql
--- Apagar docs vazios da seed
-DELETE FROM documents WHERE created_at = '2026-04-28 16:49:25.054271+00' AND content::text = '{}';
+## Fase 2 — Exportar schema (estrutura)
 
--- Apagar subpastas vazias no workspace principal e estrutura toda do secundário
-DELETE FROM document_folders WHERE id IN (
-  'be54ebfb...', '5bbae926...', '1dd8dbb7...', 'dd6fac2a...', '75cea5b3...',
-  '8a365815...', 'd483e0ca...', '1af778cc...', '77dd0e91...', '78882ca6...', '8d90e798...'
-);
+Do Supabase atual (acessível via Connectors → Lovable Cloud → View Backend), rodar:
 
--- Anexar pastas antigas à raiz Base de Conhecimento
-UPDATE document_folders 
-SET parent_folder_id = '55f28035-3425-442c-bf12-156952451f0d'
-WHERE id IN ('ec863e41...', '7ae9d9b7...', 'cf180001...', '2a7aab4b...');
-
--- Mover Desafio G4 Skills para a raiz
-UPDATE documents SET folder_id = '55f28035-3425-442c-bf12-156952451f0d' 
-WHERE id = '391785bc-4aca-44bc-a418-3cc04397b767';
+```bash
+pg_dump \
+  --schema-only \
+  --no-owner --no-privileges \
+  --schema=public --schema=storage \
+  "postgresql://postgres:[SENHA]@[HOST]:5432/postgres" \
+  > schema.sql
 ```
 
-## Fora do escopo
-- Renomear pastas existentes (mantenho os nomes originais que você já tinha: `Playbook Processos`, `Playbook Funções`, etc.)
-- Recriar `Cultura MAP` vazio — me avisa se quiser
-- Mexer no workspace secundário `b233069a...` além de limpar a seed dele
+Inclui: ~50 tabelas, enums (`app_role`, `chat_channel_type`, etc.), ~60 funções/RPCs (productivity, followers, automations), triggers, policies RLS e grants.
+
+**Limpeza manual em `schema.sql`** antes de aplicar:
+- Remover linhas referentes a schemas gerenciados (`auth`, `realtime`, `vault`, `supabase_functions`, `extensions`).
+- Manter apenas DDL de `public` e definições de buckets em `storage`.
+
+## Fase 3 — Exportar dados
+
+```bash
+pg_dump --data-only --no-owner \
+  --schema=public \
+  --exclude-table=public.schema_migrations \
+  "postgresql://..." > data.sql
+```
+
+Para **auth.users** (não acessível por pg_dump padrão), usar Supabase Management API ou script com `service_role` que lê de `auth.admin.listUsers()` e replica via `auth.admin.createUser({ email, password_hash, ... })`. Isso preserva IDs (essencial — `profiles.id` e FKs referenciam `auth.users.id`).
+
+Storage (`task-attachments`, `chat-attachments`, `stickers`): script Node que lista todos os objetos no bucket de origem e faz upload no destino com mesmo path.
+
+## Fase 4 — Restaurar no destino
+
+Ordem obrigatória:
+
+1. Aplicar `schema.sql` (cria tabelas + RLS + funções).
+2. Recriar buckets em Storage (private, mesmos nomes).
+3. Importar `auth.users` via API.
+4. Aplicar `data.sql` (FKs já têm os user_ids corretos).
+5. Reativar publicação realtime se necessário (`ALTER PUBLICATION supabase_realtime ADD TABLE ...`).
+6. Subir objetos do storage.
+
+## Fase 5 — Edge functions e secrets
+
+- Copiar `supabase/functions/*` para o novo projeto Lovable.
+- Redeploy automático ao conectar.
+- Reconfigurar secrets no novo projeto: `RESEND_API_KEY`, `LOVABLE_API_KEY`, e quaisquer chaves de integração (GCSM/Social Flow, etc.).
+- Configurar auth providers (Google OAuth) novamente no dashboard do novo Supabase.
+
+## Fase 6 — Cutover
+
+1. Smoke test: login, criar tarefa, comentário, anexo, automação, chat, productivity report.
+2. Comparar contagens (`SELECT count(*)` por tabela) entre origem e destino.
+3. Comunicar nova URL aos usuários (eles mantêm email/senha porque importamos `auth.users`).
+4. Atualizar webhooks externos (GCSM aponta para o novo `api-gateway` URL).
+5. Manter o projeto Cloud antigo em modo somente-leitura por ~30 dias como fallback.
+
+---
+
+## Riscos e mitigação
+
+| Risco | Mitigação |
+|---|---|
+| IDs de usuário divergentes quebram FKs | Importar `auth.users` preservando UUIDs antes dos dados |
+| Senhas de usuários perdidas | Usar `password_hash` via Admin API; senhas continuam válidas |
+| Triggers disparando durante `data.sql` | `SET session_replication_role = replica;` durante restore |
+| Sequências fora de sincronia | `SELECT setval(...)` em todas as sequências após restore |
+| Storage signed URLs antigas (15 dias) | Sem fix — apenas avisar; novas URLs geradas no novo Supabase |
+| Realtime publication | Re-adicionar tabelas no novo projeto |
+
+## Estimativa de esforço
+
+- Schema export/cleanup: ~2h
+- Auth migration script: ~3h
+- Data restore + verificação: ~2h
+- Storage migration: ~1h (depende do volume)
+- Edge functions + secrets: ~1h
+- Testes + cutover: ~3h
+
+**Total: ~1–2 dias de trabalho focado.**
+
+## Próximo passo sugerido
+
+Confirma que quer seguir por esse caminho? Se sim, começo gerando:
+1. O script de export do schema já limpo
+2. O script Node de migração de `auth.users` + storage
+3. Checklist executável passo a passo
+
+Ou, se preferir, posso primeiro abrir o painel atual do Supabase pra você ver tudo que existe antes de decidir.
