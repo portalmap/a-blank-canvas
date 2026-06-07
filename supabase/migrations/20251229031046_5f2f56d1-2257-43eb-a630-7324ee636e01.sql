@@ -1,0 +1,39 @@
+-- Adicionar novos valores ao enum automation_trigger
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_custom_field_changed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_schedule';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_comment_added';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_all_checklists_resolved';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_all_subtasks_resolved';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_task_added_here';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_task_moved_here';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_due_date_changed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_start_date_changed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_date_before_after';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_start_date_arrives';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_due_date_arrives';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_custom_date_arrives';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_time_tracked';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_assignee_added';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_assignee_removed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_name_changed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_priority_changed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_tag_added';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_tag_removed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_task_type_changed';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_task_linked';
+ALTER TYPE automation_trigger ADD VALUE IF NOT EXISTS 'on_task_unblocked';
+
+-- Adicionar novos valores ao enum automation_action
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'set_priority';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'add_assignee';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'remove_assignee';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'add_follower';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'add_tag';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'remove_tag';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'set_due_date';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'set_start_date';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'send_notification';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'create_subtask';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'move_task';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'archive_task';
+ALTER TYPE automation_action ADD VALUE IF NOT EXISTS 'send_webhook';
