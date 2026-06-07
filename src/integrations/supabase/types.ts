@@ -2051,6 +2051,33 @@ export type Database = {
           },
         ]
       }
+      sso_clients: {
+        Row: {
+          app_slug: string
+          client_secret_hash: string
+          created_at: string
+          id: string
+          redirect_uri: string
+          status: string
+        }
+        Insert: {
+          app_slug: string
+          client_secret_hash: string
+          created_at?: string
+          id?: string
+          redirect_uri: string
+          status?: string
+        }
+        Update: {
+          app_slug?: string
+          client_secret_hash?: string
+          created_at?: string
+          id?: string
+          redirect_uri?: string
+          status?: string
+        }
+        Relationships: []
+      }
       status_template_items: {
         Row: {
           category: string | null
