@@ -4,7 +4,7 @@ import { useArchivedSpaces, useRestoreSpace, useDeleteSpace } from '@/hooks/useS
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Archive, RotateCcw, Trash2, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "@/lib/router-compat";
 import {
   AlertDialog,
   AlertDialogAction,

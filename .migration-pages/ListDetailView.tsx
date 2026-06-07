@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from "@/lib/router-compat";
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useFolders } from '@/hooks/useFolders';

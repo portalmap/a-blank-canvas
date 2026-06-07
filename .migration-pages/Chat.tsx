@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from "@/lib/router-compat";
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { ChatSidebar, ChatRoom, ChannelMembersDialog } from '@/components/chat';
 import { useAllChatChannels } from '@/hooks/useChat';

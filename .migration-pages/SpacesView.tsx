@@ -4,7 +4,7 @@ import { useSpaces } from '@/hooks/useSpaces';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Plus, FolderOpen } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "@/lib/router-compat";
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
 import { CreateSpaceDialog } from '@/components/spaces/CreateSpaceDialog';
 

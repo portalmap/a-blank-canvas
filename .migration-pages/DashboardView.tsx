@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from "@/lib/router-compat";
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, Settings, Share2, RefreshCw, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';

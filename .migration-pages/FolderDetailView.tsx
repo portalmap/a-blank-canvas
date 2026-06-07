@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from "@/lib/router-compat";
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpace } from '@/hooks/useSpaces';
 import { useFolder } from '@/hooks/useFolders';

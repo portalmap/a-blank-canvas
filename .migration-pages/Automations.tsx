@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from "@/lib/router-compat";
 import { Button } from '@/components/ui/button';
 import { Plus, Zap, UserPlus, Eye } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';

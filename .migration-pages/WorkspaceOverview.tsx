@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useWorkspaces, useCreateWorkspace, useDefaultWorkspace, useSetDefaultWorkspace } from '@/hooks/useWorkspaces';
 import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "@/lib/router-compat";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

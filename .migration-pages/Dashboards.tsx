@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "@/lib/router-compat";
 import { Plus, LayoutDashboard, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDashboards, Dashboard } from '@/hooks/useDashboards';
