@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
+import { computeDeviceFingerprint } from "@/lib/deviceFingerprint";
 
 function safeRedirect(raw: string | null | undefined): string {
   if (!raw || typeof raw !== "string") return "/";
@@ -24,9 +25,10 @@ function SsoCallback() {
         return;
       }
 
+      const fingerprint = await computeDeviceFingerprint();
       const { data, error: fnErr } = await supabase.functions.invoke(
         "sso-exchange",
-        { body: { code } },
+        { body: { code, fingerprint } },
       );
       if (cancelled) return;
       if (fnErr || !data?.email || !data?.token_hash) {
