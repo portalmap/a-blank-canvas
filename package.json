@@ -3,6 +3,14 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+  "overrides": {
+    "@tiptap/core": "3.13.0",
+    "@tiptap/pm": "3.13.0"
+  },
+  "resolutions": {
+    "@tiptap/core": "3.13.0",
+    "@tiptap/pm": "3.13.0"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
