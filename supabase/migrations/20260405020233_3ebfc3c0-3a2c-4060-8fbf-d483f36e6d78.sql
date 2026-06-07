@@ -1,1 +1,0 @@
-ALTER TABLE public.space_templates ADD COLUMN type text NOT NULL DEFAULT 'space';

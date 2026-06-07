@@ -1,1 +1,0 @@
-DROP POLICY IF EXISTS "System can insert notifications" ON notifications;

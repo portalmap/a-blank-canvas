@@ -1,1 +1,0 @@
-ALTER TABLE public.chat_channels ADD COLUMN archived_at timestamptz DEFAULT NULL;

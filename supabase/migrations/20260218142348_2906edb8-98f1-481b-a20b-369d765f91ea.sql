@@ -1,1 +1,0 @@
-ALTER TABLE public.tasks ADD COLUMN recurrence_config jsonb DEFAULT NULL;
