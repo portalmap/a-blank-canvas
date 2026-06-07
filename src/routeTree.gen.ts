@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
 import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
@@ -35,10 +36,14 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
-  id: '/_authenticated/',
-  path: '/',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -51,78 +56,78 @@ const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedWorkspacesRoute = AuthenticatedWorkspacesRouteImport.update({
-  id: '/_authenticated/workspaces',
+  id: '/workspaces',
   path: '/workspaces',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTeamsRoute = AuthenticatedTeamsRouteImport.update({
-  id: '/_authenticated/teams',
+  id: '/teams',
   path: '/teams',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSpacesRoute = AuthenticatedSpacesRouteImport.update({
-  id: '/_authenticated/spaces',
+  id: '/spaces',
   path: '/spaces',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/_authenticated/settings',
+  id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedEverythingRoute = AuthenticatedEverythingRouteImport.update({
-  id: '/_authenticated/everything',
+  id: '/everything',
   path: '/everything',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDocumentsRoute = AuthenticatedDocumentsRouteImport.update({
-  id: '/_authenticated/documents',
+  id: '/documents',
   path: '/documents',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardsRoute = AuthenticatedDashboardsRouteImport.update({
-  id: '/_authenticated/dashboards',
+  id: '/dashboards',
   path: '/dashboards',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
-  id: '/_authenticated/chat',
+  id: '/chat',
   path: '/chat',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAutomationsRoute =
   AuthenticatedAutomationsRouteImport.update({
-    id: '/_authenticated/automations',
+    id: '/automations',
     path: '/automations',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedArchivedSpacesRoute =
   AuthenticatedArchivedSpacesRouteImport.update({
-    id: '/_authenticated/archived-spaces',
+    id: '/archived-spaces',
     path: '/archived-spaces',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTaskTaskIdRoute = AuthenticatedTaskTaskIdRouteImport.update({
-  id: '/_authenticated/task/$taskId',
+  id: '/task/$taskId',
   path: '/task/$taskId',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSpaceSpaceIdRoute =
   AuthenticatedSpaceSpaceIdRouteImport.update({
-    id: '/_authenticated/space/$spaceId',
+    id: '/space/$spaceId',
     path: '/space/$spaceId',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedListListIdRoute = AuthenticatedListListIdRouteImport.update({
-  id: '/_authenticated/list/$listId',
+  id: '/list/$listId',
   path: '/list/$listId',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedFolderFolderIdRoute =
   AuthenticatedFolderFolderIdRouteImport.update({
-    id: '/_authenticated/folder/$folderId',
+    id: '/folder/$folderId',
     path: '/folder/$folderId',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDocumentsIdRoute =
   AuthenticatedDocumentsIdRouteImport.update({
@@ -138,6 +143,7 @@ const AuthenticatedDashboardsIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
@@ -151,7 +157,6 @@ export interface FileRoutesByFullPath {
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
-  '/': typeof AuthenticatedIndexRoute
   '/dashboards/$id': typeof AuthenticatedDashboardsIdRoute
   '/documents/$id': typeof AuthenticatedDocumentsIdRoute
   '/folder/$folderId': typeof AuthenticatedFolderFolderIdRoute
@@ -183,6 +188,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/_authenticated/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/_authenticated/automations': typeof AuthenticatedAutomationsRoute
@@ -207,6 +213,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/auth'
     | '/archived-spaces'
     | '/automations'
@@ -220,7 +227,6 @@ export interface FileRouteTypes {
     | '/workspaces'
     | '/accept-invite/$token'
     | '/auth/reset-password'
-    | '/'
     | '/dashboards/$id'
     | '/documents/$id'
     | '/folder/$folderId'
@@ -251,6 +257,7 @@ export interface FileRouteTypes {
     | '/task/$taskId'
   id:
     | '__root__'
+    | '/_authenticated'
     | '/auth'
     | '/_authenticated/archived-spaces'
     | '/_authenticated/automations'
@@ -274,23 +281,9 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
-  AuthenticatedArchivedSpacesRoute: typeof AuthenticatedArchivedSpacesRoute
-  AuthenticatedAutomationsRoute: typeof AuthenticatedAutomationsRoute
-  AuthenticatedChatRoute: typeof AuthenticatedChatRoute
-  AuthenticatedDashboardsRoute: typeof AuthenticatedDashboardsRouteWithChildren
-  AuthenticatedDocumentsRoute: typeof AuthenticatedDocumentsRouteWithChildren
-  AuthenticatedEverythingRoute: typeof AuthenticatedEverythingRoute
-  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedSpacesRoute: typeof AuthenticatedSpacesRoute
-  AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
-  AuthenticatedWorkspacesRoute: typeof AuthenticatedWorkspacesRoute
   AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedFolderFolderIdRoute: typeof AuthenticatedFolderFolderIdRoute
-  AuthenticatedListListIdRoute: typeof AuthenticatedListListIdRoute
-  AuthenticatedSpaceSpaceIdRoute: typeof AuthenticatedSpaceSpaceIdRoute
-  AuthenticatedTaskTaskIdRoute: typeof AuthenticatedTaskTaskIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -302,12 +295,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/auth/reset-password': {
       id: '/auth/reset-password'
@@ -328,98 +328,98 @@ declare module '@tanstack/react-router' {
       path: '/workspaces'
       fullPath: '/workspaces'
       preLoaderRoute: typeof AuthenticatedWorkspacesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/teams': {
       id: '/_authenticated/teams'
       path: '/teams'
       fullPath: '/teams'
       preLoaderRoute: typeof AuthenticatedTeamsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/spaces': {
       id: '/_authenticated/spaces'
       path: '/spaces'
       fullPath: '/spaces'
       preLoaderRoute: typeof AuthenticatedSpacesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/everything': {
       id: '/_authenticated/everything'
       path: '/everything'
       fullPath: '/everything'
       preLoaderRoute: typeof AuthenticatedEverythingRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/documents': {
       id: '/_authenticated/documents'
       path: '/documents'
       fullPath: '/documents'
       preLoaderRoute: typeof AuthenticatedDocumentsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboards': {
       id: '/_authenticated/dashboards'
       path: '/dashboards'
       fullPath: '/dashboards'
       preLoaderRoute: typeof AuthenticatedDashboardsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/chat': {
       id: '/_authenticated/chat'
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof AuthenticatedChatRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/automations': {
       id: '/_authenticated/automations'
       path: '/automations'
       fullPath: '/automations'
       preLoaderRoute: typeof AuthenticatedAutomationsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/archived-spaces': {
       id: '/_authenticated/archived-spaces'
       path: '/archived-spaces'
       fullPath: '/archived-spaces'
       preLoaderRoute: typeof AuthenticatedArchivedSpacesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/task/$taskId': {
       id: '/_authenticated/task/$taskId'
       path: '/task/$taskId'
       fullPath: '/task/$taskId'
       preLoaderRoute: typeof AuthenticatedTaskTaskIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/space/$spaceId': {
       id: '/_authenticated/space/$spaceId'
       path: '/space/$spaceId'
       fullPath: '/space/$spaceId'
       preLoaderRoute: typeof AuthenticatedSpaceSpaceIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/list/$listId': {
       id: '/_authenticated/list/$listId'
       path: '/list/$listId'
       fullPath: '/list/$listId'
       preLoaderRoute: typeof AuthenticatedListListIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/folder/$folderId': {
       id: '/_authenticated/folder/$folderId'
       path: '/folder/$folderId'
       fullPath: '/folder/$folderId'
       preLoaderRoute: typeof AuthenticatedFolderFolderIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/documents/$id': {
       id: '/_authenticated/documents/$id'
@@ -437,16 +437,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface AuthRouteChildren {
-  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
-}
-
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthResetPasswordRoute: AuthResetPasswordRoute,
-}
-
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface AuthenticatedDashboardsRouteChildren {
   AuthenticatedDashboardsIdRoute: typeof AuthenticatedDashboardsIdRoute
@@ -476,8 +466,25 @@ const AuthenticatedDocumentsRouteWithChildren =
     AuthenticatedDocumentsRouteChildren,
   )
 
-const rootRouteChildren: RootRouteChildren = {
-  AuthRoute: AuthRouteWithChildren,
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedArchivedSpacesRoute: typeof AuthenticatedArchivedSpacesRoute
+  AuthenticatedAutomationsRoute: typeof AuthenticatedAutomationsRoute
+  AuthenticatedChatRoute: typeof AuthenticatedChatRoute
+  AuthenticatedDashboardsRoute: typeof AuthenticatedDashboardsRouteWithChildren
+  AuthenticatedDocumentsRoute: typeof AuthenticatedDocumentsRouteWithChildren
+  AuthenticatedEverythingRoute: typeof AuthenticatedEverythingRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSpacesRoute: typeof AuthenticatedSpacesRoute
+  AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
+  AuthenticatedWorkspacesRoute: typeof AuthenticatedWorkspacesRoute
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedFolderFolderIdRoute: typeof AuthenticatedFolderFolderIdRoute
+  AuthenticatedListListIdRoute: typeof AuthenticatedListListIdRoute
+  AuthenticatedSpaceSpaceIdRoute: typeof AuthenticatedSpaceSpaceIdRoute
+  AuthenticatedTaskTaskIdRoute: typeof AuthenticatedTaskTaskIdRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedArchivedSpacesRoute: AuthenticatedArchivedSpacesRoute,
   AuthenticatedAutomationsRoute: AuthenticatedAutomationsRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
@@ -488,13 +495,41 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedSpacesRoute: AuthenticatedSpacesRoute,
   AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
   AuthenticatedWorkspacesRoute: AuthenticatedWorkspacesRoute,
-  AcceptInviteTokenRoute: AcceptInviteTokenRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedFolderFolderIdRoute: AuthenticatedFolderFolderIdRoute,
   AuthenticatedListListIdRoute: AuthenticatedListListIdRoute,
   AuthenticatedSpaceSpaceIdRoute: AuthenticatedSpaceSpaceIdRoute,
   AuthenticatedTaskTaskIdRoute: AuthenticatedTaskTaskIdRoute,
 }
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
+interface AuthRouteChildren {
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRouteWithChildren,
+  AcceptInviteTokenRoute: AcceptInviteTokenRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
