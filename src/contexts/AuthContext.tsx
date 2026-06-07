@@ -26,6 +26,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const queryClient = useQueryClient();
   const previousSessionRef = useRef<Session | null>(null);
   const isInitialLoadRef = useRef(true);
+  const navigateRef = useRef(navigate);
+  const pathnameRef = useRef(location.pathname);
+  useEffect(() => {
+    navigateRef.current = navigate;
+    pathnameRef.current = location.pathname;
+  }, [navigate, location.pathname]);
 
   useEffect(() => {
     // Check for existing session first
@@ -52,16 +58,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           event === 'SIGNED_IN' && 
           !isInitialLoadRef.current &&
           !previousSessionRef.current &&
-          location.pathname === '/auth'
+          pathnameRef.current === '/auth'
         ) {
-          navigate('/');
+          navigateRef.current('/');
         }
 
         // Detect session loss (JWT expired / forced sign out)
         if (event === 'SIGNED_OUT' && previousSessionRef.current) {
           queryClient.clear();
           toast.info('Sua sessão expirou. Faça login novamente.');
-          navigate('/auth');
+          navigateRef.current('/auth');
         }
         
         previousSessionRef.current = newSession;
@@ -69,7 +75,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     return () => subscription.unsubscribe();
-  }, [navigate, location.pathname]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signUp = async (email: string, password: string) => {
     try {
