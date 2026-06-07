@@ -3,7 +3,7 @@ import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHor
 import { NavLink } from '@/components/NavLink';
 import { useTheme } from 'next-themes';
 import mapLogoLight from '@/assets/map-logo-light.png';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from "@/lib/router-compat";
 import {
   Sidebar,
   SidebarContent,

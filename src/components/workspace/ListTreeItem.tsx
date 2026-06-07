@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { List, Plus, MoreHorizontal, Trash2, Pencil, Link, Move, Copy, Archive, Zap } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/router-compat";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useStatuses } from "@/hooks/useStatuses";
 import { useCreateTask } from "@/hooks/useTasks";

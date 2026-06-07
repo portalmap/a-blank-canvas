@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "@/lib/router-compat";
 import { ProductivityDetailsReport, ProductivityTaskDetail } from '@/hooks/useProductivityDetailsReport';
 import { cn } from '@/lib/utils';
 import { ArrowUpRight, Clock, CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react';

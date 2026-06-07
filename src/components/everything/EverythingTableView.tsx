@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, MoreHorizontal, Calendar, MapPin } from 'luc
 import { format, isToday, isTomorrow, isPast, isThisWeek, addDays, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { parseLocalDate } from '@/lib/dateUtils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "@/lib/router-compat";
 import {
   Table,
   TableBody,

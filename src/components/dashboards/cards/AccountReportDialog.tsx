@@ -7,7 +7,7 @@ import { AccountEntry, AccountSpaceEntry, AccountTaskEntry } from '@/hooks/useAc
 import { cn } from '@/lib/utils';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "@/lib/router-compat";
 import { ArrowUpRight, CheckCircle2, Clock, AlertTriangle, HelpCircle } from 'lucide-react';
 
 interface AccountReportDialogProps {

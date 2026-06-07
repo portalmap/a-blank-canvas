@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, Folder, MoreHorizontal, List, Trash2, Pencil, Link, Move, Copy, Archive, ListPlus, Zap } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/router-compat";
 import { useLists, useCreateList } from "@/hooks/useLists";
 import { useDeleteFolder, useUpdateFolder } from "@/hooks/useFolders";
 import { useDuplicateFolder } from "@/hooks/useDuplicate";
