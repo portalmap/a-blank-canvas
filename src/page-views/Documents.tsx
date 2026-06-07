@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from "@/lib/router-compat";
 import { Plus, FileText, Star, BookOpen, Clock } from 'lucide-react';

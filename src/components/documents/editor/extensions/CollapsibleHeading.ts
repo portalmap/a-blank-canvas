@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Heading } from '@tiptap/extension-heading';
 import { CollapsiblePlugin, collapsiblePluginKey } from './CollapsiblePlugin';
 

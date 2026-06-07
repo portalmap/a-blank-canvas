@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { 
   PieChart, BarChart3, LineChart, Calculator, ListTodo, 

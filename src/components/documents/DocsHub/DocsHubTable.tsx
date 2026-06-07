@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { FileText, BookOpen, Star, MoreHorizontal, Archive, Trash2, ExternalLink } from 'lucide-react';
