@@ -29,6 +29,43 @@ export const Link = React.forwardRef<HTMLAnchorElement, AnyProps>(function Link(
   return <LinkAny ref={ref} to={to} replace={replace} {...rest} />;
 });
 
+export type NavLinkProps = AnyProps;
+
+/**
+ * react-router-dom NavLink shim. The className/style render props receive
+ * { isActive, isPending } — we drive them from TanStack's active match state.
+ */
+export const NavLink = React.forwardRef<HTMLAnchorElement, AnyProps>(function NavLink(
+  { to, className, style, children, end, ...rest },
+  ref,
+) {
+  const LinkAny = TSRLink as unknown as React.ComponentType<AnyProps>;
+  const renderClass =
+    typeof className === "function"
+      ? ({ isActive }: { isActive: boolean }) =>
+          className({ isActive, isPending: false, isTransitioning: false })
+      : className;
+  const renderStyle =
+    typeof style === "function"
+      ? ({ isActive }: { isActive: boolean }) =>
+          style({ isActive, isPending: false, isTransitioning: false })
+      : style;
+  return (
+    <LinkAny
+      ref={ref}
+      to={to}
+      activeOptions={end ? { exact: true } : undefined}
+      className={renderClass}
+      style={renderStyle}
+      {...rest}
+    >
+      {typeof children === "function"
+        ? (state: any) => children({ isActive: !!state?.isActive, isPending: false, isTransitioning: false })
+        : children}
+    </LinkAny>
+  );
+});
+
 export function Navigate(props: AnyProps) {
   const NavAny = TSRNavigate as unknown as React.ComponentType<AnyProps>;
   return <NavAny {...props} />;
