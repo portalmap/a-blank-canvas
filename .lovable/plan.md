@@ -1,47 +1,75 @@
-## Status atual
 
-Boa notícia: o Supabase conectado (`efqnscrnyyyjpswctahq`) **não está vazio** — ele tem as 73 tabelas do MAP Flow (workspaces, tasks, spaces, lists, chat, documents, automations, profiles, user_roles etc.) e todas as funções de produtividade. Então é o Supabase certo, as 132 migrações já estão aplicadas.
+# Correção geral de UX/UI + alinhamento ao MAP Flow v.2.0
 
-O que ainda falta para o app voltar a funcionar de ponta a ponta:
+## Diagnóstico
 
-## O que precisa ser feito
+O projeto v.2.0 e este compartilham o mesmo código de componentes (AppSidebar, etc.) e o mesmo conjunto de tokens HSL. A diferença está no **stack de build**:
 
-### 1. Deploy das 12 Edge Functions
-As funções estão em `supabase/functions/` no repo (copiadas do GitHub) mas **não estão deployadas** no Supabase atual. Sem isso quebram: convites de usuário, transcrição de áudio, API gateway, webhooks, reset de senha, troca de email, etc.
+- **v.2.0**: Tailwind v3 + react-router + react-resizable-panels v2 — funciona.
+- **Atual**: Tailwind v4 + TanStack Start + react-resizable-panels v4 — várias quebras silenciosas e uma fatal.
 
-Functions a deployar:
-- `add-user-with-invite`, `send-invitation-email`, `reset-user-password`, `update-user-email`, `get-user-emails`
-- `api-gateway`, `api-tasks`
-- `webhook-enqueue`, `webhooks-dispatcher`, `webhooks-inbound`
-- `transcribe-audio`
-- `migrate-helper`
+### Causas raiz identificadas
 
-Também conferir/configurar secrets que essas funções esperam (RESEND_API_KEY para emails, OPENAI/Lovable AI para transcribe-audio, etc.) — listo o que falta após inspecionar cada função.
+1. **Tokens HSL não viram utilitários no Tailwind v4.** `src/styles.css` define `--primary`, `--sidebar-background`, etc. como triplets HSL, mas não existe bloco `@theme inline` mapeando para `--color-*`. Logo classes como `bg-sidebar`, `bg-primary`, `text-sidebar-foreground`, `border-border`, `bg-status-done`, `bg-priority-high` não geram CSS → cores aparecem erradas ou ausentes em toda a aplicação.
+2. **Largura da sidebar não é aplicada.** `src/components/ui/sidebar.tsx` usa sintaxe v3 `w-[--sidebar-width]`, `w-[--sidebar-width-icon]`, `calc(--sidebar-width-icon + theme(spacing.4))`. No Tailwind v4 essas classes não resolvem a variável CSS — o painel `fixed` fica sem largura útil, o spacer colapsa, e o `<main>` é coberto. No estado colapsado o ícone aparece sobre o texto pelo mesmo motivo.
+3. **Documentos quebra com `Element type is invalid` em `ResizablePanelGroup`.** `react-resizable-panels@4` renomeou exports para `Group`/`Panel`/`Separator`. O wrapper shadcn (`src/components/ui/resizable.tsx`) importa `PanelGroup` e `PanelResizeHandle` que viraram `undefined`. Afeta também `Chat.tsx` e o tipo `ImperativePanelHandle` em `Documents.tsx`.
+4. **Hydration warning** em `<html className="light">`: `next-themes` adiciona a classe no cliente; o SSR não tem essa classe. Resolvível com `suppressHydrationWarning` na raiz.
+5. **Botão "Try again" + reload na sidebar (visto no replay):** consequência das quebras acima — assim que uma rota com Resizable monta, a árvore explode até o boundary do TanStack.
 
-### 2. Verificar o estado real do preview
-Os logs do dev server ainda mostram `ReferenceError: localStorage is not defined` durante SSR vindo de `WorkspaceContext`. O arquivo já tem `typeof window === "undefined"` na inicialização, então preciso:
-- Confirmar se o erro persiste após o último restart (pode ser log antigo)
-- Se persistir, mover providers que dependem de browser APIs para um wrapper client-only, ou marcar as rotas afetadas com `ssr: false`
+## O que será feito
 
-### 3. Validar o fluxo principal logado
-Com edge functions deployadas e SSR limpo, testar no preview:
-- Login em `/auth`
-- Carregamento de `/` (home com feed, tasks, workspaces)
-- Navegação para spaces, lists, tasks, chat, documents, settings
-- Corrigir as primeiras 2–3 telas que quebrarem (erros típicos do shim `react-router-dom` → TanStack: `Link` com `to` dinâmico, `useParams` tipado, etc.)
+### Fase 1 — Reparar quebras estruturais (alta prioridade)
 
-### 4. (Opcional, depois) Limpeza pós-migração
-- Trocar o shim `@/lib/router-compat` por imports diretos de `@tanstack/react-router` nos 27 arquivos que ainda usam
-- Remover os `@ts-nocheck` aplicados em massa durante a importação, arquivo por arquivo
-- Reativar `strict` no `tsconfig.json`
+1. **`src/styles.css`** — adicionar bloco `@theme inline` mapeando todos os tokens existentes (`--color-background`, `--color-foreground`, `--color-primary`, `--color-sidebar`, `--color-sidebar-foreground`, `--color-sidebar-primary`, `--color-sidebar-accent`, `--color-sidebar-border`, `--color-sidebar-ring`, `--color-status-*`, `--color-priority-*`, `--color-chart-*`, `--color-border`, `--color-input`, `--color-ring`, `--color-muted*`, `--color-accent*`, `--color-card*`, `--color-popover*`, `--color-destructive*`, `--color-secondary*`, `--color-primary-hover`) para `hsl(var(--*))`. Sem isso nenhuma das classes semânticas do projeto pinta.
+2. **`src/components/ui/sidebar.tsx`** — substituir todas as ocorrências de `w-[--sidebar-width]`, `w-[--sidebar-width-icon]`, `left-[calc(var(--sidebar-width)*-1)]`, `w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]` etc. pela forma `var(--sidebar-width)` / `calc(var(--sidebar-width-icon) + 1rem)` (sem `theme(spacing.X)`, que também é v3-only). Aplica a `<Sidebar>`, `<SidebarInset>`, `<SidebarMenuSkeleton>` e wrappers internos.
+3. **`react-resizable-panels` v4 → v2** — fazer downgrade para `^2.1.9` (mesma versão de v.2.0). Mantém o wrapper shadcn e o uso em `Documents.tsx`/`Chat.tsx` sem alterar API. Custo: 1 dependência rebaixada; benefício: compatibilidade testada.
+4. **`src/routes/__root.tsx`** — adicionar `suppressHydrationWarning` no `<html>` para silenciar o mismatch do `next-themes`.
 
-Isso é refactor — não bloqueia o uso do app.
+### Fase 2 — Alinhar tokens visuais ao MAP Flow v.2.0
 
-## Ordem sugerida
+Os tokens HSL deste projeto já são idênticos aos do v.2.0 (sidebar dark navy `222 47% 11%`, primary royal blue `221 83% 53%`, accent vibrant blue `217 91% 60%`, etc.). Após a Fase 1 a paleta v.2.0 passa a ser aplicada automaticamente.
 
-1. Deploy das 12 edge functions + configurar secrets faltantes
-2. Verificar/corrigir SSR do `WorkspaceProvider` / `AuthProvider`
-3. Abrir o preview, logar, navegar e corrigir erros conforme aparecem
-4. (Depois, em sessão separada) limpeza do shim e dos `@ts-nocheck`
+Vou ainda copiar do v.2.0:
+- Animação `highlight-fade` (efeito de destaque ao navegar para item).
+- `border-radius` em `0.5rem` (já presente, conferir).
+- Garantir `* { border-color: hsl(var(--border)) }` global equivalente ao `@layer base` do v.2.0.
 
-Confirma que posso seguir nessa ordem? Se sim, começo pelo passo 1 (deploy das edge functions) assim que você aprovar o plano.
+### Fase 3 — Varredura página a página
+
+Para cada rota autenticada, abro no preview, capturo console + visual e corrijo problemas pontuais encontrados:
+
+- `/` (Início)
+- `/everything` (Tudo)
+- `/chat`
+- `/teams` (Equipes)
+- `/documents` + `/documents/$id`
+- `/dashboards` + `/dashboards/$id`
+- `/automations`
+- `/spaces` + `/space/$spaceId`
+- `/folder/$folderId`
+- `/list/$listId`
+- `/task/$taskId`
+- `/archived-spaces`
+- `/workspaces`
+- `/settings`
+
+Para cada uma: verifico (a) erro de runtime no console, (b) sobreposição/quebra de layout, (c) cores aplicadas corretamente após a Fase 1, (d) responsividade básica. Correções pontuais ficam restritas à página/componente afetado.
+
+### Fase 4 — Verificação final
+
+- Recarregar o preview, confirmar que sidebar expande/colapsa corretamente, sem sobreposição.
+- Abrir `/documents` e confirmar que renderiza sem o erro do Resizable.
+- Conferir console limpo (sem hydration warning, sem element-type-invalid).
+- Reportar resumo do que foi corrigido por página.
+
+## Fora de escopo (para iterações futuras)
+
+- Reescrita de componentes/páginas sem bug visível.
+- Otimização de performance além das melhorias naturais da Fase 1 (ex.: code-splitting agressivo, virtualização de listas).
+- Refatoração da arquitetura do AppSidebar — só serão feitos ajustes mínimos para evitar regressões.
+- Atualização do `react-resizable-panels` para v4 com adaptação do wrapper (downgrade é mais seguro e barato agora).
+
+## Riscos
+
+- O downgrade do `react-resizable-panels` pode disparar aviso de peer-dep, mas é a versão alvo do shadcn original. Risco baixo.
+- Adicionar `@theme inline` pode revelar inconsistências em componentes que usavam cores hardcoded — vou tratar caso a caso na Fase 3.
