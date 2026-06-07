@@ -9,10 +9,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,26 +45,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
-        
-        // Only navigate to home if:
-        // 1. It's a SIGNED_IN event
-        // 2. It's not the initial load (session restoration)
-        // 3. There was no previous session (genuine login, not token refresh)
-        // 4. User is on the auth page
-        if (
-          event === 'SIGNED_IN' && 
-          !isInitialLoadRef.current &&
-          !previousSessionRef.current &&
-          pathnameRef.current === '/auth'
-        ) {
-          navigateRef.current('/');
-        }
 
-        // Detect session loss (JWT expired / forced sign out)
+        // Session loss (JWT expired). Skip when we just navigated to the
+        // explicit signed-out page (user-initiated logout closes the tab).
         if (event === 'SIGNED_OUT' && previousSessionRef.current) {
-          queryClient.clear();
-          toast.info('Sua sessão expirou. Faça login novamente.');
-          navigateRef.current('/auth');
+          const path = pathnameRef.current;
+          if (path !== '/signed-out' && !path.startsWith('/sso/')) {
+            queryClient.clear();
+            toast.info('Sua sessão expirou. Faça login novamente.');
+            const redirect = encodeURIComponent(path || '/');
+            navigateRef.current(`/sso/login?redirect=${redirect}`);
+          }
         }
         
         previousSessionRef.current = newSession;
@@ -78,87 +66,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl
-        }
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return { error };
-      }
-
-      toast.success('Conta criada com sucesso!');
-      return { error: null };
-    } catch (error: any) {
-      toast.error('Erro ao criar conta');
-      return { error };
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return { error };
-      }
-
-      return { error: null };
-    } catch (error: any) {
-      toast.error('Erro ao fazer login');
-      return { error };
-    }
-  };
-
   const signOut = async () => {
     try {
-      // Clear role cache to prevent session leaking
-      queryClient.removeQueries({ queryKey: ['user-role'] });
-      
+      queryClient.clear();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      toast.success('Logout realizado com sucesso');
-      navigate('/auth');
+
+      // Try to close the tab. If the browser blocks it (most do, unless
+      // the tab was opened by script), fall back to a neutral page that
+      // does NOT redirect to /sso/login (which would re-auth via the Hub).
+      try {
+        window.close();
+      } catch {
+        /* ignore */
+      }
+      // Give the browser a tick to honor close(); if we're still here,
+      // show the neutral signed-out screen.
+      setTimeout(() => {
+        if (!window.closed) {
+          window.location.replace('/signed-out');
+        }
+      }, 50);
     } catch (error: any) {
       toast.error('Erro ao fazer logout');
     }
   };
 
-  const resetPassword = async (email: string) => {
-    try {
-      const redirectUrl = `${window.location.origin}/auth/reset-password`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return { error };
-      }
-
-      toast.success('E-mail de redefinição enviado! Verifique sua caixa de entrada.');
-      return { error: null };
-    } catch (error: any) {
-      toast.error('Erro ao enviar e-mail de redefinição');
-      return { error };
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, session, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

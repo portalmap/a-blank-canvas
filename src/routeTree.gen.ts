@@ -9,10 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/auth'
+import { Route as SignedOutRouteImport } from './routes/signed-out'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
+import { Route as SsoLoginRouteImport } from './routes/sso.login'
+import { Route as SsoCallbackRouteImport } from './routes/sso.callback'
 import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
 import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces'
 import { Route as AuthenticatedTeamsRouteImport } from './routes/_authenticated/teams'
@@ -31,9 +32,9 @@ import { Route as AuthenticatedFolderFolderIdRouteImport } from './routes/_authe
 import { Route as AuthenticatedDocumentsIdRouteImport } from './routes/_authenticated/documents.$id'
 import { Route as AuthenticatedDashboardsIdRouteImport } from './routes/_authenticated/dashboards.$id'
 
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const SignedOutRoute = SignedOutRouteImport.update({
+  id: '/signed-out',
+  path: '/signed-out',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -45,10 +46,15 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => AuthRoute,
+const SsoLoginRoute = SsoLoginRouteImport.update({
+  id: '/sso/login',
+  path: '/sso/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SsoCallbackRoute = SsoCallbackRouteImport.update({
+  id: '/sso/callback',
+  path: '/sso/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
   id: '/accept-invite/$token',
@@ -144,7 +150,7 @@ const AuthenticatedDashboardsIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
-  '/auth': typeof AuthRouteWithChildren
+  '/signed-out': typeof SignedOutRoute
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -156,7 +162,8 @@ export interface FileRoutesByFullPath {
   '/teams': typeof AuthenticatedTeamsRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/sso/callback': typeof SsoCallbackRoute
+  '/sso/login': typeof SsoLoginRoute
   '/dashboards/$id': typeof AuthenticatedDashboardsIdRoute
   '/documents/$id': typeof AuthenticatedDocumentsIdRoute
   '/folder/$folderId': typeof AuthenticatedFolderFolderIdRoute
@@ -165,7 +172,7 @@ export interface FileRoutesByFullPath {
   '/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
 }
 export interface FileRoutesByTo {
-  '/auth': typeof AuthRouteWithChildren
+  '/signed-out': typeof SignedOutRoute
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -177,7 +184,8 @@ export interface FileRoutesByTo {
   '/teams': typeof AuthenticatedTeamsRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/sso/callback': typeof SsoCallbackRoute
+  '/sso/login': typeof SsoLoginRoute
   '/': typeof AuthenticatedIndexRoute
   '/dashboards/$id': typeof AuthenticatedDashboardsIdRoute
   '/documents/$id': typeof AuthenticatedDocumentsIdRoute
@@ -189,7 +197,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/auth': typeof AuthRouteWithChildren
+  '/signed-out': typeof SignedOutRoute
   '/_authenticated/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/_authenticated/automations': typeof AuthenticatedAutomationsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
@@ -201,7 +209,8 @@ export interface FileRoutesById {
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/sso/callback': typeof SsoCallbackRoute
+  '/sso/login': typeof SsoLoginRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/dashboards/$id': typeof AuthenticatedDashboardsIdRoute
   '/_authenticated/documents/$id': typeof AuthenticatedDocumentsIdRoute
@@ -214,7 +223,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/auth'
+    | '/signed-out'
     | '/archived-spaces'
     | '/automations'
     | '/chat'
@@ -226,7 +235,8 @@ export interface FileRouteTypes {
     | '/teams'
     | '/workspaces'
     | '/accept-invite/$token'
-    | '/auth/reset-password'
+    | '/sso/callback'
+    | '/sso/login'
     | '/dashboards/$id'
     | '/documents/$id'
     | '/folder/$folderId'
@@ -235,7 +245,7 @@ export interface FileRouteTypes {
     | '/task/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/auth'
+    | '/signed-out'
     | '/archived-spaces'
     | '/automations'
     | '/chat'
@@ -247,7 +257,8 @@ export interface FileRouteTypes {
     | '/teams'
     | '/workspaces'
     | '/accept-invite/$token'
-    | '/auth/reset-password'
+    | '/sso/callback'
+    | '/sso/login'
     | '/'
     | '/dashboards/$id'
     | '/documents/$id'
@@ -258,7 +269,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
-    | '/auth'
+    | '/signed-out'
     | '/_authenticated/archived-spaces'
     | '/_authenticated/automations'
     | '/_authenticated/chat'
@@ -270,7 +281,8 @@ export interface FileRouteTypes {
     | '/_authenticated/teams'
     | '/_authenticated/workspaces'
     | '/accept-invite/$token'
-    | '/auth/reset-password'
+    | '/sso/callback'
+    | '/sso/login'
     | '/_authenticated/'
     | '/_authenticated/dashboards/$id'
     | '/_authenticated/documents/$id'
@@ -282,17 +294,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  AuthRoute: typeof AuthRouteWithChildren
+  SignedOutRoute: typeof SignedOutRoute
   AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
+  SsoCallbackRoute: typeof SsoCallbackRoute
+  SsoLoginRoute: typeof SsoLoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/signed-out': {
+      id: '/signed-out'
+      path: '/signed-out'
+      fullPath: '/signed-out'
+      preLoaderRoute: typeof SignedOutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -309,12 +323,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/auth/reset-password': {
-      id: '/auth/reset-password'
-      path: '/reset-password'
-      fullPath: '/auth/reset-password'
-      preLoaderRoute: typeof AuthResetPasswordRouteImport
-      parentRoute: typeof AuthRoute
+    '/sso/login': {
+      id: '/sso/login'
+      path: '/sso/login'
+      fullPath: '/sso/login'
+      preLoaderRoute: typeof SsoLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sso/callback': {
+      id: '/sso/callback'
+      path: '/sso/callback'
+      fullPath: '/sso/callback'
+      preLoaderRoute: typeof SsoCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/accept-invite/$token': {
       id: '/accept-invite/$token'
@@ -505,31 +526,13 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
-interface AuthRouteChildren {
-  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
-}
-
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthResetPasswordRoute: AuthResetPasswordRoute,
-}
-
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  AuthRoute: AuthRouteWithChildren,
+  SignedOutRoute: SignedOutRoute,
   AcceptInviteTokenRoute: AcceptInviteTokenRoute,
+  SsoCallbackRoute: SsoCallbackRoute,
+  SsoLoginRoute: SsoLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

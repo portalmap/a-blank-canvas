@@ -1,1 +1,4 @@
 project_id = "efqnscrnyyyjpswctahq"
+
+[functions.sso-exchange]
+verify_jwt = false

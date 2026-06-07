@@ -166,7 +166,7 @@ export default function AcceptInvite() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate("/auth")} className="w-full">
+            <Button onClick={() => navigate("/sso/login")} className="w-full">
               Ir para Login
             </Button>
           </CardContent>
