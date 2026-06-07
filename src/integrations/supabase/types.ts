@@ -1605,10 +1605,12 @@ export type Database = {
           bio: string | null
           created_at: string
           default_workspace_id: string | null
+          email: string | null
           full_name: string | null
           id: string
           must_change_password: boolean | null
           phone: string | null
+          role_slug: string | null
           updated_at: string
         }
         Insert: {
@@ -1616,10 +1618,12 @@ export type Database = {
           bio?: string | null
           created_at?: string
           default_workspace_id?: string | null
+          email?: string | null
           full_name?: string | null
           id: string
           must_change_password?: boolean | null
           phone?: string | null
+          role_slug?: string | null
           updated_at?: string
         }
         Update: {
@@ -1627,10 +1631,12 @@ export type Database = {
           bio?: string | null
           created_at?: string
           default_workspace_id?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
           must_change_password?: boolean | null
           phone?: string | null
+          role_slug?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3443,6 +3449,7 @@ export type Database = {
         Returns: boolean
       }
       is_global_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_hub_global_admin: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_system_admin: { Args: { _user_id: string }; Returns: boolean }
       is_workspace_admin: {
