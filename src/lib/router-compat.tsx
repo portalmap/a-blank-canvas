@@ -40,23 +40,27 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, AnyProps>(function Na
   ref,
 ) {
   const LinkAny = TSRLink as unknown as React.ComponentType<AnyProps>;
-  const renderClass =
-    typeof className === "function"
-      ? ({ isActive }: { isActive: boolean }) =>
-          className({ isActive, isPending: false, isTransitioning: false })
-      : className;
-  const renderStyle =
-    typeof style === "function"
-      ? ({ isActive }: { isActive: boolean }) =>
-          style({ isActive, isPending: false, isTransitioning: false })
-      : style;
+  // TSR Link expects className/style as STRING — passing a function leaves the
+  // attribute blank. Resolve the react-router-dom style render-prop API into
+  // separate baseProps + activeProps that TSR can merge.
+  const inactiveState = { isActive: false, isPending: false, isTransitioning: false };
+  const activeState = { isActive: true, isPending: false, isTransitioning: false };
+  const inactiveClass = typeof className === "function" ? className(inactiveState) : className;
+  const activeClass = typeof className === "function" ? className(activeState) : undefined;
+  const inactiveStyle = typeof style === "function" ? style(inactiveState) : style;
+  const activeStyle = typeof style === "function" ? style(activeState) : undefined;
   return (
     <LinkAny
       ref={ref}
       to={to}
       activeOptions={end ? { exact: true } : undefined}
-      className={renderClass}
-      style={renderStyle}
+      className={inactiveClass}
+      style={inactiveStyle}
+      activeProps={
+        activeClass !== undefined || activeStyle !== undefined
+          ? { className: activeClass, style: activeStyle }
+          : undefined
+      }
       {...rest}
     >
       {typeof children === "function"
