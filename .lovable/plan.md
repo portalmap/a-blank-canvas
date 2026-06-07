@@ -1,75 +1,122 @@
+## Camada de detecção de sessão roubada + revogação do Hub (fail-open)
 
-# Correção geral de UX/UI + alinhamento ao MAP Flow v.2.0
+Princípio: a sessão local de 7 dias continua mandando. O Hub é REDE DE SEGURANÇA — só derruba quando responde explicitamente "revoked" ou quando há sinal forte LOCAL. Hub indisponível nunca derruba.
 
-## Diagnóstico
+### 1. Variáveis de ambiente
 
-O projeto v.2.0 e este compartilham o mesmo código de componentes (AppSidebar, etc.) e o mesmo conjunto de tokens HSL. A diferença está no **stack de build**:
+- Secrets (já existentes): `SSO_CLIENT_SECRET`, `HUB_BASE_URL`, `HUB_SSO_REDEEM_URL`, `APP_SLUG`.
+- Adicionar no `.env` (públicos, vão no bundle):
+  - `VITE_HUB_SUPABASE_URL`
+  - `VITE_HUB_ANON_KEY`
 
-- **v.2.0**: Tailwind v3 + react-router + react-resizable-panels v2 — funciona.
-- **Atual**: Tailwind v4 + TanStack Start + react-resizable-panels v4 — várias quebras silenciosas e uma fatal.
+### 2. Migration — tabela `session_context`
 
-### Causas raiz identificadas
+```text
+session_context (
+  user_id uuid PK FK auth.users,
+  email text not null,
+  login_at timestamptz not null default now(),
+  baseline_ip text,
+  baseline_fingerprint text,
+  updated_at timestamptz
+)
+```
 
-1. **Tokens HSL não viram utilitários no Tailwind v4.** `src/styles.css` define `--primary`, `--sidebar-background`, etc. como triplets HSL, mas não existe bloco `@theme inline` mapeando para `--color-*`. Logo classes como `bg-sidebar`, `bg-primary`, `text-sidebar-foreground`, `border-border`, `bg-status-done`, `bg-priority-high` não geram CSS → cores aparecem erradas ou ausentes em toda a aplicação.
-2. **Largura da sidebar não é aplicada.** `src/components/ui/sidebar.tsx` usa sintaxe v3 `w-[--sidebar-width]`, `w-[--sidebar-width-icon]`, `calc(--sidebar-width-icon + theme(spacing.4))`. No Tailwind v4 essas classes não resolvem a variável CSS — o painel `fixed` fica sem largura útil, o spacer colapsa, e o `<main>` é coberto. No estado colapsado o ícone aparece sobre o texto pelo mesmo motivo.
-3. **Documentos quebra com `Element type is invalid` em `ResizablePanelGroup`.** `react-resizable-panels@4` renomeou exports para `Group`/`Panel`/`Separator`. O wrapper shadcn (`src/components/ui/resizable.tsx`) importa `PanelGroup` e `PanelResizeHandle` que viraram `undefined`. Afeta também `Chat.tsx` e o tipo `ImperativePanelHandle` em `Documents.tsx`.
-4. **Hydration warning** em `<html className="light">`: `next-themes` adiciona a classe no cliente; o SSR não tem essa classe. Resolvível com `suppressHydrationWarning` na raiz.
-5. **Botão "Try again" + reload na sidebar (visto no replay):** consequência das quebras acima — assim que uma rota com Resizable monta, a árvore explode até o boundary do TanStack.
+- GRANTs: `authenticated` (select próprio), `service_role` ALL.
+- RLS: `auth.uid() = user_id` para SELECT. INSERT/UPDATE apenas via service_role (edge functions).
+- Trigger `updated_at`.
 
-## O que será feito
+### 3. Edge function `sso-exchange` — gravar baseline no login
 
-### Fase 1 — Reparar quebras estruturais (alta prioridade)
+Após `verifyOtp` lógico (na verdade após criar/garantir o usuário no fluxo atual), o front envia ao `sso-exchange` o `fingerprint` do dispositivo. A função:
 
-1. **`src/styles.css`** — adicionar bloco `@theme inline` mapeando todos os tokens existentes (`--color-background`, `--color-foreground`, `--color-primary`, `--color-sidebar`, `--color-sidebar-foreground`, `--color-sidebar-primary`, `--color-sidebar-accent`, `--color-sidebar-border`, `--color-sidebar-ring`, `--color-status-*`, `--color-priority-*`, `--color-chart-*`, `--color-border`, `--color-input`, `--color-ring`, `--color-muted*`, `--color-accent*`, `--color-card*`, `--color-popover*`, `--color-destructive*`, `--color-secondary*`, `--color-primary-hover`) para `hsl(var(--*))`. Sem isso nenhuma das classes semânticas do projeto pinta.
-2. **`src/components/ui/sidebar.tsx`** — substituir todas as ocorrências de `w-[--sidebar-width]`, `w-[--sidebar-width-icon]`, `left-[calc(var(--sidebar-width)*-1)]`, `w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]` etc. pela forma `var(--sidebar-width)` / `calc(var(--sidebar-width-icon) + 1rem)` (sem `theme(spacing.X)`, que também é v3-only). Aplica a `<Sidebar>`, `<SidebarInset>`, `<SidebarMenuSkeleton>` e wrappers internos.
-3. **`react-resizable-panels` v4 → v2** — fazer downgrade para `^2.1.9` (mesma versão de v.2.0). Mantém o wrapper shadcn e o uso em `Documents.tsx`/`Chat.tsx` sem alterar API. Custo: 1 dependência rebaixada; benefício: compatibilidade testada.
-4. **`src/routes/__root.tsx`** — adicionar `suppressHydrationWarning` no `<html>` para silenciar o mismatch do `next-themes`.
+- Lê IP externo do header `x-forwarded-for` (primeiro IP).
+- Faz UPSERT em `session_context` com `user_id`, `email`, `baseline_ip`, `baseline_fingerprint`, `login_at = now()`.
 
-### Fase 2 — Alinhar tokens visuais ao MAP Flow v.2.0
+Ajuste mínimo no contrato: adicionar `fingerprint` ao body do exchange. O front calcula antes de chamar.
 
-Os tokens HSL deste projeto já são idênticos aos do v.2.0 (sidebar dark navy `222 47% 11%`, primary royal blue `221 83% 53%`, accent vibrant blue `217 91% 60%`, etc.). Após a Fase 1 a paleta v.2.0 passa a ser aplicada automaticamente.
+### 4. Nova edge function `session-guard` (verify_jwt=true)
 
-Vou ainda copiar do v.2.0:
-- Animação `highlight-fade` (efeito de destaque ao navegar para item).
-- `border-radius` em `0.5rem` (já presente, conferir).
-- Garantir `* { border-color: hsl(var(--border)) }` global equivalente ao `@layer base` do v.2.0.
+Recebe `{ fingerprint }` no body. Lê o user do JWT (cabeçalho Authorization).
 
-### Fase 3 — Varredura página a página
+Fluxo:
+1. Obter IP atual via `x-forwarded-for`.
+2. Carregar baseline de `session_context` (via service_role).
+3. SINAL FORTE LOCAL se:
+   - `current_ip !== baseline_ip` (quando baseline existe), ou
+   - `fingerprint !== baseline_fingerprint`.
+4. Consultar Hub (timeout curto, ex. 3s):
+   - `POST {HUB_BASE_URL}/api/public/session-status` body `{ client_secret, app_slug, email, since: login_at.toISOString() }`.
+   - Qualquer erro de rede/timeout/status != 2xx → ignorar (fail-open).
+   - Se `{ revoked: true }` → marcar para logout.
+5. Se SINAL FORTE local → reportar:
+   - `POST {HUB_BASE_URL}/api/public/security-report` com `{ client_secret, app_slug, email, signal_type: "ip_change" | "fingerprint_change", details }`.
+   - Retornar `{ action: "logout", reason }`.
+6. Se Hub respondeu revoked → `{ action: "logout", reason: "hub_revoked" }`.
+7. Caso contrário → `{ action: "continue" }`.
 
-Para cada rota autenticada, abro no preview, capturo console + visual e corrijo problemas pontuais encontrados:
+Erros internos da função (não o Hub) também são fail-open: devolver `continue`.
 
-- `/` (Início)
-- `/everything` (Tudo)
-- `/chat`
-- `/teams` (Equipes)
-- `/documents` + `/documents/$id`
-- `/dashboards` + `/dashboards/$id`
-- `/automations`
-- `/spaces` + `/space/$spaceId`
-- `/folder/$folderId`
-- `/list/$listId`
-- `/task/$taskId`
-- `/archived-spaces`
-- `/workspaces`
-- `/settings`
+### 5. Cliente — fingerprint estável
 
-Para cada uma: verifico (a) erro de runtime no console, (b) sobreposição/quebra de layout, (c) cores aplicadas corretamente após a Fase 1, (d) responsividade básica. Correções pontuais ficam restritas à página/componente afetado.
+Helper `src/lib/deviceFingerprint.ts`:
+- Concatena `navigator.userAgent`, `navigator.platform`, `navigator.language`, `screen.width x screen.height`, `screen.colorDepth`, `Intl.DateTimeFormat().resolvedOptions().timeZone`.
+- Hash via `crypto.subtle.digest('SHA-256', ...)` → hex.
 
-### Fase 4 — Verificação final
+Usado tanto no `sso-callback` (envia ao `sso-exchange`) quanto no `session-guard`.
 
-- Recarregar o preview, confirmar que sidebar expande/colapsa corretamente, sem sobreposição.
-- Abrir `/documents` e confirmar que renderiza sem o erro do Resizable.
-- Conferir console limpo (sem hydration warning, sem element-type-invalid).
-- Reportar resumo do que foi corrigido por página.
+### 6. Cliente — hook `useSessionGuard`
 
-## Fora de escopo (para iterações futuras)
+Em `AuthContext` (ou novo `SessionGuardProvider` montado no `__root`):
+- Quando há sessão ativa: chamar `session-guard` imediatamente e a cada 30 min (`setInterval`).
+- Se `action === "logout"`: `supabase.auth.signOut()` + `navigate('/sso/login?redirect=...')` + toast informativo.
+- Erro de invocação → ignorar (fail-open).
 
-- Reescrita de componentes/páginas sem bug visível.
-- Otimização de performance além das melhorias naturais da Fase 1 (ex.: code-splitting agressivo, virtualização de listas).
-- Refatoração da arquitetura do AppSidebar — só serão feitos ajustes mínimos para evitar regressões.
-- Atualização do `react-resizable-panels` para v4 com adaptação do wrapper (downgrade é mais seguro e barato agora).
+### 7. Detecção de reuse de refresh
 
-## Riscos
+No `AuthContext.onAuthStateChange`, hoje já tratamos `SIGNED_OUT` inesperado. Estender:
+- Guardar `lastEmailRef` em memória (do `previousSessionRef.user.email`).
+- Em `SIGNED_OUT` não iniciado pelo usuário (path != `/signed-out` e não veio de `signOut()` local — usar flag `userInitiatedSignOutRef`):
+  - `fetch('${HUB_BASE_URL}/api/public/security-report', ...)` — NÃO, isso exporia o client_secret. ⇒ chamar nova edge function pública `report-refresh-reuse` (verify_jwt=false) que recebe só `{ email }` e injeta o `client_secret` server-side ao postar no Hub.
+  - Em seguida redirecionar para `/sso/login`.
 
-- O downgrade do `react-resizable-panels` pode disparar aviso de peer-dep, mas é a versão alvo do shadcn original. Risco baixo.
-- Adicionar `@theme inline` pode revelar inconsistências em componentes que usavam cores hardcoded — vou tratar caso a caso na Fase 3.
+### 8. Push de revogação em tempo real (Hub Realtime)
+
+`src/lib/hubRevocationChannel.ts`:
+- Cria segundo client Supabase com `VITE_HUB_SUPABASE_URL` + `VITE_HUB_ANON_KEY` (sem persistência: `auth: { persistSession: false }`).
+- Subscribe ao canal Broadcast `session-revocations`.
+- Ao receber `{ subject_hash, revoked_at }`:
+  - Calcular `sha256(email.toLowerCase())` do usuário logado.
+  - Se bate E `new Date(revoked_at) > login_at` (carregado de `session_context` ou guardado no estado): `signOut()` + redirect `/sso/login`.
+
+Montado no `AuthContext` quando há sessão; desmontado no logout.
+
+### 9. Routes / wiring
+
+- Nenhuma rota nova. Tudo dentro de `AuthContext` + edge functions.
+- `supabase/config.toml`: registrar `session-guard` (verify_jwt=true) e `report-refresh-reuse` (verify_jwt=false).
+
+### 10. Segurança
+
+- `client_secret` NUNCA no front. Toda chamada para `/api/public/session-status` e `/api/public/security-report` parte das edge functions (`session-guard`, `report-refresh-reuse`).
+- `VITE_HUB_*` são públicos (anon key + URL), uso apenas para Realtime read-only.
+- Toda interação com Hub: try/catch + timeout, fail-open por padrão.
+
+### Arquivos a criar/editar
+
+Novos:
+- `supabase/migrations/<ts>_session_context.sql`
+- `supabase/functions/session-guard/index.ts`
+- `supabase/functions/report-refresh-reuse/index.ts`
+- `src/lib/deviceFingerprint.ts`
+- `src/lib/hubRevocationChannel.ts`
+- `src/hooks/useSessionGuard.ts`
+
+Editar:
+- `supabase/functions/sso-exchange/index.ts` (aceitar `fingerprint`, gravar baseline com IP do header)
+- `src/routes/sso.callback.tsx` (calcular fingerprint, enviar ao exchange)
+- `src/contexts/AuthContext.tsx` (montar session-guard, hub revocation channel, detectar refresh-reuse)
+- `supabase/config.toml` (registrar novas functions)
+- `.env` (placeholders `VITE_HUB_SUPABASE_URL`, `VITE_HUB_ANON_KEY`)
+
+Após aprovação, vou pedir os valores reais de `VITE_HUB_SUPABASE_URL` e `VITE_HUB_ANON_KEY` para preencher no `.env`.

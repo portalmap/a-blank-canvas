@@ -1649,6 +1649,36 @@ export type Database = {
           },
         ]
       }
+      session_context: {
+        Row: {
+          baseline_fingerprint: string | null
+          baseline_ip: string | null
+          created_at: string
+          email: string
+          login_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          baseline_fingerprint?: string | null
+          baseline_ip?: string | null
+          created_at?: string
+          email: string
+          login_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          baseline_fingerprint?: string | null
+          baseline_ip?: string | null
+          created_at?: string
+          email?: string
+          login_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       space_followers: {
         Row: {
           created_at: string | null
