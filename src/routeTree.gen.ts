@@ -10,12 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignedOutRouteImport } from './routes/signed-out'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as SsoLoginRouteImport } from './routes/sso.login'
 import { Route as SsoCallbackRouteImport } from './routes/sso.callback'
-import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
 import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
 import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces'
 import { Route as AuthenticatedTeamsRouteImport } from './routes/_authenticated/teams'
@@ -39,11 +37,6 @@ const SignedOutRoute = SignedOutRouteImport.update({
   path: '/signed-out',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -62,11 +55,6 @@ const SsoCallbackRoute = SsoCallbackRouteImport.update({
   id: '/sso/callback',
   path: '/sso/callback',
   getParentRoute: () => rootRouteImport,
-} as any)
-const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => AuthRoute,
 } as any)
 const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
   id: '/accept-invite/$token',
@@ -162,7 +150,6 @@ const AuthenticatedDashboardsIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
-  '/auth': typeof AuthRouteWithChildren
   '/signed-out': typeof SignedOutRoute
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
@@ -175,7 +162,6 @@ export interface FileRoutesByFullPath {
   '/teams': typeof AuthenticatedTeamsRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/sso/callback': typeof SsoCallbackRoute
   '/sso/login': typeof SsoLoginRoute
   '/dashboards/$id': typeof AuthenticatedDashboardsIdRoute
@@ -186,7 +172,6 @@ export interface FileRoutesByFullPath {
   '/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
 }
 export interface FileRoutesByTo {
-  '/auth': typeof AuthRouteWithChildren
   '/signed-out': typeof SignedOutRoute
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
@@ -199,7 +184,6 @@ export interface FileRoutesByTo {
   '/teams': typeof AuthenticatedTeamsRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/sso/callback': typeof SsoCallbackRoute
   '/sso/login': typeof SsoLoginRoute
   '/': typeof AuthenticatedIndexRoute
@@ -213,7 +197,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/auth': typeof AuthRouteWithChildren
   '/signed-out': typeof SignedOutRoute
   '/_authenticated/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/_authenticated/automations': typeof AuthenticatedAutomationsRoute
@@ -226,7 +209,6 @@ export interface FileRoutesById {
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/sso/callback': typeof SsoCallbackRoute
   '/sso/login': typeof SsoLoginRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -241,7 +223,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/auth'
     | '/signed-out'
     | '/archived-spaces'
     | '/automations'
@@ -254,7 +235,6 @@ export interface FileRouteTypes {
     | '/teams'
     | '/workspaces'
     | '/accept-invite/$token'
-    | '/auth/reset-password'
     | '/sso/callback'
     | '/sso/login'
     | '/dashboards/$id'
@@ -265,7 +245,6 @@ export interface FileRouteTypes {
     | '/task/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/auth'
     | '/signed-out'
     | '/archived-spaces'
     | '/automations'
@@ -278,7 +257,6 @@ export interface FileRouteTypes {
     | '/teams'
     | '/workspaces'
     | '/accept-invite/$token'
-    | '/auth/reset-password'
     | '/sso/callback'
     | '/sso/login'
     | '/'
@@ -291,7 +269,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
-    | '/auth'
     | '/signed-out'
     | '/_authenticated/archived-spaces'
     | '/_authenticated/automations'
@@ -304,7 +281,6 @@ export interface FileRouteTypes {
     | '/_authenticated/teams'
     | '/_authenticated/workspaces'
     | '/accept-invite/$token'
-    | '/auth/reset-password'
     | '/sso/callback'
     | '/sso/login'
     | '/_authenticated/'
@@ -318,7 +294,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  AuthRoute: typeof AuthRouteWithChildren
   SignedOutRoute: typeof SignedOutRoute
   AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
   SsoCallbackRoute: typeof SsoCallbackRoute
@@ -332,13 +307,6 @@ declare module '@tanstack/react-router' {
       path: '/signed-out'
       fullPath: '/signed-out'
       preLoaderRoute: typeof SignedOutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -368,13 +336,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/sso/callback'
       preLoaderRoute: typeof SsoCallbackRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/auth/reset-password': {
-      id: '/auth/reset-password'
-      path: '/reset-password'
-      fullPath: '/auth/reset-password'
-      preLoaderRoute: typeof AuthResetPasswordRouteImport
-      parentRoute: typeof AuthRoute
     }
     '/accept-invite/$token': {
       id: '/accept-invite/$token'
@@ -565,19 +526,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
-interface AuthRouteChildren {
-  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
-}
-
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthResetPasswordRoute: AuthResetPasswordRoute,
-}
-
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  AuthRoute: AuthRouteWithChildren,
   SignedOutRoute: SignedOutRoute,
   AcceptInviteTokenRoute: AcceptInviteTokenRoute,
   SsoCallbackRoute: SsoCallbackRoute,
@@ -586,3 +536,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
