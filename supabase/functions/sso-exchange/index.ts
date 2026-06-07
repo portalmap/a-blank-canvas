@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  let body: { code?: unknown; redirect_to?: unknown };
+  let body: { code?: unknown; redirect_to?: unknown; fingerprint?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -101,7 +101,16 @@ Deno.serve(async (req) => {
   const code = typeof body.code === "string" ? body.code.trim() : "";
   const redirectTo =
     typeof body.redirect_to === "string" ? body.redirect_to : undefined;
+  const fingerprint =
+    typeof body.fingerprint === "string" ? body.fingerprint : "";
   if (!code) return json({ error: "Missing code" }, 400, origin);
+
+  // Capture external IP from the request (browser cannot know this).
+  const xff = req.headers.get("x-forwarded-for");
+  const baselineIp =
+    (xff ? xff.split(",")[0]!.trim() : "") ||
+    req.headers.get("x-real-ip") ||
+    null;
 
   // 1. Redeem code at the Hub (server-to-server).
   let hubResp: Response;
@@ -214,6 +223,25 @@ Deno.serve(async (req) => {
   if (linkErr || !linkData?.properties?.hashed_token) {
     console.error("generateLink failed", linkErr);
     return json({ error: "Could not issue session token" }, 500, origin);
+  }
+
+  // 5. Upsert session_context baseline (IP + fingerprint + login_at).
+  try {
+    await admin
+      .from("session_context")
+      .upsert(
+        {
+          user_id: existing.id,
+          email,
+          baseline_ip: baselineIp,
+          baseline_fingerprint: fingerprint || null,
+          login_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+  } catch (e) {
+    console.error("session_context upsert failed", e);
+    // Non-fatal: continue issuing the session.
   }
 
   return json(
