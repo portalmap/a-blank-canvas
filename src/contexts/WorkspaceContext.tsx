@@ -30,6 +30,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingDefault, setIsLoadingDefault] = useState(true);
   const [hasCheckedDefault, setHasCheckedDefault] = useState(false);
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(() => {
+    if (typeof window === "undefined") return null;
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
@@ -43,6 +44,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const setActiveWorkspace = (workspace: Workspace | null) => {
     setActiveWorkspaceState(workspace);
+    if (typeof window === "undefined") return;
     if (workspace) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
     } else {
@@ -52,7 +54,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const clearActiveWorkspace = () => {
     setActiveWorkspaceState(null);
-    localStorage.removeItem(STORAGE_KEY);
+    if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
   };
 
   // Clear workspace when user logs out
