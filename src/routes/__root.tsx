@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -121,6 +121,8 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -128,12 +130,13 @@ function RootComponent() {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AuthProvider>
-            <WorkspaceProvider>
-              {/* Required: nested routes render here. */}
-              <Outlet />
-            </WorkspaceProvider>
-          </AuthProvider>
+          {mounted ? (
+            <AuthProvider>
+              <WorkspaceProvider>
+                <Outlet />
+              </WorkspaceProvider>
+            </AuthProvider>
+          ) : null}
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
