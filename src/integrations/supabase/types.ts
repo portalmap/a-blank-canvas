@@ -3514,6 +3514,10 @@ export type Database = {
         Returns: boolean
       }
       restore_space: { Args: { p_space_id: string }; Returns: undefined }
+      sync_hub_role_to_app_roles: {
+        Args: { _role_slug: string; _user_id: string }
+        Returns: undefined
+      }
       sync_template_statuses_for_list: {
         Args: {
           p_list_id: string
