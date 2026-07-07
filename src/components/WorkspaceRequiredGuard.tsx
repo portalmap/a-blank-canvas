@@ -4,6 +4,9 @@ import { useWorkspaces, useSetDefaultWorkspace } from '@/hooks/useWorkspaces';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate, useLocation } from '@/lib/router-compat';
 
 export const WorkspaceRequiredGuard = ({ children }: { children: ReactNode }) => {
   const { activeWorkspace, setActiveWorkspace, isLoadingDefault } = useWorkspace();
@@ -11,6 +14,35 @@ export const WorkspaceRequiredGuard = ({ children }: { children: ReactNode }) =>
   const setDefaultWorkspace = useSetDefaultWorkspace();
   const [setAsDefault, setSetAsDefault] = useState(false);
   const [autoSelected, setAutoSelected] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [hasGlobalPermission, setHasGlobalPermission] = useState<boolean | null>(null);
+
+  const noWorkspaces = !isLoadingDefault && !isLoadingWorkspaces && (!workspaces || workspaces.length === 0);
+
+  // Check global role only when there are no workspaces
+  useEffect(() => {
+    let cancelled = false;
+    if (!noWorkspaces || !user) return;
+    (async () => {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      if (cancelled) return;
+      const allowed = data?.some((r) => ['global_owner', 'owner', 'admin'].includes(r.role)) ?? false;
+      setHasGlobalPermission(allowed);
+    })();
+    return () => { cancelled = true; };
+  }, [noWorkspaces, user?.id]);
+
+  // Redirect global admins to /workspaces so they can create the first one
+  useEffect(() => {
+    if (noWorkspaces && hasGlobalPermission && location.pathname !== '/workspaces') {
+      navigate('/workspaces', { replace: true });
+    }
+  }, [noWorkspaces, hasGlobalPermission, location.pathname]);
 
   // Auto-select if only 1 workspace
   useEffect(() => {
@@ -36,6 +68,25 @@ export const WorkspaceRequiredGuard = ({ children }: { children: ReactNode }) =>
 
   // No workspaces at all
   if (!workspaces || workspaces.length === 0) {
+    // Global admins: allow through (they'll be redirected to /workspaces),
+    // and let /workspaces itself render so they can create one.
+    if (hasGlobalPermission === null) {
+      return (
+        <div className="flex items-center justify-center h-screen w-full">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+    if (hasGlobalPermission) {
+      if (location.pathname === '/workspaces') {
+        return <>{children}</>;
+      }
+      return (
+        <div className="flex items-center justify-center h-screen w-full">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center h-screen w-full">
         <p className="text-muted-foreground">Nenhum workspace disponível. Contate o administrador.</p>
