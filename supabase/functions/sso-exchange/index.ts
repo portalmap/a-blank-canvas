@@ -214,6 +214,19 @@ Deno.serve(async (req) => {
     return json({ error: "Could not upsert profile" }, 500, origin);
   }
 
+  // 3b. Sincroniza o papel do Hub para o sistema local de permissões (user_roles).
+  //     administrador_global -> global_owner, administrador -> admin.
+  //     Não-fatal: se falhar, o login continua, mas o admin perceberá na UI.
+  try {
+    const { error: syncErr } = await admin.rpc("sync_hub_role_to_app_roles", {
+      _user_id: existing.id,
+      _role_slug: role,
+    });
+    if (syncErr) console.error("sync_hub_role_to_app_roles failed", syncErr);
+  } catch (e) {
+    console.error("sync_hub_role_to_app_roles threw", e);
+  }
+
   // 4. Generate a magic-link OTP for the client to verify -> establishes session.
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
     type: "magiclink",
