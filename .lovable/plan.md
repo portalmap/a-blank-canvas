@@ -1,56 +1,40 @@
-## Objetivo
-Garantir que o Workspace seja realmente independente — não obrigatório atrelar/manter um "usuário responsável".
+## Problema
 
-## Análise atual
+O SSO grava apenas `profiles.role_slug` com o papel vindo do MAP Hub (`administrador_global`, `administrador`, `gestor`, `membro`, `convidado`), mas **todo o sistema de permissões do MAP Flow** (RLS, `is_system_admin`, `can_create_workspace`, etc.) lê de `public.user_roles` — que nunca é populada pelo SSO.
 
-**Estado bom (já OK):**
-- `workspaces` não tem coluna `owner_user_id` — só `created_by_user_id` (nullable).
-- Enum `workspace_role` = `admin | member | limited_member | guest` (sem `owner`).
-- Políticas RLS de UPDATE/DELETE usam `workspace_members` (papel admin) + `is_global_owner`, não dependem de "creator".
-- UI de criação (`WorkspaceOverview`, `AppSidebar`) pede apenas nome — não solicita responsável.
+Resultado: um "administrador_global" vindo do Hub entra no MAP Flow sem qualquer permissão real (não consegue criar workspace, não é reconhecido como system admin em RLS). Só o hook `useAppRole` / `is_hub_global_admin` enxerga o papel — e nenhuma policy relevante usa isso.
 
-**Pontos que amarram o workspace a um usuário:**
-1. FK `workspaces.created_by_user_id → auth.users(id)` está sem `ON DELETE`. Se o usuário criador for excluído, o `DELETE` do usuário falha (RESTRICT), bloqueando remoção do "responsável".
-2. Trigger `add_workspace_creator_as_member` faz:
-   - `NEW.created_by_user_id := auth.uid();`
-   - `INSERT INTO workspace_members (…, auth.uid(), 'admin')`
-   Se `auth.uid()` for `NULL` (criação via service_role / edge function / SQL admin), o INSERT em `workspace_members` falha (user_id NOT NULL) e a criação quebra.
+## Mapeamento Hub → MAP Flow
 
-## Mudanças propostas
+| Hub role                | `user_roles.role` (app_role) |
+| ----------------------- | ---------------------------- |
+| `administrador_global`  | `global_owner`               |
+| `administrador`         | `admin`                      |
+| `gestor` / `membro` / `convidado` | (nenhum papel global; permissões vêm apenas de `workspace_members`) |
 
-### 1. Migration (schema)
-- Alterar FK `workspaces_created_by_user_id_fkey` para `ON DELETE SET NULL`, permitindo excluir o usuário criador sem impacto no workspace.
-- Recriar a função `add_workspace_creator_as_member` para tornar tudo condicional a `auth.uid() IS NOT NULL`:
-  - Só define `created_by_user_id` se houver usuário autenticado.
-  - Só insere em `workspace_members` se houver `auth.uid()`.
-  - Workspace criado via admin/SQL/edge fica sem creator e sem membro inicial (admins globais mantêm acesso via `is_system_admin`).
+`owner` (técnico) fica exclusivamente para gestão manual dentro do MAP Flow — o Hub não emite esse papel.
 
-### 2. Verificação de código (sem alterações previstas)
-- Confirmar que nenhum hook/UI trata `created_by_user_id` como campo obrigatório de exibição/edição do workspace.
-- Confirmar que `useWorkspaces` continua funcionando quando o workspace não tem membros ainda (já tem fallback que adiciona o usuário atual como admin).
+## Mudanças
+
+### 1. Função `public.sync_hub_role_to_app_roles(_user_id uuid, _role_slug text)`
+Nova função SECURITY DEFINER que, dado o usuário e o slug Hub:
+- Remove entradas obsoletas em `user_roles` que a função possa ter criado (`global_owner`, `admin`) e que não correspondem mais ao slug atual.
+- Insere a linha correspondente ao mapeamento acima (idempotente, `ON CONFLICT DO NOTHING`).
+- Não toca em `owner` (papel técnico interno) nem em `workspace_members`.
+
+Executada via migration (não altera dados existentes de owner técnico).
+
+### 2. `sso-exchange` (edge function)
+Depois do upsert de `profiles`, chamar `admin.rpc('sync_hub_role_to_app_roles', { _user_id, _role_slug: role })`. Falha aqui é logada mas não bloqueia login (não-fatal, mesmo padrão do `session_context`).
+
+### 3. Backfill único na migration
+Rodar `sync_hub_role_to_app_roles` para cada `profiles.id` com `role_slug` já preenchido, para regularizar usuários existentes que entraram antes desse fix.
+
+## Verificação
+Após aplicar, com um usuário SSO logado:
+- `SELECT role FROM user_roles WHERE user_id = <id>` deve conter `global_owner` para `administrador_global` e `admin` para `administrador`.
+- `SELECT is_system_admin('<id>')` e `can_create_workspace('<id>')` devem devolver `true` conforme o papel.
 
 ## Fora de escopo
-- Nenhuma mudança em spaces/`account_user_id` (esse é intencional por escopo separado).
-- Nenhuma mudança na UI de criação/edição de workspace.
-
-## Detalhes técnicos
-SQL da migration (resumo):
-```sql
-ALTER TABLE public.workspaces
-  DROP CONSTRAINT workspaces_created_by_user_id_fkey,
-  ADD CONSTRAINT workspaces_created_by_user_id_fkey
-    FOREIGN KEY (created_by_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-CREATE OR REPLACE FUNCTION public.add_workspace_creator_as_member()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  IF auth.uid() IS NOT NULL THEN
-    NEW.created_by_user_id := COALESCE(NEW.created_by_user_id, auth.uid());
-    INSERT INTO public.workspace_members (workspace_id, user_id, role)
-    VALUES (NEW.id, auth.uid(), 'admin')
-    ON CONFLICT (workspace_id, user_id) DO NOTHING;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-```
+- Nenhum mapeamento automático para `workspace_members` (o Hub não conhece workspaces do MAP Flow — quem entra como `membro/gestor/convidado` continua sendo adicionado a workspaces manualmente pelo admin, como hoje).
+- Nenhuma mudança de UI.
