@@ -1,34 +1,36 @@
 ## Diagnóstico
 
-Hoje, com 0 workspaces, o `WorkspaceRequiredGuard` renderiza:
-> "Nenhum workspace disponível. Contate o administrador."
+Erro no Postgres ao criar workspace:
 
-Isso bloqueia inclusive um `administrador_global` (via `user_roles.role IN ('global_owner','owner','admin')`) que deveria conseguir entrar e criar o primeiro workspace.
+```
+insert or update on table "workspace_members" violates foreign key constraint "workspace_members_workspace_id_fkey"
+```
 
-## Correção
+Causa: o trigger `on_workspace_created` está definido como **BEFORE INSERT** em `workspaces` e, dentro dele, `add_workspace_creator_as_member` insere em `workspace_members` referenciando `NEW.id`. Como a linha do workspace ainda não foi gravada, a FK `workspace_id_fkey` (IMMEDIATE) falha e o insert inteiro é revertido → toast "Erro ao criar workspace".
 
-Em `src/components/WorkspaceRequiredGuard.tsx`, quando `workspaces.length === 0`:
+O trigger faz duas coisas:
+1. `NEW.created_by_user_id := COALESCE(NEW.created_by_user_id, auth.uid())` — precisa ser BEFORE.
+2. `INSERT INTO workspace_members ...` — precisa ser AFTER (senão FK quebra).
 
-1. Consultar `user_roles` do usuário logado (a mesma checagem que o `WorkspaceContext` já faz para permissão global).
-2. Se `hasGlobalPermission` (`global_owner` / `owner` / `admin`):
-   - Redirecionar para `/workspaces` (a página existente `WorkspaceOverview` já permite criar/gerenciar workspaces). Usar `useNavigate` do `@/lib/router-compat` com `replace: true`.
-   - Enquanto o redirect não acontece, renderizar spinner (não a mensagem de bloqueio).
-3. Se não tem permissão global: manter a mensagem atual "Nenhum workspace disponível. Contate o administrador."
+## Correção (migração)
 
-Também exportar/expor a checagem via `useState` local no guard (buscar uma vez após confirmar `workspaces.length === 0`); não vale a pena mover para o `WorkspaceContext` porque só o guard precisa.
+Dividir em dois triggers e duas funções:
 
-## Alternativa considerada e descartada
+- `set_workspace_creator()` — BEFORE INSERT, apenas seta `created_by_user_id`.
+- `add_workspace_creator_as_member()` (redefinida) — AFTER INSERT, insere em `workspace_members` usando `NEW.id`, mantendo o `ON CONFLICT DO NOTHING`.
+- Recriar o trigger `on_workspace_created` como AFTER INSERT apontando para a nova função de membership; criar novo trigger BEFORE INSERT `set_workspace_creator_before_insert` para o campo `created_by_user_id`.
 
-Auto-criar um workspace "Meu workspace" no primeiro acesso do admin — evita fricção mas cria dado sem intenção; melhor levar à tela de gestão.
+Nenhuma alteração em RLS, GRANTs, ou outras tabelas. Nenhuma mudança no código do frontend (`useCreateWorkspace` continua igual).
 
 ## Fora do escopo
 
-- Fluxo do SSO/Hub.
-- Regras de RLS ou migrações.
-- Comportamento de usuários com role de workspace (member/guest) — continua igual.
+- Fluxo SSO / MAP Hub.
+- Trigger `create_default_statuses_for_workspace` (já é AFTER e funciona; segue como está, mesmo estando duplicado — pode ser limpo depois).
+- `WorkspaceRequiredGuard` (já ajustado).
 
 ## Verificação
 
-- Login SSO com usuário `administrador_global` sem workspace → cai em `/workspaces` sem ver a mensagem de bloqueio; consegue criar o primeiro workspace e o `WorkspaceRequiredGuard` deixa passar depois.
-- Usuário comum sem workspace → continua vendo a mensagem "Nenhum workspace disponível…".
-- Usuário com 1+ workspaces → comportamento inalterado (auto-seleção / diálogo de seleção).
+Após aplicar a migração, clicar em "Criar Workspace" com o usuário `global_owner` deve:
+1. Inserir em `workspaces`.
+2. AFTER trigger insere em `workspace_members` (workspace_id agora existe → FK ok).
+3. Toast "Workspace criado com sucesso!" e o guard passa a permitir o acesso normal.
