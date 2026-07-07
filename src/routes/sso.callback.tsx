@@ -41,9 +41,8 @@ function SsoCallback() {
       }
 
       const { error: verifyErr } = await supabase.auth.verifyOtp({
-        email: data.email,
-        token: data.token_hash,
         type: "magiclink",
+        token_hash: data.token_hash,
       });
       if (cancelled) return;
       if (verifyErr) {
