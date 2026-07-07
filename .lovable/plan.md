@@ -1,40 +1,51 @@
-## Problema
+## Diagnóstico
 
-O SSO grava apenas `profiles.role_slug` com o papel vindo do MAP Hub (`administrador_global`, `administrador`, `gestor`, `membro`, `convidado`), mas **todo o sistema de permissões do MAP Flow** (RLS, `is_system_admin`, `can_create_workspace`, etc.) lê de `public.user_roles` — que nunca é populada pelo SSO.
+O erro "Edge Function returned a non-2xx status code" é do `supabase.functions.invoke("sso-exchange", ...)` em `src/routes/sso.callback.tsx`. Dentro da função (`supabase/functions/sso-exchange/index.ts`), a chamada `fetch(HUB_SSO_REDEEM_URL, { client_secret: SSO_CLIENT_SECRET, ... })` está voltando `!ok` → função devolve 401 → SDK do browser transforma em "non-2xx".
 
-Resultado: um "administrador_global" vindo do Hub entra no MAP Flow sem qualquer permissão real (não consegue criar workspace, não é reconhecido como system admin em RLS). Só o hook `useAppRole` / `is_hub_global_admin` enxerga o papel — e nenhuma policy relevante usa isso.
+O `audit_log` do Hub confirma: `reason: invalid_client_secret`. Ou seja, `SSO_CLIENT_SECRET` armazenado nos secrets deste projeto (MAP Flow) **não** corresponde ao `client_secret_hash` da linha `app_slug = 'map-flow'` na tabela `sso_clients` do projeto MAP Hub. Não há bug de código nem no MAP Flow nem no Hub — é apenas dessincronia do segredo.
 
-## Mapeamento Hub → MAP Flow
+Nada mais no fluxo precisa mudar: `sso-exchange` já trata role, cria usuário, popula `user_roles` via `sync_hub_role_to_app_roles`, grava `session_context` e emite magiclink.
 
-| Hub role                | `user_roles.role` (app_role) |
-| ----------------------- | ---------------------------- |
-| `administrador_global`  | `global_owner`               |
-| `administrador`         | `admin`                      |
-| `gestor` / `membro` / `convidado` | (nenhum papel global; permissões vêm apenas de `workspace_members`) |
+## Escopo desta correção
 
-`owner` (técnico) fica exclusivamente para gestão manual dentro do MAP Flow — o Hub não emite esse papel.
+Só ressincronizar o segredo. Nenhuma alteração de código, RLS, migração, UI ou fluxo de sessão.
 
-## Mudanças
+## Limite importante
 
-### 1. Função `public.sync_hub_role_to_app_roles(_user_id uuid, _role_slug text)`
-Nova função SECURITY DEFINER que, dado o usuário e o slug Hub:
-- Remove entradas obsoletas em `user_roles` que a função possa ter criado (`global_owner`, `admin`) e que não correspondem mais ao slug atual.
-- Insere a linha correspondente ao mapeamento acima (idempotente, `ON CONFLICT DO NOTHING`).
-- Não toca em `owner` (papel técnico interno) nem em `workspace_members`.
+A tabela `sso_clients` vive no **projeto Supabase do MAP Hub**, não neste. Deste projeto (`efqnscrnyyyjpswctahq`) eu consigo:
+- ler/atualizar `SSO_CLIENT_SECRET` nos secrets do MAP Flow;
+- gerar um segredo novo via `generate_secret`.
 
-Executada via migration (não altera dados existentes de owner técnico).
+Eu **não** consigo executar o `UPDATE sso_clients ... WHERE app_slug='map-flow'` no Hub por este canal — isso precisa acontecer no SQL Editor do projeto Hub (ou por você, ou pelo agente daquele projeto).
 
-### 2. `sso-exchange` (edge function)
-Depois do upsert de `profiles`, chamar `admin.rpc('sync_hub_role_to_app_roles', { _user_id, _role_slug: role })`. Falha aqui é logada mas não bloqueia login (não-fatal, mesmo padrão do `session_context`).
+## Opções
 
-### 3. Backfill único na migration
-Rodar `sync_hub_role_to_app_roles` para cada `profiles.id` com `role_slug` já preenchido, para regularizar usuários existentes que entraram antes desse fix.
+### Opção A — Reaproveitar o segredo atual do MAP Flow (mais rápida)
+1. Você abre Project Settings → Secrets do MAP Flow, copia o valor atual de `SSO_CLIENT_SECRET`.
+2. No projeto MAP Hub, roda no SQL Editor:
+   ```sql
+   UPDATE sso_clients
+   SET client_secret_hash = encode(sha256(convert_to('<VALOR_COLADO>', 'utf8')), 'hex')
+   WHERE app_slug = 'map-flow';
+   ```
+   (Ajustar a expressão de hash exatamente como o Hub calcula — o texto do Lovable no Hub usa `sha256(hex(secret))`; use a forma que o `sso-redeem.ts` do Hub usa. Se preferir, o agente do Hub aplica.)
+3. Nenhuma mudança neste projeto. Testar "Acessar" no card MAP Flow.
 
-## Verificação
-Após aplicar, com um usuário SSO logado:
-- `SELECT role FROM user_roles WHERE user_id = <id>` deve conter `global_owner` para `administrador_global` e `admin` para `administrador`.
-- `SELECT is_system_admin('<id>')` e `can_create_workspace('<id>')` devem devolver `true` conforme o papel.
+### Opção B — Rotacionar o segredo dos dois lados (mais limpa)
+1. Aqui no MAP Flow: eu chamo `generate_secret` para `SSO_CLIENT_SECRET` (32+ bytes) — sobrescreve o secret atual sem expor o valor no chat.
+2. Você me confirma que atualizou, e no projeto MAP Hub roda o mesmo `UPDATE` acima com o valor novo (que você pode ver em Project Settings → Secrets do MAP Flow, ou pedir para o agente do Hub sincronizar).
+3. Testar "Acessar".
 
-## Fora de escopo
-- Nenhum mapeamento automático para `workspace_members` (o Hub não conhece workspaces do MAP Flow — quem entra como `membro/gestor/convidado` continua sendo adicionado a workspaces manualmente pelo admin, como hoje).
-- Nenhuma mudança de UI.
+## Verificação pós-fix
+
+- `audit_log` do Hub: `sso_code_issued` → `sso_code_redeemed` (sem `sso_redeem_failed`).
+- Console do browser no `/sso/callback`: sem erro; redirecionamento para `/`.
+- Sessão Supabase persistida em `localStorage` (`sb-efqnscrnyyyjpswctahq-auth-token`).
+
+## Detalhes técnicos (referência)
+
+- Cliente: `src/routes/sso.callback.tsx` invoca `sso-exchange` com `{ code, fingerprint }`.
+- Server: `supabase/functions/sso-exchange/index.ts` envia `{ code, client_secret: SSO_CLIENT_SECRET, app: APP_SLUG }` para `HUB_SSO_REDEEM_URL`. Falha atual está exatamente no `if (!hubResp.ok)` → retorna 401 → gera o "non-2xx" na tela.
+- Secrets envolvidos neste projeto: `SSO_CLIENT_SECRET`, `HUB_SSO_REDEEM_URL`, `HUB_BASE_URL`, `APP_SLUG` (deve valer `map-flow`).
+
+**Qual opção seguimos, A ou B?**
