@@ -40,7 +40,7 @@ export const WorkspaceRequiredGuard = ({ children }: { children: ReactNode }) =>
   // Redirect global admins to /workspaces so they can create the first one
   useEffect(() => {
     if (noWorkspaces && hasGlobalPermission && location.pathname !== '/workspaces') {
-      navigate({ to: '/workspaces', replace: true });
+      navigate('/workspaces', { replace: true });
     }
   }, [noWorkspaces, hasGlobalPermission, location.pathname]);
 
