@@ -18,13 +18,12 @@ const SSO_CLIENT_SECRET = Deno.env.get("SSO_CLIENT_SECRET") ?? "";
 const APP_SLUG = Deno.env.get("APP_SLUG") ?? "map-flow";
 
 function corsHeaders(origin: string | null): HeadersInit {
-  // Restrict CORS to the project's own origins (preview + published).
-  // We accept the origin if it matches the Lovable preview/published pattern
-  // for this project. Fallback to "*" only when no Origin header was sent.
-  const allowed =
-    !origin ||
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
-    /\.lovable\.app$/.test(new URL(origin).hostname);
+  // Restrict CORS to known, allowed origins only. No wildcard.
+  // Allowed: server-to-server (no Origin), local dev, Lovable preview domains,
+  // and the published domain. All suffix checks are anchored at the end
+  // of the hostname to prevent malicious subdomains like
+  // lovableproject.com.evil.com.
+  const allowed = isAllowedOrigin(origin);
   return {
     "Access-Control-Allow-Origin": allowed && origin ? origin : "null",
     "Access-Control-Allow-Headers":
@@ -32,6 +31,25 @@ function corsHeaders(origin: string | null): HeadersInit {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
+}
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return true; // server-to-server or no Origin header
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  const hostname = url.hostname;
+  if (hostname === "localhost") return true;
+  if (hostname === "127.0.0.1") return true;
+  // Anchored suffix checks only:
+  if (/\.lovable\.app$/.test(hostname)) return true;
+  if (/\.lovableproject\.com$/.test(hostname)) return true;
+  // Exact published domain:
+  if (hostname === "mapflow.lovable.app") return true;
+  return false;
 }
 
 function json(body: unknown, status: number, origin: string | null) {
