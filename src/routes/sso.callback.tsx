@@ -14,10 +14,40 @@ function safeRedirect(raw: string | null | undefined): string {
 function SsoCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [isStaleCode, setIsStaleCode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Helper: read stored redirect target once.
+      const readRedirect = (): string => {
+        try {
+          const target = safeRedirect(sessionStorage.getItem("sso:redirect"));
+          sessionStorage.removeItem("sso:redirect");
+          return target;
+        } catch {
+          return "/";
+        }
+      };
+
+      // 1. If a Supabase session already exists (e.g. user refreshed the
+      //    callback URL after a successful login), skip the exchange.
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (sessionData?.session) {
+          try {
+            window.history.replaceState({}, "", "/sso/callback");
+          } catch {
+            /* ignore */
+          }
+          navigate(readRedirect(), { replace: true });
+          return;
+        }
+      } catch {
+        /* fall through to code exchange */
+      }
+
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
       if (!code) {
@@ -31,12 +61,34 @@ function SsoCallback() {
         { body: { code, fingerprint } },
       );
       if (cancelled) return;
+
+      // 2. Consume the code from the URL exactly once — regardless of the
+      //    outcome — so an accidental F5 does not retry with a stale code.
+      try {
+        window.history.replaceState({}, "", "/sso/callback");
+      } catch {
+        /* ignore */
+      }
+
       if (fnErr || !data?.email || !data?.token_hash) {
-        setError(
+        const rawMsg =
           (fnErr as any)?.message ??
             (data as any)?.error ??
-            "Falha ao validar a sessão com o Hub.",
-        );
+            "Falha ao validar a sessão com o Hub.";
+        // Hub returns 401 when the code was already used or expired. The
+        // edge function surfaces that as "Hub rejected code (401)".
+        const stale =
+          /rejected code \(401\)/i.test(String(rawMsg)) ||
+          /invalid_grant/i.test(String(rawMsg)) ||
+          (fnErr as any)?.context?.status === 401;
+        if (stale) {
+          setIsStaleCode(true);
+          setError(
+            "Este código de login já foi utilizado ou expirou. Gere um novo login.",
+          );
+        } else {
+          setError(rawMsg);
+        }
         return;
       }
 
@@ -50,14 +102,7 @@ function SsoCallback() {
         return;
       }
 
-      let target = "/";
-      try {
-        target = safeRedirect(sessionStorage.getItem("sso:redirect"));
-        sessionStorage.removeItem("sso:redirect");
-      } catch {
-        /* ignore */
-      }
-      navigate(target, { replace: true });
+      navigate(readRedirect(), { replace: true });
     })();
     return () => {
       cancelled = true;
@@ -72,9 +117,9 @@ function SsoCallback() {
           <p className="text-sm text-muted-foreground">{error}</p>
           <button
             className="text-sm underline"
-            onClick={() => navigate("/sso/login")}
+            onClick={() => navigate("/sso/login", { replace: true })}
           >
-            Tentar novamente
+            {isStaleCode ? "Fazer login novamente" : "Tentar novamente"}
           </button>
         </div>
       ) : (
