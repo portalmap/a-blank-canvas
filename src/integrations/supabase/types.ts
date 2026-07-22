@@ -1649,6 +1649,48 @@ export type Database = {
           },
         ]
       }
+      relay_diagnostico_log: {
+        Row: {
+          assunto: string | null
+          criado_em: string
+          destino: string | null
+          direcao: string
+          id: string
+          mensagem_id: string | null
+          modo: string | null
+          observacao: string | null
+          origem: string | null
+          payload: Json | null
+          status_code: number | null
+        }
+        Insert: {
+          assunto?: string | null
+          criado_em?: string
+          destino?: string | null
+          direcao: string
+          id?: string
+          mensagem_id?: string | null
+          modo?: string | null
+          observacao?: string | null
+          origem?: string | null
+          payload?: Json | null
+          status_code?: number | null
+        }
+        Update: {
+          assunto?: string | null
+          criado_em?: string
+          destino?: string | null
+          direcao?: string
+          id?: string
+          mensagem_id?: string | null
+          modo?: string | null
+          observacao?: string | null
+          origem?: string | null
+          payload?: Json | null
+          status_code?: number | null
+        }
+        Relationships: []
+      }
       session_context: {
         Row: {
           baseline_fingerprint: string | null
