@@ -1,108 +1,71 @@
-# Documento de Integrações — MAP Flow
+## Objetivo
 
-Vou criar um único arquivo `docs/INTEGRATIONS.md` na raiz do projeto, em português, cobrindo com detalhes as duas integrações que este projeto (MAP Flow) mantém com sistemas externos:
+Criar o canal de diagnóstico isolado entre MAP Flow (spoke) e MAP Hub Flow, tratando apenas o assunto `diagnostico.ping`. Nada de produção é lido, alterado ou disparado.
 
-1. **Portal MAP** — integração via API Token (REST) e Webhooks.
-2. **MAP Hub Flow** — SSO centralizado, verificação contínua de sessão e revogação em tempo real.
+## Padrão a seguir
 
-Nenhum código-fonte será alterado — apenas o markdown será criado.
+O `sso-exchange` deste projeto é uma **Supabase Edge Function** (`supabase/functions/sso-exchange/index.ts`, registrada em `supabase/config.toml` com `verify_jwt = false`). Portanto os novos endpoints serão **Edge Functions** também, no mesmo formato (Deno.serve, `Deno.env.get`, `createClient` com `SERVICE_ROLE_KEY`).
 
-## Estrutura do documento
+URL pública final do inbox (será informada ao usuário no final):
+`https://efqnscrnyyyjpswctahq.supabase.co/functions/v1/hub-inbox`
 
-### 1. Visão geral
-- Diagrama textual mostrando os três sistemas (Portal MAP ↔ MAP Flow ↔ MAP Hub Flow) e o sentido do fluxo de cada canal.
-- Tabela-resumo de cada endpoint, sua direção (in/out), autenticação e finalidade.
+## Etapas
 
-### 2. Integração com o Portal MAP
+### 1. Migration — nova tabela isolada
+Criar `public.relay_diagnostico_log` exatamente como especificado: colunas `direcao` (check enviado|recebido), `mensagem_id`, `origem`, `destino`, `assunto`, `modo`, `payload jsonb`, `status_code`, `observacao`, `criado_em`. RLS habilitado, **sem policy**, `REVOKE ALL ... FROM anon, authenticated`. Nenhum GRANT — acesso só via service_role a partir das Edge Functions.
 
-**2.1 Endpoints que o Portal chama neste projeto (entrada):**
-- `POST /functions/v1/api-tasks` — criação simples de tarefa a partir do Portal. Autenticação via `Authorization: Bearer <api_token>` (tabela `api_tokens`, coluna `token`). Detalhar payload (`title`, `description`, `due_date`, `start_date`, `priority`, `list_id`, `status_id`, `status_name` case-insensitive, `attachment_url`), lógica de resolução de `list_id` (payload → `target_list_id` do token), cadeia de fallback do `status_id` (por nome → default da lista → primeiro da lista → default do workspace → primeiro do workspace), datas default (hoje / hoje+7d), registro em `task_activities` com `metadata.created_by = 'api'`, atualização de `last_used_at` no token, e códigos de erro (400/401/403/404/500).
-- `ANY /functions/v1/api-gateway/<recurso>[/<id>]` — CRUD completo para automações externas. Autenticação idêntica (Bearer token). Listar recursos suportados: `workspaces`, `spaces`, `folders`, `lists`, `tasks`, `subtasks`, `statuses`, `tags`, `task-tags`, `comments`, `checklists`, `checklist-items`, `assignees`, `attachments`, `members`, `activities`. Documentar filtros por query string (`name`, `tag_name`, `space_id`, etc.), resolução de anexos para signed URLs (`task-attachments` bucket, 45 dias) e formato de resposta `{ data }` / `{ error }`.
-- `POST /functions/v1/webhooks-inbound?source=<slug>&workspace=<uuid>` — recebe webhooks vindos de sistemas externos (Portal ou outros). Autenticação dupla e opcional: header `x-webhook-token` (comparado a `INBOUND_WEBHOOK_TOKEN`) e/ou `x-webhook-signature` HMAC-SHA256 (segredo `INBOUND_WEBHOOK_SIGNING_SECRET`). Persiste em `webhook_inbox` (headers filtrados, payload, status `received`).
-- Atividade `task.created` marcada como `created_by: 'portal'` é reconhecida na UI (`TaskActivityItem`) e renderizada com o rótulo "🌐 Portal MAP".
+### 2. Secrets
+Solicitar via `add_secret` (uma única vez, após a migration): `HUB_RELAY_TOKEN`, `HUB_INBOX_TOKEN`, `DIAG_KEY`. Definir `HUB_RELAY_URL` via `set_secret` com o valor já fornecido (`https://project--3d15789c-5980-43e3-bd4f-81165402e97d.lovable.app`).
 
-**2.2 Endpoints que este projeto chama no Portal (saída):**
-- `POST <endpoint_configurado>` — disparado pela edge function `webhooks-dispatcher` para cada endpoint registrado em `webhook_endpoints` que assine o evento (ou `*`). Estrutura completa do envelope:
-  ```json
-  {
-    "id": "<delivery_uuid>",
-    "event": "task.created",
-    "workspace_id": "<uuid>",
-    "occurred_at": "ISO-8601",
-    "data": { ... }
-  }
-  ```
-- Headers enviados: `Content-Type: application/json`, `x-webhook-signature: sha256=<hex>` (HMAC do body com o `secret` do endpoint), `x-webhook-id`, `x-webhook-event`, `x-webhook-timestamp`.
-- Ciclo de vida: enfileirado em `webhook_deliveries` pela função `webhook-enqueue` → dispatcher percorre `status=pending` → sucesso marca `success`; erros aplicam backoff exponencial (1m, 5m, 15m, 1h, 3h, 12h, 24h) com `MAX_ATTEMPTS=8`, timeout de 30s.
-- Eventos disponíveis (do `WEBHOOK_EVENTS`): `task.created`, `task.updated`, `task.deleted`, `task.status_changed`, `comment.created`, `comment.updated`, `list.created/updated/deleted`, `space.created/updated`, `webhook.test`, coringa `*`.
-- Como o Portal registra seu endpoint: via UI de Webhooks (`useWebhooks.ts`) — insere em `webhook_endpoints` com `url`, `events[]`, `secret` (gerado com `crypto.getRandomValues`), `is_active`, `description`.
-- Como o Portal deve validar as chamadas: recalcular HMAC-SHA256(body, secret) e comparar com `x-webhook-signature`, usando comparação em tempo constante.
+### 3. Edge Function `hub-inbox`
+Arquivo novo: `supabase/functions/hub-inbox/index.ts`. Registrar em `supabase/config.toml` com `verify_jwt = false` (auth manual via `HUB_INBOX_TOKEN`).
 
-**2.3 Tabelas envolvidas:** `api_tokens`, `webhook_endpoints`, `webhook_deliveries`, `webhook_inbox`. Descrever colunas-chave de cada.
+Fluxo:
+- OPTIONS → CORS (mesmo estilo restrito do `sso-exchange`, mas aqui pode aceitar server-to-server: origem ausente OK; para navegador, restringir a `*.lovable.app` / `*.lovableproject.com` com sufixo ancorado).
+- Ler `Authorization: Bearer <token>`; comparar com `HUB_INBOX_TOKEN` (timing-safe). Não bate → 401.
+- Parse JSON; inválido → 400.
+- Inserir em `relay_diagnostico_log` com `direcao='recebido'`, `mensagem_id=body.id`, `origem`, `assunto`, `modo`, `payload`.
+- Se `assunto === 'diagnostico.ping'`:
+  - `modo === 'consulta'` → 200 `{ pong: true, recebido_de, sou_eu: 'map-flow', echo, processado_em }`
+  - `modo === 'entrega'` → 200 `{ ok: true, recebido_de }`
+- Qualquer outro `assunto` → 422 `{ error: 'assunto_nao_suportado', assunto }`.
+- Nunca logar o token; nunca tocar em outra tabela.
 
-### 3. Integração com o MAP Hub Flow
+### 4. Edge Function `relay-test-send`
+Arquivo novo: `supabase/functions/relay-test-send/index.ts`. Registrar em `supabase/config.toml` com `verify_jwt = false` (auth manual via `x-diag-key`).
 
-**3.1 Objetivo:** o Hub é o identity provider central. Cuida de login, papéis (`administrador_global`, `administrador`, `gestor`, `membro`, `convidado`), revogação global e sinais de segurança.
+Fluxo:
+- Validar header `x-diag-key === DIAG_KEY` (timing-safe). Não bate → 401.
+- Ler `modo` da querystring (`consulta` padrão, ou `entrega`); qualquer outro → 400.
+- Montar envelope: `{ destinos: ['portal-map'], assunto: 'diagnostico.ping', modo, referencia_origem: 'teste-<ts>', payload: { echo: 'ping de map-flow', quando: '<ISO now>' } }`.
+- Determinar rota do Hub: `consulta` → `${HUB_RELAY_URL}/api/public/relay-query`; `entrega` → `${HUB_RELAY_URL}/api/public/relay`.
+- `fetch` com `Authorization: Bearer ${HUB_RELAY_TOKEN}`, `Content-Type: application/json`, `AbortSignal.timeout(15000)`.
+- Capturar status e corpo (tentar `.json()`, fallback `.text()`).
+- Inserir em `relay_diagnostico_log` com `direcao='enviado'`, `destino='portal-map'`, `assunto`, `modo`, `status_code`, `observacao` (JSON stringificado do corpo).
+- Responder `{ enviado_para, modo, hub_status, resposta_do_hub }`.
 
-**3.2 Variáveis de ambiente (edge + client):**
-- Edge: `HUB_BASE_URL`, `HUB_SSO_REDEEM_URL`, `SSO_CLIENT_SECRET`, `APP_SLUG=map-flow`.
-- Cliente (Vite): `VITE_HUB_BASE_URL`, `VITE_HUB_SUPABASE_URL`, `VITE_HUB_ANON_KEY`.
+### 5. Tela opcional `/diagnostico-relay`
+**Não incluir nesta primeira iteração** — o curl valida tudo e a tela adiciona superfície sem necessidade. Se você quiser depois, faço em uma segunda rodada usando uma terceira Edge Function `relay-diagnostico-list` (server-side, com `service_role`) atrás de uma checagem de papel `administrador`/`gestor`.
 
-**3.3 Fluxo de login (SSO):**
-1. Usuário abre `/sso/login` → cliente monta URL `${HUB_BASE_URL}/sso/login?app=map-flow&redirect=<callback>` e redireciona.
-2. Hub autentica → volta para `/sso/callback?code=<auth_code>`.
-3. `sso.callback.tsx` chama a edge function `sso-exchange` com `{ code, fingerprint }`.
-4. `sso-exchange` (verify_jwt=false) faz `POST HUB_SSO_REDEEM_URL` server-to-server com `{ code, client_secret, app }`. O Hub responde `{ user: {id, email, name, avatar_url}, role, app }`.
-5. Edge function valida `role` contra whitelist, valida `app === APP_SLUG`, procura/cria usuário no Supabase local (busca por email em `profiles` e paginação em `auth.admin.listUsers`), upserta `profiles`, chama RPC `sync_hub_role_to_app_roles` para popular `user_roles`, cria um magic-link OTP e devolve `{ email, token_hash, type: 'magiclink' }`.
-6. Cliente chama `supabase.auth.verifyOtp` → sessão local emitida → redireciona para o alvo salvo.
-7. Baseline de segurança (`session_context`): IP externo (`x-forwarded-for`), `fingerprint` do dispositivo, `login_at` são gravados no upsert.
-8. Detalhes anti-reuso: query string é limpa via `history.replaceState` após consumir o `code`; se já existe sessão local (F5), pula a troca; detecção de 401/`invalid_grant` mostra "Fazer login novamente".
-9. CORS estrito da `sso-exchange`: apenas `localhost/127.0.0.1`, `*.lovable.app` (regex ancorado), `*.lovableproject.com` (regex ancorado), `mapflow.lovable.app` e origem ausente. Sem `*`.
+### 6. Deploy e verificação
+- Deploy das duas funções (`hub-inbox`, `relay-test-send`).
+- `curl` de fumaça:
+  - `hub-inbox` sem token → 401.
+  - `hub-inbox` com token e assunto errado → 422.
+  - `hub-inbox` com `diagnostico.ping` + `modo=consulta` → 200 com `pong: true, sou_eu: 'map-flow'`.
+  - `relay-test-send` sem `x-diag-key` → 401 (não vou disparar contra o Hub sem seu OK — apenas valido o gate; o disparo real é acionado por você).
+- Confirmar que `relay_diagnostico_log` recebeu as linhas correspondentes.
+- Relatar (a) padrão = **Edge Function** e (b) URL do inbox = `https://efqnscrnyyyjpswctahq.supabase.co/functions/v1/hub-inbox`.
 
-**3.4 Verificação contínua da sessão:**
-- Hook `useSessionGuard` roda ao montar e a cada 30 min → chama `POST /functions/v1/session-guard` (verify_jwt=true) com `{ fingerprint }`.
-- `session-guard`:
-  - Compara IP externo atual com `session_context.baseline_ip` e fingerprint com `baseline_fingerprint`. Se houver **strong signal** (`ip_change` ou `fingerprint_change`) → reporta `POST HUB_BASE_URL/api/public/security-report` e responde `{ action: 'logout', reason: strongSignal }`.
-  - Faz `POST HUB_BASE_URL/api/public/session-status` (`{ client_secret, app_slug, email, since: login_at }`) — se Hub responder `{ revoked: true }` → `{ action: 'logout', reason: 'hub_revoked' }`.
-  - Falhas de rede / internas do Hub são **fail-open** (`continue`), nunca deslogam por engano. Timeout de 3s no fetch.
-- Ação `logout` → `queryClient.clear()`, toast, `supabase.auth.signOut()`, redireciona para `/sso/login?redirect=...`.
+## Isolamento (autocheck)
+- Nenhum ALTER em tabela existente.
+- Nenhum import/chamada a `api-tasks`, `api-gateway`, `webhooks-*`, `sso-*`.
+- Nenhuma gravação em `webhook_deliveries` / `webhook_inbox`.
+- Nenhuma policy em `relay_diagnostico_log` (acesso só via service_role).
+- Tokens só lidos via `Deno.env.get` dentro das funções; nunca no frontend, nunca logados.
 
-**3.5 Revogação em tempo real (push):**
-- `src/lib/hubRevocationChannel.ts` cria um cliente Supabase para o **projeto do Hub** (`VITE_HUB_SUPABASE_URL` + `VITE_HUB_ANON_KEY`) e ouve o canal Realtime `session-revocations`, evento `revoked`.
-- Payload: `{ subject_hash, revoked_at }`. Cliente compara `subject_hash` com `sha256Hex(email)` local e só desloga se `revoked_at > login_at`. Mesma sequência de logout do session-guard.
-
-**3.6 Refresh-token reuse (detecção de roubo de sessão):**
-- Quando `onAuthStateChange` dispara `SIGNED_OUT` inesperado (usuário não iniciou logout e não está em `/signed-out` ou `/sso/*`), o cliente chama `POST /functions/v1/report-refresh-reuse` (verify_jwt=false) com `{ email }`.
-- Essa função injeta o `client_secret` server-side e faz `POST HUB_BASE_URL/api/public/security-report` com `signal_type: 'refresh_reuse'`. Retorno é sempre 200 (fail-open, sem leak de timing).
-
-**3.7 Sincronização de papéis:**
-- `sso-exchange` invoca a RPC `sync_hub_role_to_app_roles(_user_id, _role_slug)` (não fatal). Mapeia `administrador_global → global_owner`, `administrador → admin`, etc., populando `public.user_roles` — que é a fonte de verdade para RLS local.
-
-**3.8 Tabelas envolvidas:** `profiles` (`id`, `email`, `full_name`, `avatar_url`, `role_slug`), `session_context` (`user_id`, `email`, `baseline_ip`, `baseline_fingerprint`, `login_at`), `user_roles`.
-
-### 4. Configuração no Hub
-Lista curta dos itens que o Hub precisa ter cadastrados para o MAP Flow funcionar:
-- App slug: `map-flow`
-- Redirect URIs autorizados: `https://mapflow.lovable.app/sso/callback`, `https://id-preview--*.lovable.app/sso/callback`, `https://*.lovableproject.com/sso/callback`, `http://localhost:8080/sso/callback`.
-- Client secret compartilhado (`SSO_CLIENT_SECRET`).
-- Endpoints públicos consumidos pelo MAP Flow: `/sso/redeem`, `/api/public/session-status`, `/api/public/security-report`.
-- Canal Realtime: `session-revocations` (broadcast `revoked`).
-
-### 5. Referências rápidas
-Tabela com os caminhos de arquivo mais importantes para cada fluxo, para facilitar manutenção:
-- `supabase/functions/api-tasks/index.ts`
-- `supabase/functions/api-gateway/index.ts`
-- `supabase/functions/webhook-enqueue/index.ts`
-- `supabase/functions/webhooks-dispatcher/index.ts`
-- `supabase/functions/webhooks-inbound/index.ts`
-- `supabase/functions/sso-exchange/index.ts`
-- `supabase/functions/session-guard/index.ts`
-- `supabase/functions/report-refresh-reuse/index.ts`
-- `src/routes/sso.login.tsx`, `src/routes/sso.callback.tsx`
-- `src/contexts/AuthContext.tsx`, `src/hooks/useSessionGuard.ts`
-- `src/lib/hubRevocationChannel.ts`
-- `src/hooks/useWebhooks.ts`, `src/hooks/useWebhookTrigger.ts`
-
-## Entrega
-
-Arquivo único: `docs/INTEGRATIONS.md`. Sem alterações em código, migrations, secrets ou config.
+## Detalhes técnicos
+- Comparação de tokens: `crypto.timingSafeEqual` sobre `TextEncoder`.
+- CORS do `hub-inbox`: reaproveitar o padrão anchored-suffix do `sso-exchange` para preflight; o Hub chama server-to-server (sem Origin), o que já é aceito.
+- `service_role` cliente com `auth: { persistSession: false, autoRefreshToken: false }`.
+- Erros de insert no log não devem quebrar a resposta funcional (log-e-continua, igual `session_context` no `sso-exchange`).
