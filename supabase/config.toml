@@ -8,3 +8,9 @@ verify_jwt = true
 
 [functions.report-refresh-reuse]
 verify_jwt = false
+
+[functions.hub-inbox]
+verify_jwt = false
+
+[functions.relay-test-send]
+verify_jwt = false
