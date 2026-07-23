@@ -1,71 +1,81 @@
-## Objetivo
 
-Criar o canal de diagnóstico isolado entre MAP Flow (spoke) e MAP Hub Flow, tratando apenas o assunto `diagnostico.ping`. Nada de produção é lido, alterado ou disparado.
+# Plano: Documento de referência da camada administrativa
 
-## Padrão a seguir
+Objetivo único: gerar `docs/PADROES-TELAS-ADMIN-MAPFLOW.md` com base em investigação do código atual. Nenhuma alteração de código será feita.
 
-O `sso-exchange` deste projeto é uma **Supabase Edge Function** (`supabase/functions/sso-exchange/index.ts`, registrada em `supabase/config.toml` com `verify_jwt = false`). Portanto os novos endpoints serão **Edge Functions** também, no mesmo formato (Deno.serve, `Deno.env.get`, `createClient` com `SERVICE_ROLE_KEY`).
+## Investigação a realizar
 
-URL pública final do inbox (será informada ao usuário no final):
-`https://efqnscrnyyyjpswctahq.supabase.co/functions/v1/hub-inbox`
+Antes de escrever o documento, ler estes arquivos para extrair trechos reais (5-15 linhas):
 
-## Etapas
+**Proteção de rota e papéis**
+- `src/components/AdminRoute.tsx`
+- `src/components/ProtectedRoute.tsx`
+- `src/components/WorkspaceRequiredGuard.tsx`
+- `src/hooks/useUserRole.ts`
+- `src/hooks/useAppRole.ts`
+- `src/routes/_authenticated/route.tsx`
+- `src/routes/_authenticated/settings.tsx` (exemplo de rota protegida por admin)
+- `src/contexts/AuthContext.tsx`, `src/contexts/WorkspaceContext.tsx`
 
-### 1. Migration — nova tabela isolada
-Criar `public.relay_diagnostico_log` exatamente como especificado: colunas `direcao` (check enviado|recebido), `mensagem_id`, `origem`, `destino`, `assunto`, `modo`, `payload jsonb`, `status_code`, `observacao`, `criado_em`. RLS habilitado, **sem policy**, `REVOKE ALL ... FROM anon, authenticated`. Nenhum GRANT — acesso só via service_role a partir das Edge Functions.
+**Telas administrativas existentes**
+- `src/page-views/Settings.tsx` (já em contexto)
+- `src/components/settings/*` (UserManagement, WorkspaceSettings, etc.)
+- `src/page-views/ArchivedSpaces.tsx`, `src/page-views/Automations.tsx`
+- Estrutura de rotas em `src/routes/_authenticated/`
+- Shell: `src/components/AppSidebar.tsx`, `src/components/MobileHeader.tsx`
 
-### 2. Secrets
-Solicitar via `add_secret` (uma única vez, após a migration): `HUB_RELAY_TOKEN`, `HUB_INBOX_TOKEN`, `DIAG_KEY`. Definir `HUB_RELAY_URL` via `set_secret` com o valor já fornecido (`https://project--3d15789c-5980-43e3-bd4f-81165402e97d.lovable.app`).
+**Leitura de dados server-only (ponto crítico)**
+- Edge Functions relevantes: `supabase/functions/get-user-emails/index.ts`, `reset-user-password/index.ts`, `add-user-with-invite/index.ts`, `update-user-email/index.ts`, `migrate-helper/index.ts`
+- Consumo no front: `src/hooks/useAllProfiles.ts`, `src/hooks/useWorkspaceMembers.ts`, componentes em `src/components/settings/UserManagement.tsx`
+- Padrão de invocação: `supabase.functions.invoke(...)` (visto em `AuthContext` e `useSessionGuard`)
+- Confirmar que TanStack `createServerFn` **não** é usado para admin (padrão do projeto é Edge Function)
+- `src/integrations/supabase/client.server.ts` e `auth-middleware.ts` — existem mas checar se são efetivamente usados
 
-### 3. Edge Function `hub-inbox`
-Arquivo novo: `supabase/functions/hub-inbox/index.ts`. Registrar em `supabase/config.toml` com `verify_jwt = false` (auth manual via `HUB_INBOX_TOKEN`).
+**Componentes de UI**
+- `components.json` (shadcn new-york, lucide) — já em contexto
+- `src/components/ui/*` — listar componentes de tabela/dialog/toast disponíveis
+- Uso real de tabela: procurar em `src/components/settings/UserManagement.tsx`, `src/components/dashboards/DashboardsTable.tsx`, `src/components/documents/DocsHub/DocsHubTable.tsx`
+- Toast: `sonner` (visto em AuthContext)
+- Estados vazio/loading/erro: padrões em hooks com react-query
 
-Fluxo:
-- OPTIONS → CORS (mesmo estilo restrito do `sso-exchange`, mas aqui pode aceitar server-to-server: origem ausente OK; para navegador, restringir a `*.lovable.app` / `*.lovableproject.com` com sufixo ancorado).
-- Ler `Authorization: Bearer <token>`; comparar com `HUB_INBOX_TOKEN` (timing-safe). Não bate → 401.
-- Parse JSON; inválido → 400.
-- Inserir em `relay_diagnostico_log` com `direcao='recebido'`, `mensagem_id=body.id`, `origem`, `assunto`, `modo`, `payload`.
-- Se `assunto === 'diagnostico.ping'`:
-  - `modo === 'consulta'` → 200 `{ pong: true, recebido_de, sou_eu: 'map-flow', echo, processado_em }`
-  - `modo === 'entrega'` → 200 `{ ok: true, recebido_de }`
-- Qualquer outro `assunto` → 422 `{ error: 'assunto_nao_suportado', assunto }`.
-- Nunca logar o token; nunca tocar em outra tabela.
+**Convenções**
+- Nomenclatura: `page-views/` para páginas, `routes/` para roteamento, `hooks/use*`, `components/<dominio>/`
+- Idioma: PT-BR em UI (visto em Settings.tsx), inglês em código
+- Datas: procurar `src/lib/dateUtils.ts` e uso de `date-fns` no `package.json`
 
-### 4. Edge Function `relay-test-send`
-Arquivo novo: `supabase/functions/relay-test-send/index.ts`. Registrar em `supabase/config.toml` com `verify_jwt = false` (auth manual via `x-diag-key`).
+## Estrutura do arquivo `docs/PADROES-TELAS-ADMIN-MAPFLOW.md`
 
-Fluxo:
-- Validar header `x-diag-key === DIAG_KEY` (timing-safe). Não bate → 401.
-- Ler `modo` da querystring (`consulta` padrão, ou `entrega`); qualquer outro → 400.
-- Montar envelope: `{ destinos: ['portal-map'], assunto: 'diagnostico.ping', modo, referencia_origem: 'teste-<ts>', payload: { echo: 'ping de map-flow', quando: '<ISO now>' } }`.
-- Determinar rota do Hub: `consulta` → `${HUB_RELAY_URL}/api/public/relay-query`; `entrega` → `${HUB_RELAY_URL}/api/public/relay`.
-- `fetch` com `Authorization: Bearer ${HUB_RELAY_TOKEN}`, `Content-Type: application/json`, `AbortSignal.timeout(15000)`.
-- Capturar status e corpo (tentar `.json()`, fallback `.text()`).
-- Inserir em `relay_diagnostico_log` com `direcao='enviado'`, `destino='portal-map'`, `assunto`, `modo`, `status_code`, `observacao` (JSON stringificado do corpo).
-- Responder `{ enviado_para, modo, hub_status, resposta_do_hub }`.
+1. **Proteção de rota**
+   - Camadas: `_authenticated/route.tsx` (autenticação) → `WorkspaceRequiredGuard` → `AdminRoute` (papel)
+   - Papéis globais (`user_roles`: `global_owner`, `owner`, `admin`) e de workspace (`workspace_members.role`: `admin`, `member`, `limited_member`, `guest`)
+   - Hook `useUserRole` como fonte única; hook `useAppRole` para papel Hub (role_slug)
+   - Exemplo: `src/routes/_authenticated/settings.tsx` embrulhado em `<AdminRoute>`
 
-### 5. Tela opcional `/diagnostico-relay`
-**Não incluir nesta primeira iteração** — o curl valida tudo e a tela adiciona superfície sem necessidade. Se você quiser depois, faço em uma segunda rodada usando uma terceira Edge Function `relay-diagnostico-list` (server-side, com `service_role`) atrás de uma checagem de papel `administrador`/`gestor`.
+2. **Telas administrativas existentes**
+   - `Settings` (perfil, workspace, usuários, status, tags, templates, automações, produtividade, notificações, webhooks, API) via Tabs
+   - `ArchivedSpaces`, `Automations`
+   - Shell: `_authenticated/route.tsx` com `SidebarProvider` + `AppSidebar` + `MobileHeader`
+   - Registro de rota nova: criar arquivo em `src/routes/_authenticated/<nome>.tsx` com `createFileRoute` + wrapper `<AdminRoute>`; router gera `routeTree.gen.ts`
 
-### 6. Deploy e verificação
-- Deploy das duas funções (`hub-inbox`, `relay-test-send`).
-- `curl` de fumaça:
-  - `hub-inbox` sem token → 401.
-  - `hub-inbox` com token e assunto errado → 422.
-  - `hub-inbox` com `diagnostico.ping` + `modo=consulta` → 200 com `pong: true, sou_eu: 'map-flow'`.
-  - `relay-test-send` sem `x-diag-key` → 401 (não vou disparar contra o Hub sem seu OK — apenas valido o gate; o disparo real é acionado por você).
-- Confirmar que `relay_diagnostico_log` recebeu as linhas correspondentes.
-- Relatar (a) padrão = **Edge Function** e (b) URL do inbox = `https://efqnscrnyyyjpswctahq.supabase.co/functions/v1/hub-inbox`.
+3. **Leitura de dados server-only** (seção principal)
+   - Padrão: Supabase Edge Function com `SUPABASE_SERVICE_ROLE_KEY`, chamada via `supabase.functions.invoke('<nome>', { body })`
+   - Autorização: função valida JWT do chamador e checa papel via `has_role` ou consulta a `user_roles`
+   - Exemplo completo: `get-user-emails` (server) + consumo em `UserManagement` / hook correspondente
+   - `createServerFn` do TanStack: não é o padrão adotado para admin neste projeto (declarar explicitamente)
 
-## Isolamento (autocheck)
-- Nenhum ALTER em tabela existente.
-- Nenhum import/chamada a `api-tasks`, `api-gateway`, `webhooks-*`, `sso-*`.
-- Nenhuma gravação em `webhook_deliveries` / `webhook_inbox`.
-- Nenhuma policy em `relay_diagnostico_log` (acesso só via service_role).
-- Tokens só lidos via `Deno.env.get` dentro das funções; nunca no frontend, nunca logados.
+4. **Componentes de UI**
+   - shadcn/ui new-york + lucide-react + sonner (toast) + `@tanstack/react-query`
+   - Tabela: padrão usado em `UserManagement` / `DocsHubTable` / `DashboardsTable` (documentar qual)
+   - Estados: `isLoading` do react-query → skeleton/spinner; erro → toast; vazio → mensagem inline
+
+5. **Convenções**
+   - Arquivos: `page-views/Xxx.tsx`, `routes/_authenticated/xxx.tsx`, `hooks/useXxx.ts`, `components/<dominio>/Xxx.tsx`
+   - Idioma: rótulos em português; nomes de código em inglês
+   - Datas: `date-fns` com locale pt-BR (confirmar em `src/lib/dateUtils.ts`)
 
 ## Detalhes técnicos
-- Comparação de tokens: `crypto.timingSafeEqual` sobre `TextEncoder`.
-- CORS do `hub-inbox`: reaproveitar o padrão anchored-suffix do `sso-exchange` para preflight; o Hub chama server-to-server (sem Origin), o que já é aceito.
-- `service_role` cliente com `auth: { persistSession: false, autoRefreshToken: false }`.
-- Erros de insert no log não devem quebrar a resposta funcional (log-e-continua, igual `session_context` no `sso-exchange`).
+
+- Cada seção incluirá 1-2 trechos de código curtos (5-15 linhas) com caminho do arquivo
+- Onde algo não existir (ex.: breadcrumb global), escrever "não existe"
+- Nenhuma sugestão de melhoria; apenas descrição do estado atual
+- Entrega: mensagem final apenas confirmando criação do arquivo e listando os 5 títulos de seção
