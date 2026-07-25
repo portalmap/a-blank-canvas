@@ -222,7 +222,7 @@ function groupTasksByPriority(tasks: TaskWithAssignees[]) {
     .map((p) => ({
       key: p,
       label: priorityConfig[p]?.label || p,
-      color: priorityConfig[p]?.color || 'bg-gray-500',
+      color: priorityConfig[p]?.color || 'bg-muted-foreground',
       tasks: groups.get(p) || [],
     }))
     .filter((g) => g.tasks.length > 0);
