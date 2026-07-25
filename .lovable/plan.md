@@ -1,81 +1,60 @@
+## Aplicar MAP Design System (arquétipo sidebar) no MAP Flow
 
-# Plano: Documento de referência da camada administrativa
+Aplicar os 3 prompts do documento na ordem, alinhando o MAP Flow ao molde canônico já validado no Hub.
 
-Objetivo único: gerar `docs/PADROES-TELAS-ADMIN-MAPFLOW.md` com base em investigação do código atual. Nenhuma alteração de código será feita.
+### Etapa 1 — Fundação canônica (Prompt 1)
 
-## Investigação a realizar
+Reescrever `src/styles.css`:
+- Trocar o esquema HSL triplet atual pelos tokens **OKLCH** canônicos do bloco travado (root + `.dark`), com marca âmbar (`--brand: oklch(0.78 0.16 75)`), radius base `0.75rem`, sombras `--shadow-soft`/`--shadow-elegant`, `--glass-*`, `--gradient-*` e paleta `--status-*` (success/warning/danger/info/neutral, cada uma com `-foreground` e `-soft`).
+- Substituir o bloco `@theme inline` pelo canônico (fontes Sora/Manrope, escala de radius, todos os `--color-*` incluindo sidebar e status).
+- Ajustar `@custom-variant dark` para `(&:is(.dark *))` conforme o molde.
+- Substituir `@layer base` pelo bloco canônico (tipografia H1–H5, `small`, body 15px/1.6).
+- Preservar `@keyframes highlight-fade` / utilitário `.animate-highlight-fade` (específicos do projeto).
 
-Antes de escrever o documento, ler estes arquivos para extrair trechos reais (5-15 linhas):
+Carregar fontes no head da rota raiz (`src/routes/__root.tsx`):
+- `<link>` para `https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap` (via `head()` do TanStack).
 
-**Proteção de rota e papéis**
-- `src/components/AdminRoute.tsx`
-- `src/components/ProtectedRoute.tsx`
-- `src/components/WorkspaceRequiredGuard.tsx`
-- `src/hooks/useUserRole.ts`
-- `src/hooks/useAppRole.ts`
-- `src/routes/_authenticated/route.tsx`
-- `src/routes/_authenticated/settings.tsx` (exemplo de rota protegida por admin)
-- `src/contexts/AuthContext.tsx`, `src/contexts/WorkspaceContext.tsx`
+Atualizar `src/components/ui/card.tsx`:
+- Base: `rounded-2xl border border-border bg-card text-card-foreground` (sem sombra fixa).
+- Nova prop `elevated?: boolean` — aplica `shadow-[var(--shadow-elegant)]` só quando ligada.
+- Header/Content/Footer com `p-6`.
 
-**Telas administrativas existentes**
-- `src/page-views/Settings.tsx` (já em contexto)
-- `src/components/settings/*` (UserManagement, WorkspaceSettings, etc.)
-- `src/page-views/ArchivedSpaces.tsx`, `src/page-views/Automations.tsx`
-- Estrutura de rotas em `src/routes/_authenticated/`
-- Shell: `src/components/AppSidebar.tsx`, `src/components/MobileHeader.tsx`
+Atualizar `src/components/ui/button.tsx`:
+- `rounded-[var(--radius)]`, `active:scale-[.98]`.
+- Variantes: `default`/`primary` = `bg-primary text-primary-foreground shadow-sm hover:bg-primary/90`; `brand` (nova) = `bg-brand text-brand-foreground shadow-sm hover:bg-brand/90`; `secondary`, `outline`, `ghost`, `destructive`, `link` = padrão shadcn lendo tokens.
+- Tamanhos: `sm` h-8, `md` h-10 (default), `lg` h-[46px], `icon` h-10 w-10.
 
-**Leitura de dados server-only (ponto crítico)**
-- Edge Functions relevantes: `supabase/functions/get-user-emails/index.ts`, `reset-user-password/index.ts`, `add-user-with-invite/index.ts`, `update-user-email/index.ts`, `migrate-helper/index.ts`
-- Consumo no front: `src/hooks/useAllProfiles.ts`, `src/hooks/useWorkspaceMembers.ts`, componentes em `src/components/settings/UserManagement.tsx`
-- Padrão de invocação: `supabase.functions.invoke(...)` (visto em `AuthContext` e `useSessionGuard`)
-- Confirmar que TanStack `createServerFn` **não** é usado para admin (padrão do projeto é Edge Function)
-- `src/integrations/supabase/client.server.ts` e `auth-middleware.ts` — existem mas checar se são efetivamente usados
+Nota de compatibilidade: como o resto do código hoje usa utilitários shadcn semânticos (`bg-background`, `text-foreground`, `bg-primary`, `bg-sidebar`, etc.) que passam a resolver via OKLCH pelo novo `@theme inline`, a troca é transparente para os componentes atuais. Tokens legados (`--primary-hover`, `--status-todo`, `--priority-*`) serão mapeados na Etapa 3.
 
-**Componentes de UI**
-- `components.json` (shadcn new-york, lucide) — já em contexto
-- `src/components/ui/*` — listar componentes de tabela/dialog/toast disponíveis
-- Uso real de tabela: procurar em `src/components/settings/UserManagement.tsx`, `src/components/dashboards/DashboardsTable.tsx`, `src/components/documents/DocsHub/DocsHubTable.tsx`
-- Toast: `sonner` (visto em AuthContext)
-- Estados vazio/loading/erro: padrões em hooks com react-query
+### Etapa 2 — Sidebar alinhada ao arquétipo (Prompt 2)
 
-**Convenções**
-- Nomenclatura: `page-views/` para páginas, `routes/` para roteamento, `hooks/use*`, `components/<dominio>/`
-- Idioma: PT-BR em UI (visto em Settings.tsx), inglês em código
-- Datas: procurar `src/lib/dateUtils.ts` e uso de `date-fns` no `package.json`
+Refazer `src/components/AppSidebar.tsx` mantendo TODAS as rotas atuais (Home, Chat, Everything, Documents, Dashboards, Spaces, Lists, Automations, Teams, Workspaces, Archived Spaces, Settings, etc.):
+- **Topo**: marca "MAP Flow" = ponto âmbar (`bg-brand`) + wordmark em `font-display` (Sora) + tag discreta "MAP" em `text-muted-foreground`.
+- **Navegação agrupada** com labels eyebrow (`text-[13px] text-muted-foreground uppercase tracking-wide`). Agrupamento sugerido: **Trabalho** (Home, Chat, Everything, My Tasks) · **Organização** (Spaces, Lists, Folders, Archived Spaces) · **Conhecimento** (Documents, Dashboards) · **Automação** (Automations, Webhooks) · **Administração** (Teams, Workspaces, Settings).
+- **Item ativo**: ícone e indicador em `text-brand` (barra fina à esquerda `bg-brand`), fundo `bg-sidebar-accent` sutil.
+- **Rodapé**: avatar + nome + papel do usuário + botão de recolher.
+- **Responsivo**: colapsa para só-ícones em md; drawer no mobile (já existe `MobileHeader` com hambúrguer).
+- **Header de conteúdo**: introduzir um `PageHeader` reutilizável (`h3` de título + slot para ações/avatar à direita) e adotá-lo nas páginas principais (`HomePage`, `Documents`, `Dashboards`, `Spaces`, `Everything`, `Settings`). Páginas não migradas continuam funcionando.
 
-## Estrutura do arquivo `docs/PADROES-TELAS-ADMIN-MAPFLOW.md`
+Sem cores hardcoded — apenas tokens `--sidebar-*` e `--brand`.
 
-1. **Proteção de rota**
-   - Camadas: `_authenticated/route.tsx` (autenticação) → `WorkspaceRequiredGuard` → `AdminRoute` (papel)
-   - Papéis globais (`user_roles`: `global_owner`, `owner`, `admin`) e de workspace (`workspace_members.role`: `admin`, `member`, `limited_member`, `guest`)
-   - Hook `useUserRole` como fonte única; hook `useAppRole` para papel Hub (role_slug)
-   - Exemplo: `src/routes/_authenticated/settings.tsx` embrulhado em `<AdminRoute>`
+### Etapa 3 — Retrofit de cores (Prompt 3)
 
-2. **Telas administrativas existentes**
-   - `Settings` (perfil, workspace, usuários, status, tags, templates, automações, produtividade, notificações, webhooks, API) via Tabs
-   - `ArchivedSpaces`, `Automations`
-   - Shell: `_authenticated/route.tsx` com `SidebarProvider` + `AppSidebar` + `MobileHeader`
-   - Registro de rota nova: criar arquivo em `src/routes/_authenticated/<nome>.tsx` com `createFileRoute` + wrapper `<AdminRoute>`; router gera `routeTree.gen.ts`
+Passada incremental sobre o app:
+1. Substituir cores hardcoded (`text-white`, `bg-black`, `text-gray-*`, `bg-gray-*`, `border-gray-*`, `bg-[#...]`) por tokens semânticos (`bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`, `border-border`, `bg-primary`, `bg-brand`). Percorrer `src/page-views/**`, `src/components/**`, `src/routes/**`.
+2. Cards com destaque passam a usar `<Card elevated>` em vez de shadow inline.
+3. **Preservar significado semântico**:
+   - Statuses de task/fluxo hoje em `--status-todo/progress/review/done` → mapear para `--status-neutral/info/warning/success`.
+   - Prioridades `--priority-low/medium/high/urgent` → `--status-neutral/warning/warning/danger` (mantendo escala visual).
+   - Manter os aliases legados no `:root` apontando para os novos tokens (`--status-todo: var(--status-neutral)` etc.) para não quebrar componentes que ainda referenciam os antigos.
+4. Estados vazios: adotar moldura "em construção/convite" (card com ícone + título h4 + descrição muted + CTA), em vez de tela branca. Aplicar nas telas que hoje mostram lista vazia sem tratamento.
 
-3. **Leitura de dados server-only** (seção principal)
-   - Padrão: Supabase Edge Function com `SUPABASE_SERVICE_ROLE_KEY`, chamada via `supabase.functions.invoke('<nome>', { body })`
-   - Autorização: função valida JWT do chamador e checa papel via `has_role` ou consulta a `user_roles`
-   - Exemplo completo: `get-user-emails` (server) + consumo em `UserManagement` / hook correspondente
-   - `createServerFn` do TanStack: não é o padrão adotado para admin neste projeto (declarar explicitamente)
+Execução incremental com typecheck após cada bloco. Ao final, relatar a lista de arquivos tocados.
 
-4. **Componentes de UI**
-   - shadcn/ui new-york + lucide-react + sonner (toast) + `@tanstack/react-query`
-   - Tabela: padrão usado em `UserManagement` / `DocsHubTable` / `DashboardsTable` (documentar qual)
-   - Estados: `isLoading` do react-query → skeleton/spinner; erro → toast; vazio → mensagem inline
+### Fora do escopo
+- Sincronização automática do molde (passo 5 do documento) — só depois que os 4 apps estiverem no mesmo ponto.
+- Alterações em backend, RLS, Edge Functions, SSO ou integrações.
 
-5. **Convenções**
-   - Arquivos: `page-views/Xxx.tsx`, `routes/_authenticated/xxx.tsx`, `hooks/useXxx.ts`, `components/<dominio>/Xxx.tsx`
-   - Idioma: rótulos em português; nomes de código em inglês
-   - Datas: `date-fns` com locale pt-BR (confirmar em `src/lib/dateUtils.ts`)
-
-## Detalhes técnicos
-
-- Cada seção incluirá 1-2 trechos de código curtos (5-15 linhas) com caminho do arquivo
-- Onde algo não existir (ex.: breadcrumb global), escrever "não existe"
-- Nenhuma sugestão de melhoria; apenas descrição do estado atual
-- Entrega: mensagem final apenas confirmando criação do arquivo e listando os 5 títulos de seção
+### Verificação
+- Build/typecheck após cada etapa.
+- Screenshot do MAP Flow (login pós-SSO, Home, Documents, Sidebar recolhida, dark mode) para comparar com o Hub — o documento pede um print pareado após a Etapa 1.
