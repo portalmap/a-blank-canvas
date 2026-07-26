@@ -1,34 +1,22 @@
-## Contexto verificado
+## Diagnóstico
 
-- Workspace único: `8405df05-33a9-4f4e-a23a-8a84bc75d694` (TESTE HUB)
-- Lista única com space preenchido: `8c066634-f5a9-4f27-af8f-94340ed0a9d3` (Lista teste) → space `a787fb85-bffd-476d-a6d9-94b9fa5b5a8a` (Comunicação HUB)
-- `task_tags` está vazia → não existe tag parecida com "enviar cliente", pode criar sem risco de duplicata
-- Status válido: `0db5cca8-d80c-4dcc-becd-e51259898f5c` (To Do, default do workspace)
-- `task_attachments` está vazia; padrão de path usado pelo app: `{user_id}/{task_id}/{timestamp}_{arquivo}` no bucket `task-attachments` (guarda-se o path relativo, e o hub-inbox converte em signed URL)
-- Criador/uploader: `b7e892cf-ea9e-4d15-86d8-5243bce7034c` (mesmo da tarefa existente)
+A resolução de signed URL **já existe** no `hub-inbox` (`resolveAttachmentUrls` / `resolveTasksAttachments`, replicadas do `api-gateway`) e já é chamada antes do mapeamento. O problema é o comportamento de fallback:
 
-## O que será feito
+```ts
+if (signed[i]?.signedUrl) a.file_url = signed[i].signedUrl;
+```
 
-Uma única execução de inserção de dados (sem migration, sem alteração de schema, funções ou edge functions):
+Quando o Storage não consegue assinar um item — que é exatamente o caso do anexo de teste, cujo objeto não existe fisicamente no bucket privado `task-attachments` — `createSignedUrls` devolve aquele item com `error` e `signedUrl: null`. O código então **mantém o path original**, que é o que aparece hoje em `"url"`.
 
-1. `task_tags`: criar "enviar cliente" no workspace TESTE HUB
-2. `tasks`: criar a tarefa
-   - title: `TESTE RELAY — Post carrossel`
-   - description: HTML no formato Tiptap usado pelo editor (ex.: `<h2>…</h2><p>…</p><ul><li>…</li></ul>`)
-   - list_id / workspace_id / status_id conforme acima, priority `medium`, start_date hoje, due_date +7 dias
-   - parent_id null, archived_at null
-3. `task_tag_relations`: vincular a tarefa à tag
-4. `task_attachments`: um registro
-   - file_name `briefing-teste.pdf`
-   - file_url `b7e892cf-ea9e-4d15-86d8-5243bce7034c/{task_id}/1769000000000_briefing-teste.pdf`
-   - file_type `application/pdf`, file_size `284512`
-   - sem arquivo real no storage (o objetivo é só validar que a signed URL é gerada)
+## Correção (somente `supabase/functions/hub-inbox/index.ts`)
 
-Nenhuma escrita em `task_activities` e nenhum webhook disparado manualmente.
+1. Em `resolveAttachmentUrls`, trocar o fallback silencioso: para cada anexo cujo path não pôde ser assinado, definir `file_url = null` em vez de manter o path.
+2. Cobrir também a falha global (erro na chamada `createSignedUrls`): nesse caso todos os itens não resolvidos ficam com `url: null`, sem lançar exceção — a resposta continua íntegra.
+3. Registrar no console apenas a contagem de falhas e a mensagem de erro do Storage, **sem** paths, ids de tarefa ou nomes de arquivo.
+4. TTL segue o mesmo do projeto: `3888000` segundos (45 dias).
+5. `api-gateway` não é tocado; `list_name`, `space_name`, `description` e o restante do payload permanecem idênticos.
+6. Fazer o deploy da função `hub-inbox`.
 
-## Entrega
+## Observação importante sobre o teste
 
-Ao final devolvo o id da tarefa, o list_id, o workspace_id e o resultado da consulta de conferência (lista + space via tag "enviar cliente").
-
-### Observação técnica
-`task_tag_relations` e `task_attachments` precisam do id da tarefa; o SQL usará CTEs encadeadas (`with nova_tarefa as (insert … returning id)`) para inserir tudo numa só execução.
+Como o arquivo `briefing-teste.pdf` não existe de fato no bucket, o retorno correto após a correção será `"url": null` — não uma URL `https://`. Isso confirma que o caminho de assinatura está sendo acionado, mas para ver uma URL `https://` de verdade é preciso um anexo com objeto real no Storage. Se você quiser validar o formato `https://`, posso na sequência subir um PDF de teste real no bucket no mesmo path (basta pedir).
