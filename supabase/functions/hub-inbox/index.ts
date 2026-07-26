@@ -78,10 +78,19 @@ async function resolveAttachmentUrls(supabase: any, attachments: any[]) {
 
   let failures = 0;
   toResolve.forEach((a: any, i: number) => {
-    const url = signed?.[i]?.signedUrl;
+    const item = signed?.[i];
+    const url = item?.signedUrl;
     if (url) {
       a.file_url = url;
     } else {
+      // TEMPORARIO (diagnostico): mensagem de erro do storage + path, sem dados de tarefa
+      console.error(
+        "signed url item failed:",
+        JSON.stringify({
+          path: a.file_url,
+          error: item?.error ?? "no_item_returned",
+        }),
+      );
       // Nunca devolver o path do bucket: sem signed URL, o campo vira null.
       a.file_url = null;
       failures++;
