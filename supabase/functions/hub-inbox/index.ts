@@ -50,6 +50,134 @@ function timingSafeEqualStr(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// Helper replicado do api-gateway (edge functions nao compartilham modulos):
+// resolve paths do bucket task-attachments em signed URLs.
+async function resolveAttachmentUrls(supabase: any, attachments: any[]) {
+  if (!attachments?.length) return attachments;
+  const toResolve = attachments.filter(
+    (a: any) => a.file_url && !a.file_url.startsWith("http"),
+  );
+  if (toResolve.length === 0) return attachments;
+
+  const paths = toResolve.map((a: any) => a.file_url);
+  const { data: signed } = await supabase.storage
+    .from("task-attachments")
+    .createSignedUrls(paths, 3888000);
+
+  if (signed) {
+    toResolve.forEach((a: any, i: number) => {
+      if (signed[i]?.signedUrl) a.file_url = signed[i].signedUrl;
+    });
+  }
+  return attachments;
+}
+
+async function resolveTasksAttachments(supabase: any, tasks: any[]) {
+  if (!tasks?.length) return tasks;
+  for (const task of tasks) {
+    if (task.task_attachments?.length) {
+      await resolveAttachmentUrls(supabase, task.task_attachments);
+    }
+  }
+  return tasks;
+}
+
+const TAG_APROVACAO = "enviar cliente";
+
+async function handleListarParaAprovacao(
+  admin: any,
+  modo: string | null,
+  payload: unknown,
+  origin: string | null,
+) {
+  if (modo !== "consulta") {
+    return json({ error: "modo_nao_suportado" }, 422, origin);
+  }
+
+  const raw = (payload ?? {}) as Record<string, unknown>;
+  const listIds = Array.isArray(raw.list_ids)
+    ? (raw.list_ids as unknown[]).filter((v): v is string => typeof v === "string" && v.length > 0)
+    : [];
+  if (listIds.length === 0) {
+    return json({ error: "list_ids_obrigatorio" }, 422, origin);
+  }
+
+  try {
+    // 1. Workspace a partir das listas
+    const { data: lists, error: listsError } = await admin
+      .from("lists")
+      .select("id, workspace_id")
+      .in("id", listIds);
+    if (listsError) throw listsError;
+    if (!lists || lists.length === 0) return json({ tarefas: [] }, 200, origin);
+
+    const workspaces = [...new Set(lists.map((l: any) => l.workspace_id))];
+    if (workspaces.length > 1) {
+      return json({ error: "listas_de_workspaces_distintos" }, 422, origin);
+    }
+    const ws = workspaces[0];
+
+    // 2. Tag no workspace
+    const { data: tag, error: tagError } = await admin
+      .from("task_tags")
+      .select("id")
+      .eq("workspace_id", ws)
+      .ilike("name", TAG_APROVACAO)
+      .maybeSingle();
+    if (tagError) throw tagError;
+    if (!tag) return json({ tarefas: [] }, 200, origin);
+
+    // 3. Relacoes tag -> tarefa
+    const { data: relations, error: relError } = await admin
+      .from("task_tag_relations")
+      .select("task_id")
+      .eq("tag_id", tag.id);
+    if (relError) throw relError;
+    const taskIds = (relations ?? []).map((r: any) => r.task_id);
+    if (taskIds.length === 0) return json({ tarefas: [] }, 200, origin);
+
+    // 4. Filtro combinado: tag E conjunto de listas
+    const { data: tasks, error: tasksError } = await admin
+      .from("tasks")
+      .select(`
+        id, title, description,
+        lists!inner(workspace_id, name, space_id, space:spaces(id, name)),
+        task_attachments(id, file_url, file_name, file_type, file_size)
+      `)
+      .in("id", taskIds)
+      .in("list_id", listIds)
+      .eq("lists.workspace_id", ws)
+      .is("parent_id", null)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false });
+    if (tasksError) throw tasksError;
+
+    // 5. Resolver anexos (path -> signed URL)
+    await resolveTasksAttachments(admin, tasks ?? []);
+
+    const tarefas = (tasks ?? []).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      list_name: t.lists?.name ?? null,
+      space_name: t.lists?.space?.name ?? null,
+      attachments: (t.task_attachments ?? []).map((a: any) => ({
+        id: a.id,
+        url: a.file_url,
+        title: a.file_name,
+      })),
+    }));
+
+    return json({ tarefas }, 200, origin);
+  } catch (e) {
+    console.error(
+      "tarefa.listar_para_aprovacao query failed",
+      e instanceof Error ? e.message : String(e),
+    );
+    return json({ error: "erro_consulta" }, 500, origin);
+  }
+}
+
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
 
@@ -105,6 +233,10 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("relay_diagnostico_log insert (recebido) failed", e);
+  }
+
+  if (assunto === "tarefa.listar_para_aprovacao") {
+    return await handleListarParaAprovacao(admin, modo, payload, origin);
   }
 
   if (assunto !== "diagnostico.ping") {
