@@ -1,22 +1,24 @@
-## Diagnóstico
+## Objetivo
 
-A resolução de signed URL **já existe** no `hub-inbox` (`resolveAttachmentUrls` / `resolveTasksAttachments`, replicadas do `api-gateway`) e já é chamada antes do mapeamento. O problema é o comportamento de fallback:
+Validar a geração de signed URL no `hub-inbox` com um arquivo real e remover o log temporário de diagnóstico.
 
-```ts
-if (signed[i]?.signedUrl) a.file_url = signed[i].signedUrl;
-```
+## Passos
 
-Quando o Storage não consegue assinar um item — que é exatamente o caso do anexo de teste, cujo objeto não existe fisicamente no bucket privado `task-attachments` — `createSignedUrls` devolve aquele item com `error` e `signedUrl: null`. O código então **mantém o path original**, que é o que aparece hoje em `"url"`.
+1. **Subir PDF mínimo no Storage**
+   - Gerar localmente um PDF válido mínimo (poucos bytes, 1 página em branco).
+   - Fazer upload no bucket privado `task-attachments`, exatamente no path:
+     `b7e892cf-ea9e-4d15-86d8-5243bce7034c/574e7766-db46-4acf-8523-4c6e67134d8f/1769000000000_briefing-teste.pdf`
+   - Confirmar via consulta a `storage.objects` que o objeto passou a existir.
 
-## Correção (somente `supabase/functions/hub-inbox/index.ts`)
+2. **Validar a resolução**
+   - Chamar o `hub-inbox` com `assunto: "tarefa.listar_para_aprovacao"`, `modo: "consulta"` e `list_ids: ["8c066634-f5a9-4f27-af8f-94340ed0a9d3"]`.
+   - Confirmar que `attachments[0].url` começa com `https://` (TTL de 45 dias mantido).
 
-1. Em `resolveAttachmentUrls`, trocar o fallback silencioso: para cada anexo cujo path não pôde ser assinado, definir `file_url = null` em vez de manter o path.
-2. Cobrir também a falha global (erro na chamada `createSignedUrls`): nesse caso todos os itens não resolvidos ficam com `url: null`, sem lançar exceção — a resposta continua íntegra.
-3. Registrar no console apenas a contagem de falhas e a mensagem de erro do Storage, **sem** paths, ids de tarefa ou nomes de arquivo.
-4. TTL segue o mesmo do projeto: `3888000` segundos (45 dias).
-5. `api-gateway` não é tocado; `list_name`, `space_name`, `description` e o restante do payload permanecem idênticos.
-6. Fazer o deploy da função `hub-inbox`.
+3. **Remover o log temporário**
+   - Em `supabase/functions/hub-inbox/index.ts`, remover o `console.error("signed url item failed: …")` que expõe o path (bloco marcado como `TEMPORARIO (diagnostico)`).
+   - Manter o comportamento atual: `file_url = null` quando não houver signed URL, e o log agregado apenas com a contagem de falhas.
+   - Fazer novo deploy da função `hub-inbox`.
 
-## Observação importante sobre o teste
+## Fora de escopo
 
-Como o arquivo `briefing-teste.pdf` não existe de fato no bucket, o retorno correto após a correção será `"url": null` — não uma URL `https://`. Isso confirma que o caminho de assinatura está sendo acionado, mas para ver uma URL `https://` de verdade é preciso um anexo com objeto real no Storage. Se você quiser validar o formato `https://`, posso na sequência subir um PDF de teste real no bucket no mesmo path (basta pedir).
+Nenhuma mudança de lógica de resolução, TTL, formato de resposta, `api-gateway` ou schema.
