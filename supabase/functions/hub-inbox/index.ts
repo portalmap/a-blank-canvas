@@ -60,14 +60,35 @@ async function resolveAttachmentUrls(supabase: any, attachments: any[]) {
   if (toResolve.length === 0) return attachments;
 
   const paths = toResolve.map((a: any) => a.file_url);
-  const { data: signed } = await supabase.storage
-    .from("task-attachments")
-    .createSignedUrls(paths, 3888000);
+  let signed: any[] | null = null;
+  try {
+    const res = await supabase.storage
+      .from("task-attachments")
+      .createSignedUrls(paths, 3888000);
+    if (res.error) {
+      console.error("signed url batch failed:", res.error.message);
+    }
+    signed = res.data ?? null;
+  } catch (e) {
+    console.error(
+      "signed url batch threw:",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
 
-  if (signed) {
-    toResolve.forEach((a: any, i: number) => {
-      if (signed[i]?.signedUrl) a.file_url = signed[i].signedUrl;
-    });
+  let failures = 0;
+  toResolve.forEach((a: any, i: number) => {
+    const url = signed?.[i]?.signedUrl;
+    if (url) {
+      a.file_url = url;
+    } else {
+      // Nunca devolver o path do bucket: sem signed URL, o campo vira null.
+      a.file_url = null;
+      failures++;
+    }
+  });
+  if (failures > 0) {
+    console.error(`signed url unresolved for ${failures} attachment(s)`);
   }
   return attachments;
 }
