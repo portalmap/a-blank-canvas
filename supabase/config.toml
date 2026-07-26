@@ -14,6 +14,3 @@ verify_jwt = false
 
 [functions.relay-test-send]
 verify_jwt = false
-
-[functions.tmp-storage-seed]
-verify_jwt = false
