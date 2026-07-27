@@ -184,7 +184,7 @@ async function handleListarParaAprovacao(
       list_name: t.lists?.name ?? null,
       space_name: t.lists?.space?.name ?? null,
       attachments: (t.task_attachments ?? []).map((a: any) => ({
-        id: a.id,
+        attachment_id: a.id,
         url: a.file_url,
         title: a.file_name,
       })),
