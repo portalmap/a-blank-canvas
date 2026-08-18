@@ -1,30 +1,32 @@
-# Sincronização do perfil vindo do SSO do MAP Hub
+# Fechar os pontos que faltaram na sincronização de avatar (SSO Hub)
 
-Objetivo: ao voltar do Hub, além de criar a sessão, o MAP Flow passa a gravar nome, e-mail e uma **cópia local da foto** do usuário — sem nunca bloquear o login se algo falhar.
+A maior parte já está no ar: colunas `hub_user_id`, `avatar_path`, `avatar_origem` em `profiles`, políticas do bucket `avatars` por dono da pasta ou admin, e a sincronização isolada (try/catch) dentro do resgate do code no SSO, que respeita `avatar_origem = 'local'` e não apaga foto quando `avatar_path` vem nulo.
 
-## O que muda
+O que ainda falta, conforme o prompt completo:
 
-1. **Banco (migration)** — a tabela `profiles` ganha:
-   - `hub_user_id text unique` (identificador do usuário no Hub)
-   - `avatar_path text` (o caminho recebido do Hub, usado para comparar entre logins)
-   - `avatar_url` já existe (passa a guardar a URL da cópia local)
-   - Bucket de storage `avatars` (público para leitura, escrita só pelo backend), criado só se ainda não existir.
+## 1. Precedência do upload de admin (correção real)
 
-2. **Edge function `sso-exchange`** (único ponto onde o `client_secret` é usado; nada disso vai para o navegador):
-   - Após o resgate do código no Hub, o upsert do perfil passa a gravar também `hub_user_id`, e o `nome` do Hub é aceito tanto em `name` quanto em `nome`.
-   - **Nunca sobrescreve com vazio**: só inclui no upsert os campos que vieram preenchidos.
-   - **Foto**: se for o primeiro login ou se `avatar_path` mudou em relação ao salvo:
-     - baixa a imagem de `avatar_url` (URL assinada, temporária) via `fetch`;
-     - envia para o bucket `avatars` em `<id_local>/avatar.<ext>` com `upsert: true` (extensão derivada do content-type);
-     - grava no perfil a URL pública da cópia local em `avatar_url` e salva `avatar_path` para comparação futura.
-   - Se o download ou o upload falhar: apenas `console.error`, mantém a foto anterior e o login continua.
-   - Toda a sincronização de perfil/foto é não-fatal: nenhuma falha impede a emissão do token de sessão.
+Quando um admin troca a foto de outro usuário, a marcação `avatar_origem = 'local'` hoje é feita por um `update` direto em `profiles`, que depende de política de RLS de admin nessa tabela. Se ela não permitir, a origem continua `hub` e o Hub sobrescreve a foto no próximo login — exatamente o que a regra de precedência proíbe.
 
-3. **Front-end**: nenhuma mudança de fluxo. O callback continua recebendo apenas `email` + `token_hash` — a resposta crua do Hub nunca é exposta.
+Ajuste: a RPC de admin passa a gravar, na mesma chamada, `avatar_url`, `avatar_path = null` e `avatar_origem = 'local'`, de forma atômica e sem depender de RLS.
+
+## 2. Hook único de leitura do avatar
+
+Existe `useProfile` (lê `avatar_url`, `avatar_path`, `avatar_origem`), mas as telas de perfil/edição ainda recebem a URL por prop de outras consultas. Padronizar essas duas telas para consumir o hook único, mantendo os hooks de listagem (membros, responsáveis) como estão — eles só listam avatares de terceiros.
+
+## 3. Fallback com iniciais garantido
+
+Criar um componente único de exibição (`UserAvatar`) que sempre renderiza `AvatarFallback` com as iniciais do nome quando a URL falha ou está vazia, e usá-lo nas telas de perfil e edição de usuário. Assim uma URL assinada quebrada nunca deixa um círculo vazio.
+
+## 4. Conferência final
+
+- Confirmar que o bucket `avatars` está privado.
+- Confirmar limite de 2 MB e tipos PNG/JPG/WEBP no upload local (já aplicado) e validade longa da URL assinada local.
 
 ## Detalhes técnicos
 
-- Ordem no handler: redeem no Hub → resolver/criar usuário → upsert de perfil (campos preenchidos + `hub_user_id`) → sync de papel (já existe) → sincronização de avatar (bloco try/catch isolado, com update final só de `avatar_url`/`avatar_path`) → `generateLink` → `session_context`.
-- A comparação usa `avatar_path`; quando o Hub não manda `avatar_path`, cai para hash/compare do próprio `avatar_url` sem extensão de assinatura.
-- Limite de tamanho no download (ex.: 5 MB) e validação de `content-type` `image/*` antes de subir ao storage.
-- `hub_user_id` recebe índice único parcial (ignora nulos) para não conflitar com perfis antigos.
+- Migration: `create or replace function public.update_user_avatar_as_admin(target_user_id uuid, new_avatar_url text)` gravando também `avatar_origem = 'local'` e `avatar_path = null`, mantendo `security definer`, `set search_path = public` e a checagem de admin existente.
+- `src/components/settings/AvatarUpload.tsx`: remover o `update` best-effort de `avatar_origem` no caminho admin (a RPC passa a cuidar disso).
+- Novo `src/components/ui/user-avatar.tsx`: `Avatar` + `AvatarImage` + `AvatarFallback` com iniciais.
+- `src/components/settings/UserProfile.tsx` e `UserEditDialog.tsx`: usar `useProfile` e `UserAvatar`.
+- Nenhuma mudança no `sso-exchange` além do que já está publicado.
