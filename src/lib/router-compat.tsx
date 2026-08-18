@@ -98,7 +98,7 @@ export function useNavigate() {
 }
 
 export function useParams<T extends Record<string, string | undefined> = Record<string, string | undefined>>(): T {
-  return useTSRParams({ strict: false }) as T;
+  return (useTSRParams as any)({ strict: false }) as T;
 }
 
 export function useLocation() {
