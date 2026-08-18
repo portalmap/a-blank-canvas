@@ -17,9 +17,10 @@ interface AvatarUploadProps {
   onChange?: (newUrl: string | null) => void;
 }
 
-const MAX_SIZE = 3 * 1024 * 1024; // 3 MB
+const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_DIMENSION = 1024;
+const TEN_YEARS = 60 * 60 * 24 * 365 * 10;
 
 async function resizeImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
@@ -65,10 +66,15 @@ export function AvatarUpload({
         new_avatar_url: avatarUrl,
       });
       if (error) throw error;
+      // Marca a origem como local (best-effort: depende de permissão de admin).
+      await supabase
+        .from("profiles")
+        .update({ avatar_origem: "local" })
+        .eq("id", userId);
     } else {
       const { error } = await supabase
         .from("profiles")
-        .update({ avatar_url: avatarUrl })
+        .update({ avatar_url: avatarUrl, avatar_origem: "local" })
         .eq("id", userId);
       if (error) throw error;
     }
@@ -86,26 +92,30 @@ export function AvatarUpload({
       return;
     }
     if (file.size > MAX_SIZE) {
-      toast.error("A imagem deve ter no máximo 3 MB.");
+      toast.error("A imagem deve ter no máximo 2 MB.");
       return;
     }
     setUploading(true);
     try {
       const blob = await resizeImage(file);
       const ext = blob.type === "image/jpeg" ? "jpg" : blob.type.split("/")[1];
-      const path = `${userId}/avatar-${Date.now()}.${ext}`;
+      const path = `${userId}/${Date.now()}.${ext}`;
 
       const { error: upErr } = await supabase.storage
         .from("avatars")
         .upload(path, blob, { upsert: true, contentType: blob.type });
       if (upErr) throw upErr;
 
-      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-      const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+      // Bucket privado: usa URL assinada de validade longa.
+      const { data: signed, error: signErr } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(path, TEN_YEARS);
+      if (signErr || !signed?.signedUrl) throw signErr ?? new Error("Falha ao assinar URL");
 
-      await updateProfile(publicUrl);
-      setPreviewUrl(publicUrl);
-      onChange?.(publicUrl);
+      const url = signed.signedUrl;
+      await updateProfile(url);
+      setPreviewUrl(url);
+      onChange?.(url);
       invalidate();
       toast.success("Foto atualizada!");
     } catch (e: any) {
