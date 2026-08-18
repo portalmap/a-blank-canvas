@@ -61,6 +61,7 @@ export function UserEditDialog({
 }: UserEditDialogProps) {
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState(user.fullName);
+  const { data: profile } = useProfile(open ? user.id : null);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone || "");
   const [bio, setBio] = useState(user.bio || "");
@@ -253,7 +254,7 @@ export function UserEditDialog({
           <div className="flex justify-center">
             <AvatarUpload
               userId={user.id}
-              currentUrl={user.avatarUrl}
+              currentUrl={profile?.avatar_url ?? user.avatarUrl}
               fullName={fullName}
               size={80}
               useAdminRpc={user.id !== currentUserId}
