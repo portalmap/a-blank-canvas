@@ -14,7 +14,6 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as SsoLoginRouteImport } from './routes/sso.login'
 import { Route as SsoCallbackRouteImport } from './routes/sso.callback'
-import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
 import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces'
 import { Route as AuthenticatedTeamsRouteImport } from './routes/_authenticated/teams'
 import { Route as AuthenticatedSpacesRouteImport } from './routes/_authenticated/spaces'
@@ -54,11 +53,6 @@ const SsoLoginRoute = SsoLoginRouteImport.update({
 const SsoCallbackRoute = SsoCallbackRouteImport.update({
   id: '/sso/callback',
   path: '/sso/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
-  id: '/accept-invite/$token',
-  path: '/accept-invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedWorkspacesRoute = AuthenticatedWorkspacesRouteImport.update({
@@ -161,7 +155,6 @@ export interface FileRoutesByFullPath {
   '/spaces': typeof AuthenticatedSpacesRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
-  '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/sso/callback': typeof SsoCallbackRoute
   '/sso/login': typeof SsoLoginRoute
   '/dashboards/$id': typeof AuthenticatedDashboardsIdRoute
@@ -183,7 +176,6 @@ export interface FileRoutesByTo {
   '/spaces': typeof AuthenticatedSpacesRoute
   '/teams': typeof AuthenticatedTeamsRoute
   '/workspaces': typeof AuthenticatedWorkspacesRoute
-  '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/sso/callback': typeof SsoCallbackRoute
   '/sso/login': typeof SsoLoginRoute
   '/': typeof AuthenticatedIndexRoute
@@ -208,7 +200,6 @@ export interface FileRoutesById {
   '/_authenticated/spaces': typeof AuthenticatedSpacesRoute
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRoute
-  '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/sso/callback': typeof SsoCallbackRoute
   '/sso/login': typeof SsoLoginRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -234,7 +225,6 @@ export interface FileRouteTypes {
     | '/spaces'
     | '/teams'
     | '/workspaces'
-    | '/accept-invite/$token'
     | '/sso/callback'
     | '/sso/login'
     | '/dashboards/$id'
@@ -256,7 +246,6 @@ export interface FileRouteTypes {
     | '/spaces'
     | '/teams'
     | '/workspaces'
-    | '/accept-invite/$token'
     | '/sso/callback'
     | '/sso/login'
     | '/'
@@ -280,7 +269,6 @@ export interface FileRouteTypes {
     | '/_authenticated/spaces'
     | '/_authenticated/teams'
     | '/_authenticated/workspaces'
-    | '/accept-invite/$token'
     | '/sso/callback'
     | '/sso/login'
     | '/_authenticated/'
@@ -295,7 +283,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   SignedOutRoute: typeof SignedOutRoute
-  AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
   SsoCallbackRoute: typeof SsoCallbackRoute
   SsoLoginRoute: typeof SsoLoginRoute
 }
@@ -335,13 +322,6 @@ declare module '@tanstack/react-router' {
       path: '/sso/callback'
       fullPath: '/sso/callback'
       preLoaderRoute: typeof SsoCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/accept-invite/$token': {
-      id: '/accept-invite/$token'
-      path: '/accept-invite/$token'
-      fullPath: '/accept-invite/$token'
-      preLoaderRoute: typeof AcceptInviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/workspaces': {
@@ -529,7 +509,6 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   SignedOutRoute: SignedOutRoute,
-  AcceptInviteTokenRoute: AcceptInviteTokenRoute,
   SsoCallbackRoute: SsoCallbackRoute,
   SsoLoginRoute: SsoLoginRoute,
 }
