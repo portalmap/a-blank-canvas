@@ -158,7 +158,14 @@ Deno.serve(async (req) => {
   }
 
   let payload: {
-    user?: { id?: string; email?: string; name?: string; avatar_url?: string };
+    user?: {
+      id?: string;
+      email?: string;
+      name?: string;
+      nome?: string;
+      avatar_url?: string;
+      avatar_path?: string | null;
+    };
     role?: string;
     app?: string;
   };
@@ -170,8 +177,11 @@ Deno.serve(async (req) => {
 
   const hubUser = payload.user ?? {};
   const email = (hubUser.email ?? "").trim().toLowerCase();
-  const fullName = (hubUser.name ?? "").trim();
-  const avatarUrl = (hubUser.avatar_url ?? "").trim() || null;
+  const fullName = ((hubUser.nome ?? hubUser.name) ?? "").trim();
+  // Signed Hub URL — valid for only 7 days. Never persist it.
+  const hubAvatarUrl = (hubUser.avatar_url ?? "").trim() || null;
+  const hubAvatarPath = (hubUser.avatar_path ?? "") || null;
+  const hubUserId = (hubUser.id ?? "").trim() || null;
   const role = (payload.role ?? "").trim();
 
   if (!email) return json({ error: "Hub did not return email" }, 502, origin);
@@ -195,7 +205,6 @@ Deno.serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         full_name: fullName || null,
-        avatar_url: avatarUrl,
       },
     });
     if (createErr || !created?.user) {
@@ -215,21 +224,83 @@ Deno.serve(async (req) => {
   }
 
   // 3. Upsert profile (id-based to keep FK happy; email is the natural key).
+  //    Only fields that actually came filled are written — never blank out data.
+  const profilePayload: Record<string, unknown> = {
+    id: existing.id,
+    email,
+    role_slug: role,
+  };
+  if (fullName) profilePayload.full_name = fullName;
+  if (hubUserId) profilePayload.hub_user_id = hubUserId;
+
   const { error: upsertErr } = await admin
     .from("profiles")
-    .upsert(
-      {
-        id: existing.id,
-        email,
-        full_name: fullName || null,
-        avatar_url: avatarUrl,
-        role_slug: role,
-      },
-      { onConflict: "id" },
-    );
+    .upsert(profilePayload, { onConflict: "id" });
   if (upsertErr) {
     console.error("profile upsert failed", upsertErr);
     return json({ error: "Could not upsert profile" }, 500, origin);
+  }
+
+  // 3a. Sincroniza a FOTO do Hub para o storage local (bucket privado "avatars").
+  //     Totalmente isolado: qualquer falha só loga e o login continua.
+  try {
+    if (hubAvatarPath && hubAvatarUrl) {
+      const { data: current } = await admin
+        .from("profiles")
+        .select("avatar_path, avatar_origem")
+        .eq("id", existing.id)
+        .maybeSingle();
+
+      const origem = (current?.avatar_origem as string | null) ?? "hub";
+      const savedPath = (current?.avatar_path as string | null) ?? null;
+
+      if (origem !== "local" && savedPath !== hubAvatarPath) {
+        const resp = await fetch(hubAvatarUrl);
+        if (!resp.ok) throw new Error(`avatar download failed: ${resp.status}`);
+        const contentType = resp.headers.get("content-type") ?? "";
+        if (!contentType.startsWith("image/")) {
+          throw new Error(`avatar not an image: ${contentType}`);
+        }
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        if (bytes.byteLength > 5 * 1024 * 1024) {
+          throw new Error("avatar larger than 5MB");
+        }
+
+        const ext = contentType === "image/png"
+          ? "png"
+          : contentType === "image/webp"
+          ? "webp"
+          : contentType === "image/gif"
+          ? "gif"
+          : "jpg";
+        const localPath = `${existing.id}/${Date.now()}.${ext}`;
+
+        const { error: upErr } = await admin.storage
+          .from("avatars")
+          .upload(localPath, bytes, { contentType, upsert: true });
+        if (upErr) throw upErr;
+
+        const TEN_YEARS = 60 * 60 * 24 * 365 * 10;
+        const { data: signed, error: signErr } = await admin.storage
+          .from("avatars")
+          .createSignedUrl(localPath, TEN_YEARS);
+        if (signErr || !signed?.signedUrl) {
+          throw signErr ?? new Error("could not sign avatar url");
+        }
+
+        const { error: avatarErr } = await admin
+          .from("profiles")
+          .update({
+            avatar_url: signed.signedUrl,
+            avatar_path: hubAvatarPath,
+            avatar_origem: "hub",
+          })
+          .eq("id", existing.id);
+        if (avatarErr) throw avatarErr;
+      }
+    }
+  } catch (e) {
+    console.error("hub avatar sync failed (non-fatal)", e);
   }
 
   // 3b. Sincroniza o papel do Hub para o sistema local de permissões (user_roles).
