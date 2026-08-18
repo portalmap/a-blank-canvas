@@ -1601,12 +1601,15 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_origem: string | null
+          avatar_path: string | null
           avatar_url: string | null
           bio: string | null
           created_at: string
           default_workspace_id: string | null
           email: string | null
           full_name: string | null
+          hub_user_id: string | null
           id: string
           must_change_password: boolean | null
           phone: string | null
@@ -1614,12 +1617,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_origem?: string | null
+          avatar_path?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
           default_workspace_id?: string | null
           email?: string | null
           full_name?: string | null
+          hub_user_id?: string | null
           id: string
           must_change_password?: boolean | null
           phone?: string | null
@@ -1627,12 +1633,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_origem?: string | null
+          avatar_path?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
           default_workspace_id?: string | null
           email?: string | null
           full_name?: string | null
+          hub_user_id?: string | null
           id?: string
           must_change_password?: boolean | null
           phone?: string | null
