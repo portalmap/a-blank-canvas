@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Camera, Loader2, Trash2 } from "lucide-react";
@@ -51,6 +51,10 @@ export function AvatarUpload({
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentUrl || null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setPreviewUrl(currentUrl || null);
+  }, [currentUrl]);
 
   const updateProfile = async (avatarUrl: string | null) => {
     if (useAdminRpc) {
