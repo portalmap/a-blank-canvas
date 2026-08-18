@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AvatarUpload } from "./AvatarUpload";
+import { useProfile } from "@/hooks/useProfile";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +61,7 @@ export function UserEditDialog({
 }: UserEditDialogProps) {
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState(user.fullName);
+  const { data: profile } = useProfile(open ? user.id : null);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone || "");
   const [bio, setBio] = useState(user.bio || "");
@@ -252,7 +254,7 @@ export function UserEditDialog({
           <div className="flex justify-center">
             <AvatarUpload
               userId={user.id}
-              currentUrl={user.avatarUrl}
+              currentUrl={profile?.avatar_url ?? user.avatarUrl}
               fullName={fullName}
               size={80}
               useAdminRpc={user.id !== currentUserId}

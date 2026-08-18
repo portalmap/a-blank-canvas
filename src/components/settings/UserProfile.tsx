@@ -6,29 +6,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { useWorkspaces, useDefaultWorkspace, useSetDefaultWorkspace } from "@/hooks/useWorkspaces";
 import { AvatarUpload } from "./AvatarUpload";
-import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
 export function UserProfile() {
   const { user } = useAuth();
   const [email] = useState(user?.email || "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [fullName, setFullName] = useState<string>("");
+  const { data: profile } = useProfile(user?.id);
+  const fullName = profile?.full_name || user?.email || "";
   const { data: workspaces } = useWorkspaces();
   const { data: defaultWorkspaceId } = useDefaultWorkspace();
   const setDefaultWorkspace = useSetDefaultWorkspace();
 
   useEffect(() => {
-    if (!user?.id) return;
-    supabase
-      .from("profiles")
-      .select("avatar_url, full_name")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setAvatarUrl(data?.avatar_url || null);
-        setFullName(data?.full_name || user.email || "");
-      });
-  }, [user?.id]);
+    setAvatarUrl(profile?.avatar_url ?? null);
+  }, [profile?.avatar_url]);
 
   const handleDefaultWorkspaceChange = (value: string) => {
     setDefaultWorkspace.mutate(value === "__none__" ? null : value);
@@ -53,7 +45,7 @@ export function UserProfile() {
               onChange={(url) => setAvatarUrl(url)}
             />
             <p className="text-xs text-muted-foreground">
-              JPG, PNG ou WEBP — até 3 MB
+              JPG, PNG ou WEBP — até 2 MB
             </p>
           </div>
         )}

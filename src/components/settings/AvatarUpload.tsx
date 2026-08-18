@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { useRef, useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useEffect, useRef, useState } from "react";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,12 +52,9 @@ export function AvatarUpload({
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentUrl || null);
   const queryClient = useQueryClient();
 
-  const initials = fullName
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "?";
+  useEffect(() => {
+    setPreviewUrl(currentUrl || null);
+  }, [currentUrl]);
 
   const updateProfile = async (avatarUrl: string | null) => {
     if (useAdminRpc) {
@@ -66,15 +63,11 @@ export function AvatarUpload({
         new_avatar_url: avatarUrl,
       });
       if (error) throw error;
-      // Marca a origem como local (best-effort: depende de permissão de admin).
-      await supabase
-        .from("profiles")
-        .update({ avatar_origem: "local" })
-        .eq("id", userId);
+      // A RPC já grava avatar_origem = 'local' e limpa avatar_path.
     } else {
       const { error } = await supabase
         .from("profiles")
-        .update({ avatar_url: avatarUrl, avatar_origem: "local" })
+        .update({ avatar_url: avatarUrl, avatar_path: null, avatar_origem: "local" })
         .eq("id", userId);
       if (error) throw error;
     }
@@ -144,10 +137,7 @@ export function AvatarUpload({
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="relative">
-        <Avatar style={{ width: size, height: size }}>
-          <AvatarImage src={previewUrl || undefined} alt={fullName} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+        <UserAvatar url={previewUrl} name={fullName} size={size} />
         {uploading && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/70 rounded-full">
             <Loader2 className="h-6 w-6 animate-spin" />
