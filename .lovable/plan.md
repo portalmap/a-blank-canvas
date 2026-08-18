@@ -1,24 +1,30 @@
-## Objetivo
+# Sincronização do perfil vindo do SSO do MAP Hub
 
-Validar a geração de signed URL no `hub-inbox` com um arquivo real e remover o log temporário de diagnóstico.
+Objetivo: ao voltar do Hub, além de criar a sessão, o MAP Flow passa a gravar nome, e-mail e uma **cópia local da foto** do usuário — sem nunca bloquear o login se algo falhar.
 
-## Passos
+## O que muda
 
-1. **Subir PDF mínimo no Storage**
-   - Gerar localmente um PDF válido mínimo (poucos bytes, 1 página em branco).
-   - Fazer upload no bucket privado `task-attachments`, exatamente no path:
-     `b7e892cf-ea9e-4d15-86d8-5243bce7034c/574e7766-db46-4acf-8523-4c6e67134d8f/1769000000000_briefing-teste.pdf`
-   - Confirmar via consulta a `storage.objects` que o objeto passou a existir.
+1. **Banco (migration)** — a tabela `profiles` ganha:
+   - `hub_user_id text unique` (identificador do usuário no Hub)
+   - `avatar_path text` (o caminho recebido do Hub, usado para comparar entre logins)
+   - `avatar_url` já existe (passa a guardar a URL da cópia local)
+   - Bucket de storage `avatars` (público para leitura, escrita só pelo backend), criado só se ainda não existir.
 
-2. **Validar a resolução**
-   - Chamar o `hub-inbox` com `assunto: "tarefa.listar_para_aprovacao"`, `modo: "consulta"` e `list_ids: ["8c066634-f5a9-4f27-af8f-94340ed0a9d3"]`.
-   - Confirmar que `attachments[0].url` começa com `https://` (TTL de 45 dias mantido).
+2. **Edge function `sso-exchange`** (único ponto onde o `client_secret` é usado; nada disso vai para o navegador):
+   - Após o resgate do código no Hub, o upsert do perfil passa a gravar também `hub_user_id`, e o `nome` do Hub é aceito tanto em `name` quanto em `nome`.
+   - **Nunca sobrescreve com vazio**: só inclui no upsert os campos que vieram preenchidos.
+   - **Foto**: se for o primeiro login ou se `avatar_path` mudou em relação ao salvo:
+     - baixa a imagem de `avatar_url` (URL assinada, temporária) via `fetch`;
+     - envia para o bucket `avatars` em `<id_local>/avatar.<ext>` com `upsert: true` (extensão derivada do content-type);
+     - grava no perfil a URL pública da cópia local em `avatar_url` e salva `avatar_path` para comparação futura.
+   - Se o download ou o upload falhar: apenas `console.error`, mantém a foto anterior e o login continua.
+   - Toda a sincronização de perfil/foto é não-fatal: nenhuma falha impede a emissão do token de sessão.
 
-3. **Remover o log temporário**
-   - Em `supabase/functions/hub-inbox/index.ts`, remover o `console.error("signed url item failed: …")` que expõe o path (bloco marcado como `TEMPORARIO (diagnostico)`).
-   - Manter o comportamento atual: `file_url = null` quando não houver signed URL, e o log agregado apenas com a contagem de falhas.
-   - Fazer novo deploy da função `hub-inbox`.
+3. **Front-end**: nenhuma mudança de fluxo. O callback continua recebendo apenas `email` + `token_hash` — a resposta crua do Hub nunca é exposta.
 
-## Fora de escopo
+## Detalhes técnicos
 
-Nenhuma mudança de lógica de resolução, TTL, formato de resposta, `api-gateway` ou schema.
+- Ordem no handler: redeem no Hub → resolver/criar usuário → upsert de perfil (campos preenchidos + `hub_user_id`) → sync de papel (já existe) → sincronização de avatar (bloco try/catch isolado, com update final só de `avatar_url`/`avatar_path`) → `generateLink` → `session_context`.
+- A comparação usa `avatar_path`; quando o Hub não manda `avatar_path`, cai para hash/compare do próprio `avatar_url` sem extensão de assinatura.
+- Limite de tamanho no download (ex.: 5 MB) e validação de `content-type` `image/*` antes de subir ao storage.
+- `hub_user_id` recebe índice único parcial (ignora nulos) para não conflitar com perfis antigos.
