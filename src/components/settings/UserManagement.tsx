@@ -389,19 +389,18 @@ export function UserManagement() {
                 {isSystemAdmin ? "Visualizando todos os usuários do sistema" : `${filteredMembers.length} usuário(s) encontrado(s)`}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Convidar Usuário
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => setShowAddDialog(true)}
-              >
-                <UserCog className="h-4 w-4 mr-2" />
-                Adicionar Manualmente
-              </Button>
-            </div>
+            {isSystemAdmin && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleBackfillAvatars}
+                  disabled={backfilling}
+                >
+                  <ImageDown className={`h-4 w-4 mr-2 ${backfilling ? "animate-pulse" : ""}`} />
+                  Migrar fotos do Hub
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -512,12 +511,6 @@ export function UserManagement() {
           }}
         />
       )}
-
-      <UserAddDialog
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
-        workspaceId={currentWorkspace?.workspace_id || ''}
-      />
 
       <AlertDialog 
         open={!!deleteConfirmMember} 
