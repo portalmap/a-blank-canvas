@@ -59,8 +59,26 @@ export function UserManagement() {
   const [editUser, setEditUser] = useState<any | null>(null);
   const [detailsUser, setDetailsUser] = useState<any | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<any | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [deleteConfirmMember, setDeleteConfirmMember] = useState<any | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
+  const runBackfill = useServerFn(backfillAvatarsFromHub);
+
+  const handleBackfillAvatars = async () => {
+    setBackfilling(true);
+    try {
+      const data: any = await runBackfill();
+      toast.success("Fotos migradas", {
+        description: `${data?.migrated ?? 0} copiadas para o armazenamento local, ${data?.failed ?? 0} falharam, ${data?.skipped ?? 0} ignoradas.`,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["workspace-members-detailed"] });
+    } catch (error: any) {
+      toast.error("Erro ao migrar fotos", {
+        description: error?.message ?? "Tente novamente.",
+      });
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   // Verificar se é administrador do sistema (global_owner ou owner)
   const { data: userRoles } = useQuery({
