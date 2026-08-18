@@ -9,10 +9,11 @@ import { UserFilters } from "./UserFilters";
 import { UserEditDialog } from "./UserEditDialog";
 import { UserDetailsDrawer } from "./UserDetailsDrawer";
 import { UserPermissionsDialog } from "./UserPermissionsDialog";
-import { UserAddDialog } from "./UserAddDialog";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
-import { Loader2, UserPlus, UserCog } from "lucide-react";
+import { Loader2, ImageDown } from "lucide-react";
+import { backfillAvatarsFromHub } from "@/lib/avatar-backfill.functions";
+import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog,
