@@ -2915,12 +2915,15 @@ export type Database = {
           description: string | null
           due_date: string | null
           estimated_time: number | null
+          external_post_ref: string | null
+          format: string | null
           id: string
           is_milestone: boolean | null
           list_id: string
           parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           recurrence_config: Json | null
+          social_channel: string | null
           start_date: string | null
           status_id: string
           time_spent: number | null
@@ -2938,12 +2941,15 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           estimated_time?: number | null
+          external_post_ref?: string | null
+          format?: string | null
           id?: string
           is_milestone?: boolean | null
           list_id: string
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_config?: Json | null
+          social_channel?: string | null
           start_date?: string | null
           status_id: string
           time_spent?: number | null
@@ -2961,12 +2967,15 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           estimated_time?: number | null
+          external_post_ref?: string | null
+          format?: string | null
           id?: string
           is_milestone?: boolean | null
           list_id?: string
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_config?: Json | null
+          social_channel?: string | null
           start_date?: string | null
           status_id?: string
           time_spent?: number | null
