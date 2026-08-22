@@ -227,7 +227,6 @@ const PostSchema = z.object({
 const CalendarioSchema = z.object({
   name: z.string().nullish(),
   cliente_chave: z.string().min(1),
-  list_id: z.string().uuid().optional(),
   tasks: z.array(PostSchema).min(1),
 });
 
@@ -242,6 +241,17 @@ function normalizarNome(valor: string): string {
     .replace(/\s+/g, " ");
 }
 
+// Variante tolerante a pontuação: "Plan. de Criativos" == "plan de criativos".
+function normalizarSemPontuacao(valor: string): string {
+  return normalizarNome(valor)
+    .replace(/[.,;:!?'"`´^~/\\|_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const FOLDER_DESTINO = "tarefas & demandas";
+const LISTA_DESTINO = "plan de criativos";
+
 async function resolverAutor(admin: any, workspace: any): Promise<string | null> {
   if (workspace.created_by_user_id) return workspace.created_by_user_id;
   const { data } = await admin
@@ -253,66 +263,105 @@ async function resolverAutor(admin: any, workspace: any): Promise<string | null>
   return data?.user_id ?? null;
 }
 
+// Lista canônica: pasta "Tarefas & Demandas" -> lista "Plan. de Criativos".
 async function resolverListaDestino(
   admin: any,
   workspaceId: string,
-  listIdInformado?: string,
-): Promise<{ listId?: string; erro?: string; listas?: string[] }> {
-  const { data: listas, error } = await admin
-    .from("lists")
+): Promise<{
+  listId?: string;
+  erro?: string;
+  pastas?: string[];
+  listas?: string[];
+  pasta?: string;
+}> {
+  const { data: pastas, error: pastasErr } = await admin
+    .from("folders")
     .select("id, name")
     .eq("workspace_id", workspaceId);
-  if (error) throw error;
+  if (pastasErr) throw pastasErr;
 
-  const disponiveis = listas ?? [];
+  const pastasDisponiveis = pastas ?? [];
+  const alvoPastas = pastasDisponiveis.filter(
+    (f: any) => normalizarSemPontuacao(f.name) === FOLDER_DESTINO,
+  );
+  if (alvoPastas.length === 0) {
+    return {
+      erro: "pasta_destino_nao_encontrada",
+      pastas: pastasDisponiveis.map((f: any) => f.name),
+    };
+  }
+  if (alvoPastas.length > 1) {
+    return {
+      erro: "pasta_destino_ambigua",
+      pastas: alvoPastas.map((f: any) => f.name),
+    };
+  }
+  const pasta = alvoPastas[0];
 
-  if (listIdInformado) {
-    const achou = disponiveis.find((l: any) => l.id === listIdInformado);
-    if (!achou) return { erro: "list_id_fora_do_workspace" };
-    return { listId: achou.id };
+  const { data: listas, error: listasErr } = await admin
+    .from("lists")
+    .select("id, name")
+    .eq("folder_id", pasta.id);
+  if (listasErr) throw listasErr;
+
+  const listasDisponiveis = listas ?? [];
+  const alvoListas = listasDisponiveis.filter(
+    (l: any) => normalizarSemPontuacao(l.name) === LISTA_DESTINO,
+  );
+  if (alvoListas.length === 0) {
+    return {
+      erro: "lista_destino_nao_encontrada",
+      pasta: pasta.name,
+      listas: listasDisponiveis.map((l: any) => l.name),
+    };
+  }
+  if (alvoListas.length > 1) {
+    return {
+      erro: "lista_destino_ambigua",
+      pasta: pasta.name,
+      listas: alvoListas.map((l: any) => l.name),
+    };
   }
 
-  const calendario = disponiveis.filter(
-    (l: any) => normalizarNome(l.name) === "calendario",
-  );
-  if (calendario.length === 1) return { listId: calendario[0].id };
-
-  if (disponiveis.length === 1) return { listId: disponiveis[0].id };
-
-  return {
-    erro: "lista_destino_indefinida",
-    listas: disponiveis.map((l: any) => l.name),
-  };
+  return { listId: alvoListas[0].id };
 }
 
-async function resolverStatusInicial(
+// Conjunto de status aplicáveis à lista, na hierarquia list -> space -> workspace.
+async function carregarStatusesDaLista(
   admin: any,
   workspaceId: string,
   listId: string,
   spaceId: string | null,
-): Promise<string | null> {
+): Promise<Array<{ id: string; name: string }>> {
   const { data: statuses, error } = await admin
     .from("statuses")
-    .select("id, scope_type, scope_id, is_default, order_index")
+    .select("id, name, scope_type, scope_id, order_index")
     .eq("workspace_id", workspaceId);
   if (error) throw error;
 
-  const escolher = (scope: string, scopeId: string | null) => {
-    const candidatos = (statuses ?? []).filter(
-      (s: any) => s.scope_type === scope && (scopeId === null || s.scope_id === scopeId),
+  const doEscopo = (scope: string, scopeId: string | null) =>
+    (statuses ?? []).filter(
+      (s: any) =>
+        s.scope_type === scope && (scopeId === null || s.scope_id === scopeId),
     );
-    if (candidatos.length === 0) return null;
-    const padrao = candidatos.find((s: any) => s.is_default);
-    if (padrao) return padrao.id;
-    candidatos.sort((a: any, b: any) => a.order_index - b.order_index);
-    return candidatos[0].id;
-  };
 
-  return (
-    escolher("list", listId) ??
-    (spaceId ? escolher("space", spaceId) : null) ??
-    escolher("workspace", null)
-  );
+  const escolhidos =
+    (doEscopo("list", listId).length > 0 && doEscopo("list", listId)) ||
+    (spaceId && doEscopo("space", spaceId).length > 0 && doEscopo("space", spaceId)) ||
+    doEscopo("workspace", null);
+
+  return (escolhidos as any[]).map((s: any) => ({ id: s.id, name: s.name }));
+}
+
+// Status = status cujo nome corresponde ao canal do post (normalizado).
+function resolverStatusDoCanal(
+  statuses: Array<{ id: string; name: string }>,
+  canal: string | null | undefined,
+): string | null {
+  if (!canal) return null;
+  const alvo = normalizarSemPontuacao(canal);
+  const achou = statuses.find((s) => normalizarSemPontuacao(s.name) === alvo);
+  return achou?.id ?? null;
 }
 
 async function handleCalendarioPublicar(
