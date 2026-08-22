@@ -274,10 +274,11 @@ async function resolverListaDestino(
   listas?: string[];
   pasta?: string;
 }> {
+  // folders pertencem a spaces; o workspace vem via spaces.workspace_id.
   const { data: pastas, error: pastasErr } = await admin
     .from("folders")
-    .select("id, name")
-    .eq("workspace_id", workspaceId);
+    .select("id, name, space_id, spaces!inner(workspace_id)")
+    .eq("spaces.workspace_id", workspaceId);
   if (pastasErr) throw pastasErr;
 
   const pastasDisponiveis = pastas ?? [];
