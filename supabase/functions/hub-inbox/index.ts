@@ -492,6 +492,20 @@ async function handleCalendarioPublicar(
         continue;
       }
 
+      // Status = status da lista cujo nome corresponde ao canal do post.
+      const statusId = resolverStatusDoCanal(statusesDaLista, post.social_channel);
+      if (!statusId) {
+        resultados.push({
+          external_post_ref: post.external_post_ref,
+          task_id: null,
+          status: "erro",
+          error: "status_do_canal_nao_encontrado",
+          canal: post.social_channel ?? null,
+          status_disponiveis: nomesStatus,
+        });
+        continue;
+      }
+
       const insercao = await admin
         .from("tasks")
         .insert({
