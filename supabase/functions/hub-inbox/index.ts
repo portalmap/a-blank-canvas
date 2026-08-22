@@ -261,6 +261,11 @@ Deno.serve(async (req) => {
     return await handleListarParaAprovacao(admin, modo, payload, origin);
   }
 
+  if (assunto === "calendario.publicar") {
+    return await handleCalendarioPublicar(admin, modo, payload, mensagemId, origin);
+  }
+
+
   if (assunto !== "diagnostico.ping") {
     return json(
       { error: "assunto_nao_suportado", assunto },
