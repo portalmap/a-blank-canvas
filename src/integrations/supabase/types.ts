@@ -1286,6 +1286,30 @@ export type Database = {
           },
         ]
       }
+      hub_inbox_processed: {
+        Row: {
+          assunto: string
+          criado_em: string
+          id: string
+          mensagem_id: string
+          resposta: Json | null
+        }
+        Insert: {
+          assunto: string
+          criado_em?: string
+          id?: string
+          mensagem_id: string
+          resposta?: Json | null
+        }
+        Update: {
+          assunto?: string
+          criado_em?: string
+          id?: string
+          mensagem_id?: string
+          resposta?: Json | null
+        }
+        Relationships: []
+      }
       list_followers: {
         Row: {
           created_at: string | null

@@ -3,6 +3,7 @@
 // Trata apenas o assunto "diagnostico.ping". Qualquer outro assunto responde 422.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { z } from "https://esm.sh/zod@3.23.8";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -200,6 +201,341 @@ async function handleListarParaAprovacao(
   }
 }
 
+// ==========================================================================
+// calendario.publicar — recebe o calendário do Hub (Social Flow) e cria as
+// tarefas correspondentes, uma por post, de forma idempotente.
+// Módulo isolado: não altera diagnostico.ping nem tarefa.listar_para_aprovacao.
+// ==========================================================================
+
+const AnexoSchema = z.object({
+  url: z.string().min(1),
+  file_name: z.string().min(1).optional(),
+  file_type: z.string().optional(),
+  file_size: z.number().optional(),
+});
+
+const PostSchema = z.object({
+  external_post_ref: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().nullish(),
+  social_channel: z.string().nullish(),
+  format: z.string().nullish(),
+  due_date: z.string().nullish(),
+  attachments: z.array(AnexoSchema).optional(),
+});
+
+const CalendarioSchema = z.object({
+  name: z.string().nullish(),
+  cliente_chave: z.string().min(1),
+  list_id: z.string().uuid().optional(),
+  tasks: z.array(PostSchema).min(1),
+});
+
+// Normalização usada para casar o nome do cliente: minúsculo, sem acento
+// (qualquer diacrítico, via NFD), espaços aparados e colapsados.
+function normalizarNome(valor: string): string {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+async function resolverAutor(admin: any, workspace: any): Promise<string | null> {
+  if (workspace.created_by_user_id) return workspace.created_by_user_id;
+  const { data } = await admin
+    .from("user_roles")
+    .select("user_id")
+    .eq("role", "global_owner")
+    .limit(1)
+    .maybeSingle();
+  return data?.user_id ?? null;
+}
+
+async function resolverListaDestino(
+  admin: any,
+  workspaceId: string,
+  listIdInformado?: string,
+): Promise<{ listId?: string; erro?: string; listas?: string[] }> {
+  const { data: listas, error } = await admin
+    .from("lists")
+    .select("id, name")
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+
+  const disponiveis = listas ?? [];
+
+  if (listIdInformado) {
+    const achou = disponiveis.find((l: any) => l.id === listIdInformado);
+    if (!achou) return { erro: "list_id_fora_do_workspace" };
+    return { listId: achou.id };
+  }
+
+  const calendario = disponiveis.filter(
+    (l: any) => normalizarNome(l.name) === "calendario",
+  );
+  if (calendario.length === 1) return { listId: calendario[0].id };
+
+  if (disponiveis.length === 1) return { listId: disponiveis[0].id };
+
+  return {
+    erro: "lista_destino_indefinida",
+    listas: disponiveis.map((l: any) => l.name),
+  };
+}
+
+async function resolverStatusInicial(
+  admin: any,
+  workspaceId: string,
+  listId: string,
+  spaceId: string | null,
+): Promise<string | null> {
+  const { data: statuses, error } = await admin
+    .from("statuses")
+    .select("id, scope_type, scope_id, is_default, order_index")
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+
+  const escolher = (scope: string, scopeId: string | null) => {
+    const candidatos = (statuses ?? []).filter(
+      (s: any) => s.scope_type === scope && (scopeId === null || s.scope_id === scopeId),
+    );
+    if (candidatos.length === 0) return null;
+    const padrao = candidatos.find((s: any) => s.is_default);
+    if (padrao) return padrao.id;
+    candidatos.sort((a: any, b: any) => a.order_index - b.order_index);
+    return candidatos[0].id;
+  };
+
+  return (
+    escolher("list", listId) ??
+    (spaceId ? escolher("space", spaceId) : null) ??
+    escolher("workspace", null)
+  );
+}
+
+async function handleCalendarioPublicar(
+  admin: any,
+  modo: string | null,
+  payload: unknown,
+  mensagemId: string | null,
+  origin: string | null,
+) {
+  if (modo !== "consulta") {
+    return json({ error: "modo_nao_suportado", modo }, 422, origin);
+  }
+
+  const parsed = CalendarioSchema.safeParse(payload ?? {});
+  if (!parsed.success) {
+    return json(
+      {
+        error: "payload_invalido",
+        detalhes: parsed.error.issues.map((i) => ({
+          campo: i.path.join("."),
+          motivo: i.message,
+        })),
+      },
+      422,
+      origin,
+    );
+  }
+  const dados = parsed.data;
+
+  try {
+    // Idempotência por mensagem: mesma id => devolve a resposta guardada.
+    if (mensagemId) {
+      const { data: jaProcessada } = await admin
+        .from("hub_inbox_processed")
+        .select("resposta")
+        .eq("mensagem_id", mensagemId)
+        .maybeSingle();
+      if (jaProcessada?.resposta) {
+        return json(jaProcessada.resposta, 200, origin);
+      }
+    }
+
+    // 1. Resolver o cliente (workspace) uma única vez.
+    const chave = normalizarNome(dados.cliente_chave);
+    const { data: workspaces, error: wsError } = await admin
+      .from("workspaces")
+      .select("id, name, created_by_user_id");
+    if (wsError) throw wsError;
+
+    const candidatos = (workspaces ?? []).filter(
+      (w: any) => normalizarNome(w.name) === chave,
+    );
+    if (candidatos.length === 0) {
+      return json(
+        { error: "cliente_nao_encontrado", cliente_chave: dados.cliente_chave },
+        422,
+        origin,
+      );
+    }
+    if (candidatos.length > 1) {
+      return json(
+        { error: "cliente_ambiguo", cliente_chave: dados.cliente_chave },
+        422,
+        origin,
+      );
+    }
+    const workspace = candidatos[0];
+
+    // 2. Lista de destino.
+    const lista = await resolverListaDestino(admin, workspace.id, dados.list_id);
+    if (!lista.listId) {
+      return json(
+        {
+          error: lista.erro,
+          workspace_id: workspace.id,
+          listas_disponiveis: lista.listas ?? [],
+        },
+        422,
+        origin,
+      );
+    }
+
+    const { data: listaInfo, error: listaErr } = await admin
+      .from("lists")
+      .select("id, name, space_id")
+      .eq("id", lista.listId)
+      .maybeSingle();
+    if (listaErr) throw listaErr;
+
+    // 3. Status inicial.
+    const statusId = await resolverStatusInicial(
+      admin,
+      workspace.id,
+      lista.listId,
+      listaInfo?.space_id ?? null,
+    );
+    if (!statusId) {
+      return json(
+        { error: "status_destino_indefinido", workspace_id: workspace.id },
+        422,
+        origin,
+      );
+    }
+
+    // 4. Autor técnico.
+    const autorId = await resolverAutor(admin, workspace);
+    if (!autorId) {
+      return json({ error: "autor_tecnico_indefinido" }, 422, origin);
+    }
+
+    // 5. Uma tarefa por post, idempotente por external_post_ref.
+    const resultados: Array<Record<string, unknown>> = [];
+
+    for (const post of dados.tasks) {
+      const { data: existente, error: buscaErr } = await admin
+        .from("tasks")
+        .select("id")
+        .eq("workspace_id", workspace.id)
+        .eq("external_post_ref", post.external_post_ref)
+        .maybeSingle();
+      if (buscaErr) throw buscaErr;
+
+      if (existente) {
+        resultados.push({
+          external_post_ref: post.external_post_ref,
+          task_id: existente.id,
+          status: "ja_existia",
+        });
+        continue;
+      }
+
+      const insercao = await admin
+        .from("tasks")
+        .insert({
+          workspace_id: workspace.id,
+          list_id: lista.listId,
+          status_id: statusId,
+          title: post.title,
+          description: post.description ?? null,
+          social_channel: post.social_channel ?? null,
+          format: post.format ?? null,
+          due_date: post.due_date ?? null,
+          external_post_ref: post.external_post_ref,
+          created_by_user_id: autorId,
+        })
+        .select("id")
+        .single();
+
+      let taskId = insercao.data?.id ?? null;
+      let criada = true;
+
+      if (insercao.error) {
+        // Corrida no índice único parcial: relê a tarefa existente.
+        if (insercao.error.code === "23505") {
+          const { data: reLido } = await admin
+            .from("tasks")
+            .select("id")
+            .eq("workspace_id", workspace.id)
+            .eq("external_post_ref", post.external_post_ref)
+            .maybeSingle();
+          taskId = reLido?.id ?? null;
+          criada = false;
+        }
+        if (!taskId) throw insercao.error;
+      }
+
+      // Anexos apenas para tarefas criadas agora (evita duplicar).
+      if (criada && post.attachments?.length) {
+        const linhas = post.attachments.map((a) => ({
+          task_id: taskId,
+          file_name: a.file_name ?? a.url.split("/").pop() ?? "arquivo",
+          file_url: a.url,
+          file_type: a.file_type ?? null,
+          file_size: a.file_size ?? null,
+          uploaded_by: autorId,
+        }));
+        const anexoRes = await admin.from("task_attachments").insert(linhas);
+        if (anexoRes.error) {
+          console.error(
+            "calendario.publicar anexo falhou",
+            post.external_post_ref,
+            anexoRes.error.message,
+          );
+        }
+      }
+
+      resultados.push({
+        external_post_ref: post.external_post_ref,
+        task_id: taskId,
+        status: criada ? "criada" : "ja_existia",
+      });
+    }
+
+    const resposta = {
+      cliente: { workspace_id: workspace.id, name: workspace.name },
+      list_id: lista.listId,
+      list_name: listaInfo?.name ?? null,
+      resultados,
+    };
+
+    if (mensagemId) {
+      try {
+        await admin.from("hub_inbox_processed").insert({
+          mensagem_id: mensagemId,
+          assunto: "calendario.publicar",
+          resposta,
+        });
+      } catch (e) {
+        console.error("hub_inbox_processed insert failed", e);
+      }
+    }
+
+    return json(resposta, 200, origin);
+  } catch (e) {
+    console.error(
+      "calendario.publicar falhou",
+      e instanceof Error ? e.message : String(e),
+    );
+    return json({ error: "erro_processamento" }, 500, origin);
+  }
+}
+
+
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
 
@@ -260,6 +596,11 @@ Deno.serve(async (req) => {
   if (assunto === "tarefa.listar_para_aprovacao") {
     return await handleListarParaAprovacao(admin, modo, payload, origin);
   }
+
+  if (assunto === "calendario.publicar") {
+    return await handleCalendarioPublicar(admin, modo, payload, mensagemId, origin);
+  }
+
 
   if (assunto !== "diagnostico.ping") {
     return json(
