@@ -1,73 +1,59 @@
-# Receber `calendario.publicar` na caixa de entrada (hub-inbox)
+# Ajuste do `calendario.publicar` no hub-inbox
 
-Objetivo: o Hub envia um calendário (cliente + lista de posts) em modo consulta; o MAP Flow cria uma tarefa por post e responde, post por post, com o código da tarefa e se ela foi criada agora ou já existia.
+Dois ajustes na regra de criação da tarefa. Nada mais é tocado.
 
-## O que entra no hub-inbox
+## AJUSTE 1 — Lista de destino fixa: "Tarefas & Demandas" → "Plan. de Criativos"
 
-Novo `case` no mesmo switch de assuntos, com schema Zod próprio:
+Substitui a função `resolverListaDestino`. Nova regra, dentro do workspace já resolvido pelo nome do cliente:
 
-```
-{ id, origem, assunto: "calendario.publicar", modo: "consulta",
-  payload: { name, cliente_chave, tasks: [ { external_post_ref, title,
-    description?, social_channel?, format?, due_date?, attachments?: [
-    { url, file_name?, file_type?, file_size? } ] } ] } }
-```
+1. Busca as pastas (`folders`) do workspace e escolhe a que tem nome normalizado igual a `tarefas & demandas`.
+   - Nenhuma → rejeita `pasta_destino_nao_encontrada` (422), informando as pastas existentes.
+   - Mais de uma → rejeita `pasta_destino_ambigua` (422).
+2. Busca as listas (`lists`) com `folder_id` daquela pasta e escolhe a de nome normalizado `plan. de criativos`.
+   - Para tolerar variação de pontuação, a comparação também remove pontos e colapsa espaços (`plan de criativos` casa).
+   - Nenhuma → rejeita `lista_destino_nao_encontrada` (422), informando a pasta encontrada e as listas dentro dela.
+   - Mais de uma → rejeita `lista_destino_ambigua` (422).
 
-Regras de validação: `cliente_chave` e `tasks` obrigatórios, `tasks` com pelo menos 1 item, cada post com `external_post_ref` e `title` obrigatórios. Payload inválido → 422 com o motivo, sem criar nada.
+Removidas: a regra da lista "Calendário" e a regra da "única lista do workspace". O `payload.list_id` deixa de existir como atalho — a lista é sempre a canônica (posso manter o `list_id` explícito se você preferir; hoje o Social Flow não manda).
 
-## 1. Resolver o cliente (uma vez só)
+A normalização continua a mesma já usada (NFD sem acento, minúsculo, espaços aparados).
 
-`cliente_chave` é comparado contra `workspaces.name` normalizado (minúsculo, sem acento, espaços aparados) no próprio banco. Zero correspondência → **rejeita a mensagem inteira** (`cliente_nao_encontrado`, 422) e nenhuma tarefa é criada. Mais de uma correspondência → `cliente_ambiguo` (422). Nunca cria workspace.
+## AJUSTE 2 — Status = nome do canal do post
 
-## 2. Lista e status de destino
+Substitui `resolverStatusInicial` (que pegava o `is_default`). Agora, por post:
 
-Lista (primeira regra que resolver ganha):
-1. `payload.list_id`, se o Hub mandar — validado como pertencente ao workspace resolvido.
-2. Lista do workspace cujo nome normalizado seja `calendario` / `calendário` (a lista dedicada ao calendário de conteúdo).
-3. Se o workspace tiver **exatamente uma** lista, usa essa.
-4. Caso contrário → rejeita com `lista_destino_indefinida` e diz quais listas existem, para o Social Flow/Hub passar `list_id`.
-
-Assim nada é criado "em lugar aleatório": ou a regra é inequívoca, ou a mensagem é recusada com instrução.
-
-Status: o status default aplicável à lista, seguindo a hierarquia já usada pelo sistema — status de escopo `list` da lista, senão do `space`, senão do `workspace`, sempre o `is_default = true`; sem default, o de menor `order_index`. Nenhum default encontrado → `status_destino_indefinido` (422).
-
-Autor: `created_by_user_id` = criador do workspace; se o workspace não tiver criador, o proprietário global do sistema. Nenhum dos dois → rejeita (a coluna é obrigatória).
-
-## 3. Idempotência (duas camadas)
-
-- **Por mensagem**: tabela nova `hub_inbox_processed` (`mensagem_id` único, `assunto`, `resposta` jsonb, `criado_em`). Se a mesma `id` de mensagem chegar de novo, devolve a resposta guardada, sem reprocessar.
-- **Por post**: antes de inserir, busca tarefa com aquele `external_post_ref` no workspace. Se existir, reaproveita (`status: "ja_existia"`). O índice único parcial em (`workspace_id`, `external_post_ref`) é a rede de segurança: violação de unicidade em corrida é tratada relendo a tarefa existente, não como erro.
-
-Post sem `external_post_ref` não é aceito (é a chave de idempotência) — validação Zod já barra.
-
-## 4. Anexos
-
-Para cada anexo do post, um registro em `task_attachments` (`file_name`, `file_url`, `file_type`, `file_size`, `uploaded_by` = mesmo autor da tarefa). Só para tarefas criadas agora; tarefa que já existia não recebe anexo duplicado. Falha de anexo é registrada em log e não invalida a tarefa (a tarefa é o dado principal).
-
-## 5. Resposta ao Hub
+- Monta o conjunto de status aplicáveis à lista "Plan. de Criativos", na hierarquia que o sistema já usa: status de escopo `list` daquela lista; se a lista não tiver status próprios, os do `space` dela; senão os do `workspace`.
+- Procura nesse conjunto o status cujo nome normalizado seja igual ao `social_channel` do post.
+- Achou → é o `status_id` da tarefa.
+- Não achou (ou o post veio sem `social_channel`) → **rejeita só aquele post**, sem criar tarefa, com item de resultado:
 
 ```json
-{ "cliente": { "workspace_id": "…", "name": "TESTE HUB" },
-  "list_id": "…",
-  "resultados": [
-    { "external_post_ref": "post-1", "task_id": "…", "status": "criada" },
-    { "external_post_ref": "post-2", "task_id": "…", "status": "ja_existia" }
-  ] }
+{ "external_post_ref": "post-1", "task_id": null, "status": "erro",
+  "error": "status_do_canal_nao_encontrado",
+  "canal": "Instagram",
+  "status_disponiveis": ["Instagram", "Facebook", "TikTok"] }
 ```
 
-Um item por post, na mesma ordem em que chegou, sempre com o `external_post_ref` original ecoado — é assim que o Social Flow casa cada código com o post certo.
+Os demais posts da mesma mensagem continuam sendo criados normalmente. Nenhum status default é usado em nenhum caso.
 
-## O que NÃO muda
+## Erros — resumo
 
-- SSO (`sso-exchange`, rotas `/sso/*`) — intocado.
-- `diagnostico.ping` e `tarefa.listar_para_aprovacao` — o código atual permanece idêntico; o novo assunto é um `case` adicional antes do 422 final.
-- `verify_jwt = false` e a comparação de token em tempo constante — mantidos como estão.
-- Nenhuma outra edge function é tocada.
+| Situação | Resposta |
+|---|---|
+| Cliente não encontrado / ambíguo | 422 `cliente_nao_encontrado` / `cliente_ambiguo` (inalterado) |
+| Pasta "Tarefas & Demandas" ausente/duplicada | 422 `pasta_destino_nao_encontrada` / `pasta_destino_ambigua` (mensagem inteira recusada, nada criado) |
+| Lista "Plan. de Criativos" ausente/duplicada na pasta | 422 `lista_destino_nao_encontrada` / `lista_destino_ambigua` |
+| Canal do post sem status correspondente | 200, item do post com `status: "erro"` e `status_do_canal_nao_encontrado` |
 
-## Detalhes técnicos
+## Confirmações do que continua igual
 
-- `supabase/functions/hub-inbox/index.ts`: handler `handleCalendarioPublicar(admin, modo, payload, mensagemId, origin)`; `modo !== "consulta"` → `modo_nao_suportado`.
-- Zod via `https://esm.sh/zod@3`.
-- Normalização de nome no Postgres: função `imutable` auxiliar ou `lower(unaccent(...))`; se `unaccent` não estiver disponível, `translate()` para os acentos usados em português.
-- Migration: tabela `hub_inbox_processed` com RLS ligada, sem política para `anon`/`authenticated`, `GRANT ALL ... TO service_role` (uso exclusivo da edge function).
-- Log em `relay_diagnostico_log` continua acontecendo antes do processamento, como hoje.
+- Resolução do cliente por `workspaces.name` normalizado, com os três casos (achou / não achou / ambíguo).
+- Uma tarefa por post e a devolução do `task_id` de cada post na resposta, na mesma ordem, com o `external_post_ref` ecoado.
+- Idempotência por mensagem (`hub_inbox_processed`) e por post (`external_post_ref` + índice único parcial, incluindo o tratamento de corrida `23505`).
+- Anexos em `task_attachments` só para tarefas criadas agora; autor técnico (criador do workspace → proprietário global).
+- SSO, `diagnostico.ping`, `tarefa.listar_para_aprovacao`, `verify_jwt = false` e a comparação de token: intocados.
+- Nenhuma migration, nenhuma outra edge function alterada. Só `supabase/functions/hub-inbox/index.ts`.
+
+## Observação sobre o banco atual
+
+Hoje o único workspace ("TESTE HUB") tem a pasta "Pasta teste" com "Lista teste", e os status existentes são de escopo `workspace` ("A Fazer", "Aguardando", "Em Progresso", "Concluído") — nenhum com nome de canal. Ou seja: depois do ajuste, os testes reais só passam quando a pasta "Tarefas & Demandas", a lista "Plan. de Criativos" e os status com nome dos canais existirem no workspace do cliente. Antes disso a resposta será exatamente o erro de rejeição descrito acima.
