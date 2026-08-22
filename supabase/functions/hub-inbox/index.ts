@@ -592,7 +592,7 @@ async function handleCalendarioPublicar(
   } catch (e) {
     console.error(
       "calendario.publicar falhou",
-      e instanceof Error ? e.message : String(e),
+      e instanceof Error ? e.message : JSON.stringify(e),
     );
     return json({ error: "erro_processamento" }, 500, origin);
   }
