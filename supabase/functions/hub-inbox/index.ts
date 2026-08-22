@@ -430,13 +430,17 @@ async function handleCalendarioPublicar(
     }
     const workspace = candidatos[0];
 
-    // 2. Lista de destino.
-    const lista = await resolverListaDestino(admin, workspace.id, dados.list_id);
+    // 2. Lista de destino canônica: "Tarefas & Demandas" -> "Plan. de Criativos".
+    const lista = await resolverListaDestino(admin, workspace.id);
     if (!lista.listId) {
       return json(
         {
           error: lista.erro,
           workspace_id: workspace.id,
+          pasta_esperada: "Tarefas & Demandas",
+          lista_esperada: "Plan. de Criativos",
+          pasta_encontrada: lista.pasta ?? null,
+          pastas_disponiveis: lista.pastas ?? [],
           listas_disponiveis: lista.listas ?? [],
         },
         422,
@@ -451,20 +455,15 @@ async function handleCalendarioPublicar(
       .maybeSingle();
     if (listaErr) throw listaErr;
 
-    // 3. Status inicial.
-    const statusId = await resolverStatusInicial(
+    // 3. Status aplicáveis à lista (o status de cada post vem do canal).
+    const statusesDaLista = await carregarStatusesDaLista(
       admin,
       workspace.id,
       lista.listId,
       listaInfo?.space_id ?? null,
     );
-    if (!statusId) {
-      return json(
-        { error: "status_destino_indefinido", workspace_id: workspace.id },
-        422,
-        origin,
-      );
-    }
+    const nomesStatus = statusesDaLista.map((s) => s.name);
+
 
     // 4. Autor técnico.
     const autorId = await resolverAutor(admin, workspace);
