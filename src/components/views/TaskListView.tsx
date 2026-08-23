@@ -76,6 +76,7 @@ interface TaskListViewProps {
   onSortChange?: (column: ColumnId) => void;
   visibleColumns?: ColumnId[];
   columnOrder?: ColumnId[];
+  statuses?: { id: string; name: string; color: string | null; order_index: number }[];
 }
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
@@ -259,7 +260,8 @@ export const TaskListView = ({
   sortConfig = null, 
   onSortChange,
   visibleColumns = DEFAULT_VISIBLE_COLUMNS,
-  columnOrder = DEFAULT_COLUMN_ORDER
+  columnOrder = DEFAULT_COLUMN_ORDER,
+  statuses = []
 }: TaskListViewProps) => {
   const navigate = useNavigate();
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -528,7 +530,7 @@ export const TaskListView = ({
         groups = groupTasksByDueDate(tasksWithAssignees);
         break;
       case 'status':
-        groups = groupTasksByStatus(tasksWithAssignees);
+        groups = groupTasksByStatus(tasksWithAssignees, statuses);
         break;
       case 'assignee':
         groups = groupTasksByAssignee(tasksWithAssignees);

@@ -413,6 +413,7 @@ const ListDetailView = () => {
                 onSortChange={handleSortChange}
                 visibleColumns={visibleColumns}
                 columnOrder={columnOrder}
+                statuses={statuses || []}
               />
             )}
           </TabsContent>
