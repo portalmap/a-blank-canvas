@@ -110,6 +110,9 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
 
     // Se não tem destino ou não mudou de lugar, ignora
     if (!destination) return;
+    // Não permite soltar na coluna de diagnóstico (não é um status real)
+    if (destination.droppableId === ORPHAN_COLUMN_ID) return;
+
     if (destination.droppableId === source.droppableId && destination.index === source.index) {
       return;
     }
