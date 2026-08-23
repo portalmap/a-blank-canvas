@@ -186,126 +186,107 @@ export function StatusApplySection({ workspaceId }: StatusApplySectionProps) {
 
         {/* Location Selection */}
         <div className="space-y-3">
-          <Label>Onde aplicar</Label>
-          <ScrollArea className="h-64 rounded-lg border p-3">
-            <div className="space-y-2">
-              {/* Workspace option */}
-              <div className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50">
-                <Checkbox
-                  id="apply-workspace"
-                  checked={applyToWorkspace}
-                  onCheckedChange={(checked) => setApplyToWorkspace(!!checked)}
-                />
-                <Label htmlFor="apply-workspace" className="flex items-center gap-2 cursor-pointer">
-                  <Layout className="h-4 w-4 text-primary" />
-                  Todo o Workspace
-                </Label>
-              </div>
-
-              {/* Spaces tree */}
-              {spaces?.map((space) => (
-                <div key={space.id} className="space-y-1">
-                  <div className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50">
-                    <button
-                      onClick={() => toggleExpand('space', space.id)}
-                      className="p-0.5 hover:bg-muted rounded"
-                    >
-                      {expandedSpaces.includes(space.id) ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </button>
-                    <Checkbox
-                      id={`space-${space.id}`}
-                      checked={selectedSpaces.includes(space.id)}
-                      onCheckedChange={() => toggleSelection('space', space.id)}
-                    />
-                    <Label htmlFor={`space-${space.id}`} className="flex items-center gap-2 cursor-pointer">
-                      <div 
-                        className="w-3 h-3 rounded-sm" 
-                        style={{ backgroundColor: space.color || '#94a3b8' }}
-                      />
-                      {space.name}
-                    </Label>
-                  </div>
-
-                  {expandedSpaces.includes(space.id) && (
-                    <div className="ml-6 space-y-1">
-                      {/* Folders in space */}
-                      {getFoldersForSpace(space.id).map((folder) => (
-                        <div key={folder.id} className="space-y-1">
-                          <div className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50">
-                            <button
-                              onClick={() => toggleExpand('folder', folder.id)}
-                              className="p-0.5 hover:bg-muted rounded"
-                            >
-                              {expandedFolders.includes(folder.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
-                            <Checkbox
-                              id={`folder-${folder.id}`}
-                              checked={selectedFolders.includes(folder.id)}
-                              onCheckedChange={() => toggleSelection('folder', folder.id)}
-                            />
-                            <Label htmlFor={`folder-${folder.id}`} className="flex items-center gap-2 cursor-pointer">
-                              <Folder className="h-4 w-4 text-muted-foreground" />
-                              {folder.name}
-                            </Label>
-                          </div>
-
-                          {expandedFolders.includes(folder.id) && (
-                            <div className="ml-6 space-y-1">
-                              {getListsForFolder(folder.id).map((list) => (
-                                <div
-                                  key={list.id}
-                                  className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
-                                >
-                                  <div className="w-4" />
-                                  <Checkbox
-                                    id={`list-${list.id}`}
-                                    checked={selectedLists.includes(list.id)}
-                                    onCheckedChange={() => toggleSelection('list', list.id)}
-                                  />
-                                  <Label htmlFor={`list-${list.id}`} className="flex items-center gap-2 cursor-pointer">
-                                    <List className="h-4 w-4 text-muted-foreground" />
-                                    {list.name}
-                                  </Label>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {/* Lists directly in space */}
-                      {getListsDirectlyInSpace(space.id).map((list) => (
-                        <div
-                          key={list.id}
-                          className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
-                        >
-                          <div className="w-4" />
-                          <Checkbox
-                            id={`list-${list.id}`}
-                            checked={selectedLists.includes(list.id)}
-                            onCheckedChange={() => toggleSelection('list', list.id)}
-                          />
-                          <Label htmlFor={`list-${list.id}`} className="flex items-center gap-2 cursor-pointer">
-                            <List className="h-4 w-4 text-muted-foreground" />
-                            {list.name}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+          <div className="flex items-center justify-between gap-2">
+            <Label>Onde aplicar</Label>
+            <div className="flex items-center gap-2">
+              {selectionCount > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {selectionCount} {selectionCount === 1 ? 'local selecionado' : 'locais selecionados'}
+                </span>
+              )}
+              <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+                <Maximize2 className="h-4 w-4 mr-1.5" />
+                Expandir
+              </Button>
             </div>
+          </div>
+          <ScrollArea className="h-64 rounded-lg border p-3">
+            <LocationTree
+              idPrefix="inline"
+              density="compact"
+              spaces={spaces || []}
+              folders={folders || []}
+              lists={lists || []}
+              applyToWorkspace={applyToWorkspace}
+              onToggleWorkspace={setApplyToWorkspace}
+              selectedSpaces={selectedSpaces}
+              selectedFolders={selectedFolders}
+              selectedLists={selectedLists}
+              expandedSpaces={expandedSpaces}
+              expandedFolders={expandedFolders}
+              onToggleExpand={toggleExpand}
+              onToggleSelection={toggleSelection}
+            />
           </ScrollArea>
         </div>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Onde aplicar o modelo</DialogTitle>
+              <DialogDescription>
+                Selecione o workspace, spaces, pastas ou listas que receberão as etapas do modelo.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar space, pasta ou lista..."
+                  className="pl-9"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={expandAll}>
+                  Expandir tudo
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={collapseAll}>
+                  Recolher tudo
+                </Button>
+              </div>
+            </div>
+
+            <ScrollArea className="h-[55vh] rounded-lg border p-3">
+              <LocationTree
+                idPrefix="modal"
+                density="comfortable"
+                search={search}
+                spaces={spaces || []}
+                folders={folders || []}
+                lists={lists || []}
+                applyToWorkspace={applyToWorkspace}
+                onToggleWorkspace={setApplyToWorkspace}
+                selectedSpaces={selectedSpaces}
+                selectedFolders={selectedFolders}
+                selectedLists={selectedLists}
+                expandedSpaces={expandedSpaces}
+                expandedFolders={expandedFolders}
+                onToggleExpand={toggleExpand}
+                onToggleSelection={toggleSelection}
+              />
+            </ScrollArea>
+
+            <DialogFooter className="sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {selectionCount} {selectionCount === 1 ? 'local selecionado' : 'locais selecionados'}
+                </span>
+                {selectionCount > 0 && (
+                  <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                    Limpar seleção
+                  </Button>
+                )}
+              </div>
+              <Button type="button" onClick={() => setDialogOpen(false)}>
+                Concluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
 
         {/* Apply Button */}
         <Button 
