@@ -163,14 +163,14 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex gap-4 overflow-x-auto h-full pb-4">
+      <div className="flex gap-4 overflow-x-auto overflow-y-hidden h-full pb-4 [scrollbar-gutter:stable]">
         {columns.map((status) => {
           const statusTasks = getTasksByStatus(status.id);
 
           return (
             <div
               key={status.id}
-              className="flex-shrink-0 w-80 flex flex-col h-full min-h-0"
+              className="shrink-0 grow basis-64 min-w-[16rem] max-w-[20rem] flex flex-col h-full min-h-0"
             >
               <Droppable droppableId={status.id}>
                 {(provided, snapshot) => (
