@@ -161,7 +161,7 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex gap-4 overflow-x-auto h-full pb-4">
-        {sortedStatuses.map((status) => {
+        {columns.map((status) => {
           const statusTasks = getTasksByStatus(status.id);
 
           return (
