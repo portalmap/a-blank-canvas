@@ -76,6 +76,7 @@ interface TaskListViewProps {
   onSortChange?: (column: ColumnId) => void;
   visibleColumns?: ColumnId[];
   columnOrder?: ColumnId[];
+  statuses?: { id: string; name: string; color: string | null; order_index: number }[];
 }
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
@@ -142,9 +143,17 @@ function groupTasksByDueDate(tasks: TaskWithAssignees[]) {
   ].filter((g) => g.tasks.length > 0);
 }
 
-// Group tasks by status
-function groupTasksByStatus(tasks: TaskWithAssignees[]) {
+// Group tasks by status (keeps empty statuses visible)
+function groupTasksByStatus(
+  tasks: TaskWithAssignees[],
+  statuses?: { id: string; name: string; color: string | null; order_index: number }[]
+) {
   const groups = new Map<string, { label: string; color: string | null; tasks: TaskWithAssignees[] }>();
+
+  // Seed with every status of the list, in order, so empty stages still show up
+  [...(statuses || [])]
+    .sort((a, b) => a.order_index - b.order_index)
+    .forEach((s) => groups.set(s.id, { label: s.name, color: s.color, tasks: [] }));
 
   tasks.forEach((task) => {
     const statusId = task.status?.id || 'no-status';
@@ -157,12 +166,14 @@ function groupTasksByStatus(tasks: TaskWithAssignees[]) {
     groups.get(statusId)!.tasks.push(task);
   });
 
-  return Array.from(groups.entries()).map(([key, value]) => ({
-    key,
-    label: value.label,
-    color: value.color,
-    tasks: value.tasks,
-  }));
+  return Array.from(groups.entries())
+    .filter(([key, value]) => key !== 'no-status' || value.tasks.length > 0)
+    .map(([key, value]) => ({
+      key,
+      label: value.label,
+      color: value.color,
+      tasks: value.tasks,
+    }));
 }
 
 // Group tasks by assignee
@@ -249,7 +260,8 @@ export const TaskListView = ({
   sortConfig = null, 
   onSortChange,
   visibleColumns = DEFAULT_VISIBLE_COLUMNS,
-  columnOrder = DEFAULT_COLUMN_ORDER
+  columnOrder = DEFAULT_COLUMN_ORDER,
+  statuses = []
 }: TaskListViewProps) => {
   const navigate = useNavigate();
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -518,7 +530,7 @@ export const TaskListView = ({
         groups = groupTasksByDueDate(tasksWithAssignees);
         break;
       case 'status':
-        groups = groupTasksByStatus(tasksWithAssignees);
+        groups = groupTasksByStatus(tasksWithAssignees, statuses);
         break;
       case 'assignee':
         groups = groupTasksByAssignee(tasksWithAssignees);
