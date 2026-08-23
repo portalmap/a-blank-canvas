@@ -87,6 +87,17 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
     ? [...sortedStatuses, { id: ORPHAN_COLUMN_ID, name: 'Sem status correspondente', color: null, order_index: Number.MAX_SAFE_INTEGER }]
     : sortedStatuses;
 
+  const gridColumnsClass = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
+    4: 'grid-cols-4',
+    5: 'grid-cols-5',
+    6: 'grid-cols-6',
+  }[columns.length];
+
+  const fitColumnsInViewport = Boolean(gridColumnsClass);
+
   const getTasksByStatus = (statusId: string) => {
     if (statusId === ORPHAN_COLUMN_ID) return orphanTasks;
     return mainTasks.filter((task) => task.status_id === statusId);
@@ -163,103 +174,113 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex gap-4 overflow-x-auto overflow-y-hidden h-full pb-4 [scrollbar-gutter:stable]">
-        {columns.map((status) => {
-          const statusTasks = getTasksByStatus(status.id);
+      <div className="h-full overflow-x-auto overflow-y-hidden pb-4 [scrollbar-gutter:stable]">
+        <div
+          className={cn(
+            'h-full gap-4',
+            fitColumnsInViewport ? `grid w-full min-w-0 ${gridColumnsClass}` : 'flex min-w-max'
+          )}
+        >
+          {columns.map((status) => {
+            const statusTasks = getTasksByStatus(status.id);
 
-          return (
-            <div
-              key={status.id}
-              className="shrink-0 grow basis-64 min-w-[16rem] max-w-[20rem] flex flex-col h-full min-h-0"
-            >
-              <Droppable droppableId={status.id}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={cn(
-                      "bg-muted/50 rounded-lg p-4 flex flex-col h-full min-h-[200px] transition-colors",
-                      snapshot.isDraggingOver && "bg-muted/80 ring-2 ring-primary/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                      <h3 className="font-semibold">{status.name}</h3>
-                      <span className="text-sm text-muted-foreground">
-                        {statusTasks.length}
-                      </span>
-                    </div>
+            return (
+              <div
+                key={status.id}
+                className={cn(
+                  'flex h-full min-h-0 min-w-0 flex-col',
+                  !fitColumnsInViewport && 'w-72 shrink-0'
+                )}
+              >
+                <Droppable droppableId={status.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={cn(
+                        "bg-muted/50 rounded-lg p-4 flex flex-col h-full min-h-[200px] min-w-0 transition-colors",
+                        snapshot.isDraggingOver && "bg-muted/80 ring-2 ring-primary/20"
+                      )}
+                    >
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 mb-4 flex-shrink-0">
+                        <h3 className="min-w-0 font-semibold break-words">{status.name}</h3>
+                        <span className="shrink-0 text-sm text-muted-foreground">
+                          {statusTasks.length}
+                        </span>
+                      </div>
 
-                    <div className="flex-1 overflow-y-auto min-h-0">
-                      <div className="space-y-3">
-                        {statusTasks.length === 0 ? (
-                          <div className="text-center text-sm text-muted-foreground py-8">
-                            Nenhuma tarefa
-                          </div>
-                        ) : (
-                          statusTasks.map((task, index) => (
-                            <Draggable key={task.id} draggableId={task.id} index={index}>
-                              {(provided, snapshot) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  onClick={() => !snapshot.isDragging && navigate(`/task/${task.id}`)}
-                                >
-                                  <Card
-                                    className={cn(
-                                      "cursor-grab hover:shadow-md transition-all",
-                                      task.completed_at && "opacity-60",
-                                      snapshot.isDragging && "shadow-xl rotate-2 cursor-grabbing ring-2 ring-primary"
-                                    )}
+                      <div className="flex-1 overflow-y-auto min-h-0 min-w-0">
+                        <div className="space-y-3">
+                          {statusTasks.length === 0 ? (
+                            <div className="text-center text-sm text-muted-foreground py-8">
+                              Nenhuma tarefa
+                            </div>
+                          ) : (
+                            statusTasks.map((task, index) => (
+                              <Draggable key={task.id} draggableId={task.id} index={index}>
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    onClick={() => !snapshot.isDragging && navigate(`/task/${task.id}`)}
                                   >
-                                    <CardHeader className="p-4 pb-3">
-                                      <CardTitle className={cn(
-                                        "text-sm font-medium",
-                                        task.completed_at && "line-through"
-                                      )}>
-                                        {task.title}
-                                      </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-4 pt-0 space-y-2">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <PriorityBadge priority={task.priority} />
-                                        <SubtaskBadge parentId={task.id} />
-                                      </div>
-                                      {task.due_date && (
-                                        <div className={cn(
-                                          "flex items-center gap-2 text-xs",
-                                          isOverdue(task.due_date, task.completed_at) 
-                                            ? "text-destructive" 
-                                            : isDueToday(task.due_date, task.completed_at)
-                                              ? "text-amber-600"
-                                              : "text-muted-foreground"
-                                        )}>
-                                          <Calendar className="h-3 w-3" />
-                                          {format(new Date(task.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                                          {isOverdue(task.due_date, task.completed_at) && (
-                                            <span className="font-medium">Atrasada</span>
-                                          )}
-                                          {isDueToday(task.due_date, task.completed_at) && (
-                                            <span className="font-medium">Hoje</span>
-                                          )}
-                                        </div>
+                                    <Card
+                                      className={cn(
+                                        "min-w-0 cursor-grab hover:shadow-md transition-all",
+                                        task.completed_at && "opacity-60",
+                                        snapshot.isDragging && "shadow-xl rotate-2 cursor-grabbing ring-2 ring-primary"
                                       )}
-                                    </CardContent>
-                                  </Card>
-                                </div>
-                              )}
-                            </Draggable>
-                          ))
-                        )}
-                        {provided.placeholder}
+                                    >
+                                      <CardHeader className="p-4 pb-3">
+                                        <CardTitle className={cn(
+                                          "text-sm font-medium break-words",
+                                          task.completed_at && "line-through"
+                                        )}>
+                                          {task.title}
+                                        </CardTitle>
+                                      </CardHeader>
+                                      <CardContent className="p-4 pt-0 space-y-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <PriorityBadge priority={task.priority} />
+                                          <SubtaskBadge parentId={task.id} />
+                                        </div>
+                                        {task.due_date && (
+                                          <div className={cn(
+                                            "flex items-center gap-2 text-xs",
+                                            isOverdue(task.due_date, task.completed_at) 
+                                              ? "text-destructive" 
+                                              : isDueToday(task.due_date, task.completed_at)
+                                                ? "text-amber-600"
+                                                : "text-muted-foreground"
+                                          )}>
+                                            <Calendar className="h-3 w-3 shrink-0" />
+                                            {format(new Date(task.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                                            {isOverdue(task.due_date, task.completed_at) && (
+                                              <span className="font-medium">Atrasada</span>
+                                            )}
+                                            {isDueToday(task.due_date, task.completed_at) && (
+                                              <span className="font-medium">Hoje</span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))
+                          )}
+                          {provided.placeholder}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </Droppable>
-            </div>
-          );
-        })}
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </DragDropContext>
   );
