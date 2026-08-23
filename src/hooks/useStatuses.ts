@@ -85,21 +85,24 @@ async function resolveStatusesForScope(
   workspaceId: string
 ): Promise<StatusItem[] | null> {
   if (scopeType === 'list') {
-    // Regra definitiva: se a lista já tem status próprios (scope_type='list'),
-    // eles são a fonte de verdade — independentemente de status_source.
-    const ownStatuses = await fetchScopedStatuses('list', scopeId);
-    if (ownStatuses) return ownStatuses;
-
     const { data: list } = await supabase
       .from('lists')
       .select('status_source, status_template_id, folder_id, space_id')
       .eq('id', scopeId)
       .single();
 
+    // Modelo vinculado (sincronizado) tem prioridade: garante que as etapas
+    // do modelo existam e sejam a fonte de verdade.
     if (list?.status_source === 'template' && list?.status_template_id) {
       const result = await syncAndFetchTemplateStatuses('list', scopeId, list.status_template_id, workspaceId);
       if (result) return result;
     }
+
+    // Caso contrário: se a lista tem status próprios, eles são a fonte de verdade.
+    const ownStatuses = await fetchScopedStatuses('list', scopeId);
+    if (ownStatuses) return ownStatuses;
+
+
 
 
     // Inherit from folder
