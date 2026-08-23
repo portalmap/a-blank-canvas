@@ -49,7 +49,10 @@ interface TaskKanbanViewProps {
   statuses: Status[];
 }
 
+const ORPHAN_COLUMN_ID = '__sem_status__';
+
 const SubtaskBadge = ({ parentId }: { parentId: string }) => {
+
   const { data: subtasks } = useSubtasks(parentId);
   const count = subtasks?.length || 0;
   const completed = subtasks?.filter(s => s.completed_at).length || 0;
