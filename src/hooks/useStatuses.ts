@@ -43,11 +43,21 @@ async function syncAndFetchTemplateStatuses(
   templateId: string,
   workspaceId: string
 ): Promise<StatusItem[] | null> {
-  // Try fetching existing synced statuses first
-  let result = await fetchScopedStatuses(scopeType, scopeId);
-  if (result) return result;
+  const { data: current } = await supabase
+    .from('statuses')
+    .select('id, template_id')
+    .eq('scope_type', scopeType)
+    .eq('scope_id', scopeId);
 
-  // Sync from template
+  // Já existem etapas vindas deste modelo: são a fonte de verdade.
+  if (current?.some(s => s.template_id === templateId)) {
+    return await fetchScopedStatuses(scopeType, scopeId);
+  }
+
+  // Só sincroniza automaticamente quando o escopo não tem nenhuma etapa,
+  // para não misturar etapas legadas com as do modelo.
+  if (current && current.length > 0) return null;
+
   await supabase.rpc('sync_template_statuses_for_list', {
     p_list_id: scopeId,
     p_template_id: templateId,
