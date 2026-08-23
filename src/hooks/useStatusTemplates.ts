@@ -259,6 +259,122 @@ export const useDuplicateStatusTemplate = () => {
   });
 };
 
+// ---------- Helpers de aplicação de modelo ----------
+
+const normalizeName = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+interface ExistingStatus {
+  id: string;
+  name: string;
+  category: string | null;
+}
+
+interface NewStatusRow {
+  id: string;
+  name: string;
+  category: string | null;
+}
+
+/**
+ * Substitui as etapas de um escopo pelas etapas do modelo, remapeando as
+ * tarefas das etapas antigas para as novas (por nome, depois por categoria).
+ * Etapas antigas sem destino equivalente e que ainda possuem tarefas são
+ * preservadas no fim da ordem, para nenhuma tarefa desaparecer do Kanban.
+ */
+async function replaceScopeStatuses(params: {
+  scopeType: 'space' | 'folder' | 'list';
+  scopeId: string;
+  workspaceId: string;
+  templateId: string;
+  items: StatusTemplateItem[];
+  synchronized: boolean;
+}) {
+  const { scopeType, scopeId, workspaceId, templateId, items, synchronized } = params;
+  if (items.length === 0) return;
+
+  const sortedItems = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  // 1. Etapas atuais do escopo
+  const { data: existingRaw } = await supabase
+    .from('statuses')
+    .select('id, name, category')
+    .eq('scope_type', scopeType)
+    .eq('scope_id', scopeId);
+
+  const existing: ExistingStatus[] = existingRaw ?? [];
+
+  // 2. Inserir as etapas do modelo
+  const { data: insertedRaw, error: insertError } = await supabase
+    .from('statuses')
+    .insert(
+      sortedItems.map((item, index) => ({
+        workspace_id: workspaceId,
+        scope_type: scopeType,
+        scope_id: scopeId,
+        name: item.name,
+        color: item.color,
+        order_index: index,
+        is_default: item.is_default,
+        category: item.category,
+        template_id: synchronized ? templateId : null,
+        template_item_id: synchronized ? item.id : null,
+      }))
+    )
+    .select('id, name, category');
+
+  if (insertError) throw insertError;
+  const inserted: NewStatusRow[] = insertedRaw ?? [];
+
+  // 3. Remapear tarefas das etapas antigas
+  const byName = new Map(inserted.map(s => [normalizeName(s.name), s.id]));
+  const byCategory = new Map<string, string>();
+  for (const s of inserted) {
+    if (s.category && !byCategory.has(s.category)) byCategory.set(s.category, s.id);
+  }
+
+  const preserved: string[] = [];
+
+  for (const old of existing) {
+    const target =
+      byName.get(normalizeName(old.name)) ??
+      (old.category ? byCategory.get(old.category) : undefined);
+
+    if (target) {
+      await supabase.from('tasks').update({ status_id: target }).eq('status_id', old.id);
+      continue;
+    }
+
+    // Sem destino equivalente: só remove se não houver tarefas
+    const { count } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('status_id', old.id);
+
+    if ((count ?? 0) > 0) {
+      preserved.push(old.id);
+    }
+  }
+
+  // 4. Remover as etapas antigas que não precisam ser preservadas
+  const toDelete = existing.map(s => s.id).filter(id => !preserved.includes(id));
+  if (toDelete.length > 0) {
+    await supabase.from('statuses').delete().in('id', toDelete);
+  }
+
+  // 5. Reordenar as etapas preservadas para o fim
+  for (let i = 0; i < preserved.length; i++) {
+    await supabase
+      .from('statuses')
+      .update({ order_index: sortedItems.length + i, is_default: false })
+      .eq('id', preserved[i]);
+  }
+}
+
 export const useApplyStatusTemplate = () => {
   const queryClient = useQueryClient();
 
@@ -278,7 +394,6 @@ export const useApplyStatusTemplate = () => {
       listIds: string[];
       synchronized?: boolean;
     }) => {
-      // Get the template with its items
       const { data: template, error: templateError } = await supabase
         .from('status_templates')
         .select('*, status_template_items(*)')
@@ -287,90 +402,50 @@ export const useApplyStatusTemplate = () => {
 
       if (templateError) throw templateError;
 
-      // Apply to spaces
+      const items: StatusTemplateItem[] = (template.status_template_items ?? []) as StatusTemplateItem[];
+      const link = synchronized
+        ? { status_template_id: templateId, status_source: 'template' }
+        : { status_template_id: null, status_source: 'custom' };
+
+      let appliedCount = 0;
+
+      // ---- Spaces ----
       for (const spaceId of spaceIds) {
-        if (synchronized) {
-          // Link to template (synchronized mode)
-          await supabase
-            .from('spaces')
-            .update({ 
-              status_template_id: templateId,
-              status_source: 'template'
-            })
-            .eq('id', spaceId);
-        } else {
-          // Create independent copy
-          await supabase
-            .from('spaces')
-            .update({ 
-              status_template_id: null,
-              status_source: 'custom'
-            })
-            .eq('id', spaceId);
-
-          // Copy status items as statuses
-          if (template.status_template_items) {
-            const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
-              workspace_id: template.workspace_id,
-              scope_type: 'space' as const,
-              scope_id: spaceId,
-              name: item.name,
-              color: item.color,
-              order_index: index,
-              is_default: item.is_default,
-            }));
-
-            await supabase.from('statuses').insert(statusesToInsert);
-          }
-        }
+        await supabase.from('spaces').update(link).eq('id', spaceId);
+        await replaceScopeStatuses({
+          scopeType: 'space',
+          scopeId: spaceId,
+          workspaceId: template.workspace_id,
+          templateId,
+          items,
+          synchronized,
+        });
+        appliedCount++;
       }
 
-      // Apply to folders
+      // ---- Folders ----
       for (const folderId of folderIds) {
-        if (synchronized) {
-          await supabase
-            .from('folders')
-            .update({ 
-              status_template_id: templateId,
-              status_source: 'template'
-            })
-            .eq('id', folderId);
-        } else {
-          // Get the folder's space to find workspace_id
-          const { data: folder } = await supabase
-            .from('folders')
-            .select('space_id, spaces(workspace_id)')
-            .eq('id', folderId)
-            .single();
+        const { data: folder } = await supabase
+          .from('folders')
+          .select('space_id, spaces(workspace_id)')
+          .eq('id', folderId)
+          .single();
 
-          await supabase
-            .from('folders')
-            .update({ 
-              status_template_id: null,
-              status_source: 'custom'
-            })
-            .eq('id', folderId);
+        await supabase.from('folders').update(link).eq('id', folderId);
 
-          if (template.status_template_items && folder) {
-            const workspaceIdFromFolder = (folder.spaces as any)?.workspace_id;
-            if (workspaceIdFromFolder) {
-              const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
-                workspace_id: workspaceIdFromFolder,
-                scope_type: 'folder' as const,
-                scope_id: folderId,
-                name: item.name,
-                color: item.color,
-                order_index: index,
-                is_default: item.is_default,
-              }));
-
-              await supabase.from('statuses').insert(statusesToInsert);
-            }
-          }
-        }
+        const folderWorkspaceId = (folder?.spaces as any)?.workspace_id ?? template.workspace_id;
+        await replaceScopeStatuses({
+          scopeType: 'folder',
+          scopeId: folderId,
+          workspaceId: folderWorkspaceId,
+          templateId,
+          items,
+          synchronized,
+        });
+        appliedCount++;
       }
 
-      // Apply to lists
+      // ---- Lists ----
       for (const listId of listIds) {
         const { data: list } = await supabase
           .from('lists')
@@ -378,72 +453,103 @@ export const useApplyStatusTemplate = () => {
           .eq('id', listId)
           .single();
 
-        if (synchronized) {
-          await supabase
-            .from('lists')
-            .update({ 
-              status_template_id: templateId,
-              status_source: 'template'
-            })
-            .eq('id', listId);
-        } else {
-          await supabase
-            .from('lists')
-            .update({ 
-              status_template_id: null,
-              status_source: 'custom'
-            })
-            .eq('id', listId);
+        await supabase.from('lists').update(link).eq('id', listId);
 
-          if (template.status_template_items && list) {
-            const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
-              workspace_id: list.workspace_id,
-              scope_type: 'list' as const,
-              scope_id: listId,
+        await replaceScopeStatuses({
+          scopeType: 'list',
+          scopeId: listId,
+          workspaceId: list?.workspace_id ?? template.workspace_id,
+          templateId,
+          items,
+          synchronized,
+        });
+        appliedCount++;
+      }
+
+      // ---- Workspace ----
+      if (workspaceId) {
+        const { data: existingWs } = await supabase
+          .from('statuses')
+          .select('id, name, category')
+          .eq('workspace_id', workspaceId)
+          .eq('scope_type', 'workspace');
+
+        const sortedItems = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+        const { data: insertedWs, error: wsInsertError } = await supabase
+          .from('statuses')
+          .insert(
+            sortedItems.map((item, index) => ({
+              workspace_id: workspaceId,
+              scope_type: 'workspace' as const,
+              scope_id: null,
               name: item.name,
               color: item.color,
               order_index: index,
               is_default: item.is_default,
-            }));
+              category: item.category,
+              template_id: synchronized ? templateId : null,
+              template_item_id: synchronized ? item.id : null,
+            }))
+          )
+          .select('id, name, category');
 
-            await supabase.from('statuses').insert(statusesToInsert);
+        if (wsInsertError) throw wsInsertError;
+
+        const wsByName = new Map((insertedWs ?? []).map(s => [normalizeName(s.name), s.id]));
+        const wsByCategory = new Map<string, string>();
+        for (const s of insertedWs ?? []) {
+          if (s.category && !wsByCategory.has(s.category)) wsByCategory.set(s.category, s.id);
+        }
+
+        const preservedWs: string[] = [];
+        for (const old of existingWs ?? []) {
+          const target =
+            wsByName.get(normalizeName(old.name)) ??
+            (old.category ? wsByCategory.get(old.category) : undefined);
+
+          if (target) {
+            await supabase.from('tasks').update({ status_id: target }).eq('status_id', old.id);
+            continue;
           }
+
+          const { count } = await supabase
+            .from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .eq('status_id', old.id);
+
+          if ((count ?? 0) > 0) preservedWs.push(old.id);
         }
+
+        const wsToDelete = (existingWs ?? []).map(s => s.id).filter(id => !preservedWs.includes(id));
+        if (wsToDelete.length > 0) {
+          await supabase.from('statuses').delete().in('id', wsToDelete);
+        }
+
+        for (let i = 0; i < preservedWs.length; i++) {
+          await supabase
+            .from('statuses')
+            .update({ order_index: sortedItems.length + i, is_default: false })
+            .eq('id', preservedWs[i]);
+        }
+
+        appliedCount++;
       }
 
-      // Apply to workspace if specified
-      if (workspaceId) {
-        // First delete existing workspace statuses
-        await supabase
-          .from('statuses')
-          .delete()
-          .eq('workspace_id', workspaceId)
-          .eq('scope_type', 'workspace');
-
-        if (template.status_template_items) {
-          const statusesToInsert = template.status_template_items.map((item: StatusTemplateItem, index: number) => ({
-            workspace_id: workspaceId,
-            scope_type: 'workspace' as const,
-            scope_id: null,
-            name: item.name,
-            color: item.color,
-            order_index: index,
-            is_default: item.is_default,
-            template_id: synchronized ? templateId : null,
-          }));
-
-          await supabase.from('statuses').insert(statusesToInsert);
-        }
-      }
-
-      return { templateId };
+      return { templateId, appliedCount };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['spaces'] });
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       queryClient.invalidateQueries({ queryKey: ['lists'] });
       queryClient.invalidateQueries({ queryKey: ['statuses'] });
-      toast.success('Modelo aplicado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['statuses-for-scope'] });
+      queryClient.invalidateQueries({ queryKey: ['default-status-for-scope'] });
+      queryClient.invalidateQueries({ queryKey: ['default-status'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task'] });
+      const n = result?.appliedCount ?? 0;
+      toast.success(`Modelo aplicado em ${n} ${n === 1 ? 'local' : 'locais'}!`);
     },
     onError: (error) => {
       toast.error('Erro ao aplicar modelo');
