@@ -116,14 +116,29 @@ export function StatusApplySection({ workspaceId }: StatusApplySectionProps) {
     }
   };
 
-  const getFoldersForSpace = (spaceId: string) => 
-    folders?.filter(f => f.space_id === spaceId) || [];
+  const selectionCount =
+    (applyToWorkspace ? 1 : 0) +
+    selectedSpaces.length +
+    selectedFolders.length +
+    selectedLists.length;
 
-  const getListsForFolder = (folderId: string) =>
-    lists?.filter(l => l.folder_id === folderId) || [];
+  const clearSelection = () => {
+    setApplyToWorkspace(false);
+    setSelectedSpaces([]);
+    setSelectedFolders([]);
+    setSelectedLists([]);
+  };
 
-  const getListsDirectlyInSpace = (spaceId: string) =>
-    lists?.filter(l => l.space_id === spaceId && !l.folder_id) || [];
+  const expandAll = () => {
+    setExpandedSpaces((spaces || []).map((s) => s.id));
+    setExpandedFolders((folders || []).map((f) => f.id));
+  };
+
+  const collapseAll = () => {
+    setExpandedSpaces([]);
+    setExpandedFolders([]);
+  };
+
 
   return (
     <Card>
