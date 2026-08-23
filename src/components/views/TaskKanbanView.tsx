@@ -75,9 +75,20 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
   // Filtrar apenas tarefas principais (sem parent_id)
   const mainTasks = tasks.filter(t => !t.parent_id);
 
+  const statusIds = new Set(sortedStatuses.map(s => s.id));
+
+  // Rede de segurança: tarefas cujo status não existe nas colunas resolvidas
+  const orphanTasks = mainTasks.filter(t => !statusIds.has(t.status_id));
+
+  const columns: Status[] = orphanTasks.length > 0
+    ? [...sortedStatuses, { id: ORPHAN_COLUMN_ID, name: 'Sem status correspondente', color: null, order_index: Number.MAX_SAFE_INTEGER }]
+    : sortedStatuses;
+
   const getTasksByStatus = (statusId: string) => {
+    if (statusId === ORPHAN_COLUMN_ID) return orphanTasks;
     return mainTasks.filter((task) => task.status_id === statusId);
   };
+
 
   const isOverdue = (dueDate: string | null, completedAt?: string | null) => {
     if (!dueDate || completedAt) return false;
