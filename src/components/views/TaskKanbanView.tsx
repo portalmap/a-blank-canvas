@@ -228,7 +228,7 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
                                     <Card
                                       className={cn(
                                         "min-w-0 cursor-grab hover:shadow-md transition-all",
-                                        task.completed_at && "line-through"
+                                        task.completed_at && "opacity-60",
                                         snapshot.isDragging && "shadow-xl rotate-2 cursor-grabbing ring-2 ring-primary"
                                       )}
                                     >
