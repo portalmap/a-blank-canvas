@@ -38,6 +38,9 @@ export function StatusApplySection({ workspaceId }: StatusApplySectionProps) {
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
   const [expandedSpaces, setExpandedSpaces] = useState<string[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
 
   const { data: templates } = useStatusTemplates(workspaceId);
   const { data: spaces } = useSpaces(workspaceId);
