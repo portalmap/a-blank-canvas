@@ -28,6 +28,8 @@ import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
 import { useDefaultWorkspace, useSetDefaultWorkspace, useCreateWorkspace } from '@/hooks/useWorkspaces';
 import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
 import { CreateSpaceDialog } from '@/components/spaces/CreateSpaceDialog';
+import { ThemeLogo } from '@/components/ThemeLogo';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
