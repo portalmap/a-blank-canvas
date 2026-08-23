@@ -28,6 +28,8 @@ import { useCanCreateWorkspace } from '@/hooks/useCanCreateWorkspace';
 import { useDefaultWorkspace, useSetDefaultWorkspace, useCreateWorkspace } from '@/hooks/useWorkspaces';
 import { WorkspaceEditDialog } from '@/components/workspace/WorkspaceEditDialog';
 import { CreateSpaceDialog } from '@/components/spaces/CreateSpaceDialog';
+import { ThemeLogo } from '@/components/ThemeLogo';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,20 +131,18 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-          {/* Marca canônica MAP: ponto âmbar + wordmark Sora + tag "MAP" */}
+          {/* Marca canônica MAP: logo + wordmark Sora */}
           {!isCollapsed ? (
             <div className="flex items-center gap-2 min-w-0">
-              <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-[0_0_0_3px_color-mix(in_oklab,var(--brand)_20%,transparent)] flex-shrink-0" />
+              <ThemeLogo className="h-7 w-7 flex-shrink-0" />
               <span className="font-display text-[17px] font-semibold text-sidebar-foreground tracking-tight truncate">
                 MAP Flow
               </span>
-              <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground border border-sidebar-border rounded px-1.5 py-0.5 ml-1">
-                MAP
-              </span>
             </div>
           ) : (
-            <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-[0_0_0_3px_color-mix(in_oklab,var(--brand)_20%,transparent)]" />
+            <ThemeLogo className="h-7 w-7" />
           )}
+
           
           {/* Toggle Button - sempre visível */}
           <Tooltip delayDuration={0}>
