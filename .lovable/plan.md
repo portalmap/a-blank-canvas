@@ -16,3 +16,7 @@
 - Conferir a lista atual no Kanban e confirmar que todas as 5 etapas ficam acessíveis, inclusive uma etapa vazia.
 - Aplicar um filtro que zere uma etapa e confirmar que ela permanece visível com contador `0`.
 - Validar rolagem e arrastar/soltar em desktop e em uma largura menor, sem sobreposição de conteúdo.
+
+## Abrangência
+- A correção fica na própria visualização Kanban, portanto vale para **todas as listas atuais e futuras**, sem depender de ajuste por lista.
+- As etapas continuam vindo dos status vinculados à lista (com herança de pasta/space/workspace quando a lista não tiver os próprios), então listas novas já nascem com todas as etapas visíveis, inclusive vazias.
