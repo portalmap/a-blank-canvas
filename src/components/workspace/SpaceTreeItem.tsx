@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, Circle, MoreHorizontal, Folder, List, Trash2, Pencil, Link, Move, Copy, Archive, FolderPlus, ListPlus, Zap } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Folder, List, Trash2, Pencil, Link, Move, Copy, Archive, FolderPlus, ListPlus, Zap } from "lucide-react";
 import { useNavigate } from "@/lib/router-compat";
 import { useFolders, useCreateFolder } from "@/hooks/useFolders";
 import { useLists, useCreateList } from "@/hooks/useLists";
