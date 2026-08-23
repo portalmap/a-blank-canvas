@@ -3,22 +3,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Target, 
-  ChevronRight, 
-  ChevronDown,
-  Folder,
-  List,
-  Layout
-} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Target, Maximize2, Search } from 'lucide-react';
+import { LocationTree } from '@/components/settings/LocationTree';
 import { useStatusTemplates, useApplyStatusTemplate } from '@/hooks/useStatusTemplates';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useFoldersForWorkspace } from '@/hooks/useFolders';
 import { useListsForWorkspace } from '@/hooks/useLists';
 import { toast } from 'sonner';
+
 
 interface StatusApplySectionProps {
   workspaceId: string;
