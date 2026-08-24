@@ -250,7 +250,7 @@ function normalizarSemPontuacao(valor: string): string {
 }
 
 // Prefixos canônicos (o sufixo "| Cliente" dos nomes reais é ignorado).
-const FOLDER_DESTINO = "tarefas demandas";
+const FOLDER_DESTINO = "tarefas & demandas";
 const LISTA_DESTINO = "plan de criativos";
 
 // Remove o prefixo visual "MAP |" do nome do space.
