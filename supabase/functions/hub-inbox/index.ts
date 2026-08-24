@@ -461,34 +461,34 @@ async function handleCalendarioPublicar(
       }
     }
 
-    // 1. Resolver o cliente (workspace) uma única vez.
-    const chave = normalizarNome(dados.cliente_chave);
-    const { data: workspaces, error: wsError } = await admin
+    // 1. Resolver o cliente (Space) uma única vez, pelo nome recebido.
+    const clienteRes = await resolverCliente(admin, dados.cliente_chave);
+    if (!clienteRes.space) {
+      return json(
+        {
+          error: clienteRes.erro,
+          cliente_chave: dados.cliente_chave,
+          clientes_disponiveis: clienteRes.clientes ?? [],
+        },
+        422,
+        origin,
+      );
+    }
+    const space = clienteRes.space;
+
+    const { data: workspaceRow, error: wsError } = await admin
       .from("workspaces")
-      .select("id, name, created_by_user_id");
+      .select("id, name, created_by_user_id")
+      .eq("id", space.workspace_id)
+      .maybeSingle();
     if (wsError) throw wsError;
-
-    const candidatos = (workspaces ?? []).filter(
-      (w: any) => normalizarNome(w.name) === chave,
-    );
-    if (candidatos.length === 0) {
-      return json(
-        { error: "cliente_nao_encontrado", cliente_chave: dados.cliente_chave },
-        422,
-        origin,
-      );
+    if (!workspaceRow) {
+      return json({ error: "workspace_do_cliente_nao_encontrado" }, 422, origin);
     }
-    if (candidatos.length > 1) {
-      return json(
-        { error: "cliente_ambiguo", cliente_chave: dados.cliente_chave },
-        422,
-        origin,
-      );
-    }
-    const workspace = candidatos[0];
+    const workspace = workspaceRow;
 
-    // 2. Lista de destino canônica: "Tarefas & Demandas" -> "Plan. de Criativos".
-    const lista = await resolverListaDestino(admin, workspace.id);
+    // 2. Lista de destino dentro do Space: "Tarefas & Demandas" -> "Plan. de Criativos".
+    const lista = await resolverListaDestino(admin, space.id);
     if (!lista.listId) {
       return json(
         {
