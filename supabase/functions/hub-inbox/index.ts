@@ -494,6 +494,8 @@ async function handleCalendarioPublicar(
         {
           error: lista.erro,
           workspace_id: workspace.id,
+          space_id: space.id,
+          space_name: space.name,
           pasta_esperada: "Tarefas & Demandas",
           lista_esperada: "Plan. de Criativos",
           pasta_encontrada: lista.pasta ?? null,
