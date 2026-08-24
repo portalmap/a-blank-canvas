@@ -628,7 +628,13 @@ async function handleCalendarioPublicar(
     }
 
     const resposta = {
-      cliente: { workspace_id: workspace.id, name: workspace.name },
+      cliente: {
+        nome_recebido: dados.cliente_chave,
+        client_name: space.client_name ?? null,
+        space_id: space.id,
+        space_name: space.name,
+      },
+      workspace_id: workspace.id,
       list_id: lista.listId,
       list_name: listaInfo?.name ?? null,
       resultados,
