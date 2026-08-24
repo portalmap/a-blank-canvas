@@ -2096,6 +2096,7 @@ export type Database = {
         Row: {
           account_user_id: string | null
           archived_at: string | null
+          client_name: string | null
           color: string | null
           created_at: string
           description: string | null
@@ -2109,6 +2110,7 @@ export type Database = {
         Insert: {
           account_user_id?: string | null
           archived_at?: string | null
+          client_name?: string | null
           color?: string | null
           created_at?: string
           description?: string | null
@@ -2122,6 +2124,7 @@ export type Database = {
         Update: {
           account_user_id?: string | null
           archived_at?: string | null
+          client_name?: string | null
           color?: string | null
           created_at?: string
           description?: string | null
@@ -3597,6 +3600,7 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      normalize_client_key: { Args: { _valor: string }; Returns: string }
       restore_space: { Args: { p_space_id: string }; Returns: undefined }
       sync_hub_role_to_app_roles: {
         Args: { _role_slug: string; _user_id: string }
