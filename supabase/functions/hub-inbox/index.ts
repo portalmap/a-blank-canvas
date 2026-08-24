@@ -249,8 +249,14 @@ function normalizarSemPontuacao(valor: string): string {
     .trim();
 }
 
-const FOLDER_DESTINO = "tarefas & demandas";
+// Prefixos canônicos (o sufixo "| Cliente" dos nomes reais é ignorado).
+const FOLDER_DESTINO = "tarefas demandas";
 const LISTA_DESTINO = "plan de criativos";
+
+// Remove o prefixo visual "MAP |" do nome do space.
+function semPrefixoMap(valor: string): string {
+  return normalizarSemPontuacao(valor).replace(/^map\s+/, "").trim();
+}
 
 async function resolverAutor(admin: any, workspace: any): Promise<string | null> {
   if (workspace.created_by_user_id) return workspace.created_by_user_id;
@@ -263,10 +269,61 @@ async function resolverAutor(admin: any, workspace: any): Promise<string | null>
   return data?.user_id ?? null;
 }
 
-// Lista canônica: pasta "Tarefas & Demandas" -> lista "Plan. de Criativos".
+// Cliente = Space. Chave oficial: spaces.client_name.
+// Reserva: spaces.name sem o prefixo "MAP |".
+async function resolverCliente(
+  admin: any,
+  nomeRecebido: string,
+): Promise<{
+  space?: { id: string; name: string; client_name: string | null; workspace_id: string };
+  erro?: string;
+  clientes?: string[];
+}> {
+  const alvo = normalizarSemPontuacao(nomeRecebido);
+  const alvoSemMap = semPrefixoMap(nomeRecebido);
+
+  const { data: spaces, error } = await admin
+    .from("spaces")
+    .select("id, name, client_name, workspace_id, archived_at");
+  if (error) throw error;
+
+  const ativos = (spaces ?? []).filter((s: any) => !s.archived_at);
+
+  const porClientName = ativos.filter(
+    (s: any) =>
+      s.client_name &&
+      (normalizarSemPontuacao(s.client_name) === alvo ||
+        normalizarSemPontuacao(s.client_name) === alvoSemMap),
+  );
+
+  const candidatos =
+    porClientName.length > 0
+      ? porClientName
+      : ativos.filter(
+          (s: any) =>
+            semPrefixoMap(s.name) === alvoSemMap ||
+            normalizarSemPontuacao(s.name) === alvo,
+        );
+
+  const disponiveis = ativos.map((s: any) => s.client_name ?? s.name);
+
+  if (candidatos.length === 0) {
+    return { erro: "cliente_nao_encontrado", clientes: disponiveis };
+  }
+  if (candidatos.length > 1) {
+    return {
+      erro: "cliente_ambiguo",
+      clientes: candidatos.map((s: any) => s.client_name ?? s.name),
+    };
+  }
+  return { space: candidatos[0] };
+}
+
+// Lista canônica dentro do Space do cliente:
+// pasta "Tarefas & Demandas ..." -> lista "Plan. de Criativos ...".
 async function resolverListaDestino(
   admin: any,
-  workspaceId: string,
+  spaceId: string,
 ): Promise<{
   listId?: string;
   erro?: string;
@@ -274,16 +331,15 @@ async function resolverListaDestino(
   listas?: string[];
   pasta?: string;
 }> {
-  // folders pertencem a spaces; o workspace vem via spaces.workspace_id.
   const { data: pastas, error: pastasErr } = await admin
     .from("folders")
-    .select("id, name, space_id, spaces!inner(workspace_id)")
-    .eq("spaces.workspace_id", workspaceId);
+    .select("id, name")
+    .eq("space_id", spaceId);
   if (pastasErr) throw pastasErr;
 
   const pastasDisponiveis = pastas ?? [];
-  const alvoPastas = pastasDisponiveis.filter(
-    (f: any) => normalizarSemPontuacao(f.name) === FOLDER_DESTINO,
+  const alvoPastas = pastasDisponiveis.filter((f: any) =>
+    normalizarSemPontuacao(f.name).startsWith(FOLDER_DESTINO),
   );
   if (alvoPastas.length === 0) {
     return {
@@ -306,8 +362,8 @@ async function resolverListaDestino(
   if (listasErr) throw listasErr;
 
   const listasDisponiveis = listas ?? [];
-  const alvoListas = listasDisponiveis.filter(
-    (l: any) => normalizarSemPontuacao(l.name) === LISTA_DESTINO,
+  const alvoListas = listasDisponiveis.filter((l: any) =>
+    normalizarSemPontuacao(l.name).startsWith(LISTA_DESTINO),
   );
   if (alvoListas.length === 0) {
     return {
