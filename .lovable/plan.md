@@ -1,41 +1,55 @@
-# Receber o nome do cliente e resolver para o código interno
+# Campo do cliente no Space + recebimento pelo nome
 
-O Social Flow (via Hub) envia o **nome do cliente** em texto. O MAP Flow precisa transformar esse nome no **código interno** (UUID do Space do cliente e da lista de destino) sem mudar nada na forma de trabalhar: nenhuma tela nova, nenhuma coluna nova, nenhuma renomeação de Space, pasta ou lista.
+O Social Flow (via Hub) envia o **nome do cliente** em texto. O MAP Flow precisa transformar esse nome no **código interno** (ID do Space e da lista de destino) sem mudar a forma de trabalhar: nenhuma tela nova, nenhuma renomeação de Space, pasta ou lista.
 
 ## Situação atual (verificada no banco)
 
 - Existe **um único workspace**: "Operacional MAP".
 - Cada cliente é um **Space** com o padrão `MAP | <Cliente>` (ex.: `MAP | Accerth`, `MAP | Zomata Seguros`) — 26 spaces hoje.
 - Dentro de cada Space: pasta `Tarefas & Demandas | <Cliente>` e lista `Plan. de Criativos | <Cliente>`.
-- O recebimento atual de `calendario.publicar` procura o cliente em `workspaces.name` e depois uma pasta chamada exatamente "Tarefas & Demandas" e lista "Plan. de Criativos". Como os nomes reais têm o sufixo `| Cliente` e o cliente é Space (não workspace), essa resolução não encontra o destino.
+- A tabela `spaces` tem hoje: `name`, `description`, `color`, `status_source`, `status_template_id`, `archived_at`, `account_user_id`. **Não existe** nenhum campo com o nome do cliente separado — só o `name` visual com o prefixo `MAP |`.
 
-## O que muda
+## 1. Campo novo: `spaces.client_name`
 
-Trocar a etapa de identificação do cliente por uma resolução em três passos, tolerante ao texto que chega:
+Uma coluna nova, opcional, que passa a ser a **chave oficial de recebimento**:
 
-1. **Nome → Space**: compara o nome recebido com os Spaces do workspace, ignorando maiúsculas, acentos, pontuação, espaços extras e o prefixo `MAP |`. "accerth", "Accerth", "MAP | Accerth" e "MAP  |  Accérth" chegam todos no mesmo Space.
-2. **Space → pasta**: dentro do Space, a pasta cujo nome começa com "Tarefas & Demandas" (o sufixo `| Cliente` é ignorado).
+| Campo | O que guarda | Tipo | Obrigatório |
+|---|---|---|---|
+| `client_name` | Nome do cliente como o Social Flow o envia (ex.: `Accerth`) | texto | opcional |
+
+- Preenchida automaticamente na migration para os 26 spaces existentes, a partir do `name` sem o prefixo `MAP | ` (`MAP \| Accerth` → `Accerth`).
+- Índice único sobre a versão normalizada (minúsculo, sem acento) por workspace, para nunca haver dois spaces disputando o mesmo nome de cliente.
+- Nada visual muda: `spaces.name` continua exatamente como está e a interface segue usando ele.
+
+## 2. Recebimento: nome → ID
+
+O assunto `calendario.publicar` passa a resolver em três passos:
+
+1. **Nome → Space**: casa o nome recebido com `spaces.client_name` (comparação sem maiúsculas, acentos, pontuação ou espaços extras). Como reserva, se nenhum `client_name` casar, tenta o `spaces.name` ignorando o prefixo `MAP |` — assim um space criado sem o campo preenchido ainda funciona.
+2. **Space → pasta**: a pasta do Space cujo nome começa com "Tarefas & Demandas" (o sufixo `| Cliente` é ignorado).
 3. **Pasta → lista**: a lista cujo nome começa com "Plan. de Criativos". É aí que os posts entram.
 
-Depois disso, o fluxo já existente continua igual: idempotência por `external_post_ref`, status derivado do canal, anexos, e resposta com os códigos.
+Depois disso o fluxo existente segue igual: idempotência por `external_post_ref`, status derivado do canal, anexos e resposta com os códigos.
 
-## Erros claros, nada criado por engano
+## 3. Erros claros, nada criado por engano
 
-Se o nome não casar com nenhum Space, ou casar com mais de um, ou faltar a pasta/lista esperada, a requisição é recusada com um erro explícito informando o nome recebido e os nomes disponíveis. O MAP Flow **não cria** Space, pasta nem lista automaticamente.
+Se o nome não casar com nenhum Space, casar com mais de um, ou faltar a pasta/lista esperada, a requisição é recusada com erro explícito informando o nome recebido e os nomes disponíveis. O MAP Flow **não cria** Space, pasta nem lista automaticamente.
 
-## Resposta ao Social Flow
+## 4. Resposta ao Social Flow
 
-A resposta passa a devolver o código resolvido, para o Social Flow poder guardar o par:
-
-- `cliente`: `{ nome_recebido, space_id, space_name }`
+- `cliente`: `{ nome_recebido, client_name, space_id, space_name }`
 - `workspace_id`, `list_id`, `list_name`
 - `resultados`: por post, `external_post_ref` + `task_id` + `criada`/`ja_existia`
 
 ## Detalhes técnicos
 
-- Arquivo único alterado: `supabase/functions/hub-inbox/index.ts`, apenas dentro de `handleCalendarioPublicar` e seus helpers (`resolverListaDestino`). Os assuntos `diagnostico.ping` e `tarefa.listar_para_aprovacao` ficam intocados.
-- Nova função `resolverCliente(admin, nomeRecebido)`: lê `spaces` filtrando `workspace_id`, normaliza (NFD sem diacríticos, minúsculo, pontuação → espaço, remove prefixo `map`), e retorna `{ space_id, space_name, workspace_id }` ou erro `cliente_nao_encontrado` / `cliente_ambiguo`.
-- `resolverListaDestino` passa a receber `space_id` e usar `startsWith` normalizado para pasta ("tarefas demandas") e lista ("plan de criativos"), em vez de igualdade exata contra o workspace inteiro.
-- `resolverAutor` passa a usar o `created_by_user_id` do workspace do Space, com fallback para o `global_owner` (comportamento atual).
-- Sem migration, sem mudança de RLS/grants, sem alteração de tela.
-- Validação: chamada de teste ao endpoint com `cliente_chave: "Accerth"` conferindo que a tarefa cai em `Plan. de Criativos | Accerth`, e um segundo envio do mesmo `external_post_ref` retornando `ja_existia`.
+- Migration: `ALTER TABLE public.spaces ADD COLUMN client_name text;` + `UPDATE` de backfill removendo o prefixo `MAP | ` + `CREATE UNIQUE INDEX ... ON public.spaces (workspace_id, lower(unaccent-equivalente(client_name))) WHERE client_name IS NOT NULL` (normalização feita com `lower(translate(...))` imutável, sem depender de extensão). Sem mudança de RLS/grants — políticas de `spaces` já cobrem a coluna nova.
+- Código: apenas `supabase/functions/hub-inbox/index.ts`, dentro de `handleCalendarioPublicar` e `resolverListaDestino`. Os assuntos `diagnostico.ping` e `tarefa.listar_para_aprovacao` ficam intocados.
+- Nova função `resolverCliente(admin, nomeRecebido)`: lê `spaces` (id, name, client_name, workspace_id), normaliza e retorna o space ou erro `cliente_nao_encontrado` / `cliente_ambiguo`.
+- `resolverListaDestino` passa a receber `space_id` e a usar comparação por prefixo normalizado para pasta e lista.
+- `src/integrations/supabase/types.ts` é regenerado após a migration.
+- Validação: envio de teste com `cliente_chave: "Accerth"` conferindo que a tarefa cai em `Plan. de Criativos | Accerth`, e reenvio do mesmo `external_post_ref` retornando `ja_existia`.
+
+## Fora do escopo
+
+Campo de cliente editável na interface do Space (dá para adicionar depois, no diálogo de edição do Space) e exibição de formato/rede social na tarefa.
