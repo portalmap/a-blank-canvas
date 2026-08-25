@@ -914,6 +914,8 @@ async function handleCalendarioDecisao(
         activity_type: "comment.created",
         metadata: {
           comment_id: comentarioRow.id,
+          content,
+          comentario_cliente: comentario || null,
           origem: "hub",
           decisao,
           aprovador_nome: dados.aprovador_nome,
