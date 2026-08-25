@@ -661,7 +661,170 @@ async function handleCalendarioPublicar(
     return json({ error: "erro_processamento" }, 500, origin);
   }
 }
+// ==========================================================================
+// calendario.post.aprovado / calendario.post.reprovado — recebe a decisão do
+// cliente (via Hub) sobre tarefas já publicadas. Modo "entrega".
+// Módulo isolado: não altera os demais assuntos.
+// ==========================================================================
 
+const DecisaoItemSchema = z.object({
+  id: z.string().uuid(),
+  comentario: z.string().nullish(),
+});
+
+const DecisaoSchema = z.object({
+  aprovador_nome: z.string().min(1),
+  tasks: z.array(DecisaoItemSchema).min(1),
+});
+
+async function handleCalendarioDecisao(
+  admin: any,
+  modo: string | null,
+  payload: unknown,
+  mensagemId: string | null,
+  aprovado: boolean,
+  origin: string | null,
+) {
+  if (modo !== "entrega") {
+    return json({ error: "modo_nao_suportado", modo }, 422, origin);
+  }
+
+  const parsed = DecisaoSchema.safeParse(payload ?? {});
+  if (!parsed.success) {
+    return json(
+      {
+        error: "payload_invalido",
+        detalhes: parsed.error.issues.map((i) => ({
+          campo: i.path.join("."),
+          motivo: i.message,
+        })),
+      },
+      422,
+      origin,
+    );
+  }
+  const dados = parsed.data;
+  const decisao = aprovado ? "aprovado" : "devolvido";
+
+  try {
+    // Idempotência por mensagem: mesma id => devolve a resposta guardada,
+    // sem criar comentário nem incrementar o contador novamente.
+    if (mensagemId) {
+      const { data: jaProcessada } = await admin
+        .from("hub_inbox_processed")
+        .select("resposta")
+        .eq("mensagem_id", mensagemId)
+        .maybeSingle();
+      if (jaProcessada?.resposta) {
+        return json(jaProcessada.resposta, 200, origin);
+      }
+    }
+
+    const resultados: Array<Record<string, unknown>> = [];
+
+    for (const item of dados.tasks) {
+      // 1. Localizar a tarefa
+      const { data: task, error: taskErr } = await admin
+        .from("tasks")
+        .select("id, workspace_id, cliente_devolucoes_count")
+        .eq("id", item.id)
+        .maybeSingle();
+      if (taskErr) throw taskErr;
+      if (!task) {
+        resultados.push({ id: item.id, status: "erro", error: "task_nao_encontrada" });
+        continue;
+      }
+
+      // Autor técnico: criador do workspace da tarefa (mesmo padrão do publicar)
+      const { data: workspaceRow, error: wsErr } = await admin
+        .from("workspaces")
+        .select("id, created_by_user_id")
+        .eq("id", task.workspace_id)
+        .maybeSingle();
+      if (wsErr) throw wsErr;
+      const autorId = await resolverAutor(admin, workspaceRow ?? {});
+      if (!autorId) {
+        resultados.push({ id: item.id, status: "erro", error: "autor_tecnico_indefinido" });
+        continue;
+      }
+
+      // 2. Comentário (sempre, aprovado ou devolvido)
+      const comentario = (item.comentario ?? "").trim();
+      const content = aprovado
+        ? `Cliente ${dados.aprovador_nome} aprovou.` +
+          (comentario ? ` Comentário: ${comentario}` : "")
+        : `Cliente ${dados.aprovador_nome} devolveu. Comentário: ${comentario}`;
+
+      const { data: comentarioRow, error: comErr } = await admin
+        .from("task_comments")
+        .insert({ task_id: task.id, author_id: autorId, content })
+        .select("id")
+        .single();
+      if (comErr) throw comErr;
+
+      const { error: actErr } = await admin.from("task_activities").insert({
+        task_id: task.id,
+        user_id: autorId,
+        activity_type: "comment.created",
+        metadata: {
+          comment_id: comentarioRow.id,
+          origem: "hub",
+          decisao,
+          aprovador_nome: dados.aprovador_nome,
+        },
+      });
+      if (actErr) throw actErr;
+
+      // 3. Contador de devoluções (só no reprovado)
+      let novoContador: number | undefined;
+      if (!aprovado) {
+        novoContador = (task.cliente_devolucoes_count ?? 0) + 1;
+        const { error: updErr } = await admin
+          .from("tasks")
+          .update({ cliente_devolucoes_count: novoContador })
+          .eq("id", task.id);
+        if (updErr) throw updErr;
+      }
+
+      resultados.push({
+        id: item.id,
+        status: "processado",
+        comment_id: comentarioRow.id,
+        ...(novoContador !== undefined
+          ? { cliente_devolucoes_count: novoContador }
+          : {}),
+      });
+    }
+
+    const resposta = {
+      decisao,
+      aprovador_nome: dados.aprovador_nome,
+      resultados,
+    };
+
+    if (mensagemId) {
+      try {
+        await admin.from("hub_inbox_processed").insert({
+          mensagem_id: mensagemId,
+          assunto: aprovado
+            ? "calendario.post.aprovado"
+            : "calendario.post.reprovado",
+          resposta,
+        });
+      } catch (e) {
+        console.error("hub_inbox_processed insert failed", e);
+      }
+    }
+
+    return json(resposta, 200, origin);
+  } catch (e) {
+    console.error(
+      `calendario.post.${aprovado ? "aprovado" : "reprovado"} falhou`,
+      e instanceof Error ? e.message : JSON.stringify(e),
+    );
+    return json({ error: "erro_processamento" }, 500, origin);
+  }
+}
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
