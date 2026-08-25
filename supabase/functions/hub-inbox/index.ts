@@ -667,15 +667,130 @@ async function handleCalendarioPublicar(
 // Módulo isolado: não altera os demais assuntos.
 // ==========================================================================
 
+const DecisaoAnexoSchema = z.object({
+  file_name: z.string().optional(),
+  file_url: z.string().min(1),
+});
+
 const DecisaoItemSchema = z.object({
   id: z.string().uuid(),
   comentario: z.string().nullish(),
+  attachments: z.array(DecisaoAnexoSchema).optional(),
 });
 
 const DecisaoSchema = z.object({
   aprovador_nome: z.string().min(1),
   tasks: z.array(DecisaoItemSchema).min(1),
 });
+
+// Sanitiza o nome do arquivo para o path no storage (igual ao app).
+function sanitizeFileName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_");
+}
+
+// Baixa cada anexo da URL assinada (Portal), sobe no bucket task-attachments
+// do MAP Flow e registra em task_attachments. Falha de um anexo não afeta os
+// demais nem o comentário/contador da decisão.
+async function processarAnexosDecisao(
+  admin: any,
+  taskId: string,
+  autorId: string,
+  anexos: Array<{ file_name?: string; file_url: string }>,
+) {
+  const resultados: Array<Record<string, unknown>> = [];
+
+  for (const anexo of anexos) {
+    const nomeOriginal =
+      anexo.file_name ?? anexo.file_url.split("?")[0].split("/").pop() ?? "arquivo";
+    try {
+      // 1. Download da URL assinada do Portal
+      const dl = await fetch(anexo.file_url);
+      if (!dl.ok) {
+        console.error(
+          "decisao anexo download falhou",
+          taskId,
+          nomeOriginal,
+          dl.status,
+        );
+        resultados.push({
+          file_name: nomeOriginal,
+          status: "erro",
+          error: "download_falhou",
+        });
+        continue;
+      }
+      const contentType = dl.headers.get("content-type");
+      const bytes = new Uint8Array(await dl.arrayBuffer());
+
+      // 2. Upload para o bucket task-attachments no path padrão do sistema
+      const storagePath = `${autorId}/${taskId}/${Date.now()}_${sanitizeFileName(nomeOriginal)}`;
+      const { error: upErr } = await admin.storage
+        .from("task-attachments")
+        .upload(storagePath, bytes, {
+          contentType: contentType ?? undefined,
+          upsert: false,
+        });
+      if (upErr) {
+        console.error(
+          "decisao anexo upload falhou",
+          taskId,
+          nomeOriginal,
+          upErr.message,
+        );
+        resultados.push({
+          file_name: nomeOriginal,
+          status: "erro",
+          error: "upload_falhou",
+        });
+        continue;
+      }
+
+      // 3. Registro em task_attachments (file_url = path no storage local)
+      const { error: insErr } = await admin.from("task_attachments").insert({
+        task_id: taskId,
+        file_name: nomeOriginal,
+        file_url: storagePath,
+        file_type: contentType ?? null,
+        file_size: bytes.byteLength,
+        uploaded_by: autorId,
+      });
+      if (insErr) {
+        console.error(
+          "decisao anexo registro falhou",
+          taskId,
+          nomeOriginal,
+          insErr.message,
+        );
+        resultados.push({
+          file_name: nomeOriginal,
+          status: "erro",
+          error: "registro_falhou",
+        });
+        continue;
+      }
+
+      resultados.push({ file_name: nomeOriginal, status: "ok" });
+    } catch (e) {
+      console.error(
+        "decisao anexo erro inesperado",
+        taskId,
+        nomeOriginal,
+        e instanceof Error ? e.message : JSON.stringify(e),
+      );
+      resultados.push({
+        file_name: nomeOriginal,
+        status: "erro",
+        error: "erro_inesperado",
+      });
+    }
+  }
+
+  return resultados;
+}
 
 async function handleCalendarioDecisao(
   admin: any,
