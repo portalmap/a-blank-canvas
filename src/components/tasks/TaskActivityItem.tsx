@@ -20,7 +20,8 @@ import {
   UserCheck,
   Paperclip,
   Pencil,
-  Plug
+  Plug,
+  Undo2
 } from 'lucide-react';
 import { TaskActivity, getActivityLabel, useCreateTaskActivity, useUpdateActivityMetadata } from '@/hooks/useTaskActivities';
 import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } from '@/hooks/useTaskComments';
@@ -153,6 +154,10 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
   const isPortal = activity.metadata?.created_by === 'portal';
   const integrationLabel = activity.metadata?.integration_label as string | undefined;
   const isIntegration = !isAutomation && !isPortal && !!integrationLabel;
+  // Decisão do cliente vinda do Hub (calendario.post.aprovado/reprovado)
+  const hubDecisao = activity.metadata?.origem === 'hub' ? (activity.metadata?.decisao as string | undefined) : undefined;
+  const isHubDecisao = !!hubDecisao;
+  const clienteNome = activity.metadata?.aprovador_nome as string | undefined;
   
   const { user } = useAuth();
   const { data: comments } = useTaskComments(taskId);
