@@ -490,7 +490,8 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
             )}
 
             {/* Attachment preview */}
-            {activity.activity_type === 'attachment.added' && activity.metadata?.file_url && (
+            {activity.activity_type === 'attachment.added' && 
+             (activity.metadata?.file_url || activity.metadata?.storage_path) && (
               <AttachmentPreviewInActivity metadata={activity.metadata} />
             )}
 
