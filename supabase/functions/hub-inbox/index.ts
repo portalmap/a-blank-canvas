@@ -891,6 +891,14 @@ Deno.serve(async (req) => {
     return await handleCalendarioPublicar(admin, modo, payload, mensagemId, origin);
   }
 
+  if (assunto === "calendario.post.aprovado") {
+    return await handleCalendarioDecisao(admin, modo, payload, mensagemId, true, origin);
+  }
+
+  if (assunto === "calendario.post.reprovado") {
+    return await handleCalendarioDecisao(admin, modo, payload, mensagemId, false, origin);
+  }
+
 
   if (assunto !== "diagnostico.ping") {
     return json(
