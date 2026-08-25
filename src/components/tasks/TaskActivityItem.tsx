@@ -324,7 +324,26 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
           
           <div className="flex-1 min-w-0">
             <p className="text-sm">
-              {isAutomation ? (
+              {isHubDecisao ? (
+                <>
+                  <span className="font-medium">{clienteNome || 'Cliente'}</span>{' '}
+                  <span className="text-muted-foreground text-xs">via Portal</span>{' '}
+                  {hubDecisao === 'aprovado' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Aprovado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <Undo2 className="h-3 w-3" />
+                      Devolvido
+                    </span>
+                  )}{' '}
+                  {activity.activity_type === 'attachment.added' && (
+                    <span className="text-muted-foreground">anexou um arquivo</span>
+                  )}
+                </>
+              ) : isAutomation ? (
                 <>
                   <span className="font-medium text-amber-600 dark:text-amber-400">
                     ⚡ {activity.metadata?.automation_name || 'Automação'}
