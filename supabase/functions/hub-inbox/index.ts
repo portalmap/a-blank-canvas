@@ -901,6 +901,17 @@ async function handleCalendarioDecisao(
         if (updErr) throw updErr;
       }
 
+      // 4. Anexos da decisão (se houver) — falha de anexo não invalida o resto
+      let anexosResultado: Array<Record<string, unknown>> | undefined;
+      if (item.attachments?.length) {
+        anexosResultado = await processarAnexosDecisao(
+          admin,
+          task.id,
+          autorId,
+          item.attachments,
+        );
+      }
+
       resultados.push({
         id: item.id,
         status: "processado",
@@ -908,6 +919,7 @@ async function handleCalendarioDecisao(
         ...(novoContador !== undefined
           ? { cliente_devolucoes_count: novoContador }
           : {}),
+        ...(anexosResultado ? { attachments: anexosResultado } : {}),
       });
     }
 
