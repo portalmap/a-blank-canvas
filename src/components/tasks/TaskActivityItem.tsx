@@ -412,7 +412,9 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
             {(activity.activity_type === 'comment.created' || 
               activity.activity_type === 'comment.edited' ||
               activity.activity_type === 'assignment.created') && 
-             (activity.metadata?.content || activity.metadata?.comment_content) && (
+             (isHubDecisao
+               ? !!activity.metadata?.comentario_cliente
+               : !!(activity.metadata?.content || activity.metadata?.comment_content)) && (
               <>
                 {isEditing ? (
                   <div className="mt-2 space-y-2">
