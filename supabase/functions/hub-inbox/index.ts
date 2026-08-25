@@ -942,6 +942,8 @@ async function handleCalendarioDecisao(
           task.id,
           autorId,
           item.attachments,
+          decisao,
+          dados.aprovador_nome,
         );
       }
 
