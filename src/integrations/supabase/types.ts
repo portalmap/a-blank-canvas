@@ -2935,6 +2935,7 @@ export type Database = {
         Row: {
           archived_at: string | null
           assignee_id: string | null
+          cliente_devolucoes_count: number
           completed_at: string | null
           cover_image_url: string | null
           created_at: string
@@ -2961,6 +2962,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           assignee_id?: string | null
+          cliente_devolucoes_count?: number
           completed_at?: string | null
           cover_image_url?: string | null
           created_at?: string
@@ -2987,6 +2989,7 @@ export type Database = {
         Update: {
           archived_at?: string | null
           assignee_id?: string | null
+          cliente_devolucoes_count?: number
           completed_at?: string | null
           cover_image_url?: string | null
           created_at?: string
