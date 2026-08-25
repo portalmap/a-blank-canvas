@@ -364,9 +364,11 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
               ) : (
                 <span className="font-medium">{userName}</span>
               )}{' '}
-              <span className="text-muted-foreground">
-                {getActivityLabel(activity)}
-              </span>
+              {!isHubDecisao && (
+                <span className="text-muted-foreground">
+                  {getActivityLabel(activity)}
+                </span>
+              )}
             </p>
 
             {/* Assignment badge */}
