@@ -700,6 +700,8 @@ async function processarAnexosDecisao(
   taskId: string,
   autorId: string,
   anexos: Array<{ file_name?: string; file_url: string }>,
+  decisao: string,
+  aprovadorNome: string,
 ) {
   const resultados: Array<Record<string, unknown>> = [];
 
