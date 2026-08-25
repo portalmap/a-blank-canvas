@@ -20,7 +20,8 @@ import {
   UserCheck,
   Paperclip,
   Pencil,
-  Plug
+  Plug,
+  Undo2
 } from 'lucide-react';
 import { TaskActivity, getActivityLabel, useCreateTaskActivity, useUpdateActivityMetadata } from '@/hooks/useTaskActivities';
 import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } from '@/hooks/useTaskComments';
@@ -153,6 +154,10 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
   const isPortal = activity.metadata?.created_by === 'portal';
   const integrationLabel = activity.metadata?.integration_label as string | undefined;
   const isIntegration = !isAutomation && !isPortal && !!integrationLabel;
+  // Decisão do cliente vinda do Hub (calendario.post.aprovado/reprovado)
+  const hubDecisao = activity.metadata?.origem === 'hub' ? (activity.metadata?.decisao as string | undefined) : undefined;
+  const isHubDecisao = !!hubDecisao;
+  const clienteNome = activity.metadata?.aprovador_nome as string | undefined;
   
   const { user } = useAuth();
   const { data: comments } = useTaskComments(taskId);
@@ -319,7 +324,26 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
           
           <div className="flex-1 min-w-0">
             <p className="text-sm">
-              {isAutomation ? (
+              {isHubDecisao ? (
+                <>
+                  <span className="font-medium">{clienteNome || 'Cliente'}</span>{' '}
+                  <span className="text-muted-foreground text-xs">via Portal</span>{' '}
+                  {hubDecisao === 'aprovado' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Aprovado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <Undo2 className="h-3 w-3" />
+                      Devolvido
+                    </span>
+                  )}{' '}
+                  {activity.activity_type === 'attachment.added' && (
+                    <span className="text-muted-foreground">anexou um arquivo</span>
+                  )}
+                </>
+              ) : isAutomation ? (
                 <>
                   <span className="font-medium text-amber-600 dark:text-amber-400">
                     ⚡ {activity.metadata?.automation_name || 'Automação'}
@@ -340,9 +364,11 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
               ) : (
                 <span className="font-medium">{userName}</span>
               )}{' '}
-              <span className="text-muted-foreground">
-                {getActivityLabel(activity)}
-              </span>
+              {!isHubDecisao && (
+                <span className="text-muted-foreground">
+                  {getActivityLabel(activity)}
+                </span>
+              )}
             </p>
 
             {/* Assignment badge */}
@@ -386,7 +412,9 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
             {(activity.activity_type === 'comment.created' || 
               activity.activity_type === 'comment.edited' ||
               activity.activity_type === 'assignment.created') && 
-             (activity.metadata?.content || activity.metadata?.comment_content) && (
+             (isHubDecisao
+               ? !!activity.metadata?.comentario_cliente
+               : !!(activity.metadata?.content || activity.metadata?.comment_content)) && (
               <>
                 {isEditing ? (
                   <div className="mt-2 space-y-2">
@@ -432,7 +460,9 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
                     isResolved ? "bg-muted/30" : "bg-muted/50"
                   )}>
                     {(() => {
-                      const content = activity.metadata.content || activity.metadata.comment_content || '';
+                      const content = (isHubDecisao
+                        ? activity.metadata?.comentario_cliente
+                        : (activity.metadata?.content || activity.metadata?.comment_content)) || '';
                       const audioMatch = content.match(/\[audio:(.*?)\]/);
                       if (audioMatch) {
                         const audioUrl = audioMatch[1];
@@ -460,7 +490,8 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
             )}
 
             {/* Attachment preview */}
-            {activity.activity_type === 'attachment.added' && activity.metadata?.file_url && (
+            {activity.activity_type === 'attachment.added' && 
+             (activity.metadata?.file_url || activity.metadata?.storage_path) && (
               <AttachmentPreviewInActivity metadata={activity.metadata} />
             )}
 

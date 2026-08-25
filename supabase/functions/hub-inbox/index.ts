@@ -700,6 +700,8 @@ async function processarAnexosDecisao(
   taskId: string,
   autorId: string,
   anexos: Array<{ file_name?: string; file_url: string }>,
+  decisao: string,
+  aprovadorNome: string,
 ) {
   const resultados: Array<Record<string, unknown>> = [];
 
@@ -750,14 +752,18 @@ async function processarAnexosDecisao(
       }
 
       // 3. Registro em task_attachments (file_url = path no storage local)
-      const { error: insErr } = await admin.from("task_attachments").insert({
-        task_id: taskId,
-        file_name: nomeOriginal,
-        file_url: storagePath,
-        file_type: contentType ?? null,
-        file_size: bytes.byteLength,
-        uploaded_by: autorId,
-      });
+      const { data: anexoRow, error: insErr } = await admin
+        .from("task_attachments")
+        .insert({
+          task_id: taskId,
+          file_name: nomeOriginal,
+          file_url: storagePath,
+          file_type: contentType ?? null,
+          file_size: bytes.byteLength,
+          uploaded_by: autorId,
+        })
+        .select("id")
+        .single();
       if (insErr) {
         console.error(
           "decisao anexo registro falhou",
@@ -771,6 +777,31 @@ async function processarAnexosDecisao(
           error: "registro_falhou",
         });
         continue;
+      }
+
+      // 4. Atividade attachment.added para o anexo aparecer na aba Atividade
+      const { error: actAnexoErr } = await admin.from("task_activities").insert({
+        task_id: taskId,
+        user_id: autorId,
+        activity_type: "attachment.added",
+        metadata: {
+          attachment_id: anexoRow?.id ?? null,
+          file_name: nomeOriginal,
+          file_type: contentType ?? null,
+          file_size: bytes.byteLength,
+          storage_path: storagePath,
+          origem: "hub",
+          decisao,
+          aprovador_nome: aprovadorNome,
+        },
+      });
+      if (actAnexoErr) {
+        console.error(
+          "decisao anexo atividade falhou",
+          taskId,
+          nomeOriginal,
+          actAnexoErr.message,
+        );
       }
 
       resultados.push({ file_name: nomeOriginal, status: "ok" });
@@ -883,6 +914,8 @@ async function handleCalendarioDecisao(
         activity_type: "comment.created",
         metadata: {
           comment_id: comentarioRow.id,
+          content,
+          comentario_cliente: comentario || null,
           origem: "hub",
           decisao,
           aprovador_nome: dados.aprovador_nome,
@@ -909,6 +942,8 @@ async function handleCalendarioDecisao(
           task.id,
           autorId,
           item.attachments,
+          decisao,
+          dados.aprovador_nome,
         );
       }
 
