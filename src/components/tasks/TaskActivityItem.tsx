@@ -460,7 +460,9 @@ export const TaskActivityItem = ({ activity, taskId, workspaceId }: TaskActivity
                     isResolved ? "bg-muted/30" : "bg-muted/50"
                   )}>
                     {(() => {
-                      const content = activity.metadata.content || activity.metadata.comment_content || '';
+                      const content = (isHubDecisao
+                        ? activity.metadata?.comentario_cliente
+                        : (activity.metadata?.content || activity.metadata?.comment_content)) || '';
                       const audioMatch = content.match(/\[audio:(.*?)\]/);
                       if (audioMatch) {
                         const audioUrl = audioMatch[1];
