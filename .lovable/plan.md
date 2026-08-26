@@ -1,121 +1,97 @@
-# Enviar tarefa para aprovação via Hub ao marcar tag
+# Disparo automático: tag "enviar aprovação" → MAP Flow envia ao Hub → Portal MAP
 
-## Diagnóstico corrigido
+## Objetivo
 
-O fluxo correto não é o Portal consultar diretamente o MAP Flow como origem principal da ação.
+Quando a tag **"enviar aprovação"** (id `78b84f6c-b619-40bd-94f8-c1c2a63842c0`) for ADICIONADA a uma tarefa, o MAP Flow envia `calendario.aprovacao` ao Hub com destino `portal-map`, para o Portal reabrir o post com dados atualizados.
 
-O fluxo desejado é:
+**Não toca em:** SSO, `hub-inbox` (recebimento), fluxo legado `tarefa.listar_para_aprovacao`, tag antiga `enviar cliente`. Tudo fica intacto.
+
+## Confirmações do dicionário
+
+- Lista de itens: MAP Flow envia na chave **`tasks`** (o Hub traduz para `posts`). Confirmado — usarei `tasks`.
+- Nome do cliente no raiz: chave **`name`** (o Hub traduz para `cliente_nome`). Confirmado — usarei `name`.
+- `tasks.id` vai como `id` do item (o Hub traduz para `mapflow_task_id`, que casa o post existente no Portal).
+
+## Arquitetura do disparo
 
 ```text
-Usuário marca a tag "enviar aprovação" na tarefa
+Usuário marca tag "enviar aprovação" na tarefa (TaskTagsSelector)
         ↓
-MAP Flow detecta a marcação da tag
+useAddTaskTag (src/hooks/useTaskTags.ts) — só no onSuccess do insert
         ↓
-MAP Flow envia um envelope para o Hub
+se tag_id === 78b84f6c-...  →  supabase.functions.invoke("relay-approval-send")
         ↓
-Hub encaminha para o Portal MAP
+Edge Function relay-approval-send (verify_jwt=true, autenticada)
+   - busca dados atuais da tarefa no banco
+   - gera URLs assinadas dos anexos (bucket task-attachments, 45 dias — mesma validade que o app usa)
+   - POST {HUB_RELAY_URL}/api/public/relay  (Bearer HUB_RELAY_TOKEN, timeout 20s)
+   - registra em relay_diagnostico_log (direcao "enviado", sem token)
         ↓
-Portal MAP exibe o post novamente para aprovação do cliente
+Hub traduz e encaminha ao Portal MAP (permissão map-flow → portal-map já existe)
 ```
 
-## Estado atual confirmado
+Escolhi **frontend (hook de adicionar tag) + Edge Function** em vez de trigger de banco, porque:
+- garante que dispara **somente no ato de adicionar a tag** (nunca no carregamento da tela, nunca na remoção);
+- reutiliza o padrão já existente no projeto (`relay-test-send` usa as mesmas envs `HUB_RELAY_URL`/`HUB_RELAY_TOKEN`);
+- o segredo do Hub nunca chega ao navegador — só a Edge Function o lê.
 
-- Existem duas tags no workspace Operacional MAP:
-  - `enviar aprovação` — id `78b84f6c-b619-40bd-94f8-c1c2a63842c0`
-  - `enviar cliente` — id `d4f8592e-66dc-4b5b-b5c2-858571a031e5`
-- A `hub-inbox` atual ainda contém um fluxo de consulta para `tarefa.listar_para_aprovacao`, que filtra pela tag antiga `enviar cliente`.
-- Não há automação ativa hoje para tag adicionada (`on_tag_added`).
-- Não há endpoint cadastrado em `webhook_endpoints`; portanto, o dispatcher genérico de webhooks não está sendo usado para enviar isso ao Portal.
-- Já existe exemplo de envio MAP Flow → Hub → Portal em `relay-test-send`, usando `HUB_RELAY_URL`, `HUB_RELAY_TOKEN`, `destinos: ["portal-map"]` e assunto enviado ao Hub.
+## Mudanças
 
-## Mudança proposta
+### 1. Nova Edge Function `supabase/functions/relay-approval-send/index.ts`
 
-Criar um fluxo específico de saída para aprovação, acionado quando a tag `enviar aprovação` for adicionada à tarefa.
-
-### 1. Backend: função de envio para o Hub
-
-Criar uma Edge Function dedicada, por exemplo `relay-approval-send`, que:
-
-- Recebe `task_id` e `tag_id`.
-- Valida que a tag adicionada é exatamente `enviar aprovação`.
-- Busca os dados completos da tarefa:
-  - `tasks.id`
-  - título
-  - descrição
-  - cliente/space
-  - lista
-  - workspace
-  - `external_post_ref`
-  - `social_channel`
-  - `format`
-  - prazo/data
-  - anexos em `task_attachments`
-- Gera URLs assinadas para os anexos no bucket `task-attachments`.
-- Monta o envelope para o Hub com destino `portal-map`.
-- Envia para o Hub usando `HUB_RELAY_URL` e `HUB_RELAY_TOKEN`.
-- Registra log em `relay_diagnostico_log` ou estrutura equivalente já existente, sem expor segredo.
-
-Envelope sugerido:
+- `verify_jwt = true` (entrada em `supabase/config.toml`) — exige usuário autenticado.
+- Input: `{ task_id, tag_id }`.
+- Se `tag_id !== 78b84f6c-b619-40bd-94f8-c1c2a63842c0` → responde `{ skipped: true }` (proteção extra).
+- **Deduplicação (anti duplo-disparo):** consulta `relay_diagnostico_log` por mesmo `task_id` (em `payload->>task_id`) + assunto `calendario.aprovacao` no **mesmo minuto**; se existir, retorna `{ skipped: "duplicado" }` sem chamar o Hub. Remover e readicionar a tag depois é um envio novo e intencional — passa normalmente.
+- **Busca no momento do disparo:** task completa (`id, title, description, social_channel, format, due_date, workspace_id, list_id`); resolve nome do cliente: `spaces.client_name` com fallback para `spaces.name` (via `lists.space_id`) — mesma fonte que o recebimento usa; fallback final `workspaces.name`.
+- **Anexos:** lê `task_attachments` da tarefa; para cada um, extrai o path e gera signed URL em `task-attachments` (45 dias, como `useTaskAttachments.ts` já faz). Se um anexo falhar, ele é pulado e os demais seguem — o envio não quebra. Sem anexos → lista vazia.
+- **POST ao Hub** (`AbortSignal.timeout(20000)`):
 
 ```json
 {
   "destinos": ["portal-map"],
-  "assunto": "calendario.post.enviar_aprovacao",
+  "assunto": "calendario.aprovacao",
   "modo": "entrega",
   "referencia_origem": "<tasks.id>",
   "payload": {
-    "task_id": "<tasks.id>",
-    "external_post_ref": "<tasks.external_post_ref>",
-    "cliente_nome": "<spaces.client_name ou spaces.name>",
-    "titulo": "<tasks.title>",
-    "descricao": "<tasks.description>",
-    "social_channel": "<tasks.social_channel>",
-    "format": "<tasks.format>",
-    "due_date": "<tasks.due_date>",
-    "attachments": []
+    "name": "<nome do cliente>",
+    "tasks": [
+      {
+        "id": "<tasks.id>",
+        "title": "<tasks.title>",
+        "description": "<tasks.description>",
+        "social_channel": "<tasks.social_channel>",
+        "format": "<tasks.format>",
+        "due_date": "<tasks.due_date>",
+        "attachments": [{ "file_name": "...", "file_url": "<signed url>" }]
+      }
+    ]
   }
 }
 ```
 
-### 2. Frontend: disparar ao marcar a tag
+- **Log:** insert em `relay_diagnostico_log` com `direcao: "enviado"`, `destino: "portal-map"`, `assunto: "calendario.aprovacao"`, `modo: "entrega"`, payload e `status_code` da resposta do Hub. Token nunca é logado nem retornado.
+- **Erro do Hub:** retorna `{ success: false, hub_status }` — a tarefa não sofre nenhuma alteração (a tag permanece marcada; nada inconsistente).
 
-Ajustar o fluxo em `useTaskTags.ts`:
+### 2. Frontend: gatilho em `src/hooks/useTaskTags.ts`
 
-- Quando uma tag for adicionada, além das automações atuais, verificar se o nome da tag é `enviar aprovação`.
-- Se for, chamar a Edge Function `relay-approval-send`.
-- Não disparar no carregamento da tela, só no ato de adicionar a tag.
-- Não disparar quando a tag for removida.
+- No `onSuccess` de `useAddTaskTag`: busca o nome/id da tag adicionada; se for a tag "enviar aprovação" (comparação por **id**, imune a acento/caixa), chama `supabase.functions.invoke("relay-approval-send", { body: { task_id, tag_id } })`.
+- Falha no envio → `toast` destrutivo "Falha ao reenviar para aprovação" (a tag continua marcada; usuário pode remover e readicionar para reenviar).
+- Nada dispara em `useTaskTagRelations` (leitura) nem em `useRemoveTaskTag`.
 
-### 3. Idempotência
+### 3. Configuração
 
-Evitar reenvio duplicado por acidente:
+- Adicionar `[functions.relay-approval-send] verify_jwt = true` em `supabase/config.toml`.
+- Deploy da nova função. As envs `HUB_RELAY_URL` e `HUB_RELAY_TOKEN` já existem no projeto (usadas por `relay-test-send`).
 
-- Se a mesma tarefa receber a tag novamente após remoção e adição, considerar isso um novo envio intencional.
-- Se houver clique duplo/retry no mesmo momento, deduplicar usando janela curta ou registro em `hub_inbox_processed`/log equivalente com `task_id + assunto + minuto`.
+## Fora do escopo (fica como está)
 
-### 4. Compatibilidade com o fluxo antigo
-
-Manter `tarefa.listar_para_aprovacao` por enquanto para não quebrar o Portal caso ele ainda consulte esse assunto.
-
-Ajustar a tag do fluxo antigo para `enviar aprovação`, assim os dois caminhos ficam coerentes durante a transição:
-
-- novo caminho ativo: MAP Flow envia ao Hub quando marca a tag;
-- caminho legado: Portal/Hub ainda consegue consultar tarefas marcadas, se necessário.
-
-### 5. Banco de dados
-
-Não precisa migration estrutural.
-
-Usar `run_sql` apenas se for necessário consolidar tags:
-
-- Se a tag `enviar aprovação` já existe, ela deve ser usada como referência oficial.
-- Não apagar `enviar cliente` automaticamente sem revisar se há tarefas ainda marcadas nela.
-- Opcionalmente migrar relações antigas de `enviar cliente` para `enviar aprovação`, preservando `task_tag_relations`.
+- `hub-inbox` e o recebimento (`calendario.post.aprovado/reprovado`, `tarefa.listar_para_aprovacao`) — intactos.
+- SSO — intacto.
+- Tag antiga `enviar cliente` — mantida; limpeza é passo posterior.
 
 ## Validação
 
-1. Marcar a tag `enviar aprovação` em uma tarefa de teste.
-2. Confirmar que a chamada ao Hub foi feita com `destinos: ["portal-map"]`.
-3. Confirmar log de saída no banco.
-4. Confirmar que os anexos saem como URLs assinadas.
-5. Confirmar que o Portal MAP recebe o assunto `calendario.post.enviar_aprovacao` e consegue exibir o post para aprovação.
+1. Deploy da função e chamada de teste com a tarefa de teste existente ("TESTE RELAY — Post carrossel").
+2. Conferir `relay_diagnostico_log`: registro `enviado` com `hub_status` 200.
+3. Marcar a tag na interface e confirmar: um único disparo, toast em caso de erro, e sem disparo ao apenas abrir a tarefa.
