@@ -339,6 +339,10 @@ export function useRemoveTaskTag() {
         queryKey: ["task-tag-relations", variables.taskId],
       });
 
+      await logTagActivity(queryClient, variables.taskId, variables.tagId, "removed");
+
+
+
       // Clean up old execution records for this tag so re-adding can trigger again
       try {
         await supabase
