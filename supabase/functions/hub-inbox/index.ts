@@ -106,6 +106,7 @@ async function resolveTasksAttachments(supabase: any, tasks: any[]) {
 }
 
 const TAG_APROVACAO = "enviar cliente";
+const TAG_ENVIAR_APROVACAO_ID = "78b84f6c-b619-40bd-94f8-c1c2a63842c0";
 
 async function handleListarParaAprovacao(
   admin: any,
@@ -923,8 +924,9 @@ async function handleCalendarioDecisao(
       });
       if (actErr) throw actErr;
 
-      // 3. Contador de devoluções (só no reprovado)
+      // 3. Contador de devoluções + remoção da etiqueta (só no reprovado)
       let novoContador: number | undefined;
+      let tagRemovida: boolean | undefined;
       if (!aprovado) {
         novoContador = (task.cliente_devolucoes_count ?? 0) + 1;
         const { error: updErr } = await admin
@@ -932,6 +934,24 @@ async function handleCalendarioDecisao(
           .update({ cliente_devolucoes_count: novoContador })
           .eq("id", task.id);
         if (updErr) throw updErr;
+
+        // Remove a etiqueta "enviar aprovação" para sair do ciclo de aprovação.
+        // Falha aqui não invalida o resto do processamento.
+        try {
+          const { error: tagErr } = await admin
+            .from("task_tag_relations")
+            .delete()
+            .eq("task_id", task.id)
+            .eq("tag_id", TAG_ENVIAR_APROVACAO_ID);
+          if (tagErr) throw tagErr;
+          tagRemovida = true;
+        } catch (e) {
+          tagRemovida = false;
+          console.error(
+            "falha ao remover etiqueta enviar aprovação",
+            e instanceof Error ? e.message : JSON.stringify(e),
+          );
+        }
       }
 
       // 4. Anexos da decisão (se houver) — falha de anexo não invalida o resto
@@ -953,6 +973,9 @@ async function handleCalendarioDecisao(
         comment_id: comentarioRow.id,
         ...(novoContador !== undefined
           ? { cliente_devolucoes_count: novoContador }
+          : {}),
+        ...(tagRemovida !== undefined
+          ? { tag_enviar_aprovacao_removida: tagRemovida }
           : {}),
         ...(anexosResultado ? { attachments: anexosResultado } : {}),
       });
