@@ -152,7 +152,9 @@ export const getActivityLabel = (activity: TaskActivity): string => {
     return `transferência de ${userName} classificada como ${classLabel}${score}`;
   }
   if (activity.activity_type === 'attachment.removed') {
-    return `removeu o anexo "${activity.old_value || 'arquivo'}"`;
+    const fileName = activity.metadata?.file_name || activity.old_value || 'arquivo';
+    const asAdmin = activity.metadata?.removed_by_admin ? ' (como administrador)' : '';
+    return `removeu o anexo "${fileName}"${asAdmin}`;
   }
 
   const type = activity.activity_type;

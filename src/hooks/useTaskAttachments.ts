@@ -147,18 +147,22 @@ export const useDeleteAttachment = () => {
       taskId: string;
       fileUrl: string;
     }) => {
+      // Excluir primeiro o registro: se a permissão não permitir, o arquivo permanece intacto
+      const { data: deleted, error } = await supabase
+        .from('task_attachments')
+        .delete()
+        .eq('id', attachmentId)
+        .select('id');
+
+      if (error) throw error;
+      if (!deleted || deleted.length === 0) throw new Error('sem_permissao');
+
       // Extrair o path - pode ser URL completa (legado) ou path relativo (novo)
       const filePath = extractStoragePath(fileUrl, 'task-attachments');
       if (filePath) {
         await supabase.storage.from('task-attachments').remove([filePath]);
       }
 
-      const { error } = await supabase
-        .from('task_attachments')
-        .delete()
-        .eq('id', attachmentId);
-
-      if (error) throw error;
       return { taskId };
     },
     onSuccess: (data) => {
