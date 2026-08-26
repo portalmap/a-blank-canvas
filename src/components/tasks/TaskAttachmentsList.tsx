@@ -1,8 +1,10 @@
 import { useRef } from 'react';
 import { Paperclip, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/useTaskAttachments';
+import { useTaskAttachments, useUploadAttachment, useDeleteAttachment, TaskAttachment } from '@/hooks/useTaskAttachments';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { AttachmentPreview } from './AttachmentPreview';
 import { toast } from 'sonner';
 
@@ -16,6 +18,12 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
   const uploadAttachment = useUploadAttachment();
   const deleteAttachment = useDeleteAttachment();
   const createActivity = useCreateTaskActivity();
+  const { user } = useAuth();
+  const { data: roleInfo } = useUserRole();
+  const isAdmin = !!roleInfo?.isAdmin;
+
+  const canDelete = (attachment: TaskAttachment) =>
+    isAdmin || attachment.uploaded_by === user?.id;
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
