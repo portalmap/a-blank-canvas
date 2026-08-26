@@ -43,7 +43,7 @@ export const relayApprovalSend = createServerFn({ method: "POST" })
       .select("id")
       .eq("direcao", "enviado")
       .eq("assunto", ASSUNTO)
-      .gte("created_at", umMinutoAtras)
+      .gte("criado_em", umMinutoAtras)
       .filter("payload->>task_id", "eq", data.task_id)
       .limit(1)
       .maybeSingle();
