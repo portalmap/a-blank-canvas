@@ -22,8 +22,10 @@ import {
   Pencil,
   Plug,
   Tag,
+  Play,
   Undo2
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TaskActivity, getActivityLabel, useCreateTaskActivity, useUpdateActivityMetadata } from '@/hooks/useTaskActivities';
 import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } from '@/hooks/useTaskComments';
 import { useAuth } from '@/contexts/AuthContext';
