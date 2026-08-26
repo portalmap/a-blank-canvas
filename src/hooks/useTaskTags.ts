@@ -239,6 +239,28 @@ export function useAddTaskTag() {
           executeTagAutomations(variables.taskId, task.workspace_id, variables.tagId, 'on_tag_added', queryClient);
           reevaluateConditionAutomations(variables.taskId, task.workspace_id, queryClient);
         }
+
+        // Tag "enviar aprovação": dispara envio ao Hub (destino portal-map)
+        if (variables.tagId === TAG_ENVIAR_APROVACAO_ID) {
+          try {
+            const { relayApprovalSend } = await import('@/lib/relay-approval.functions');
+            const result = await relayApprovalSend({ data: { task_id: variables.taskId, tag_id: variables.tagId } });
+            if ('success' in result && !result.success) {
+              toast({
+                title: 'Falha ao reenviar para aprovação',
+                description: 'A etiqueta foi mantida. Remova e adicione novamente para tentar de novo.',
+                variant: 'destructive',
+              });
+            }
+          } catch (err) {
+            console.error('Error sending approval relay:', err);
+            toast({
+              title: 'Falha ao reenviar para aprovação',
+              description: 'A etiqueta foi mantida. Remova e adicione novamente para tentar de novo.',
+              variant: 'destructive',
+            });
+          }
+        }
       } catch (err) {
         console.error('Error triggering automation re-evaluation:', err);
       }
