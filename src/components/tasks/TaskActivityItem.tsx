@@ -106,6 +106,7 @@ interface TaskActivityItemProps {
 const getActivityIcon = (type: string) => {
   if (type === 'task.created') return Plus;
   if (type === 'comment.created') return MessageSquare;
+  if (type === 'tag.added' || type === 'tag.removed') return Tag;
   if (type === 'comment.edited') return Pencil;
   if (type === 'assignment.created') return UserCheck;
   if (type === 'assignment.resolved') return CheckCircle2;
