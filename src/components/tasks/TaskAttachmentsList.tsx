@@ -60,7 +60,7 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
     }
   };
 
-  const handleRemoveAttachment = async (attachment: { id: string; file_url: string; file_name: string }) => {
+  const handleRemoveAttachment = async (attachment: TaskAttachment) => {
     try {
       await deleteAttachment.mutateAsync({
         attachmentId: attachment.id,
@@ -72,11 +72,20 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
         activityType: 'attachment.removed',
         fieldName: 'attachment',
         oldValue: attachment.file_name,
+        metadata: {
+          file_name: attachment.file_name,
+          file_type: attachment.file_type,
+          file_size: attachment.file_size,
+          uploaded_by: attachment.uploaded_by,
+          removed_by_admin: isAdmin && attachment.uploaded_by !== user?.id,
+        },
       });
       toast.success('Anexo removido!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao remover anexo:', error);
-      toast.error('Erro ao remover anexo');
+      toast.error(error?.message === 'sem_permissao'
+        ? 'Você não tem permissão para excluir este anexo'
+        : 'Erro ao remover anexo');
     }
   };
 
