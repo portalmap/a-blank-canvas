@@ -199,6 +199,48 @@ export function useTaskTagRelations(taskId: string | undefined) {
   });
 }
 
+/**
+ * Registra na atividade da tarefa a adição/remoção de uma etiqueta.
+ * Falha aqui nunca bloqueia a operação da etiqueta.
+ */
+async function logTagActivity(
+  queryClient: ReturnType<typeof useQueryClient>,
+  taskId: string,
+  tagId: string,
+  action: "added" | "removed",
+) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: tag } = await supabase
+      .from("task_tags")
+      .select("name, color")
+      .eq("id", tagId)
+      .maybeSingle();
+
+    const tagName = tag?.name ?? null;
+
+    await supabase.from("task_activities").insert({
+      task_id: taskId,
+      user_id: user.id,
+      activity_type: action === "added" ? "tag.added" : "tag.removed",
+      field_name: "tags",
+      old_value: action === "removed" ? tagName : null,
+      new_value: action === "added" ? tagName : null,
+      metadata: {
+        tag_id: tagId,
+        tag_name: tagName,
+        tag_color: tag?.color ?? null,
+      },
+    });
+
+    queryClient.invalidateQueries({ queryKey: ["task-activities", taskId] });
+  } catch (err) {
+    console.error("Error logging tag activity:", err);
+  }
+}
+
 const TAG_ENVIAR_APROVACAO_ID = "78b84f6c-b619-40bd-94f8-c1c2a63842c0";
 
 export function useAddTaskTag() {
