@@ -1,43 +1,37 @@
-# Plano: corrigir novo erro ao adicionar a etiqueta "enviar aprovação"
+# Plano: remover etiqueta "enviar aprovação" quando o Portal devolver o post
+
+## Objetivo
+
+Quando o Hub entregar `calendario.post.reprovado` (cliente devolveu o post), o MAP Flow remove a etiqueta **"enviar aprovação"** (id `78b84f6c-b619-40bd-94f8-c1c2a63842c0`) da tarefa, além do que já faz hoje (comentário, atividade e contador de devoluções).
+
+Assim a etiqueta sai do ciclo: o usuário ajusta a tarefa e adiciona a etiqueta novamente para reenviar ao Portal — e o disparo de saída (`relay-approval`) volta a funcionar porque a etiqueta foi removida e readicionada.
 
 ## Diagnóstico confirmado
 
-O erro não está mais na adição da etiqueta em si. A etiqueta foi adicionada e o MAP Flow tentou enviar o evento `calendario.aprovacao` ao Hub.
+- `supabase/functions/hub-inbox/index.ts`, função que trata `calendario.post.aprovado/reprovado` (linhas ~831-989):
+  - já cria comentário, atividade e incrementa `cliente_devolucoes_count` no reprovado;
+  - **não** remove nenhuma etiqueta — é o que falta.
+- A remoção será apenas no **reprovado** (devolução). No aprovado a etiqueta permanece.
 
-O Hub/Portal recusou a entrega com validação 422:
+## Mudança
 
-```text
-payload_invalido
-fieldErrors.posts: Expected string, received null
-```
+### `supabase/functions/hub-inbox/index.ts`
 
-O log do MAP Flow mostra que o envio atual está saindo como `tasks: [...]`, com alguns campos nulos (`format`, `due_date`) e sem um campo literal `posts` preenchido no formato que o Portal está validando.
+Dentro do loop de tarefas, no bloco `if (!aprovado)` (após incrementar o contador):
 
-## O que será corrigido
+1. Deletar de `task_tag_relations` o registro com `task_id = task.id` e `tag_id = 78b84f6c-b619-40bd-94f8-c1c2a63842c0` (delete simples via client admin; se não existir, nada acontece).
+2. Falha nessa remoção não invalida o resto do processamento — loga no console e segue (mesmo padrão dos anexos).
+3. Incluir no resultado do item: `tag_enviar_aprovacao_removida: true/false` para rastreio na resposta ao Hub.
 
-1. Ajustar o payload de saída de `calendario.aprovacao` para não enviar valores nulos em campos que o destino valida como string.
-2. Incluir/preencher o campo `posts` com texto válido derivado da tarefa, usando esta prioridade:
-   - descrição da tarefa convertida para texto simples, quando existir;
-   - título da tarefa como fallback.
-3. Manter o envio passando pelo Hub com destino `portal-map`, sem criar atalho direto para o Portal.
-4. Preservar o comportamento atual: a etiqueta continua sendo aplicada mesmo se o relay falhar.
-5. Melhorar a mensagem de retorno para diferenciar:
-   - etiqueta aplicada, mas envio recusado pelo Portal;
-   - Hub indisponível;
-   - relay não configurado.
-6. Registrar no log de diagnóstico o payload normalizado enviado e a resposta do Hub, sem expor token.
+Nenhuma mudança em:
+- frontend (a interface já reflete a remoção via invalidação de queries ao recarregar);
+- `calendario.post.aprovado`;
+- fluxo de saída (`relay-approval`).
 
 ## Validação
 
-1. Remover e adicionar novamente a etiqueta `enviar aprovação` na tarefa de teste.
-2. Conferir se o novo registro em `relay_diagnostico_log` retorna status aceito pelo Hub/Portal.
-3. Confirmar que o payload não contém `posts: null` nem strings obrigatórias nulas.
-4. Confirmar visualmente que a etiqueta permanece aplicada na tarefa.
-
-## Detalhes técnicos
-
-- Arquivo principal a ajustar: `src/lib/relay-approval.server.ts`.
-- Manter `src/lib/relay-approval.functions.ts` como wrapper fino de `createServerFn`.
-- A normalização deve converter a descrição TipTap/JSON da tarefa para texto simples antes de enviar ao Portal.
-- Campos opcionais sem valor devem ser omitidos ou convertidos para string vazia somente quando o contrato do destino exigir string.
-- Nenhuma mudança de banco é necessária para esta correção.
+1. Marcar a etiqueta "enviar aprovação" numa tarefa de teste.
+2. Simular (ou aguardar) um `calendario.post.reprovado` vindo do Hub para essa tarefa.
+3. Confirmar: comentário/atividade criados, contador incrementado **e** a etiqueta ausente na tarefa.
+4. Readicionar a etiqueta e confirmar que o relay de saída dispara novamente.
+5. Deploy da edge function `hub-inbox` após a alteração.
