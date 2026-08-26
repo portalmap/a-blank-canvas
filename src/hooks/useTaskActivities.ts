@@ -220,6 +220,15 @@ export const getActivityLabel = (activity: TaskActivity): string => {
       return `${prefix}criou uma atribuição para "${activity.metadata?.assignee_name || 'usuário'}"`;
     case 'assignment.resolved':
       return `${prefix}resolveu a atribuição de "${activity.metadata?.assignee_name || 'usuário'}"`;
+    case 'tag.added':
+      return `${prefix}adicionou a etiqueta "${activity.metadata?.tag_name || activity.new_value || ''}"`;
+    case 'tag.removed': {
+      const tagName = activity.metadata?.tag_name || activity.old_value || '';
+      if (activity.metadata?.origem === 'portal-map' || activity.metadata?.origem === 'hub') {
+        return `${prefix}removeu a etiqueta "${tagName}" (via Portal MAP)`;
+      }
+      return `${prefix}removeu a etiqueta "${tagName}"`;
+    }
     case 'attachment.added':
       return `${prefix}anexou "${activity.metadata?.file_name || 'arquivo'}"`;
     case 'subtask.created':
