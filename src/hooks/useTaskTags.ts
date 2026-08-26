@@ -197,8 +197,11 @@ export function useTaskTagRelations(taskId: string | undefined) {
   });
 }
 
+const TAG_ENVIAR_APROVACAO_ID = "78b84f6c-b619-40bd-94f8-c1c2a63842c0";
+
 export function useAddTaskTag() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({
