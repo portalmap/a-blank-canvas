@@ -21,6 +21,7 @@ import {
   Paperclip,
   Pencil,
   Plug,
+  Tag,
   Undo2
 } from 'lucide-react';
 import { TaskActivity, getActivityLabel, useCreateTaskActivity, useUpdateActivityMetadata } from '@/hooks/useTaskActivities';
