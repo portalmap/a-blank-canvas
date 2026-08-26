@@ -22,8 +22,10 @@ import {
   Pencil,
   Plug,
   Tag,
+  Play,
   Undo2
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TaskActivity, getActivityLabel, useCreateTaskActivity, useUpdateActivityMetadata } from '@/hooks/useTaskActivities';
 import { useResolveCommentAssignment, useTaskComments, useUpdateTaskComment } from '@/hooks/useTaskComments';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,37 +54,63 @@ const extractStoragePath = (fileUrl: string): string => {
 const AttachmentPreviewInActivity = ({ metadata }: { metadata: any }) => {
   const [resolvedUrl, setResolvedUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [open, setOpen] = useState(false);
+
+  const fileName: string = metadata.file_name || 'Anexo';
+  const fileType: string = metadata.file_type || '';
+  const isImage = fileType.startsWith('image/') || /\.(png|jpe?g|gif|webp|avif|bmp)$/i.test(fileName);
+  const isVideo = fileType.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(fileName);
 
   useEffect(() => {
+    let cancelled = false;
     const resolve = async () => {
-      const storagePath = metadata.storage_path || extractStoragePath(metadata.file_url);
+      setLoading(true);
+      setFailed(false);
+      const storagePath = metadata.storage_path || extractStoragePath(metadata.file_url || '');
       if (!storagePath || storagePath.startsWith('http')) {
-        // Fallback: usar a URL direta (pode estar expirada)
-        setResolvedUrl(metadata.file_url);
+        if (cancelled) return;
+        setResolvedUrl(metadata.file_url || '');
+        setFailed(!metadata.file_url);
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase.storage
+      const { data } = await supabase.storage
         .from('task-attachments')
         .createSignedUrl(storagePath, 3888000);
-      setResolvedUrl(data?.signedUrl || metadata.file_url);
+      if (cancelled) return;
+      const url = data?.signedUrl || metadata.file_url || '';
+      setResolvedUrl(url);
+      setFailed(!url);
       setLoading(false);
     };
     resolve();
-  }, [metadata.file_url, metadata.storage_path]);
+    return () => { cancelled = true; };
+  }, [metadata.file_url, metadata.storage_path, attempt]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="mt-2 h-20 w-20 rounded-md border border-border bg-muted/40 animate-pulse" />
+    );
+  }
 
-  return (
-    <div className="mt-2">
-      {metadata.file_type?.startsWith('image/') ? (
-        <img
-          src={resolvedUrl}
-          alt={metadata.file_name || 'Anexo'}
-          className="h-20 w-20 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity border border-border"
-          onClick={() => window.open(resolvedUrl, '_blank')}
-        />
-      ) : (
+  if (failed) {
+    return (
+      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <Paperclip className="h-3 w-3" />
+        <span className="truncate max-w-[200px]">{fileName}</span>
+        <span>— não foi possível carregar o anexo</span>
+        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAttempt((a) => a + 1)}>
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
+
+  if (!isImage && !isVideo) {
+    return (
+      <div className="mt-2">
         <a
           href={resolvedUrl}
           target="_blank"
@@ -90,12 +118,68 @@ const AttachmentPreviewInActivity = ({ metadata }: { metadata: any }) => {
           className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
         >
           <Paperclip className="h-3 w-3" />
-          {metadata.file_name}
+          {fileName}
         </a>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title={fileName}
+        className="relative h-20 w-20 overflow-hidden rounded-md border border-border bg-muted/40 hover:opacity-80 transition-opacity"
+      >
+        {isImage ? (
+          <img
+            src={resolvedUrl}
+            alt={fileName}
+            className="h-full w-full object-cover"
+            loading="lazy"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <>
+            <video
+              src={resolvedUrl}
+              muted
+              preload="metadata"
+              playsInline
+              className="h-full w-full object-cover"
+              onError={() => setFailed(true)}
+            />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/35">
+              <Play className="h-6 w-6 text-white drop-shadow" />
+            </span>
+          </>
+        )}
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-4xl p-2">
+          <DialogTitle className="sr-only">{fileName}</DialogTitle>
+          {isImage ? (
+            <img src={resolvedUrl} alt={fileName} className="w-full max-h-[80vh] object-contain rounded" />
+          ) : (
+            <video src={resolvedUrl} controls autoPlay className="w-full max-h-[80vh] rounded" />
+          )}
+          <a
+            href={resolvedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+          >
+            <Paperclip className="h-3 w-3" />
+            {fileName}
+          </a>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
 
 interface TaskActivityItemProps {
   activity: TaskActivity;
