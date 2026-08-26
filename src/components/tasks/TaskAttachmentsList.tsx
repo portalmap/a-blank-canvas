@@ -130,8 +130,8 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
             <AttachmentPreview
               key={attachment.id}
               attachment={attachment}
-              showRemove
-              onRemove={() => handleRemoveAttachment(attachment)}
+              showRemove={canDelete(attachment)}
+              onRemove={canDelete(attachment) ? () => handleRemoveAttachment(attachment) : undefined}
             />
           ))}
         </div>
