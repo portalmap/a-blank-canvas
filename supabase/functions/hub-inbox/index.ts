@@ -106,6 +106,7 @@ async function resolveTasksAttachments(supabase: any, tasks: any[]) {
 }
 
 const TAG_APROVACAO = "enviar cliente";
+const TAG_ENVIAR_APROVACAO_ID = "78b84f6c-b619-40bd-94f8-c1c2a63842c0";
 
 async function handleListarParaAprovacao(
   admin: any,
@@ -972,6 +973,9 @@ async function handleCalendarioDecisao(
         comment_id: comentarioRow.id,
         ...(novoContador !== undefined
           ? { cliente_devolucoes_count: novoContador }
+          : {}),
+        ...(tagRemovida !== undefined
+          ? { tag_enviar_aprovacao_removida: tagRemovida }
           : {}),
         ...(anexosResultado ? { attachments: anexosResultado } : {}),
       });
