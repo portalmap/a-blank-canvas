@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { reevaluateConditionAutomations, executeTagAutomations } from "@/hooks/useStatusChangeAutomations";
+import { relayApprovalSend } from "@/lib/relay-approval.functions";
 
 export interface TaskTag {
   id: string;
@@ -243,7 +244,6 @@ export function useAddTaskTag() {
         // Tag "enviar aprovação": dispara envio ao Hub (destino portal-map)
         if (variables.tagId === TAG_ENVIAR_APROVACAO_ID) {
           try {
-            const { relayApprovalSend } = await import('@/lib/relay-approval.functions');
             const result = await relayApprovalSend({ data: { task_id: variables.taskId, tag_id: variables.tagId } });
             if ('success' in result && !result.success) {
               toast({
