@@ -194,7 +194,7 @@ const getActivityIcon = (type: string) => {
   if (type === 'comment.edited') return Pencil;
   if (type === 'assignment.created') return UserCheck;
   if (type === 'assignment.resolved') return CheckCircle2;
-  if (type === 'attachment.added') return Paperclip;
+  if (type === 'attachment.added' || type === 'attachment.removed') return Paperclip;
   if (type.startsWith('productivity.')) return Flag;
   if (type.includes('status') || type.includes('priority')) return Flag;
   if (type.includes('date')) return Calendar;
