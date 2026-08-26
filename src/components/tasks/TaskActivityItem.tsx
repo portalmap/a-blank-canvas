@@ -220,6 +220,7 @@ const getActivityColor = (type: string, metadata?: Record<string, any> | null) =
   if (type === 'assignment.created') return 'bg-amber-500/10 text-amber-500';
   if (type === 'assignment.resolved') return 'bg-emerald-500/10 text-emerald-500';
   if (type === 'attachment.added') return 'bg-indigo-500/10 text-indigo-500';
+  if (type === 'attachment.removed') return 'bg-rose-500/10 text-rose-500';
   if (type.startsWith('productivity.')) return getProductivityActivityColor(metadata || null);
   if (type.includes('status')) return 'bg-purple-500/10 text-purple-500';
   if (type.includes('priority')) return 'bg-orange-500/10 text-orange-500';
