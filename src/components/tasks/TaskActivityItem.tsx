@@ -129,6 +129,8 @@ const getProductivityActivityColor = (metadata: Record<string, any> | null) => {
 
 const getActivityColor = (type: string, metadata?: Record<string, any> | null) => {
   if (type === 'task.created') return 'bg-green-500/10 text-green-500';
+  if (type === 'tag.added') return 'bg-violet-500/10 text-violet-500';
+  if (type === 'tag.removed') return 'bg-slate-500/10 text-slate-500';
   if (type === 'comment.created') return 'bg-blue-500/10 text-blue-500';
   if (type === 'comment.edited') return 'bg-blue-500/10 text-blue-500';
   if (type === 'assignment.created') return 'bg-amber-500/10 text-amber-500';
