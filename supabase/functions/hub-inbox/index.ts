@@ -947,6 +947,21 @@ async function handleCalendarioDecisao(
           .eq("tag_id", TAG_ENVIAR_APROVACAO_ID);
         if (tagErr) throw tagErr;
         tagRemovida = true;
+
+        await admin.from("task_activities").insert({
+          task_id: task.id,
+          user_id: autorId,
+          activity_type: "tag.removed",
+          field_name: "tags",
+          old_value: "enviar aprovação",
+          metadata: {
+            tag_id: TAG_ENVIAR_APROVACAO_ID,
+            tag_name: "enviar aprovação",
+            origem: "portal-map",
+            decisao,
+            aprovador_nome: dados.aprovador_nome,
+          },
+        });
       } catch (e) {
         tagRemovida = false;
         console.error(
