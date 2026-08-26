@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { reevaluateConditionAutomations, executeTagAutomations } from "@/hooks/useStatusChangeAutomations";
@@ -203,6 +204,7 @@ const TAG_ENVIAR_APROVACAO_ID = "78b84f6c-b619-40bd-94f8-c1c2a63842c0";
 export function useAddTaskTag() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const sendApprovalRelay = useServerFn(relayApprovalSend);
 
   return useMutation({
     mutationFn: async ({
@@ -244,7 +246,7 @@ export function useAddTaskTag() {
         // Tag "enviar aprovação": dispara envio ao Hub (destino portal-map)
         if (variables.tagId === TAG_ENVIAR_APROVACAO_ID) {
           try {
-            const result = await relayApprovalSend({ data: { task_id: variables.taskId, tag_id: variables.tagId } });
+            const result = await sendApprovalRelay({ data: { task_id: variables.taskId, tag_id: variables.tagId } });
             if ('success' in result && !result.success) {
               toast({
                 title: 'Falha ao reenviar para aprovação',
