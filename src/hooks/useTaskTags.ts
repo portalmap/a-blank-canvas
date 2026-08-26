@@ -231,6 +231,9 @@ export function useAddTaskTag() {
         queryKey: ["task-tag-relations", variables.taskId],
       });
 
+      await logTagActivity(queryClient, variables.taskId, variables.tagId, "added");
+
+
       // Execute tag-triggered automations
       try {
         const { data: task } = await supabase
