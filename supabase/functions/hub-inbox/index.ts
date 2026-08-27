@@ -1028,6 +1028,384 @@ async function handleCalendarioDecisao(
   }
 }
 
+// ==========================================================================
+// briefing.publicar — cada briefing vira uma SUBTAREFA da tarefa do post.
+// Módulo isolado: não altera calendario.*, diagnostico.ping nem o SSO.
+// ==========================================================================
+
+const BriefingAnexoSchema = z.object({
+  file_name: z.string().optional(),
+  file_url: z.string().min(1),
+});
+
+const BriefingItemSchema = z.object({
+  parent_id: z.string().uuid(),
+  external_briefing_ref: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().nullish(),
+  social_channel: z.string().nullish(),
+  attachments: z.array(BriefingAnexoSchema).optional(),
+});
+
+const BriefingSchema = z.object({
+  name: z.string().nullish(),
+  subtasks: z.array(BriefingItemSchema).min(1),
+});
+
+// Status padrão aplicável à lista da mãe (hierarquia list -> space -> workspace).
+async function resolverStatusPadraoDaLista(
+  admin: any,
+  workspaceId: string,
+  listId: string,
+): Promise<string | null> {
+  const { data: lista } = await admin
+    .from("lists")
+    .select("id, space_id, folder_id")
+    .eq("id", listId)
+    .maybeSingle();
+
+  let spaceId: string | null = lista?.space_id ?? null;
+  if (!spaceId && lista?.folder_id) {
+    const { data: folder } = await admin
+      .from("folders")
+      .select("space_id")
+      .eq("id", lista.folder_id)
+      .maybeSingle();
+    spaceId = folder?.space_id ?? null;
+  }
+
+  const { data: statuses, error } = await admin
+    .from("statuses")
+    .select("id, scope_type, scope_id, is_default, order_index")
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+
+  const doEscopo = (scope: string, scopeId: string | null) =>
+    (statuses ?? []).filter(
+      (s: any) =>
+        s.scope_type === scope && (scopeId === null || s.scope_id === scopeId),
+    );
+
+  let candidatos = doEscopo("list", listId);
+  if (!candidatos.length && spaceId) candidatos = doEscopo("space", spaceId);
+  if (!candidatos.length) candidatos = doEscopo("workspace", null);
+  if (!candidatos.length) return null;
+
+  const padrao = candidatos.find((s: any) => s.is_default);
+  if (padrao) return padrao.id;
+  const ordenados = [...candidatos].sort(
+    (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0),
+  );
+  return ordenados[0]?.id ?? null;
+}
+
+// Baixa cada anexo da URL assinada, sobe no bucket task-attachments e registra
+// em task_attachments com task_id = id da SUBTAREFA. Falha de um anexo não
+// invalida a subtarefa.
+async function processarAnexosSubtarefa(
+  admin: any,
+  subtarefaId: string,
+  autorId: string,
+  anexos: Array<{ file_name?: string; file_url: string }>,
+) {
+  const resultados: Array<Record<string, unknown>> = [];
+
+  for (const anexo of anexos) {
+    const nomeOriginal =
+      anexo.file_name ?? anexo.file_url.split("?")[0].split("/").pop() ?? "arquivo";
+    try {
+      const dl = await fetch(anexo.file_url);
+      if (!dl.ok) {
+        console.error("briefing anexo download falhou", subtarefaId, nomeOriginal, dl.status);
+        resultados.push({ file_name: nomeOriginal, status: "erro", error: "download_falhou" });
+        continue;
+      }
+      const contentType = dl.headers.get("content-type");
+      const bytes = new Uint8Array(await dl.arrayBuffer());
+
+      const storagePath = `${autorId}/${subtarefaId}/${Date.now()}_${sanitizeFileName(nomeOriginal)}`;
+      const { error: upErr } = await admin.storage
+        .from("task-attachments")
+        .upload(storagePath, bytes, {
+          contentType: contentType ?? undefined,
+          upsert: false,
+        });
+      if (upErr) {
+        console.error("briefing anexo upload falhou", subtarefaId, nomeOriginal, upErr.message);
+        resultados.push({ file_name: nomeOriginal, status: "erro", error: "upload_falhou" });
+        continue;
+      }
+
+      const { data: anexoRow, error: insErr } = await admin
+        .from("task_attachments")
+        .insert({
+          task_id: subtarefaId,
+          file_name: nomeOriginal,
+          file_url: storagePath,
+          file_type: contentType ?? null,
+          file_size: bytes.byteLength,
+          uploaded_by: autorId,
+        })
+        .select("id")
+        .single();
+      if (insErr) {
+        console.error("briefing anexo registro falhou", subtarefaId, nomeOriginal, insErr.message);
+        resultados.push({ file_name: nomeOriginal, status: "erro", error: "registro_falhou" });
+        continue;
+      }
+
+      // Atividade do anexo na própria subtarefa (mesmo padrão da decisão).
+      try {
+        await admin.from("task_activities").insert({
+          task_id: subtarefaId,
+          user_id: autorId,
+          activity_type: "attachment.added",
+          field_name: "attachments",
+          new_value: nomeOriginal,
+          metadata: {
+            attachment_id: anexoRow?.id ?? null,
+            file_name: nomeOriginal,
+            file_url: storagePath,
+            file_type: contentType ?? null,
+            file_size: bytes.byteLength,
+            created_by: "integration",
+            origem: "briefing",
+          },
+        });
+      } catch (e) {
+        console.error("briefing anexo atividade falhou", subtarefaId, e);
+      }
+
+      resultados.push({
+        file_name: nomeOriginal,
+        attachment_id: anexoRow?.id ?? null,
+        status: "salvo",
+      });
+    } catch (e) {
+      console.error(
+        "briefing anexo erro inesperado",
+        subtarefaId,
+        nomeOriginal,
+        e instanceof Error ? e.message : JSON.stringify(e),
+      );
+      resultados.push({ file_name: nomeOriginal, status: "erro", error: "excecao" });
+    }
+  }
+
+  return resultados;
+}
+
+async function handleBriefingPublicar(
+  admin: any,
+  modo: string | null,
+  payload: unknown,
+  mensagemId: string | null,
+  origin: string | null,
+) {
+  if (modo !== "consulta") {
+    return json({ error: "modo_invalido", modo, esperado: "consulta" }, 400, origin);
+  }
+
+  const parsed = BriefingSchema.safeParse(payload);
+  if (!parsed.success) {
+    return json(
+      {
+        error: "payload_invalido",
+        detalhes: parsed.error.issues.map((i) => ({
+          campo: i.path.join("."),
+          motivo: i.message,
+        })),
+      },
+      422,
+      origin,
+    );
+  }
+  const dados = parsed.data;
+
+  try {
+    // Idempotência por mensagem.
+    if (mensagemId) {
+      const { data: jaProcessada } = await admin
+        .from("hub_inbox_processed")
+        .select("resposta")
+        .eq("mensagem_id", mensagemId)
+        .maybeSingle();
+      if (jaProcessada?.resposta) {
+        return json(jaProcessada.resposta, 200, origin);
+      }
+    }
+
+    const resultados: Array<Record<string, unknown>> = [];
+
+    for (const item of dados.subtasks) {
+      // 1. Tarefa-mãe
+      const { data: mae } = await admin
+        .from("tasks")
+        .select("id, workspace_id, list_id")
+        .eq("id", item.parent_id)
+        .maybeSingle();
+
+      if (!mae) {
+        resultados.push({
+          external_briefing_ref: item.external_briefing_ref,
+          status: "erro",
+          error: "tarefa_mae_nao_encontrada",
+        });
+        continue;
+      }
+
+      // 2. Autor técnico = criador do workspace da mãe.
+      const { data: workspace } = await admin
+        .from("workspaces")
+        .select("id, created_by_user_id")
+        .eq("id", mae.workspace_id)
+        .maybeSingle();
+      const autorId = workspace ? await resolverAutor(admin, workspace) : null;
+      if (!autorId) {
+        resultados.push({
+          external_briefing_ref: item.external_briefing_ref,
+          status: "erro",
+          error: "autor_tecnico_nao_encontrado",
+        });
+        continue;
+      }
+
+      // 3. Idempotência por briefing: já existe subtarefa com essa referência?
+      const refDireta = item.external_briefing_ref;
+      const refPrefixada = `briefing:${item.external_briefing_ref}`;
+
+      const { data: existentes } = await admin
+        .from("tasks")
+        .select("id, parent_id, external_post_ref")
+        .eq("workspace_id", mae.workspace_id)
+        .in("external_post_ref", [refDireta, refPrefixada]);
+
+      const jaSubtarefa = (existentes ?? []).find(
+        (t: any) => t.parent_id === item.parent_id,
+      );
+      if (jaSubtarefa) {
+        resultados.push({
+          external_briefing_ref: item.external_briefing_ref,
+          id: jaSubtarefa.id,
+          parent_id: item.parent_id,
+          status: "ja_existia",
+        });
+        continue;
+      }
+
+      // A referência direta pode já pertencer à própria tarefa do post.
+      const refOcupada = (existentes ?? []).some(
+        (t: any) => t.external_post_ref === refDireta,
+      );
+      const refFinal = refOcupada ? refPrefixada : refDireta;
+
+      // 4. Status padrão da lista da mãe.
+      const statusId = await resolverStatusPadraoDaLista(
+        admin,
+        mae.workspace_id,
+        mae.list_id,
+      );
+      if (!statusId) {
+        resultados.push({
+          external_briefing_ref: item.external_briefing_ref,
+          status: "erro",
+          error: "status_nao_encontrado",
+        });
+        continue;
+      }
+
+      // 5. Criar a subtarefa herdando workspace/lista da mãe.
+      const { data: subtarefa, error: insErr } = await admin
+        .from("tasks")
+        .insert({
+          parent_id: item.parent_id,
+          workspace_id: mae.workspace_id,
+          list_id: mae.list_id,
+          status_id: statusId,
+          title: item.title,
+          description: item.description ?? null,
+          social_channel: item.social_channel ?? null,
+          external_post_ref: refFinal,
+          created_by_user_id: autorId,
+        })
+        .select("id")
+        .single();
+
+      if (insErr || !subtarefa) {
+        console.error(
+          "briefing.publicar insert subtarefa falhou",
+          item.external_briefing_ref,
+          insErr?.message,
+        );
+        resultados.push({
+          external_briefing_ref: item.external_briefing_ref,
+          status: "erro",
+          error: "criacao_falhou",
+        });
+        continue;
+      }
+
+      // 6. Atividade subtask.created na tarefa-mãe.
+      try {
+        await admin.from("task_activities").insert({
+          task_id: item.parent_id,
+          user_id: autorId,
+          activity_type: "subtask.created",
+          metadata: {
+            subtask_id: subtarefa.id,
+            subtask_title: item.title,
+            created_by: "integration",
+            origem: "briefing",
+            external_briefing_ref: item.external_briefing_ref,
+          },
+        });
+      } catch (e) {
+        console.error("briefing.publicar atividade falhou", subtarefa.id, e);
+      }
+
+      // 7. Anexos da subtarefa.
+      const anexos = item.attachments?.length
+        ? await processarAnexosSubtarefa(admin, subtarefa.id, autorId, item.attachments)
+        : [];
+
+      resultados.push({
+        external_briefing_ref: item.external_briefing_ref,
+        id: subtarefa.id,
+        parent_id: item.parent_id,
+        status: "criada",
+        anexos,
+      });
+    }
+
+    const resposta = {
+      assunto: "briefing.publicar",
+      status: "ok",
+      cliente: dados.name ?? null,
+      resultados,
+    };
+
+    if (mensagemId) {
+      try {
+        await admin.from("hub_inbox_processed").insert({
+          mensagem_id: mensagemId,
+          assunto: "briefing.publicar",
+          resposta,
+        });
+      } catch (e) {
+        console.error("hub_inbox_processed insert failed", e);
+      }
+    }
+
+    return json(resposta, 200, origin);
+  } catch (e) {
+    console.error(
+      "briefing.publicar falhou",
+      e instanceof Error ? e.message : JSON.stringify(e),
+    );
+    return json({ error: "erro_processamento" }, 500, origin);
+  }
+}
+
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
 
