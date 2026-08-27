@@ -1,45 +1,62 @@
-# Diagnóstico: estrutura de subtarefas (briefings)
+# Receber `briefing.publicar` no hub-inbox (briefing = subtarefa)
 
-## 1. Onde vive a subtarefa
-Não existe tabela separada. Subtarefa é uma linha na própria tabela `public.tasks`, ligada à mãe pela coluna:
+Novo módulo isolado dentro de `supabase/functions/hub-inbox/index.ts`, no mesmo padrão dos módulos que já existem. Nenhum assunto atual é tocado.
 
-- `tasks.parent_id` (uuid, nullable) → aponta para `tasks.id` da tarefa-mãe.
+## 1. Entrada
 
-Se `parent_id` é nulo, é tarefa normal; se preenchido, aparece como subtarefa na aba de subtarefas da tarefa-mãe.
+Schema Zod próprio (`BriefingSchema`), separado dos demais:
 
-## 2. Campos obrigatórios para criar subtarefa
-Colunas NOT NULL sem default em `tasks`:
+- raiz: `name` (opcional, só referência do cliente — não resolve Space), `subtasks` (lista, mínimo 1)
+- cada item: `parent_id` (obrigatório), `external_briefing_ref` (obrigatório), `title` (obrigatório), `description`, `social_channel`, `attachments` (lista de `{ file_name?, file_url }`, pode vir vazia)
 
-- `workspace_id`
-- `list_id`
-- `title`
-- `status_id`
-- `created_by_user_id`
+Payload inválido → 422 com a mesma forma de erro já usada (`payload_invalido` + campo/motivo).
 
-Ou seja: **não há herança automática** (nenhum trigger copia da mãe). Quem cria precisa informar cada um. O padrão atual do app é copiar da tarefa-mãe: `workspace_id`, `list_id` e `parent_id` da mãe, e `status_id` = status default do workspace/lista.
+## 2. Criação da subtarefa (por item)
 
-Com default (opcionais): `priority` ('medium'), `cliente_devolucoes_count` (0), `time_spent` (0), `is_milestone` (false), datas, `description`, `assignee_id`, etc.
+1. Buscar a mãe: `tasks` por `id = parent_id`, lendo `id, workspace_id, list_id`. Não achou → item devolve `{ external_briefing_ref, status: "erro", error: "tarefa_mae_nao_encontrada" }` e o laço continua.
+2. Autor técnico: criador do workspace da mãe (mesma função já usada pelo `calendario.publicar`).
+3. `status_id`: reusa a resolução de status da lista já existente (hierarquia lista → space → workspace) e escolhe o status marcado como padrão; sem padrão, o de menor `order_index`.
+4. Insert em `tasks` com: `parent_id`, `workspace_id` e `list_id` herdados da mãe, `status_id` resolvido, `title`, `description`, `social_channel`, `external_post_ref = external_briefing_ref`, `created_by_user_id = autor técnico`.
+5. Atividade `subtask.created` em `task_activities` na tarefa-mãe, `user_id` = autor técnico, `metadata` com `subtask_id` e `subtask_title` — igual ao `useCreateSubtask` da interface.
 
-## 3. Identificação da mãe
-Sim — `tasks.id` (uuid). É o mesmo identificador usado no `hub-inbox` para as decisões do cliente (`calendario.post.aprovado/reprovado`).
+Se o insert da subtarefa falhar, o item devolve erro e nada parcial é criado (anexos e atividade só rodam depois do insert bem-sucedido).
 
-## 4. Anexos da subtarefa
-Idêntico à tarefa normal: `public.task_attachments` com `task_id` = id da **subtarefa**.
+## 3. Idempotência
 
-Obrigatórios: `task_id`, `file_name`, `file_url`, `uploaded_by`. Opcionais: `file_size`, `file_type`.
-Arquivos ficam no bucket privado `task-attachments` (mesmo padrão já usado no recebimento de anexos do Portal).
+Duas camadas, iguais às do `calendario.publicar`:
 
-## 5. Fluxo antigo (send-to-mapflow / onlyBriefings)
-Não existe nada disso neste projeto: nenhuma Edge Function, server function ou referência a `send-to-mapflow`, `onlyBriefings` ou "briefing" no código atual. Portanto não há padrão anterior de título/estrutura de subtarefa herdado aqui — esse fluxo vivia no sistema de origem (Social Flow / Hub), não no MAP Flow.
+- **Por mensagem:** `hub_inbox_processed` guarda `mensagem_id` + resposta; reenvio da mesma mensagem devolve a resposta gravada sem reprocessar.
+- **Por briefing:** antes de inserir, consulta `tasks` por `workspace_id` da mãe + `external_post_ref = external_briefing_ref`. Se existir, devolve essa linha com `status: "ja_existia"` e não duplica. O banco já garante isso com o índice único parcial `tasks_workspace_external_post_ref_uidx (workspace_id, external_post_ref)`.
+- Detalhe de borda: se a referência do briefing coincidir com a `external_post_ref` de uma tarefa que **não** é subtarefa dessa mãe, o índice único bloquearia o insert. Nesse caso a subtarefa é gravada com a referência prefixada (`briefing:<ref>`), e a mesma regra é usada na checagem de duplicidade — o eco na resposta continua sendo o `external_briefing_ref` original.
 
-O único padrão existente no MAP Flow é o da UI (`useCreateSubtask`): cria em `tasks` com `parent_id`, herdando `workspace_id`/`list_id` da mãe, `status_id` default, e registra atividade `subtask.created` na tarefa-mãe (metadata com `subtask_id` e `subtask_title`).
+## 4. Anexos
 
-## Observação para o próximo passo
-Para receber briefings do Hub como subtarefas, o padrão consistente seria:
-1. resolver a tarefa-mãe por `tasks.id` (ou por `external_post_ref`, se o Hub mandar a referência do post);
-2. inserir a subtarefa em `tasks` herdando workspace/lista da mãe;
-3. gravar anexos em `task_attachments` após download para o bucket;
-4. registrar `subtask.created` (+ `attachment.added`) em `task_activities` para aparecer no histórico;
-5. idempotência via `hub_inbox_processed`.
+Reaproveita exatamente o padrão de anexos da decisão do cliente: download da URL assinada → upload no bucket `task-attachments` no path `autor_tecnico/subtarefa_id/timestamp_nome` (nome sanitizado) → registro em `task_attachments` com `task_id` = id da **subtarefa**, `uploaded_by` = autor técnico, `file_url` = path no bucket, `file_type`/`file_size` preenchidos.
 
-Nada foi alterado.
+Falha de um anexo (download, upload ou registro) é logada e devolvida como item de anexo com erro; a subtarefa continua válida e os outros anexos seguem.
+
+## 5. Resposta síncrona ao Hub
+
+```text
+{
+  assunto: "briefing.publicar",
+  status: "ok",
+  resultados: [
+    { external_briefing_ref, id: "<uuid da subtarefa>", parent_id, status: "criada" | "ja_existia", anexos: [...] },
+    { external_briefing_ref, status: "erro", error: "tarefa_mae_nao_encontrada" }
+  ]
+}
+```
+
+`id` é o campo canônico do subtarefa_id no MAP Flow, permitindo ao Social Flow casar cada briefing com sua subtarefa. Nada é enviado de volta ao Portal/Social Flow além dessa resposta.
+
+## 6. O que continua intacto
+
+- `calendario.publicar`, `calendario.post.aprovado`, `calendario.post.reprovado`, `tarefa.listar_para_aprovacao` e `diagnostico.ping`: nenhuma linha alterada; só um novo `if (assunto === "briefing.publicar")` no mesmo roteador.
+- `verify_jwt = false` em `supabase/config.toml` e a validação de token da função: mantidos como estão.
+- SSO (`sso-exchange`, rotas `/sso/*`, `session-guard`): não tocados.
+- Banco: **nenhuma migration** — todas as colunas e índices necessários já existem.
+
+## Detalhes técnicos
+
+Arquivo único alterado: `supabase/functions/hub-inbox/index.ts` (novas funções `resolverStatusPadraoDaLista`, `processarAnexosSubtarefa` reutilizando o helper existente, `tratarBriefingPublicar`), mais o deploy da função.
