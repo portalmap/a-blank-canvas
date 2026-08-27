@@ -1479,6 +1479,10 @@ Deno.serve(async (req) => {
     return await handleCalendarioDecisao(admin, modo, payload, mensagemId, false, origin);
   }
 
+  if (assunto === "briefing.publicar") {
+    return await handleBriefingPublicar(admin, modo, payload, mensagemId, origin);
+  }
+
 
   if (assunto !== "diagnostico.ping") {
     return json(
