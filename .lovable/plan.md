@@ -1,70 +1,88 @@
-# Diagnóstico — `calendario.publicar` (nada alterado)
+# Diagnóstico — decisão do cliente e envio de aprovação (nada alterado)
 
-## 1. Schema Zod que valida o payload
+## 1. RECEBE `calendario.post.aprovado` / `calendario.post.reprovado` (do Portal MAP)
 
-### Raiz (`CalendarioSchema`)
+### Schema Zod
 
-```text
-name           string | null   opcional
-cliente_chave  string (min 1)  OBRIGATÓRIO
-tasks          array (min 1)   OBRIGATÓRIO
-```
-
-### Cada item de `tasks` (`PostSchema`)
+Raiz (`DecisaoSchema`):
 
 ```text
-external_post_ref  string (min 1)   OBRIGATÓRIO
-title              string (min 1)   OBRIGATÓRIO
-description        string | null    opcional
-social_channel     string | null    opcional
-format             string | null    opcional
-due_date           string | null    opcional
-attachments        array            opcional
+aprovador_nome  string (min 1)  OBRIGATÓRIO
+tasks           array (min 1)   OBRIGATÓRIO
 ```
 
-### Cada item de `attachments` (`AnexoSchema`)
+Cada item (`DecisaoItemSchema`):
 
 ```text
-url        string (min 1)   OBRIGATÓRIO  <- URL do arquivo
-file_name  string (min 1)   opcional     <- nome do arquivo
-file_type  string           opcional
-file_size  number           opcional
+id          string (uuid)   OBRIGATÓRIO
+comentario  string | null   opcional
+attachments array           opcional
 ```
 
-## 2. JSON exato devolvido na resposta (status 200)
+### O que faz com cada campo
+
+- `aprovador_nome`: usado no texto do comentário e na atividade (`Cliente {aprovador_nome} aprovou.` / `devolveu`).
+- `tasks.id`: `tasks.id` da tarefa no MAP Flow. Localiza a tarefa; se não achar, retorna erro no resultado do item.
+- `tasks.comentario`: texto opcional do cliente. Sempre cria um `task_comments` e um `task_activities` (`activity_type = 'comment.created'`) com a decisão e o nome do aprovador no metadata.
+- `tasks.attachments`: para cada anexo, baixa da URL, sobe no bucket `task-attachments` e registra em `task_attachments` + atividade `attachment.added`.
+
+Ações extras:
+
+- Se `reprovado`: incrementa `tasks.cliente_devolucoes_count` em +1.
+- Em ambos (`aprovado` e `reprovado`): remove a tag "enviar aprovação" (`78b84f6c-b619-40bd-94f8-c1c2a63842c0`) da tarefa, se existir.
+- Idempotência: se o `mensagem_id` já existir em `hub_inbox_processed`, devolve a resposta salva sem reprocessar.
+
+## 2. ENVIA `calendario.aprovacao` (MAP Flow → Portal MAP, ao marcar a tag)
+
+### Envelope completo
 
 ```text
 {
-  cliente: {
-    nome_recebido: string,
-    client_name: string | null,
-    space_id: string,
-    space_name: string
-  },
-  workspace_id: string,
-  list_id: string,
-  list_name: string | null,
-  resultados: [
-    {
-      external_post_ref: string,
-      task_id: string,
-      status: "criada" | "ja_existia"
-    }
-  ]
+  destinos: ["portal-map"],
+  assunto: "calendario.aprovacao",
+  modo: "entrega",
+  referencia_origem: string,  // tasks.id
+  payload: {
+    name: string | null,       // nome do cliente
+    tasks: [
+      {
+        id: string,
+        title: string,
+        description: string | null,
+        social_channel: string | null,
+        format: string | null,
+        due_date: string | null,
+        attachments: [
+          {
+            file_name: string,
+            file_url: string   // URL assinada (45 dias)
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
 
-Em caso de erro de processamento de um post dentro do array, o item pode vir com chaves extras:
+### Chaves do payload (sem anexo)
+
+Raiz do `payload`:
 
 ```text
-{
-  external_post_ref: string,
-  task_id: string | null,
-  status: "erro",
-  error: string,
-  canal: string | null,
-  status_disponiveis: string[]
-}
+name   string | null
+ tasks  array (1 item)
+```
+
+Cada item de `tasks`:
+
+```text
+id              string
+title           string
+description     string | null
+social_channel  string | null
+format          string | null
+due_date        string | null
+attachments     array
 ```
 
 Nada será alterado — apenas diagnóstico.
