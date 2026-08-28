@@ -1,26 +1,80 @@
-# Anexos não aparecem no Mockup do Portal MAP
+# Diagnóstico — Nomes das chaves de anexo por fluxo (nada alterado)
 
-## O que foi verificado
+## 1. ENVIO `calendario.aprovacao` (relay-approval.server.ts) — MAP Flow → Hub → Portal
 
-- O último envio de `calendario.aprovacao` (28/08 20:56, tarefa "POST 1 | OUTUBRO | Instagram") saiu do MAP Flow **com 1 anexo** (PNG) e o Hub confirmou entrega no portal-map com `status_code: 200`. Ou seja: o MAP Flow enviou e o Portal recebeu.
-- No Portal MAP, o mockup monta imagem/vídeo lendo cada anexo pelas chaves **`url`** (e `title` como nome do arquivo). Anexo sem `url` é simplesmente ignorado — não gera erro.
-- O MAP Flow envia cada anexo como **`file_url` / `file_name`**. Como o Portal grava os anexos como JSON livre (sem validação), a mensagem passa com 200, mas o mockup não encontra nenhuma mídia.
-- Também não é enviado nenhum campo de imagem principal (`image_url`), que o Portal usa na miniatura do calendário.
+Cada anexo é montado com:
 
-Conclusão: não é falha de entrega nem de permissão do arquivo — é **incompatibilidade de nome de campo do anexo**.
+```text
+{ "file_name": "<nome do arquivo>", "file_url": "<URL assinada>" }
+```
 
-## O que fazer (só no MAP Flow, sem mexer no Hub nem no Portal)
+- Arquivo/URL: **`file_url`**
+- Nome: **`file_name`**
 
-1. No envio de `calendario.aprovacao`, montar cada anexo com as chaves que o Portal entende, mantendo as atuais para não quebrar nada:
-   - `url` (URL assinada) + `title` (nome do arquivo)
-   - manter `file_url` e `file_name`
-   - acrescentar `file_type` (mime, quando existir) e `id` do anexo
-2. Enviar `image_url` no post: primeira imagem dos anexos (jpg/jpeg/png/gif/webp), para a miniatura do calendário do Portal.
-3. Garantir que a URL assinada preserve a extensão do arquivo (o Portal detecta imagem/vídeo pela extensão na URL ou no título) — se o caminho não tiver extensão, o `title` cobre o caso.
-4. Reenviar a tarefa de teste (remover e recolocar a tag "enviar aprovação") e validar no log de relay que o anexo saiu com `url` preenchida.
+## 2. RESPOSTA `tarefa.listar_para_aprovacao` (hub-inbox) — Portal consulta o MAP Flow
 
-## Detalhes técnicos
+Cada anexo volta com:
 
-- Arquivo alterado: `src/lib/relay-approval.server.ts` (montagem da lista `attachments` e do objeto do post).
-- Consulta de anexos passa a trazer também `file_type`/mime de `task_attachments` (se a coluna existir; caso contrário, deduzir pela extensão do `file_name`).
-- Nada muda no `hub-inbox` (entrada), nas tags, nem no fluxo de aprovação/reprovação.
+```text
+{ "attachment_id": "<id>", "url": "<URL assinada>", "title": "<nome do arquivo>", ... }
+```
+
+- Arquivo/URL: **`url`** (resolvida para URL assinada antes de responder; se não resolver, volta `null`)
+- Nome: **`title`**
+- Bônus: **`attachment_id`** (id do registro em `task_attachments`)
+
+## 3. RECEBIMENTO (hub-inbox) — outros sistemas → MAP Flow
+
+### 3a. `calendario.publicar` (posts vindos do Social Flow/Hub)
+
+Zod (`AnexoSchema`):
+
+```text
+url: string (obrigatório)
+file_name: string (opcional)
+file_type: string (opcional)
+```
+
+- Arquivo/URL: **`url`** (obrigatório)
+- Nome: **`file_name`** (opcional; se ausente, deriva do final da `url`)
+- Bônus: **`file_type`** (opcional)
+
+### 3b. `calendario.post.aprovado` / `calendario.post.reprovado` (decisão do cliente, vinda do Portal)
+
+Zod (`DecisaoAnexoSchema`):
+
+```text
+file_url: string (obrigatório)
+file_name: string (opcional)
+```
+
+- Arquivo/URL: **`file_url`** (URL assinada do Portal; o MAP Flow baixa e regrava no bucket próprio)
+- Nome: **`file_name`** (opcional; se ausente, deriva do final da `file_url`)
+
+### 3c. `briefing.publicar` (briefings do Hub viram subtarefas)
+
+Zod (`BriefingAnexoSchema`):
+
+```text
+file_url: string (obrigatório)
+file_name: string (opcional)
+```
+
+- Arquivo/URL: **`file_url`**
+- Nome: **`file_name`** (opcional; mesma derivação pelo final da `file_url`)
+
+## Resumo
+
+| Fluxo | Chave do arquivo/URL | Chave do nome |
+|---|---|---|
+| Envio `calendario.aprovacao` | `file_url` | `file_name` |
+| Resposta `tarefa.listar_para_aprovacao` | `url` | `title` |
+| Entrada `calendario.publicar` | `url` | `file_name` |
+| Entrada decisões `calendario.post.*` | `file_url` | `file_name` |
+| Entrada `briefing.publicar` | `file_url` | `file_name` |
+
+## Ponto de atenção (ligado ao problema dos anexos no Portal)
+
+O mockup do Portal MAP lê anexos pelas chaves **`url` + `title`** (mesmas chaves que o próprio MAP Flow usa na resposta de `tarefa.listar_para_aprovacao`). O envio `calendario.aprovacao`, porém, sai com **`file_url` + `file_name`** — é o único fluxo que conversa com o Portal usando essa nomenclatura. É essa diferença que faz o anexo não aparecer no mockup mesmo com entrega confirmada (200).
+
+Nenhuma alteração foi feita — apenas diagnóstico.
