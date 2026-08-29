@@ -1,95 +1,93 @@
-# Diagnóstico — lógica de produtividade (nada alterado)
+# Diagnóstico — decisões recebidas do Portal (nada alterado)
 
-## Cálculo base
+Tarefa envolvida nas duas mensagens: `67602c0c-9171-47ff-8a33-17183a0899a9`.
 
-A produtividade parte de três datas de uma tarefa:
+## 1. Payload que CHEGOU — `calendario.post.reprovado`
 
-- `start_date` — quando a tarefa começou;
-- `due_date` — prazo final;
-- `completed_at` — data de conclusão (se houver).
+Recebido em **2026-08-29 09:47:36.825 UTC** (`direcao: recebido`, `modo: entrega`).
 
-A **data de referência** é `completed_at` quando a tarefa está concluída; caso contrário, é a data/hora atual.
-
-### Percentual de entrega
-
-```text
-percentual = (referencia - start_date) / (due_date - start_date) * 100
+```json
+{
+  "aprovador_nome": "Portal MAP",
+  "tasks": [
+    {
+      "id": "67602c0c-9171-47ff-8a33-17183a0899a9",
+      "comentario": "não goste, sou chato",
+      "attachments": []
+    }
+  ]
+}
 ```
 
-- Se o prazo total for zero ou negativo, retorna 200% (máximo atraso).
-- Representa "quanto do prazo já foi consumido".
+Sem anexos nessa devolução.
 
-### Score de produtividade
+## 2. Payload que CHEGOU — `calendario.post.aprovado`
 
-```text
-score = 200 - percentual_de_entrega, limitado entre 0 e 200
+Recebido em **2026-08-29 09:50:18.916 UTC**.
+
+```json
+{
+  "aprovador_nome": "Portal MAP",
+  "tasks": [
+    {
+      "id": "67602c0c-9171-47ff-8a33-17183a0899a9",
+      "comentario": "AGORA SIM POW",
+      "attachments": [
+        {
+          "file_name": "1787997000661_favicon_strike_jiujitsu.png",
+          "file_url": "https://<portal>.supabase.co/storage/v1/object/sign/task-attachments/.../1787997000661_favicon_strike_jiujitsu.png?token=..."
+        }
+      ]
+    }
+  ]
+}
 ```
 
-- Quanto mais cedo a tarefa foi entregue, maior o score.
-- Entrega exatamente no prazo → score 100.
-- Atraso total → score 0.
-
-### Classificação
-
-Usa os limiares configuráveis em `productivity_settings`:
+### Chaves confirmadas
 
 ```text
-early_threshold_percent   padrão 50
-on_time_threshold_percent padrão 100
+raiz:      aprovador_nome, tasks
+item:      id, comentario, attachments
+anexo:     file_url  (URL do arquivo)
+           file_name (nome do arquivo)
 ```
 
-Classificações:
+## 3. Confirmações com timestamp
+
+### Devolução (reprovado)
 
 ```text
-percentual <= early_threshold  → early      (Antecipada)
-percentual <= on_time_threshold → on_time    (Em dia / No prazo)
-percentual > on_time_threshold → late       (Atrasada)
+09:47:38.672  comentário criado (task_comments ddf5bb47...)
+              "Cliente Portal MAP devolveu. Comentário: não goste, sou chato"
+09:47:38.941  atividade comment.created (decisao: devolvido)
+09:47:40.109  atividade tag.removed — "enviar aprovação" removida
+              contador cliente_devolucoes_count = 1  (subiu, OK)
 ```
 
-Tarefas sem `start_date` ou sem `due_date` não entram no cálculo de percentual no indicador individual (`useTaskProductivityClassification` retorna `null`). Nas estatísticas agregadas, elas caem na categoria `noDueDate` (Sem prazo).
+Nenhum anexo veio, portanto nada a baixar.
 
-## Regras por pessoa
-
-As funções de ranking e relatórios filtram as tarefas atribuídas a uma pessoa:
-
-- Atribuição atual: `task_assignees.user_id`.
-- Atribuições históricas (tarefas transferidas): `task_assignee_history`.
-
-A flag `includeTransferred` controla se tarefas que a pessoa já teve mas não tem mais contam para ela.
-
-Métricas por pessoa:
+### Aprovação
 
 ```text
-early       → tarefas concluídas abaixo do limiar "early"
-onTime      → concluídas entre early e on_time
-late        → concluídas acima de on_time
-noDueDate   → concluídas sem start_date/due_date
-productivityScore → média dos scores
+09:50:21.136  comentário criado (task_comments 2abe3373...)
+              "Cliente Portal MAP aprovou. Comentário: AGORA SIM POW"
+09:50:21.389  atividade comment.created (decisao: aprovado)
+09:50:21.905  atividade tag.removed — "enviar aprovação" removida
+09:50:23.432  anexo baixado e registrado (task_attachments d833caa7...)
+              file_name: 1787997000661_favicon_strike_jiujitsu.png
+              storage: b7e892cf.../67602c0c.../1787997022967_...png
+              tipo: image/png, 22.385 bytes
+09:50:23.697  atividade attachment.added (origem: hub, decisao: aprovado)
 ```
 
-## Regras por lista / pasta / space
+Contador não foi tocado na aprovação — correto (só sobe no reprovado).
 
-As estatísticas por escopo (`scope`) agregam as tarefas de uma localização sem filtrar por pessoa:
+## Resumo
 
-```text
-workspace → todas as tarefas do workspace
-space     → tasks cujo list_id pertence ao space (via lists.space_id)
-folder    → tasks cujo list_id pertence a uma pasta (lists.folder_id)
-list      → tasks de uma lista específica
-```
+Tudo funcionou nos dois fluxos:
 
-A contagem segue as mesmas classificações (`early`, `on_time`, `late`, `noDueDate`), mas sem vínculo com usuário.
+- comentário criado — sim, nos dois;
+- contador de devolução — subiu para 1 no reprovado;
+- anexo do cliente — baixado do Portal, subido no bucket local `task-attachments` e registrado com atividade visível.
 
-## Onde isso é usado
-
-- `TaskProductivityIndicator.tsx`: bolinha colorida nas tarefas com tooltip.
-- `useProductivityStats.ts`, `useProductivityRanking.ts`, `useProductivityDetailsReport.ts`, `useAccountProductivity.ts`, `useUserProductivityDetails.ts`: painéis e relatórios de produtividade.
-- `useProductivityClassification.ts`: funções puras de cálculo.
-
-## Observações
-
-- O cálculo usa hora do dia: `start_date` começa às `00:00:00` e `due_date` termina às `23:59:59`.
-- Tarefas sem prazo não geram score nem percentual; são contadas só como volume (`noDueDate`).
-- A classificação depende dos limiares do workspace; se não houver configuração, usa 50/100.
-
-Nada será alterado — apenas diagnóstico.
+Nada foi alterado — apenas diagnóstico.
