@@ -1,41 +1,91 @@
-# Diagnóstico — decisões recebidas do Portal (nada alterado)
+# Diagnóstico — chaves reais dos três fluxos (nada alterado)
 
-Tarefa envolvida nas duas mensagens: `67602c0c-9171-47ff-8a33-17183a0899a9`.
+## 1. RECEBE `briefing.publicar` (do Hub)
 
-## 1. Payload que CHEGOU — `calendario.post.reprovado`
+### Schema Zod
 
-Recebido em **2026-08-29 09:47:36.825 UTC** (`direcao: recebido`, `modo: entrega`).
+Raiz (`BriefingSchema`):
 
-```json
+```text
+name      string | null   opcional
+subtasks  array (min 1)   OBRIGATÓRIO
+```
+
+Cada item (`BriefingItemSchema`):
+
+```text
+parent_id              string (uuid)  OBRIGATÓRIO
+external_briefing_ref  string (min 1) OBRIGATÓRIO
+title                  string (min 1) OBRIGATÓRIO
+description            string | null  opcional
+social_channel         string | null  opcional
+attachments            array          opcional
+```
+
+Cada anexo (`BriefingAnexoSchema`):
+
+```text
+file_url   string (min 1)  OBRIGATÓRIO  <- URL do arquivo
+file_name  string          opcional     <- nome do arquivo
+```
+
+### Resposta devolvida
+
+```text
 {
-  "aprovador_nome": "Portal MAP",
-  "tasks": [
-    {
-      "id": "67602c0c-9171-47ff-8a33-17183a0899a9",
-      "comentario": "não goste, sou chato",
-      "attachments": []
-    }
-  ]
+  assunto: "briefing.publicar",
+  status: "ok",
+  cliente: string | null,      // eco do name
+  resultados: [ ... ]
 }
 ```
 
-Sem anexos nessa devolução.
+Item de `resultados` — sucesso:
 
-## 2. Payload que CHEGOU — `calendario.post.aprovado`
+```text
+{
+  external_briefing_ref: string,
+  id: string,            // uuid da subtarefa criada
+  parent_id: string,
+  status: "criada",
+  anexos: [ { file_name, status, error? } ]
+}
+```
 
-Recebido em **2026-08-29 09:50:18.916 UTC**.
+Item já existente:
+
+```text
+{ external_briefing_ref, id, parent_id, status: "ja_existia" }
+```
+
+Item com erro:
+
+```text
+{ external_briefing_ref, status: "erro", error: "tarefa_mae_nao_encontrada"
+                                              | "autor_tecnico_nao_encontrado"
+                                              | "status_nao_encontrado"
+                                              | "criacao_falhou" }
+```
+
+## 2. ENVIA `calendario.aprovacao` (para portal-map, com anexo)
+
+Payload real do último envio (2026-08-29 10:08:14 UTC, `status_code` 200):
 
 ```json
 {
-  "aprovador_nome": "Portal MAP",
+  "name": "Assessoria MAP",
   "tasks": [
     {
-      "id": "67602c0c-9171-47ff-8a33-17183a0899a9",
-      "comentario": "AGORA SIM POW",
+      "id": "e2322362-1102-4c6a-b7aa-3f5ad862d244",
+      "title": "POST 1 | OUTUBRO | Instagram | Outubro Teste começa pela clareza",
+      "description": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"textAlign\":null},\"content\":[{\"type\":\"text\",\"text\":\"GOSTEI MUITO, BORA APARECER NAS REDES SOCIAIS\"}]}]}",
+      "social_channel": "Instagram",
+      "format": null,
+      "due_date": "2026-08-27",
       "attachments": [
         {
-          "file_name": "1787997000661_favicon_strike_jiujitsu.png",
-          "file_url": "https://<portal>.supabase.co/storage/v1/object/sign/task-attachments/.../1787997000661_favicon_strike_jiujitsu.png?token=..."
+          "file_name": "briefing-instagram-77f66973-15fb-494e-99fd-a05916e80fae.png",
+          "file_url": "https://efqnscrnyyyjpswctahq.supabase.co/storage/v1/object/sign/task-attachments/.../1787950538066_briefing-instagram-....png?token=..."
         }
       ]
     }
@@ -43,51 +93,63 @@ Recebido em **2026-08-29 09:50:18.916 UTC**.
 }
 ```
 
-### Chaves confirmadas
+Envelope enviado ao Hub:
 
 ```text
-raiz:      aprovador_nome, tasks
-item:      id, comentario, attachments
-anexo:     file_url  (URL do arquivo)
-           file_name (nome do arquivo)
+{
+  destinos: ["portal-map"],
+  assunto: "calendario.aprovacao",
+  modo: "entrega",
+  referencia_origem: <tasks.id>,
+  payload: { ...acima }
+}
 ```
 
-## 3. Confirmações com timestamp
-
-### Devolução (reprovado)
+Chaves:
 
 ```text
-09:47:38.672  comentário criado (task_comments ddf5bb47...)
-              "Cliente Portal MAP devolveu. Comentário: não goste, sou chato"
-09:47:38.941  atividade comment.created (decisao: devolvido)
-09:47:40.109  atividade tag.removed — "enviar aprovação" removida
-              contador cliente_devolucoes_count = 1  (subiu, OK)
+raiz do payload:  name, tasks
+cada item:        id, title, description, social_channel, format, due_date, attachments
+cada anexo:       file_url  (URL do arquivo, assinada 45 dias)
+                  file_name (nome do arquivo)
 ```
 
-Nenhum anexo veio, portanto nada a baixar.
+Observação factual: `description` sai como **string JSON do TipTap**, não texto puro. `format` saiu `null`.
 
-### Aprovação
+## 3. RECEBE `calendario.post.aprovado` / `calendario.post.reprovado` (do Portal)
+
+### Schema Zod
+
+Raiz (`DecisaoSchema`):
 
 ```text
-09:50:21.136  comentário criado (task_comments 2abe3373...)
-              "Cliente Portal MAP aprovou. Comentário: AGORA SIM POW"
-09:50:21.389  atividade comment.created (decisao: aprovado)
-09:50:21.905  atividade tag.removed — "enviar aprovação" removida
-09:50:23.432  anexo baixado e registrado (task_attachments d833caa7...)
-              file_name: 1787997000661_favicon_strike_jiujitsu.png
-              storage: b7e892cf.../67602c0c.../1787997022967_...png
-              tipo: image/png, 22.385 bytes
-09:50:23.697  atividade attachment.added (origem: hub, decisao: aprovado)
+aprovador_nome  string (min 1)  OBRIGATÓRIO
+tasks           array (min 1)   OBRIGATÓRIO
 ```
 
-Contador não foi tocado na aprovação — correto (só sobe no reprovado).
+Cada item (`DecisaoItemSchema`):
 
-## Resumo
+```text
+id           string (uuid)  OBRIGATÓRIO   // tasks.id do MAP Flow
+comentario   string | null  opcional
+attachments  array          opcional
+```
 
-Tudo funcionou nos dois fluxos:
+Cada anexo (`DecisaoAnexoSchema`):
 
-- comentário criado — sim, nos dois;
-- contador de devolução — subiu para 1 no reprovado;
-- anexo do cliente — baixado do Portal, subido no bucket local `task-attachments` e registrado com atividade visível.
+```text
+file_url   string (min 1)  OBRIGATÓRIO  <- URL do arquivo
+file_name  string          opcional     <- nome do arquivo
+```
+
+## Resumo das chaves de anexo nos três fluxos
+
+| Fluxo | Direção | URL | Nome |
+|---|---|---|---|
+| `briefing.publicar` | recebe | `file_url` | `file_name` |
+| `calendario.aprovacao` | envia | `file_url` | `file_name` |
+| `calendario.post.aprovado/reprovado` | recebe | `file_url` | `file_name` |
+
+Esses três são consistentes entre si. A única saída que difere é a resposta de `tarefa.listar_para_aprovacao`, que usa `url` + `title`.
 
 Nada foi alterado — apenas diagnóstico.
