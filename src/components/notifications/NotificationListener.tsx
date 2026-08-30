@@ -153,8 +153,10 @@ export function NotificationListener() {
             'Comentário atribuído a você',
             'Um comentário foi atribuído a você em uma tarefa.',
             <MessageSquare className="h-4 w-4" />,
-            `/task/${row.task_id}`
+            `/task/${row.task_id}`,
+            { type: 'comment_assigned', referenceType: 'task', referenceId: row.task_id }
           );
+
         }
       );
 
