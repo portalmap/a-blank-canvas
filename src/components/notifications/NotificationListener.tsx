@@ -205,8 +205,10 @@ export function NotificationListener() {
             'Novo post no feed',
             'Um novo post foi publicado no feed.',
             <Newspaper className="h-4 w-4" />,
-            '/'
+            '/',
+            { type: 'feed_new_post', referenceType: 'feed_post', referenceId: row.id }
           );
+
         }
       );
     }
