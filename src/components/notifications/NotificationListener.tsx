@@ -312,8 +312,10 @@ export function NotificationListener() {
               'Tarefa atrasada',
               task.title || 'Uma tarefa está atrasada.',
               <AlertTriangle className="h-4 w-4" />,
-              `/task/${task.id}`
+              `/task/${task.id}`,
+              { type: 'task_overdue', referenceType: 'task', referenceId: task.id }
             );
+
           });
         }
       }
