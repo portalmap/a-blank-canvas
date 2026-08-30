@@ -51,7 +51,13 @@ export function NotificationListener() {
   const workspaceId = activeWorkspace?.id;
 
   const showToast = useCallback(
-    (title: string, description: string, icon: React.ReactNode, link?: string) => {
+    (
+      title: string,
+      description: string,
+      icon: React.ReactNode,
+      link?: string,
+      persist?: { type: string; referenceType?: string; referenceId?: string }
+    ) => {
       toast(title, {
         description,
         icon,
@@ -63,9 +69,30 @@ export function NotificationListener() {
             }
           : undefined,
       });
+
+      // Persiste na central de notificações (sino + modal).
+      if (persist && userId && workspaceId) {
+        void supabase
+          .from('notifications')
+          .insert({
+            user_id: userId,
+            workspace_id: workspaceId,
+            type: persist.type,
+            title,
+            message: description,
+            link: link ?? null,
+            reference_type: persist.referenceType ?? null,
+            reference_id: persist.referenceId ?? null,
+          })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+            queryClient.invalidateQueries({ queryKey: ['notifications-unread-count', userId] });
+          });
+      }
     },
-    [navigate]
+    [navigate, userId, workspaceId, queryClient]
   );
+
 
   // --- Realtime subscriptions ---
   useEffect(() => {
