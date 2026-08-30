@@ -36,6 +36,8 @@ export function NotificationReminderProvider() {
   const location = useLocation();
   const [modalOpen, setModalOpen] = useState(false);
   const snoozedUntilRef = useRef(0);
+  const visitingRef = useRef<{ from: string; path: string | null } | null>(null);
+
   const [tick, setTick] = useState(0);
 
   // Carrega o "adiar" persistido ao trocar de usuário.
