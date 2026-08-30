@@ -349,8 +349,10 @@ export function NotificationListener() {
               'Tarefa vence amanhã',
               task.title || 'Uma tarefa vence amanhã.',
               <Clock className="h-4 w-4" />,
-              `/task/${task.id}`
+              `/task/${task.id}`,
+              { type: 'task_due_tomorrow', referenceType: 'task', referenceId: task.id }
             );
+
           });
         }
       }
