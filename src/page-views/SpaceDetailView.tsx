@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Plus, FolderOpen, List, ChevronRight, Pencil, FileText, UserCheck, X } from 'lucide-react';
+import { Loader2, Plus, FolderOpen, List, ChevronRight, ChevronDown, Pencil, FileText, UserCheck, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
@@ -49,6 +50,7 @@ const SpaceDetailView = () => {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
+  const [responsaveisOpen, setResponsaveisOpen] = useState(false);
 
   const handleCreateFolder = async () => {
     if (!spaceId || !newFolderName.trim()) return;
@@ -187,79 +189,94 @@ const SpaceDetailView = () => {
       </Card>
 
       {/* Responsáveis do Space */}
-      <Card className="bg-muted border-0 shadow-none">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <UserCheck className="h-4 w-4" />
-            Responsáveis
-          </CardTitle>
-          <CardDescription>
-            Responsáveis gerais pelas tarefas deste space
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {([
-              {
-                key: 'account' as const,
-                label: 'Account',
-                hint: 'Responsável geral por todas as tarefas deste space',
-                value: currentSpace.account_user_id,
-              },
-              {
-                key: 'headProjetos' as const,
-                label: 'Head de Projetos',
-                hint: 'Produtividade calculada pela média da equipe deste space',
-                value: (currentSpace as any).head_projetos_user_id,
-              },
-              {
-                key: 'headAccount' as const,
-                label: 'Head de Account',
-                hint: 'Produtividade calculada pela média dos Accounts dos spaces',
-                value: (currentSpace as any).head_account_user_id,
-              },
-            ]).map((field) => (
-              <div key={field.key} className="space-y-1.5 min-w-0">
-                <p className="text-sm font-medium">{field.label}</p>
-                <p className="text-xs text-muted-foreground">{field.hint}</p>
-                <Select
-                  value={field.value || 'none'}
-                  onValueChange={(value) => {
-                    const userId = value === 'none' ? null : value;
-                    updateSpace.mutate({
-                      id: currentSpace.id,
-                      name: currentSpace.name,
-                      ...(field.key === 'account' ? { accountUserId: userId } : {}),
-                      ...(field.key === 'headProjetos' ? { headProjetosUserId: userId } : {}),
-                      ...(field.key === 'headAccount' ? { headAccountUserId: userId } : {}),
-                    });
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={`Selecione o ${field.label}...`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum</SelectItem>
-                    {members.map((member) => (
-                      <SelectItem key={member.user_id} value={member.user_id}>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-5 w-5 shrink-0">
-                            <AvatarImage src={member.profile?.avatar_url || undefined} />
-                            <AvatarFallback className="text-[10px]">
-                              {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="truncate">{member.profile?.full_name || 'Sem nome'}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      <Collapsible open={responsaveisOpen} onOpenChange={setResponsaveisOpen}>
+        <Card className="bg-muted border-0 shadow-none">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-3 cursor-pointer hover:bg-accent/40 transition-colors">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <UserCheck className="h-4 w-4" />
+                    Responsáveis
+                  </CardTitle>
+                  <CardDescription>
+                    Responsáveis gerais pelas tarefas deste space
+                  </CardDescription>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                    responsaveisOpen ? 'rotate-180' : ''
+                  }`}
+                />
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {([
+                  {
+                    key: 'account' as const,
+                    label: 'Account',
+                    hint: 'Responsável geral por todas as tarefas deste space',
+                    value: currentSpace.account_user_id,
+                  },
+                  {
+                    key: 'headProjetos' as const,
+                    label: 'Head de Projetos',
+                    hint: 'Produtividade calculada pela média da equipe deste space',
+                    value: (currentSpace as any).head_projetos_user_id,
+                  },
+                  {
+                    key: 'headAccount' as const,
+                    label: 'Head de Account',
+                    hint: 'Produtividade calculada pela média dos Accounts dos spaces',
+                    value: (currentSpace as any).head_account_user_id,
+                  },
+                ]).map((field) => (
+                  <div key={field.key} className="space-y-1.5 min-w-0">
+                    <p className="text-sm font-medium">{field.label}</p>
+                    <p className="text-xs text-muted-foreground">{field.hint}</p>
+                    <Select
+                      value={field.value || 'none'}
+                      onValueChange={(value) => {
+                        const userId = value === 'none' ? null : value;
+                        updateSpace.mutate({
+                          id: currentSpace.id,
+                          name: currentSpace.name,
+                          ...(field.key === 'account' ? { accountUserId: userId } : {}),
+                          ...(field.key === 'headProjetos' ? { headProjetosUserId: userId } : {}),
+                          ...(field.key === 'headAccount' ? { headAccountUserId: userId } : {}),
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={`Selecione o ${field.label}...`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {members.map((member) => (
+                          <SelectItem key={member.user_id} value={member.user_id}>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-5 w-5 shrink-0">
+                                <AvatarImage src={member.profile?.avatar_url || undefined} />
+                                <AvatarFallback className="text-[10px]">
+                                  {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="truncate">{member.profile?.full_name || 'Sem nome'}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
 
       <TaskStatsDashboard stats={taskStats} isLoading={statsLoading} />
