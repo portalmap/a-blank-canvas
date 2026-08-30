@@ -32,8 +32,8 @@ export function NotificationReminderModal({
   return (
     <Dialog open={open}>
       <DialogContent
-        showCloseButton={false}
-        className="max-w-lg"
+        className="max-w-lg [&>button.absolute]:hidden"
+
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
