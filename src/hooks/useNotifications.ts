@@ -137,3 +137,48 @@ export const useMarkAllNotificationsAsRead = () => {
     },
   });
 };
+
+export const useMarkNotificationAsUnread = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, userId }: { id: string; userId: string }) => {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: false })
+        .eq('id', id);
+
+      if (error) throw error;
+      return { id, userId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications', data.userId] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count', data.userId] });
+    },
+  });
+};
+
+/** Mantém lista e contador atualizados em tempo real. */
+export const useNotificationsRealtime = (userId?: string) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+          queryClient.invalidateQueries({ queryKey: ['notifications-unread-count', userId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
+};
