@@ -51,7 +51,7 @@ export const useProductivityRanking = (options: UseProductivityRankingOptions = 
         p_workspace_id: workspaceId,
         p_start_date: options.startDate?.toISOString() || null,
         p_end_date: options.endDate?.toISOString() || null,
-        p_include_transferred: options.includeTransferred || false,
+        p_include_transferred: options.includeTransferred ?? true,
         p_early_threshold: earlyThreshold,
         p_on_time_threshold: onTimeThreshold,
       });

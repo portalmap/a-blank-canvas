@@ -19,7 +19,7 @@ interface ScopeProductivityCardProps {
 }
 
 const ScopeProductivityCard = ({ scope, spaceId, folderId, listId }: ScopeProductivityCardProps) => {
-  const [includeTransferred, setIncludeTransferred] = useState(false);
+  const [includeTransferred, setIncludeTransferred] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());

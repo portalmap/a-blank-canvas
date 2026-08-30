@@ -266,7 +266,7 @@ const ProductivityCardWrapper = ({
   dateRange?: DateRangeProps;
 }) => {
   const { activeWorkspace } = useWorkspace();
-  const [includeTransferred, setIncludeTransferred] = useState(false);
+  const [includeTransferred, setIncludeTransferred] = useState(true);
   
   // Suporta tanto userIds quanto userId (para compatibilidade)
   const effectiveUserIds = card.config.userIds || (card.config.userId ? [card.config.userId] : undefined);
@@ -345,7 +345,7 @@ const ProductivityRankingCardWrapper = ({
   commonProps: { title: string; onDelete: () => void; onEdit: () => void; onExpand: () => void; isExpanded: boolean };
   dateRange?: DateRangeProps;
 }) => {
-  const [includeTransferred, setIncludeTransferred] = useState(false);
+  const [includeTransferred, setIncludeTransferred] = useState(true);
   const { data: rankingData, isLoading } = useProductivityRanking({ 
     includeTransferred,
     startDate: dateRange?.startDate,

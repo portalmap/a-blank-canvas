@@ -47,7 +47,7 @@ export const useProductivityDetailsReport = (options: UseProductivityDetailsRepo
   const { activeWorkspace } = useWorkspace();
   const { user } = useAuth();
   const { data: settings } = useProductivitySettings();
-  const { scope = 'workspace', spaceId, folderId, listId, userId, userIds, startDate, endDate, includeTransferred = false, enabled = false } = options;
+  const { scope = 'workspace', spaceId, folderId, listId, userId, userIds, startDate, endDate, includeTransferred = true, enabled = false } = options;
 
   const earlyThreshold = settings?.early_threshold_percent ?? 50;
   const onTimeThreshold = settings?.on_time_threshold_percent ?? 100;

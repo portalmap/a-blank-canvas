@@ -225,7 +225,7 @@ const ProductivityCardComponent = ({
               <div className="flex items-center justify-between pt-2 border-t">
                 <span className="text-xs text-muted-foreground">Incluir transferidas</span>
                 <Switch
-                  checked={includeTransferred ?? false}
+                  checked={includeTransferred ?? true}
                   onCheckedChange={onToggleTransferred}
                   className="scale-75"
                 />

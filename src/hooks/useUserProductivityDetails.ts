@@ -55,7 +55,7 @@ export const useUserProductivityDetails = (options: UseUserProductivityDetailsOp
         p_user_id: userId,
         p_start_date: startDate || null,
         p_end_date: endDate || null,
-        p_include_transferred: includeTransferred || false,
+        p_include_transferred: includeTransferred ?? true,
         p_early_threshold: earlyThreshold,
         p_on_time_threshold: onTimeThreshold,
         p_limit: 200,
