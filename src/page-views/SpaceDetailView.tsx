@@ -187,7 +187,7 @@ const SpaceDetailView = () => {
       </Card>
 
       {/* Responsáveis do Space */}
-      <Card>
+      <Card className="bg-muted border-0 shadow-none">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <UserCheck className="h-4 w-4" />
@@ -197,65 +197,67 @@ const SpaceDetailView = () => {
             Responsáveis gerais pelas tarefas deste space
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {([
-            {
-              key: 'account' as const,
-              label: 'Account',
-              hint: 'Responsável geral por todas as tarefas deste space',
-              value: currentSpace.account_user_id,
-            },
-            {
-              key: 'headProjetos' as const,
-              label: 'Head de Projetos',
-              hint: 'Produtividade calculada pela média da equipe deste space',
-              value: (currentSpace as any).head_projetos_user_id,
-            },
-            {
-              key: 'headAccount' as const,
-              label: 'Head de Account',
-              hint: 'Produtividade calculada pela média dos Accounts dos spaces',
-              value: (currentSpace as any).head_account_user_id,
-            },
-          ]).map((field) => (
-            <div key={field.key} className="space-y-1.5">
-              <p className="text-sm font-medium">{field.label}</p>
-              <p className="text-xs text-muted-foreground">{field.hint}</p>
-              <Select
-                value={field.value || 'none'}
-                onValueChange={(value) => {
-                  const userId = value === 'none' ? null : value;
-                  updateSpace.mutate({
-                    id: currentSpace.id,
-                    name: currentSpace.name,
-                    ...(field.key === 'account' ? { accountUserId: userId } : {}),
-                    ...(field.key === 'headProjetos' ? { headProjetosUserId: userId } : {}),
-                    ...(field.key === 'headAccount' ? { headAccountUserId: userId } : {}),
-                  });
-                }}
-              >
-                <SelectTrigger className="w-[280px]">
-                  <SelectValue placeholder={`Selecione o ${field.label}...`} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {members.map((member) => (
-                    <SelectItem key={member.user_id} value={member.user_id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-5 w-5">
-                          <AvatarImage src={member.profile?.avatar_url || undefined} />
-                          <AvatarFallback className="text-[10px]">
-                            {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
-                          </AvatarFallback>
-                        </Avatar>
-                        {member.profile?.full_name || 'Sem nome'}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ))}
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {([
+              {
+                key: 'account' as const,
+                label: 'Account',
+                hint: 'Responsável geral por todas as tarefas deste space',
+                value: currentSpace.account_user_id,
+              },
+              {
+                key: 'headProjetos' as const,
+                label: 'Head de Projetos',
+                hint: 'Produtividade calculada pela média da equipe deste space',
+                value: (currentSpace as any).head_projetos_user_id,
+              },
+              {
+                key: 'headAccount' as const,
+                label: 'Head de Account',
+                hint: 'Produtividade calculada pela média dos Accounts dos spaces',
+                value: (currentSpace as any).head_account_user_id,
+              },
+            ]).map((field) => (
+              <div key={field.key} className="space-y-1.5 min-w-0">
+                <p className="text-sm font-medium">{field.label}</p>
+                <p className="text-xs text-muted-foreground">{field.hint}</p>
+                <Select
+                  value={field.value || 'none'}
+                  onValueChange={(value) => {
+                    const userId = value === 'none' ? null : value;
+                    updateSpace.mutate({
+                      id: currentSpace.id,
+                      name: currentSpace.name,
+                      ...(field.key === 'account' ? { accountUserId: userId } : {}),
+                      ...(field.key === 'headProjetos' ? { headProjetosUserId: userId } : {}),
+                      ...(field.key === 'headAccount' ? { headAccountUserId: userId } : {}),
+                    });
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={`Selecione o ${field.label}...`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {members.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-5 w-5 shrink-0">
+                            <AvatarImage src={member.profile?.avatar_url || undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="truncate">{member.profile?.full_name || 'Sem nome'}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
