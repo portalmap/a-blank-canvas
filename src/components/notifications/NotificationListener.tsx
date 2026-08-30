@@ -177,8 +177,10 @@ export function NotificationListener() {
             'Mensagem atribuída a você',
             'Uma mensagem de chat foi atribuída a você.',
             <MessageSquare className="h-4 w-4" />,
-            `/chat?channel=${row.channel_id}&message=${row.id}`
+            `/chat?channel=${row.channel_id}&message=${row.id}`,
+            { type: 'chat_comment_assigned', referenceType: 'chat_message', referenceId: row.id }
           );
+
         }
       );
     }
