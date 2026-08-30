@@ -255,8 +255,11 @@ export function NotificationListener() {
           showToast(
             'Acesso a Space removido',
             'Seu acesso a um Space foi removido.',
-            <ShieldMinus className="h-4 w-4" />
+            <ShieldMinus className="h-4 w-4" />,
+            undefined,
+            { type: 'space_permission_removed' }
           );
+
         }
       );
     }
