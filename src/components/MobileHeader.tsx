@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { ThemeLogo } from "@/components/ThemeLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+
 
 export function MobileHeader() {
   const { toggleSidebar } = useSidebar();
@@ -15,6 +17,8 @@ export function MobileHeader() {
       </div>
       <div className="flex items-center gap-1">
         <ThemeToggle />
+        <NotificationBell />
+
         <Button variant="ghost" size="icon" onClick={toggleSidebar}>
           <Menu className="h-5 w-5" />
           <span className="sr-only">Abrir menu</span>

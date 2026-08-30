@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from "@/lib/router-compat";
+
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -44,6 +46,8 @@ export function NotificationListener() {
   const { activeWorkspace } = useWorkspace();
   const { data: settings } = useNotificationSettings();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
   const mountedRef = useRef(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -51,7 +55,13 @@ export function NotificationListener() {
   const workspaceId = activeWorkspace?.id;
 
   const showToast = useCallback(
-    (title: string, description: string, icon: React.ReactNode, link?: string) => {
+    (
+      title: string,
+      description: string,
+      icon: React.ReactNode,
+      link?: string,
+      persist?: { type: string; referenceType?: string; referenceId?: string }
+    ) => {
       toast(title, {
         description,
         icon,
@@ -63,9 +73,30 @@ export function NotificationListener() {
             }
           : undefined,
       });
+
+      // Persiste na central de notificações (sino + modal).
+      if (persist && userId && workspaceId) {
+        void supabase
+          .from('notifications')
+          .insert({
+            user_id: userId,
+            workspace_id: workspaceId,
+            type: persist.type,
+            title,
+            message: description,
+            link: link ?? null,
+            reference_type: persist.referenceType ?? null,
+            reference_id: persist.referenceId ?? null,
+          })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+            queryClient.invalidateQueries({ queryKey: ['notifications-unread-count', userId] });
+          });
+      }
     },
-    [navigate]
+    [navigate, userId, workspaceId, queryClient]
   );
+
 
   // --- Realtime subscriptions ---
   useEffect(() => {
@@ -96,8 +127,10 @@ export function NotificationListener() {
             'Tarefa atribuída a você',
             'Uma nova tarefa foi atribuída a você.',
             <UserPlus className="h-4 w-4" />,
-            `/task/${row.task_id}`
+            `/task/${row.task_id}`,
+            { type: 'task_assigned', referenceType: 'task', referenceId: row.task_id }
           );
+
         }
       );
     }
@@ -120,8 +153,10 @@ export function NotificationListener() {
             'Comentário atribuído a você',
             'Um comentário foi atribuído a você em uma tarefa.',
             <MessageSquare className="h-4 w-4" />,
-            `/task/${row.task_id}`
+            `/task/${row.task_id}`,
+            { type: 'comment_assigned', referenceType: 'task', referenceId: row.task_id }
           );
+
         }
       );
 
@@ -142,8 +177,10 @@ export function NotificationListener() {
             'Mensagem atribuída a você',
             'Uma mensagem de chat foi atribuída a você.',
             <MessageSquare className="h-4 w-4" />,
-            `/chat?channel=${row.channel_id}&message=${row.id}`
+            `/chat?channel=${row.channel_id}&message=${row.id}`,
+            { type: 'chat_comment_assigned', referenceType: 'chat_message', referenceId: row.id }
           );
+
         }
       );
     }
@@ -168,8 +205,10 @@ export function NotificationListener() {
             'Novo post no feed',
             'Um novo post foi publicado no feed.',
             <Newspaper className="h-4 w-4" />,
-            '/'
+            '/',
+            { type: 'feed_new_post', referenceType: 'feed_post', referenceId: row.id }
           );
+
         }
       );
     }
@@ -192,8 +231,10 @@ export function NotificationListener() {
             'Acesso a Space concedido',
             'Você recebeu acesso a um novo Space.',
             <ShieldPlus className="h-4 w-4" />,
-            `/space/${row.space_id}`
+            `/space/${row.space_id}`,
+            { type: 'space_permission_added', referenceType: 'space', referenceId: row.space_id }
           );
+
         }
       );
 
@@ -214,8 +255,11 @@ export function NotificationListener() {
           showToast(
             'Acesso a Space removido',
             'Seu acesso a um Space foi removido.',
-            <ShieldMinus className="h-4 w-4" />
+            <ShieldMinus className="h-4 w-4" />,
+            undefined,
+            { type: 'space_permission_removed' }
           );
+
         }
       );
     }
@@ -268,8 +312,10 @@ export function NotificationListener() {
               'Tarefa atrasada',
               task.title || 'Uma tarefa está atrasada.',
               <AlertTriangle className="h-4 w-4" />,
-              `/task/${task.id}`
+              `/task/${task.id}`,
+              { type: 'task_overdue', referenceType: 'task', referenceId: task.id }
             );
+
           });
         }
       }
@@ -303,8 +349,10 @@ export function NotificationListener() {
               'Tarefa vence amanhã',
               task.title || 'Uma tarefa vence amanhã.',
               <Clock className="h-4 w-4" />,
-              `/task/${task.id}`
+              `/task/${task.id}`,
+              { type: 'task_due_tomorrow', referenceType: 'task', referenceId: task.id }
             );
+
           });
         }
       }
