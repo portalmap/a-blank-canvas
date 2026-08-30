@@ -46,12 +46,14 @@ export const useCreateSpace = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ workspaceId, name, description, color, accountUserId }: { 
+    mutationFn: async ({ workspaceId, name, description, color, accountUserId, headProjetosUserId, headAccountUserId }: { 
       workspaceId: string; 
       name: string; 
       description?: string;
       color?: string;
       accountUserId?: string | null;
+      headProjetosUserId?: string | null;
+      headAccountUserId?: string | null;
     }) => {
       // Usar função segura do banco de dados
       const { data, error } = await supabase
@@ -64,13 +66,18 @@ export const useCreateSpace = () => {
 
       if (error) throw error;
       
-      // Se accountUserId definido, atualizar o space
-      if (accountUserId) {
+      // Se responsáveis definidos, atualizar o space
+      const responsibles: Record<string, string> = {};
+      if (accountUserId) responsibles.account_user_id = accountUserId;
+      if (headProjetosUserId) responsibles.head_projetos_user_id = headProjetosUserId;
+      if (headAccountUserId) responsibles.head_account_user_id = headAccountUserId;
+      if (Object.keys(responsibles).length > 0) {
         await supabase
           .from('spaces')
-          .update({ account_user_id: accountUserId })
+          .update(responsibles as any)
           .eq('id', data);
       }
+
       
       // Buscar o space criado para retornar os dados completos
       const { data: space, error: fetchError } = await supabase
