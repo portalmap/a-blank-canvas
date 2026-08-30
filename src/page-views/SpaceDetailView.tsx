@@ -50,6 +50,7 @@ const SpaceDetailView = () => {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
+  const [responsaveisOpen, setResponsaveisOpen] = useState(false);
 
   const handleCreateFolder = async () => {
     if (!spaceId || !newFolderName.trim()) return;
