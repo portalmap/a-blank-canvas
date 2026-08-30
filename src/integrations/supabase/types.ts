@@ -2100,6 +2100,8 @@ export type Database = {
           color: string | null
           created_at: string
           description: string | null
+          head_account_user_id: string | null
+          head_projetos_user_id: string | null
           id: string
           name: string
           status_source: string | null
@@ -2114,6 +2116,8 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          head_account_user_id?: string | null
+          head_projetos_user_id?: string | null
           id?: string
           name: string
           status_source?: string | null
@@ -2128,6 +2132,8 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          head_account_user_id?: string | null
+          head_projetos_user_id?: string | null
           id?: string
           name?: string
           status_source?: string | null
@@ -2139,6 +2145,20 @@ export type Database = {
           {
             foreignKeyName: "spaces_account_user_id_fkey"
             columns: ["account_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaces_head_account_user_id_fkey"
+            columns: ["head_account_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaces_head_projetos_user_id_fkey"
+            columns: ["head_projetos_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3491,6 +3511,28 @@ export type Database = {
           full_name: string
           user_id: string
         }[]
+      }
+      get_head_account_productivity_report: {
+        Args: {
+          p_early_threshold?: number
+          p_end_date?: string
+          p_head_user_id?: string
+          p_on_time_threshold?: number
+          p_start_date?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      get_head_projetos_productivity_report: {
+        Args: {
+          p_early_threshold?: number
+          p_end_date?: string
+          p_head_user_id?: string
+          p_on_time_threshold?: number
+          p_start_date?: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       get_productivity_details_by_scope:
         | {
