@@ -1,155 +1,30 @@
-# Diagnóstico — chaves reais dos três fluxos (nada alterado)
+# Importar tarefas e subtarefas de 23–30 de agosto
 
-## 1. RECEBE `briefing.publicar` (do Hub)
+Trazer para o banco atual as 147 linhas do CSV enviado (98 tarefas + 49 subtarefas), todas do workspace **Operacional MAP** (o único existente).
 
-### Schema Zod
+## O que já foi verificado
 
-Raiz (`BriefingSchema`):
+- O banco tem hoje 1.009 tarefas, criadas entre 01/07 e 21/08/2026. **Nenhuma tarefa do banco tem data de criação dentro do período do CSV**, então a importação é de dados novos — não há substituição.
+- 33 das 36 listas do CSV já existem, com pasta e space corretos. **Faltam 3 listas**: `Tech | Pintepisos`, `Informações | PsicoMed` e `Informações | Vanessa Marques Beauty` (os spaces existem; 1 tarefa concluída em cada).
+- No CSV, o campo `tarefa_pai` traz o **título** da tarefa pai, não o ID. As 49 subtarefas apontam para 49 posts que **não** estão no CSV. Amostragem no banco: parte desses pais existe (ex.: os posts de setembro do Atacadão da Suburbana e do Monvizo), parte **não** existe (ex.: `POST 01 SETEMBRO TINTAS PALMARES` na lista Designer/Edição de Vídeo | Tintas Palmares).
+- Status usados: Aguardando (56), Em Progresso (34), Concluído (25), Instagram (21), A Fazer (5), Env. Aprovação (3), Temas Enviados (2), Contrato Criado (1). `Contrato Criado` não existe hoje em nenhuma lista.
+- Responsável principal está vazio em todas as linhas; os nomes aparecem em `responsaveis`/`seguidores`. Dos 13 nomes, só **3 existem** aqui: Victor Borges, Mirian Vilivas e Wendy Uda. Os demais (Amanda Tavares, Cadu Rios, Cintia, Débora Keer, Emanuela Caetano, Javier Hernandez, João Pessoa, Juliane Levorato, Leonardo Vicari, Luan Roberto e dois e-mails soltos) não têm usuário no sistema.
+- Etiquetas: só 1 linha tem tag (`tecnologia`), que já existe no workspace.
 
-```text
-name      string | null   opcional
-subtasks  array (min 1)   OBRIGATÓRIO
-```
+## O que será feito
 
-Cada item (`BriefingItemSchema`):
+1. **Criar as 3 listas faltantes** dentro da pasta `Tarefas & Demandas | <cliente>` do space correspondente, visão `list`.
+2. **Criar os status que faltarem** em cada lista de destino, com a categoria vinda do CSV (`not_started` / `active` / `in_progress` / `done`), reaproveitando os status já existentes com o mesmo nome na mesma lista.
+3. **Importar as 98 tarefas** preservando o `tarefa_id` original (mesmo UUID), com título, descrição, status, prioridade, datas de início/entrega, conclusão, criação/atualização, marco, tempo estimado/gasto e arquivamento.
+4. **Importar as 49 subtarefas** resolvendo o pai por título dentro da mesma lista. Quando o pai não existir no banco, a subtarefa entra como **tarefa normal na mesma lista** (sem pai), para nenhum registro ser perdido — o relatório final lista quais caíram nesse caso.
+5. **Responsáveis e seguidores**: apenas Victor Borges, Mirian Vilivas e Wendy Uda são vinculados (`task_assignees` / `task_followers`). Os outros nomes ficam sem vínculo.
+6. **Etiqueta**: vincular `tecnologia` à única tarefa que a tem.
+7. `created_by_user_id` (obrigatório) recebe o usuário global `portal@assessoriamap.com.br`, já que nenhum dos autores do CSV existe aqui.
 
-```text
-parent_id              string (uuid)  OBRIGATÓRIO
-external_briefing_ref  string (min 1) OBRIGATÓRIO
-title                  string (min 1) OBRIGATÓRIO
-description            string | null  opcional
-social_channel         string | null  opcional
-attachments            array          opcional
-```
+## Detalhes técnicos
 
-Cada anexo (`BriefingAnexoSchema`):
-
-```text
-file_url   string (min 1)  OBRIGATÓRIO  <- URL do arquivo
-file_name  string          opcional     <- nome do arquivo
-```
-
-### Resposta devolvida
-
-```text
-{
-  assunto: "briefing.publicar",
-  status: "ok",
-  cliente: string | null,      // eco do name
-  resultados: [ ... ]
-}
-```
-
-Item de `resultados` — sucesso:
-
-```text
-{
-  external_briefing_ref: string,
-  id: string,            // uuid da subtarefa criada
-  parent_id: string,
-  status: "criada",
-  anexos: [ { file_name, status, error? } ]
-}
-```
-
-Item já existente:
-
-```text
-{ external_briefing_ref, id, parent_id, status: "ja_existia" }
-```
-
-Item com erro:
-
-```text
-{ external_briefing_ref, status: "erro", error: "tarefa_mae_nao_encontrada"
-                                              | "autor_tecnico_nao_encontrado"
-                                              | "status_nao_encontrado"
-                                              | "criacao_falhou" }
-```
-
-## 2. ENVIA `calendario.aprovacao` (para portal-map, com anexo)
-
-Payload real do último envio (2026-08-29 10:08:14 UTC, `status_code` 200):
-
-```json
-{
-  "name": "Assessoria MAP",
-  "tasks": [
-    {
-      "id": "e2322362-1102-4c6a-b7aa-3f5ad862d244",
-      "title": "POST 1 | OUTUBRO | Instagram | Outubro Teste começa pela clareza",
-      "description": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"textAlign\":null},\"content\":[{\"type\":\"text\",\"text\":\"GOSTEI MUITO, BORA APARECER NAS REDES SOCIAIS\"}]}]}",
-      "social_channel": "Instagram",
-      "format": null,
-      "due_date": "2026-08-27",
-      "attachments": [
-        {
-          "file_name": "briefing-instagram-77f66973-15fb-494e-99fd-a05916e80fae.png",
-          "file_url": "https://efqnscrnyyyjpswctahq.supabase.co/storage/v1/object/sign/task-attachments/.../1787950538066_briefing-instagram-....png?token=..."
-        }
-      ]
-    }
-  ]
-}
-```
-
-Envelope enviado ao Hub:
-
-```text
-{
-  destinos: ["portal-map"],
-  assunto: "calendario.aprovacao",
-  modo: "entrega",
-  referencia_origem: <tasks.id>,
-  payload: { ...acima }
-}
-```
-
-Chaves:
-
-```text
-raiz do payload:  name, tasks
-cada item:        id, title, description, social_channel, format, due_date, attachments
-cada anexo:       file_url  (URL do arquivo, assinada 45 dias)
-                  file_name (nome do arquivo)
-```
-
-Observação factual: `description` sai como **string JSON do TipTap**, não texto puro. `format` saiu `null`.
-
-## 3. RECEBE `calendario.post.aprovado` / `calendario.post.reprovado` (do Portal)
-
-### Schema Zod
-
-Raiz (`DecisaoSchema`):
-
-```text
-aprovador_nome  string (min 1)  OBRIGATÓRIO
-tasks           array (min 1)   OBRIGATÓRIO
-```
-
-Cada item (`DecisaoItemSchema`):
-
-```text
-id           string (uuid)  OBRIGATÓRIO   // tasks.id do MAP Flow
-comentario   string | null  opcional
-attachments  array          opcional
-```
-
-Cada anexo (`DecisaoAnexoSchema`):
-
-```text
-file_url   string (min 1)  OBRIGATÓRIO  <- URL do arquivo
-file_name  string          opcional     <- nome do arquivo
-```
-
-## Resumo das chaves de anexo nos três fluxos
-
-| Fluxo | Direção | URL | Nome |
-|---|---|---|---|
-| `briefing.publicar` | recebe | `file_url` | `file_name` |
-| `calendario.aprovacao` | envia | `file_url` | `file_name` |
-| `calendario.post.aprovado/reprovado` | recebe | `file_url` | `file_name` |
-
-Esses três são consistentes entre si. A única saída que difere é a resposta de `tarefa.listar_para_aprovacao`, que usa `url` + `title`.
-
-Nada foi alterado — apenas diagnóstico.
+- Tudo em uma migration SQL única e transacional gerada a partir do CSV; nenhum código do app muda.
+- Ordem de inserção: listas → status → tarefas (pais antes de filhos) → responsáveis/seguidores → etiquetas.
+- `ON CONFLICT (id) DO NOTHING` nas tarefas, para a migration ser idempotente caso rode de novo.
+- Textos com acentos, aspas e quebras de linha escapados com dollar-quoting.
+- Verificação final: 147 tarefas novas, contagem de subtarefas com pai válido, nenhuma tarefa com status de outra lista, e a lista dos pais não encontrados.
