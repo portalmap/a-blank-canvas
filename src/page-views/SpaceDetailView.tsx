@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Plus, FolderOpen, List, ChevronRight, Pencil, FileText, UserCheck, X } from 'lucide-react';
+import { Loader2, Plus, FolderOpen, List, ChevronRight, ChevronDown, Pencil, FileText, UserCheck, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TaskStatsDashboard from '@/components/dashboard/TaskStatsDashboard';
 import QuickAutomationButtons from '@/components/automations/QuickAutomationButtons';
