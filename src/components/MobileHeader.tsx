@@ -17,6 +17,8 @@ export function MobileHeader() {
       </div>
       <div className="flex items-center gap-1">
         <ThemeToggle />
+        <NotificationBell />
+
         <Button variant="ghost" size="icon" onClick={toggleSidebar}>
           <Menu className="h-5 w-5" />
           <span className="sr-only">Abrir menu</span>
