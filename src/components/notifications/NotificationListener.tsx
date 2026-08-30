@@ -127,8 +127,10 @@ export function NotificationListener() {
             'Tarefa atribuída a você',
             'Uma nova tarefa foi atribuída a você.',
             <UserPlus className="h-4 w-4" />,
-            `/task/${row.task_id}`
+            `/task/${row.task_id}`,
+            { type: 'task_assigned', referenceType: 'task', referenceId: row.task_id }
           );
+
         }
       );
     }
