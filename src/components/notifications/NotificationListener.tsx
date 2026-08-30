@@ -46,6 +46,8 @@ export function NotificationListener() {
   const { activeWorkspace } = useWorkspace();
   const { data: settings } = useNotificationSettings();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
   const mountedRef = useRef(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
