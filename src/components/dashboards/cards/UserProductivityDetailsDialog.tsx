@@ -155,7 +155,7 @@ const UserProductivityDetailsDialogComponent = ({
   onOpenChange,
   startDate,
   endDate,
-  includeTransferred = false,
+  includeTransferred = true,
 }: UserProductivityDetailsDialogProps) => {
   const navigate = useNavigate();
   const { data, isLoading } = useUserProductivityDetails({

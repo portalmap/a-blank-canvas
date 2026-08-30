@@ -136,7 +136,7 @@ const ProductivityRankingCardComponent = ({
   onExpand,
   isLoading = false,
   isExpanded = false,
-  includeTransferred = false,
+  includeTransferred = true,
   onToggleTransferred,
   startDate,
   endDate,
