@@ -64,6 +64,23 @@ export function NotificationReminderProvider() {
       setModalOpen(false);
       return;
     }
+    // Depois de clicar numa notificação, deixa o usuário ver o destino:
+    // o modal só volta quando ele navegar para outra página.
+    const visiting = visitingRef.current;
+    if (visiting) {
+      if (visiting.path === null) {
+        if (location.pathname !== visiting.from) {
+          visitingRef.current = { from: visiting.from, path: location.pathname };
+        }
+        setModalOpen(false);
+        return;
+      }
+      if (location.pathname === visiting.path) {
+        setModalOpen(false);
+        return;
+      }
+      visitingRef.current = null;
+    }
     setModalOpen(true);
   }, [userId, unreadCount, location.pathname, tick]);
 
@@ -71,16 +88,19 @@ export function NotificationReminderProvider() {
     const until = Date.now() + SNOOZE_MS;
     snoozedUntilRef.current = until;
     if (userId) writeSnoozeUntil(userId, until);
+    visitingRef.current = null;
     setModalOpen(false);
   }, [userId]);
 
   const handleOpenNotification = useCallback(
     (n: Notification) => {
+      visitingRef.current = { from: location.pathname, path: null };
       setModalOpen(false);
       openNotification(n);
     },
-    [openNotification]
+    [openNotification, location.pathname]
   );
+
 
   const handleMarkAll = useCallback(() => {
     markAll();
