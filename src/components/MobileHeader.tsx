@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { ThemeLogo } from "@/components/ThemeLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+
 
 export function MobileHeader() {
   const { toggleSidebar } = useSidebar();
