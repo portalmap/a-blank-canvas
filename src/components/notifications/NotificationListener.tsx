@@ -231,8 +231,10 @@ export function NotificationListener() {
             'Acesso a Space concedido',
             'Você recebeu acesso a um novo Space.',
             <ShieldPlus className="h-4 w-4" />,
-            `/space/${row.space_id}`
+            `/space/${row.space_id}`,
+            { type: 'space_permission_added', referenceType: 'space', referenceId: row.space_id }
           );
+
         }
       );
 
