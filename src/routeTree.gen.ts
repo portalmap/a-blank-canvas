@@ -24,6 +24,7 @@ import { Route as AuthenticatedDashboardsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAutomationsRouteImport } from './routes/_authenticated/automations'
 import { Route as AuthenticatedArchivedSpacesRouteImport } from './routes/_authenticated/archived-spaces'
+import { Route as AuthenticatedDashboardsIndexRouteImport } from './routes/_authenticated/dashboards.index'
 import { Route as AuthenticatedTaskTaskIdRouteImport } from './routes/_authenticated/task.$taskId'
 import { Route as AuthenticatedSpaceSpaceIdRouteImport } from './routes/_authenticated/space.$spaceId'
 import { Route as AuthenticatedListListIdRouteImport } from './routes/_authenticated/list.$listId'
@@ -107,6 +108,12 @@ const AuthenticatedArchivedSpacesRoute =
     path: '/archived-spaces',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardsIndexRoute =
+  AuthenticatedDashboardsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedDashboardsRoute,
+  } as any)
 const AuthenticatedTaskTaskIdRoute = AuthenticatedTaskTaskIdRouteImport.update({
   id: '/task/$taskId',
   path: '/task/$taskId',
@@ -163,13 +170,13 @@ export interface FileRoutesByFullPath {
   '/list/$listId': typeof AuthenticatedListListIdRoute
   '/space/$spaceId': typeof AuthenticatedSpaceSpaceIdRoute
   '/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
+  '/dashboards/': typeof AuthenticatedDashboardsIndexRoute
 }
 export interface FileRoutesByTo {
   '/signed-out': typeof SignedOutRoute
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
   '/chat': typeof AuthenticatedChatRoute
-  '/dashboards': typeof AuthenticatedDashboardsRouteWithChildren
   '/documents': typeof AuthenticatedDocumentsRouteWithChildren
   '/everything': typeof AuthenticatedEverythingRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByTo {
   '/list/$listId': typeof AuthenticatedListListIdRoute
   '/space/$spaceId': typeof AuthenticatedSpaceSpaceIdRoute
   '/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
+  '/dashboards': typeof AuthenticatedDashboardsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -209,6 +217,7 @@ export interface FileRoutesById {
   '/_authenticated/list/$listId': typeof AuthenticatedListListIdRoute
   '/_authenticated/space/$spaceId': typeof AuthenticatedSpaceSpaceIdRoute
   '/_authenticated/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
+  '/_authenticated/dashboards/': typeof AuthenticatedDashboardsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -233,13 +242,13 @@ export interface FileRouteTypes {
     | '/list/$listId'
     | '/space/$spaceId'
     | '/task/$taskId'
+    | '/dashboards/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/signed-out'
     | '/archived-spaces'
     | '/automations'
     | '/chat'
-    | '/dashboards'
     | '/documents'
     | '/everything'
     | '/settings'
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/list/$listId'
     | '/space/$spaceId'
     | '/task/$taskId'
+    | '/dashboards'
   id:
     | '__root__'
     | '/_authenticated'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/_authenticated/list/$listId'
     | '/_authenticated/space/$spaceId'
     | '/_authenticated/task/$taskId'
+    | '/_authenticated/dashboards/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -394,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedArchivedSpacesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboards/': {
+      id: '/_authenticated/dashboards/'
+      path: '/'
+      fullPath: '/dashboards/'
+      preLoaderRoute: typeof AuthenticatedDashboardsIndexRouteImport
+      parentRoute: typeof AuthenticatedDashboardsRoute
+    }
     '/_authenticated/task/$taskId': {
       id: '/_authenticated/task/$taskId'
       path: '/task/$taskId'
@@ -441,11 +459,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedDashboardsRouteChildren {
   AuthenticatedDashboardsIdRoute: typeof AuthenticatedDashboardsIdRoute
+  AuthenticatedDashboardsIndexRoute: typeof AuthenticatedDashboardsIndexRoute
 }
 
 const AuthenticatedDashboardsRouteChildren: AuthenticatedDashboardsRouteChildren =
   {
     AuthenticatedDashboardsIdRoute: AuthenticatedDashboardsIdRoute,
+    AuthenticatedDashboardsIndexRoute: AuthenticatedDashboardsIndexRoute,
   }
 
 const AuthenticatedDashboardsRouteWithChildren =
