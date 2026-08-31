@@ -98,6 +98,8 @@ const TaskView = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
   const [showActivityPanel, setShowActivityPanel] = useState(true);
+  const isMobile = useIsMobile();
+
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string>('');
