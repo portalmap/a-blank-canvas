@@ -2,7 +2,6 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { ThemeLogo } from "@/components/ThemeLogo";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SafeBoundary } from "@/components/SafeBoundary";
 
@@ -17,7 +16,6 @@ export function MobileHeader() {
         <span className="font-semibold text-foreground">MAP Flow</span>
       </div>
       <div className="flex items-center gap-1">
-        <ThemeToggle />
         <SafeBoundary name="notification-bell-mobile">
           <NotificationBell />
         </SafeBoundary>
