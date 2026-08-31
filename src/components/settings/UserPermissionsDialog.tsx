@@ -266,6 +266,46 @@ export function UserPermissionsDialog({
                       </p>
                     ) : (
                       <div className="space-y-2 py-2">
+                        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <Checkbox
+                            id={`select-all-${workspace.id}`}
+                            checked={
+                              selectedCount === workspace.spaces.length
+                                ? true
+                                : selectedCount > 0
+                                  ? "indeterminate"
+                                  : false
+                            }
+                            onCheckedChange={(checked) =>
+                              handleToggleAll(workspace, checked === true)
+                            }
+                          />
+                          <Label
+                            htmlFor={`select-all-${workspace.id}`}
+                            className="font-normal cursor-pointer flex-1"
+                          >
+                            Selecionar todos ({selectedCount} selecionado
+                            {selectedCount === 1 ? "" : "s"})
+                          </Label>
+
+                          <Select
+                            value=""
+                            disabled={selectedCount === 0}
+                            onValueChange={(value) =>
+                              handleBulkRole(workspace, value as PermissionRole)
+                            }
+                          >
+                            <SelectTrigger className="w-[190px] h-8">
+                              <SelectValue placeholder="Aplicar aos selecionados" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="viewer">Visualizador</SelectItem>
+                              <SelectItem value="commenter">Comentarista</SelectItem>
+                              <SelectItem value="editor">Editor</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
                         {workspace.spaces.map((space) => {
                           const permission = permissions.get(space.id);
                           const enabled = !!permission;
