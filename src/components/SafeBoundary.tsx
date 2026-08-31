@@ -25,7 +25,18 @@ export class SafeBoundary extends Component<SafeBoundaryProps, SafeBoundaryState
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`[SafeBoundary:${this.props.name}]`, error, info.componentStack);
+    if (import.meta.env.DEV) {
+      try {
+        sessionStorage.setItem(
+          `safe_boundary_${this.props.name}`,
+          `${error?.message ?? error}\n${error?.stack ?? ''}\n${info.componentStack ?? ''}`.slice(0, 4000)
+        );
+      } catch {
+        /* ignore */
+      }
+    }
   }
+
 
   render() {
     if (this.state.failed) return this.props.fallback ?? null;
