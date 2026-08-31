@@ -22,6 +22,9 @@ import { TaskMainContent } from '@/components/tasks/TaskMainContent';
 import { TaskActivityPanel } from '@/components/tasks/TaskActivityPanel';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
