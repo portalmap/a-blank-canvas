@@ -11,25 +11,25 @@ import { ProductivitySettings } from "@/components/settings/ProductivitySettings
 
 export default function Settings() {
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto space-y-6 p-3 md:p-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Configurações</h1>
+        <h1 className="text-2xl font-bold text-foreground md:text-3xl">Configurações</h1>
         <p className="text-muted-foreground mt-2">
           Gerencie suas preferências, workspace e membros da equipe
         </p>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-9 lg:w-[1080px]">
-          <TabsTrigger value="profile">Perfil</TabsTrigger>
-          <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          <TabsTrigger value="status">Status</TabsTrigger>
-          <TabsTrigger value="tags">Etiquetas</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="automations">Automações</TabsTrigger>
-          <TabsTrigger value="productivity">Produtividade</TabsTrigger>
-          <TabsTrigger value="users">Usuários</TabsTrigger>
-          <TabsTrigger value="notifications">Notificações</TabsTrigger>
+        <TabsList className="flex w-full justify-start overflow-x-auto lg:grid lg:w-[1080px] lg:grid-cols-9">
+          <TabsTrigger className="shrink-0" value="profile">Perfil</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="workspace">Workspace</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="status">Status</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="tags">Etiquetas</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="templates">Templates</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="automations">Automações</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="productivity">Produtividade</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="users">Usuários</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="notifications">Notificações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">

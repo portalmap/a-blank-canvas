@@ -492,6 +492,7 @@ export const TaskListView = ({
     if (filteredTasks.length === 0) return null;
 
     return (
+      <div className="w-full overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -518,6 +519,7 @@ export const TaskListView = ({
           {filteredTasks.map((task) => renderTaskRow(task))}
         </TableBody>
       </Table>
+      </div>
     );
   };
 
@@ -638,7 +640,7 @@ export const TaskListView = ({
   // Render flat table (original behavior)
   return (
     <>
-      <div className="border rounded-lg">
+      <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>

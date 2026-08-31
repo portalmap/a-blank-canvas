@@ -13,6 +13,7 @@ import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { executeStatusChangeAutomations } from '@/hooks/useStatusChangeAutomations';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Task {
   id: string;
@@ -96,7 +97,7 @@ export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
     6: 'grid-cols-6',
   }[columns.length];
 
-  const fitColumnsInViewport = Boolean(gridColumnsClass);
+  const fitColumnsInViewport = Boolean(gridColumnsClass) && !isMobile;
 
   const getTasksByStatus = (statusId: string) => {
     if (statusId === ORPHAN_COLUMN_ID) return orphanTasks;
