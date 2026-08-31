@@ -165,8 +165,13 @@ export const useNotificationsRealtime = (userId?: string) => {
   useEffect(() => {
     if (!userId) return;
 
+    // Tópico único por instância: `supabase.channel(nome)` reaproveita o canal
+    // existente quando o nome repete, e um segundo `.on()` depois do
+    // `subscribe()` lança erro (vários componentes usam este hook).
+    const topic = `notifications-${userId}-${Math.random().toString(36).slice(2)}`;
+
     const channel = supabase
-      .channel(`notifications-${userId}`)
+      .channel(topic)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
@@ -182,3 +187,4 @@ export const useNotificationsRealtime = (userId?: string) => {
     };
   }, [userId, queryClient]);
 };
+
