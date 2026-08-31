@@ -54,7 +54,7 @@ const Dashboards = () => {
           <Skeleton className="h-6 w-full mb-2" />
           <Skeleton className="h-6 w-full" />
         </div>
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-3 md:p-6">
           <Skeleton className="h-10 w-48 mb-6" />
           <div className="grid grid-cols-3 gap-4 mb-6">
             <Skeleton className="h-24 w-full" />

@@ -196,7 +196,7 @@ const DashboardView = () => {
       </header>
 
       {/* Dashboard Editor */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-3 md:p-6">
         <DashboardEditor
           cards={dashboard.config.cards || []}
           stats={stats}

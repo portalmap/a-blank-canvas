@@ -107,7 +107,7 @@ const SpaceDetailView = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto space-y-6 p-3 md:p-6">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -124,7 +124,7 @@ const SpaceDetailView = () => {
 
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl">
             <div 
               className="w-4 h-4 rounded-full" 
               style={{ backgroundColor: currentSpace.color || '#94a3b8' }}

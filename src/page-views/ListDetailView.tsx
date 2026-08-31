@@ -275,8 +275,8 @@ const ListDetailView = () => {
 
   return (
     <div className="flex h-full overflow-hidden">
-      <div className="flex-1 flex flex-col gap-6 container mx-auto p-6 overflow-hidden">
-        <Breadcrumb className="flex-shrink-0">
+      <div className="container mx-auto flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-3 md:gap-6 md:p-6">
+        <Breadcrumb className="hidden flex-shrink-0 md:block">
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink onClick={() => navigate('/')}>
@@ -306,14 +306,14 @@ const ListDetailView = () => {
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="flex justify-between items-start gap-4 flex-shrink-0">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold">{currentList.name}</h1>
+        <div className="flex flex-shrink-0 flex-col items-start gap-3 md:flex-row md:justify-between md:gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-bold md:text-3xl">{currentList.name}</h1>
             {currentList.description && (
               <p className="text-muted-foreground mt-1">{currentList.description}</p>
             )}
           </div>
-          <div className="relative w-64">
+          <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Pesquisar tarefas..."
@@ -326,8 +326,8 @@ const ListDetailView = () => {
 
         <ScopeProductivityCard scope="list" listId={listId} />
 
-        <div className="flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
             <QuickAutomationButtons
               workspaceId={activeWorkspace.id}
               scopeType="list"
@@ -483,7 +483,7 @@ const ListDetailView = () => {
                 placeholder="Ex: Implementar autenticação"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="new-task-start">Data de Início *</Label>
                 <Input

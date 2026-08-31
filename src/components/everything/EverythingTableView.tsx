@@ -452,7 +452,7 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
 
   if (groupBy === 'none') {
     return (
-      <Table>
+      <div className="w-full overflow-x-auto"><Table>
         {renderTableHeader(tasks)}
         <TableBody>
           {tasks.map(renderTaskRow)}
@@ -464,7 +464,7 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
             </TableRow>
           )}
         </TableBody>
-      </Table>
+      </Table></div>
     );
   }
 
@@ -495,12 +495,12 @@ export function EverythingTableView({ tasks, groupBy, selectedTaskIds = [], onSe
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <Table>
+              <div className="w-full overflow-x-auto"><Table>
                 {renderTableHeader(tasksInGroup)}
                 <TableBody>
                   {tasksInGroup.map(renderTaskRow)}
                 </TableBody>
-              </Table>
+              </Table></div>
             </CollapsibleContent>
           </Collapsible>
         );

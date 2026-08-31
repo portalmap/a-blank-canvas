@@ -83,7 +83,7 @@ export const DashboardsTable = ({ dashboards, isLoading, onEdit }: DashboardsTab
 
       {/* Table */}
       <div className="border border-border rounded-lg overflow-hidden">
-        <Table>
+        <div className="w-full overflow-x-auto"><Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-[40%]">Nome</TableHead>
@@ -170,7 +170,7 @@ export const DashboardsTable = ({ dashboards, isLoading, onEdit }: DashboardsTab
               ))
             )}
           </TableBody>
-        </Table>
+        </Table></div>
       </div>
 
       {/* Delete Confirmation Dialog */}
