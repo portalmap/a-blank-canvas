@@ -4,6 +4,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { ThemeLogo } from "@/components/ThemeLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { SafeBoundary } from "@/components/SafeBoundary";
 
 
 export function MobileHeader() {
@@ -17,7 +18,10 @@ export function MobileHeader() {
       </div>
       <div className="flex items-center gap-1">
         <ThemeToggle />
-        <NotificationBell />
+        <SafeBoundary name="notification-bell-mobile">
+          <NotificationBell />
+        </SafeBoundary>
+
 
         <Button variant="ghost" size="icon" onClick={toggleSidebar}>
           <Menu className="h-5 w-5" />
