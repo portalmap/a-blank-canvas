@@ -141,6 +141,30 @@ export function UserPermissionsDialog({
     }
   };
 
+  const handleToggleAll = (workspace: WorkspaceWithSpaces, checked: boolean) => {
+    const newPermissions = new Map(permissions);
+    workspace.spaces.forEach((space) => {
+      if (checked) {
+        if (!newPermissions.has(space.id)) {
+          newPermissions.set(space.id, { resourceId: space.id, role: "viewer" });
+        }
+      } else {
+        newPermissions.delete(space.id);
+      }
+    });
+    setPermissions(newPermissions);
+  };
+
+  const handleBulkRole = (workspace: WorkspaceWithSpaces, role: PermissionRole) => {
+    const newPermissions = new Map(permissions);
+    workspace.spaces.forEach((space) => {
+      if (newPermissions.has(space.id)) {
+        newPermissions.set(space.id, { resourceId: space.id, role });
+      }
+    });
+    setPermissions(newPermissions);
+  };
+
   const handleToggleExpand = (wsId: string) => {
     const newExpanded = new Set(expanded);
     if (newExpanded.has(wsId)) {
@@ -242,6 +266,46 @@ export function UserPermissionsDialog({
                       </p>
                     ) : (
                       <div className="space-y-2 py-2">
+                        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <Checkbox
+                            id={`select-all-${workspace.id}`}
+                            checked={
+                              selectedCount === workspace.spaces.length
+                                ? true
+                                : selectedCount > 0
+                                  ? "indeterminate"
+                                  : false
+                            }
+                            onCheckedChange={(checked) =>
+                              handleToggleAll(workspace, checked === true)
+                            }
+                          />
+                          <Label
+                            htmlFor={`select-all-${workspace.id}`}
+                            className="font-normal cursor-pointer flex-1"
+                          >
+                            Selecionar todos ({selectedCount} selecionado
+                            {selectedCount === 1 ? "" : "s"})
+                          </Label>
+
+                          <Select
+                            value=""
+                            disabled={selectedCount === 0}
+                            onValueChange={(value) =>
+                              handleBulkRole(workspace, value as PermissionRole)
+                            }
+                          >
+                            <SelectTrigger className="w-[190px] h-8">
+                              <SelectValue placeholder="Aplicar aos selecionados" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="viewer">Visualizador</SelectItem>
+                              <SelectItem value="commenter">Comentarista</SelectItem>
+                              <SelectItem value="editor">Editor</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
                         {workspace.spaces.map((space) => {
                           const permission = permissions.get(space.id);
                           const enabled = !!permission;
