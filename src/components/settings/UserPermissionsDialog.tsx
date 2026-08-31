@@ -75,6 +75,7 @@ export function UserPermissionsDialog({
         .from("spaces")
         .select("id, name")
         .eq("workspace_id", workspaceId)
+        .is("archived_at", null)
         .order("name");
 
       if (spacesError) throw spacesError;
