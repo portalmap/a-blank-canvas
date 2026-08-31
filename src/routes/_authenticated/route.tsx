@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileHeader } from "@/components/MobileHeader";
 import { TopBar } from "@/components/TopBar";
+import { SafeBoundary } from "@/components/SafeBoundary";
 import { NotificationListener } from "@/components/notifications/NotificationListener";
 import { NotificationReminderProvider } from "@/components/notifications/NotificationReminderProvider";
 
@@ -13,8 +14,10 @@ function AuthenticatedLayout() {
     <ProtectedRoute>
       <WorkspaceRequiredGuard>
         <SidebarProvider>
-          <NotificationListener />
-          <NotificationReminderProvider />
+          <SafeBoundary name="notifications">
+            <NotificationListener />
+            <NotificationReminderProvider />
+          </SafeBoundary>
           <div className="flex flex-col h-screen w-full overflow-hidden">
             <MobileHeader />
             <div className="flex flex-1 overflow-hidden">
@@ -32,6 +35,7 @@ function AuthenticatedLayout() {
     </ProtectedRoute>
   );
 }
+
 
 
 export const Route = createFileRoute("/_authenticated")({

@@ -73,10 +73,22 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Go home
           </a>
         </div>
+        {import.meta.env.DEV && (
+          <details className="mt-6 rounded-md border border-border bg-muted/50 p-3 text-left">
+            <summary className="cursor-pointer text-xs font-medium text-foreground">
+              Detalhes técnicos do erro
+            </summary>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
+              {String(error?.message ?? error)}
+              {error?.stack ? `\n\n${error.stack}` : ""}
+            </pre>
+          </details>
+        )}
       </div>
     </div>
   );
 }
+
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
