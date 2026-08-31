@@ -1,72 +1,35 @@
-# Permissões do Hub não são reconhecidas no login
+# Corrigir "This page didn't load" para usuários logados
 
-## O que eu verifiquei (dados reais)
+## O que já foi confirmado
 
-Consultei o banco e o código do SSO. O papel do Hub **está** sendo gravado:
+- O servidor está saudável: todas as requisições de preview (`/`, `/documents`, `/sso/login`, `/sso/callback`) retornam **200**. Não é erro de SSR nem de rota.
+- Sem sessão salva, a aplicação abre normalmente e redireciona para o login do MAP Hub (testado no sandbox).
+- Na sua janela de preview existe uma sessão salva (`sb-...-auth-token`) e a tela mostra exatamente a mensagem de erro do limite de erro do React ("This page didn't load"). Ou seja: **o erro acontece ao renderizar a área autenticada no navegador**, depois do login.
+- Tipos e build local estão limpos, então é um erro de execução — a mensagem real está sendo engolida pela tela de erro genérica.
+- A única camada nova desde a última vez que o app abria é a central de notificações (sino, modal de 30 min, listener), montada dentro de `_authenticated`.
 
-| e-mail | papel do Hub | papel global local | membro do workspace |
-|---|---|---|---|
-| rodrigobraz | administrador_global | global_owner | admin |
-| wendyuda / mirianvilivas / amandatavares | administrador | admin | **nenhum** |
-| joaopessoa | membro | — | member (adicionado à mão) |
+Causa exata ainda **não confirmada** — por isso o primeiro passo do plano é fazer o erro aparecer.
 
-Ou seja: o `sso-exchange` chama corretamente a sincronização e grava `admin` /
-`global_owner`. O problema é depois disso.
+## Passo 1 — Fazer o erro real aparecer (diagnóstico)
 
-## Causa
+Na tela de erro raiz (`src/routes/__root.tsx`), exibir, apenas fora de produção, a mensagem e o stack do erro em um bloco recolhível, além de continuar enviando para o log. Assim o próximo carregamento mostra o nome do componente/arquivo que quebrou em vez do texto genérico.
 
-O acesso a workspaces, spaces, pastas, listas e tarefas é decidido pela
-tabela de membros do workspace — não pelo papel global. Duas lacunas:
+## Passo 2 — Isolar a área autenticada
 
-1. Quem entra pelo Hub **não recebe nenhum vínculo com workspace**. Sem esse
-   vínculo, as regras de acesso não retornam nada: a pessoa loga e vê o sistema
-   vazio (nenhum workspace, nenhum space), mesmo sendo "administrador" no Hub.
-2. A função interna que libera "administrador do sistema" só reconhece
-   `global_owner` e `owner`. O papel `admin` (vindo de `administrador` no Hub)
-   não é considerado em nenhuma regra de visualização.
+Envolver o layout autenticado em um limite de erro próprio e, dentro dele, isolar a camada de notificações (`NotificationListener`, `NotificationReminderProvider`, `NotificationBell`) em um limite de erro silencioso. Consequência: se qualquer coisa da central de notificações falhar, o sino/modal simplesmente não aparece — o sistema inteiro não cai mais. Isso vale como proteção permanente, não só para este bug.
 
-Por isso só funciona para quem é `administrador_global` **e** já tinha vínculo
-manual no workspace.
+## Passo 3 — Corrigir a causa
 
-## O que vou fazer
+Com o erro identificado no Passo 1, aplicar a correção pontual no arquivo culpado (provável: algo na cadeia da central de notificações). Se o erro apontar para outro módulo, a correção vai para lá — sem alterar o restante do sistema.
 
-Módulo isolado de "provisionamento de acesso no login", sem alterar o fluxo de
-SSO existente nem as telas.
+## Passo 4 — Validar
 
-1. **Mapa de papéis Hub → papel no workspace** (confirmado por você):
-   - `Administrador Global` → **admin** (+ `global_owner` global)
-   - `Administrador` → **admin** (+ `admin` global)
-   - `Gestor` → **membro**
-   - `Membro` → **membro**
-   - `Convidado` → **convidado**
+- Recarregar o preview logado e confirmar que a home, Documentos, Spaces e Configurações abrem.
+- Confirmar que o sino carrega a lista e que o modal de não lidas continua funcionando (abrir, adiar, marcar todas).
+- Conferir que o console fica sem erros.
 
-2. **Nova função no banco** (`provision_hub_user_access`) que, a cada login,
-   garante o vínculo da pessoa em todos os workspaces ativos com o papel
-   correspondente ao mapa acima. Ela apenas cria o que falta e corrige o papel
-   quando o Hub mudou; nunca rebaixa nem apaga permissões específicas de space
-   concedidas manualmente.
-3. **Ajuste na regra de administrador do sistema**: `admin` global passa a
-   contar como administrador do sistema para leitura, de modo que
-   `administrador` do Hub veja os workspaces mesmo antes do vínculo existir.
-4. **Chamada no `sso-exchange`**, logo após a sincronização de papel já
-   existente, isolada em try/catch (falha aqui não bloqueia o login).
-5. **Correção retroativa**: aplicar o provisionamento aos usuários já criados
-   (wendyuda, mirianvilivas, amandatavares e demais), para não depender de um
-   novo login.
+## Notas técnicas
 
-## Abrangência
-
-Hoje existe mais de um workspace (ex.: "Operacional MAP", "TESTE HUB"). O padrão
-aplicado será: **todo usuário do Hub entra em todos os workspaces** com o papel
-mapeado acima. Se preferir restringir a um workspace padrão depois, é um ajuste
-pontual nessa mesma função.
-
-
-## Detalhes técnicos
-
-- Migration: nova função `public.provision_hub_user_access(_user_id uuid, _role_slug text)`
-  (SECURITY DEFINER, search_path fixo), atualização de `public.is_system_admin`
-  para incluir `has_role(_user_id,'admin')`, e um `DO` block de backfill.
-- `supabase/functions/sso-exchange/index.ts`: um `admin.rpc('provision_hub_user_access', ...)`
-  ao lado do `sync_hub_role_to_app_roles` atual.
-- Nenhuma mudança em componentes de UI ou hooks.
+- Módulos afetados: `src/routes/__root.tsx` (exibição do erro em dev), `src/routes/_authenticated/route.tsx` (limites de erro) e um novo componente pequeno de limite de erro reutilizável.
+- Nada de mudanças em banco de dados, RLS, SSO ou Edge Functions.
+- Sem sessão do Hub disponível no ambiente de teste automatizado, a validação final precisa ser feita no seu preview logado.
