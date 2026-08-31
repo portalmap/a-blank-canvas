@@ -54,12 +54,13 @@ SSO existente nem as telas.
    (wendyuda, mirianvilivas, amandatavares e demais), para não depender de um
    novo login.
 
-## Ponto que preciso confirmar
+## Abrangência
 
 Hoje existe mais de um workspace (ex.: "Operacional MAP", "TESTE HUB"). O padrão
-que vou aplicar é: **todo usuário do Hub entra em todos os workspaces** com o
-papel mapeado. Se você preferir um único workspace padrão (e os demais só por
-convite manual), me diga qual e eu ajusto essa parte.
+aplicado será: **todo usuário do Hub entra em todos os workspaces** com o papel
+mapeado acima. Se preferir restringir a um workspace padrão depois, é um ajuste
+pontual nessa mesma função.
+
 
 ## Detalhes técnicos
 
