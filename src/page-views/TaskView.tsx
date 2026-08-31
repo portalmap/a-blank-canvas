@@ -99,6 +99,7 @@ const TaskView = () => {
   const navigate = useNavigate();
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const isMobile = useIsMobile();
+  const [mobileActivityOpen, setMobileActivityOpen] = useState(false);
 
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -160,17 +161,17 @@ const TaskView = () => {
 
   if (taskLoading || !task) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center gap-4 p-4">
+        <div className="flex items-center gap-2 p-3 md:gap-4 md:p-4">
           <Button 
             variant="ghost" 
             size="icon"
@@ -180,7 +181,7 @@ const TaskView = () => {
           </Button>
 
           {taskWorkspace && currentSpace && currentList && (
-            <Breadcrumb>
+            <Breadcrumb className="hidden min-w-0 md:block">
               <BreadcrumbList>
                 <BreadcrumbItem>
                   <BreadcrumbLink onClick={() => navigate('/')}>
@@ -247,7 +248,11 @@ const TaskView = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setShowActivityPanel(!showActivityPanel)}
+              onClick={() =>
+                isMobile
+                  ? setMobileActivityOpen((v) => !v)
+                  : setShowActivityPanel((v) => !v)
+              }
               title={showActivityPanel ? 'Ocultar atividades' : 'Mostrar atividades'}
             >
               {showActivityPanel ? (
@@ -286,8 +291,8 @@ const TaskView = () => {
 
       {/* Activity Panel (mobile/tablet) */}
       <Sheet
-        open={isMobile && showActivityPanel}
-        onOpenChange={(open) => setShowActivityPanel(open)}
+        open={isMobile && mobileActivityOpen}
+        onOpenChange={setMobileActivityOpen}
       >
         <SheetContent side="right" className="w-full p-0 sm:max-w-md">
           <SheetHeader className="border-b p-4">
