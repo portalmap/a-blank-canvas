@@ -222,3 +222,24 @@
 .animate-highlight-fade {
   animation: highlight-fade 2s ease-out forwards;
 }
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  animation-name: ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+    transform: none;
+  }
+  .ticker-viewport {
+    mask-image: none;
+  }
+}
