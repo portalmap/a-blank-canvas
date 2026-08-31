@@ -174,7 +174,7 @@ export function WorkspaceSettings() {
               {loadingMembers ? (
                 <div className="text-sm text-muted-foreground">Carregando membros...</div>
               ) : members && members.length > 0 ? (
-                <Table>
+                <div className="w-full overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>E-mail</TableHead>
@@ -230,7 +230,7 @@ export function WorkspaceSettings() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table></div>
               ) : (
                 <div className="text-sm text-muted-foreground">Nenhum membro encontrado.</div>
               )}

@@ -51,7 +51,7 @@ export const DocsHubTable = ({
 
   return (
     <div className="rounded-lg border">
-      <Table>
+      <div className="w-full overflow-x-auto"><Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[50%]">Título</TableHead>
@@ -156,7 +156,7 @@ export const DocsHubTable = ({
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </Table></div>
     </div>
   );
 };

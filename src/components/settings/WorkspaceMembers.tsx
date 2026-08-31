@@ -137,7 +137,7 @@ export function WorkspaceMembers() {
         ) : !members || members.length === 0 ? (
           <div className="text-muted-foreground">Nenhum membro encontrado</div>
         ) : (
-          <Table>
+          <div className="w-full overflow-x-auto"><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>ID do Usuário</TableHead>
@@ -206,7 +206,7 @@ export function WorkspaceMembers() {
                 );
               })}
             </TableBody>
-          </Table>
+          </Table></div>
         )}
       </CardContent>
     </Card>
