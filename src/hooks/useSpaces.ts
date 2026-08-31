@@ -141,9 +141,12 @@ export const useUpdateSpace = () => {
       return data;
     },
     onSuccess: (data) => {
+      queryClient.setQueryData(['space', data.id], data);
+      queryClient.invalidateQueries({ queryKey: ['space', data.id] });
       queryClient.invalidateQueries({ queryKey: ['spaces', data.workspace_id] });
       toast.success('Space atualizado com sucesso!');
     },
+
     onError: (error: Error) => {
       console.error('Erro ao atualizar space:', error);
       toast.error(`Erro ao atualizar space: ${error.message}`);
