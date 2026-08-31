@@ -198,7 +198,7 @@ export function BulkActionsBar({
   return (
     <>
       <div ref={barRef} className="fixed z-50" style={positionStyle}>
-        <div className="flex items-center gap-2 bg-background border rounded-lg shadow-lg px-2 py-2">
+        <div className="flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-lg border bg-background px-2 py-2 shadow-lg">
           <button
             type="button"
             aria-label="Mover barra"
@@ -236,7 +236,7 @@ export function BulkActionsBar({
             listId={listId}
             onSuccess={onClearSelection}
           >
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
+            <Button variant="ghost" size="sm" className="h-9 gap-1 md:h-8">
               <CircleDot className="h-4 w-4" />
               Status
             </Button>
@@ -247,7 +247,7 @@ export function BulkActionsBar({
             workspaceId={workspaceId}
             onSuccess={onClearSelection}
           >
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
+            <Button variant="ghost" size="sm" className="h-9 gap-1 md:h-8">
               <Users className="h-4 w-4" />
               Responsáveis
             </Button>
@@ -257,7 +257,7 @@ export function BulkActionsBar({
             taskIds={selectedTaskIds}
             onSuccess={onClearSelection}
           >
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
+            <Button variant="ghost" size="sm" className="h-9 gap-1 md:h-8">
               <Calendar className="h-4 w-4" />
               Datas
             </Button>
@@ -268,7 +268,7 @@ export function BulkActionsBar({
             workspaceId={workspaceId}
             onSuccess={onClearSelection}
           >
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
+            <Button variant="ghost" size="sm" className="h-9 gap-1 md:h-8">
               <Tag className="h-4 w-4" />
               Etiquetas
             </Button>
@@ -279,7 +279,7 @@ export function BulkActionsBar({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 gap-1"
+            className="h-9 gap-1 md:h-8"
             onClick={() => setShowMoveDialog(true)}
           >
             <FolderInput className="h-4 w-4" />
@@ -289,7 +289,7 @@ export function BulkActionsBar({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 gap-1"
+            className="h-9 gap-1 md:h-8"
             onClick={handleCopy}
             disabled={!listId || !defaultStatusId || copyTasks.isPending}
           >
@@ -302,7 +302,7 @@ export function BulkActionsBar({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 gap-1"
+            className="h-9 gap-1 md:h-8"
             onClick={handleArchive}
             disabled={archiveTasks.isPending}
           >
@@ -312,7 +312,7 @@ export function BulkActionsBar({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 gap-1 text-destructive hover:text-destructive"
+            className="h-9 gap-1 text-destructive hover:text-destructive md:h-8"
             onClick={() => setShowDeleteDialog(true)}
           >
             <Trash2 className="h-4 w-4" />
