@@ -141,6 +141,30 @@ export function UserPermissionsDialog({
     }
   };
 
+  const handleToggleAll = (workspace: WorkspaceWithSpaces, checked: boolean) => {
+    const newPermissions = new Map(permissions);
+    workspace.spaces.forEach((space) => {
+      if (checked) {
+        if (!newPermissions.has(space.id)) {
+          newPermissions.set(space.id, { resourceId: space.id, role: "viewer" });
+        }
+      } else {
+        newPermissions.delete(space.id);
+      }
+    });
+    setPermissions(newPermissions);
+  };
+
+  const handleBulkRole = (workspace: WorkspaceWithSpaces, role: PermissionRole) => {
+    const newPermissions = new Map(permissions);
+    workspace.spaces.forEach((space) => {
+      if (newPermissions.has(space.id)) {
+        newPermissions.set(space.id, { resourceId: space.id, role });
+      }
+    });
+    setPermissions(newPermissions);
+  };
+
   const handleToggleExpand = (wsId: string) => {
     const newExpanded = new Set(expanded);
     if (newExpanded.has(wsId)) {
