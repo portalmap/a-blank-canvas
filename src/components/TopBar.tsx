@@ -1,16 +1,17 @@
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationTicker } from '@/components/notifications/NotificationTicker';
 import { SafeBoundary } from '@/components/SafeBoundary';
 
-/** Faixa fina no topo (desktop), alinhada à direita, acima do cabeçalho de cada página. */
+/** Faixa fina no topo (desktop): letreiro vivo de notificações + sino. */
 export function TopBar() {
   return (
-    <div className="hidden h-10 shrink-0 items-center justify-end gap-1 bg-background px-4 md:flex">
-      <ThemeToggle />
+    <div className="hidden h-10 shrink-0 items-center gap-3 bg-background px-4 md:flex">
+      <SafeBoundary name="notification-ticker">
+        <NotificationTicker />
+      </SafeBoundary>
       <SafeBoundary name="notification-bell">
         <NotificationBell />
       </SafeBoundary>
     </div>
   );
 }
-
