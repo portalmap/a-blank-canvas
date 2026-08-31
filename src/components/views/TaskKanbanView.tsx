@@ -71,6 +71,8 @@ const SubtaskBadge = ({ parentId }: { parentId: string }) => {
 export const TaskKanbanView = ({ tasks, statuses }: TaskKanbanViewProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+
   const { mutate: updateTask } = useUpdateTask();
   const createActivity = useCreateTaskActivity();
 
