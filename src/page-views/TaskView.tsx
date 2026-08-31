@@ -261,19 +261,19 @@ const TaskView = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
         {/* Task Content */}
         <ScrollArea className={cn(
-          "flex-1 transition-all duration-200",
+          "min-w-0 flex-1 transition-all duration-200",
           showActivityPanel ? "lg:w-[65%]" : "w-full"
         )}>
-          <div className="p-6 max-w-3xl mx-auto">
+          <div className="mx-auto max-w-3xl p-3 md:p-6">
             <TaskMainContent task={task} />
           </div>
         </ScrollArea>
 
-        {/* Activity Panel */}
-        {showActivityPanel && (
+        {/* Activity Panel (desktop) */}
+        {showActivityPanel && !isMobile && (
           <div className="hidden lg:flex w-[35%] border-l bg-muted/30">
             <TaskActivityPanel 
               taskId={task.id} 
@@ -283,6 +283,26 @@ const TaskView = () => {
           </div>
         )}
       </div>
+
+      {/* Activity Panel (mobile/tablet) */}
+      <Sheet
+        open={isMobile && showActivityPanel}
+        onOpenChange={(open) => setShowActivityPanel(open)}
+      >
+        <SheetContent side="right" className="w-full p-0 sm:max-w-md">
+          <SheetHeader className="border-b p-4">
+            <SheetTitle>Atividade</SheetTitle>
+          </SheetHeader>
+          <div className="flex h-[calc(100%-65px)] flex-col bg-muted/30">
+            <TaskActivityPanel
+              taskId={task.id}
+              workspaceId={task.workspace_id}
+              taskTitle={task.title}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
 
       {/* Duplicate Task Dialog */}
       <Dialog open={isDuplicateDialogOpen} onOpenChange={setIsDuplicateDialogOpen}>
