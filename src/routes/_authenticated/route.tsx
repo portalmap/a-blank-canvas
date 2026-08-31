@@ -22,9 +22,9 @@ function AuthenticatedLayout() {
             <MobileHeader />
             <div className="flex flex-1 overflow-hidden">
               <AppSidebar />
-              <main className="flex flex-1 flex-col overflow-hidden">
+              <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <TopBar />
-                <div className="flex-1 overflow-auto">
+                <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
                   <Outlet />
                 </div>
               </main>

@@ -220,7 +220,9 @@ const TaskView = () => {
             </Breadcrumb>
           )}
 
-          <div className="ml-auto flex items-center gap-1">
+          <span className="min-w-0 flex-1 truncate font-medium md:hidden">{task.title}</span>
+
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
