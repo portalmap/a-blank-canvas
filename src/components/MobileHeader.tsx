@@ -11,7 +11,7 @@ export function MobileHeader() {
   const { toggleSidebar } = useSidebar();
 
   return (
-    <header className="flex items-center justify-between p-4 border-b bg-background md:hidden">
+    <header className="flex items-center justify-between p-4 bg-background md:hidden">
       <div className="flex items-center gap-2">
         <ThemeLogo className="h-8 w-8 object-contain" />
         <span className="font-semibold text-foreground">MAP Flow</span>
