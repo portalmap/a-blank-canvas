@@ -222,7 +222,7 @@ const Documents = () => {
           <div className="h-full p-6 overflow-auto">
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">Documentos</h1>
+                <h1 className="text-2xl font-bold md:text-3xl">Documentos</h1>
                 <p className="text-muted-foreground mt-1">
                   Crie e compartilhe documentação, playbooks e guias
                 </p>

@@ -42,10 +42,10 @@ const Teams = () => {
   }
 
   return (
-    <div className="flex-1 p-6">
+    <div className="flex-1 p-3 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Equipes</h1>
+          <h1 className="text-2xl font-bold md:text-3xl">Equipes</h1>
           <p className="text-muted-foreground mt-1">
             Organize squads e gerencie membros
           </p>

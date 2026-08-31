@@ -25,7 +25,7 @@ const Automations = () => {
 
   if (!activeWorkspace) {
     return (
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-3 md:p-6">
         <p className="text-muted-foreground">Selecione um workspace para ver as automações.</p>
       </div>
     );
@@ -36,7 +36,7 @@ const Automations = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl">
             <Zap className="h-8 w-8 text-primary" />
             Automações
           </h1>
