@@ -33,12 +33,13 @@ manual no workspace.
 Módulo isolado de "provisionamento de acesso no login", sem alterar o fluxo de
 SSO existente nem as telas.
 
-1. **Mapa de papéis Hub → papel no workspace** (regra explícita):
-   - `administrador_global` → admin do workspace + `global_owner` global
-   - `administrador` → admin do workspace + `admin` global
-   - `gestor` → member
-   - `membro` → member
-   - `convidado` → guest
+1. **Mapa de papéis Hub → papel no workspace** (confirmado por você):
+   - `Administrador Global` → **admin** (+ `global_owner` global)
+   - `Administrador` → **admin** (+ `admin` global)
+   - `Gestor` → **membro**
+   - `Membro` → **membro**
+   - `Convidado` → **convidado**
+
 2. **Nova função no banco** (`provision_hub_user_access`) que, a cada login,
    garante o vínculo da pessoa em todos os workspaces ativos com o papel
    correspondente ao mapa acima. Ela apenas cria o que falta e corrige o papel
