@@ -4,10 +4,8 @@ import { WorkspaceSettings } from "@/components/settings/WorkspaceSettings";
 import { UserManagement } from "@/components/settings/UserManagement";
 import { StatusSettings } from "@/components/settings/StatusSettings";
 import { TagsSettings } from "@/components/settings/TagsSettings";
-import { WebhooksSettings } from "@/components/settings/webhooks/WebhooksSettings";
 import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettings";
 import { AutomationTemplateSettings } from "@/components/settings/AutomationTemplateSettings";
-import { ApiSettings } from "@/components/settings/api/ApiSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { ProductivitySettings } from "@/components/settings/ProductivitySettings";
 
@@ -22,7 +20,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-11 lg:w-[1320px]">
+        <TabsList className="grid w-full grid-cols-9 lg:w-[1080px]">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
@@ -32,8 +30,6 @@ export default function Settings() {
           <TabsTrigger value="productivity">Produtividade</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
-          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
-          <TabsTrigger value="api">API</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -70,14 +66,6 @@ export default function Settings() {
 
         <TabsContent value="notifications" className="mt-6">
           <NotificationSettings />
-        </TabsContent>
-
-        <TabsContent value="webhooks" className="mt-6">
-          <WebhooksSettings />
-        </TabsContent>
-
-        <TabsContent value="api" className="mt-6">
-          <ApiSettings />
         </TabsContent>
       </Tabs>
     </div>

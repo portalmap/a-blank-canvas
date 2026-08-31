@@ -2,10 +2,10 @@
 
 Este documento descreve, com o máximo de detalhes técnicos, como o **MAP Flow** (este projeto) se comunica com dois sistemas externos:
 
-1. **Portal MAP** — integração via API Token (REST) e Webhooks bidirecionais.
+1. **Portal MAP** — hoje a comunicação acontece pelo canal do Hub (hub-inbox / relay). A antiga camada de API Token + Webhooks foi **descontinuada e removida** (ver aviso na seção 2).
 2. **MAP Hub Flow** — identity provider central: SSO, verificação contínua de sessão, revogação em tempo real e sinais de segurança.
 
-> Fonte de verdade: código sob `supabase/functions/*` e `src/routes/sso.*`, `src/contexts/AuthContext.tsx`, `src/hooks/useSessionGuard.ts`, `src/lib/hubRevocationChannel.ts`, `src/hooks/useWebhooks.ts`.
+> Fonte de verdade: código sob `supabase/functions/*` e `src/routes/sso.*`, `src/contexts/AuthContext.tsx`, `src/hooks/useSessionGuard.ts`, `src/lib/hubRevocationChannel.ts`.
 
 ---
 
@@ -50,7 +50,11 @@ Este documento descreve, com o máximo de detalhes técnicos, como o **MAP Flow*
 
 ## 2. Integração com o Portal MAP
 
-O Portal MAP é um sistema externo que orquestra publicações/tarefas. Ele **consome** dados do MAP Flow via API Token e **recebe** notificações via webhooks assinados.
+> **DESCONTINUADO (31/08/2026).** Toda a camada de API Token + Webhooks descrita nas seções 2.1 e 2.2 foi removida do projeto: as abas "API" e "Webhooks" em Configurações, os hooks `useApiTokens`/`useWebhooks`/`useWebhookTrigger`, as edge functions `api-tasks`, `api-gateway`, `webhooks-inbound`, `webhook-enqueue`, `webhooks-dispatcher` e as tabelas `api_tokens`, `webhook_endpoints`, `webhook_deliveries`, `webhook_inbox`. Nada disso estava em uso (zero tokens, zero endpoints, zero entregas).
+>
+> A comunicação atual com o Portal MAP passa pelo Hub: entrada na function hub-inbox e saída em `src/lib/relay-approval.server.ts` (`calendario.aprovacao`). As seções abaixo ficam apenas como registro histórico.
+
+O Portal MAP é um sistema externo que orquestra publicações/tarefas.
 
 ### 2.1 Endpoints que o Portal chama neste projeto (entrada)
 
