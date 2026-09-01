@@ -75,6 +75,11 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [items, setItems] = useState<StatusItemForm[]>([]);
+  const [checkingRemoval, setCheckingRemoval] = useState(false);
+  const [pendingOrdered, setPendingOrdered] = useState<StatusItemForm[] | null>(null);
+  const [removalTargets, setRemovalTargets] = useState<{ id: string; name: string; count: number }[]>([]);
+  const [targetByRemoved, setTargetByRemoved] = useState<Record<string, string>>({});
+
 
   const { data: template, isLoading } = useStatusTemplate(templateId || undefined);
   const createTemplate = useCreateStatusTemplate();
