@@ -372,11 +372,99 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
         </Button>
         <Button 
           onClick={handleSave}
-          disabled={!name.trim() || items.length === 0}
+          disabled={
+            !name.trim() ||
+            items.length === 0 ||
+            checkingRemoval ||
+            updateTemplate.isPending ||
+            createTemplate.isPending
+          }
         >
+          {checkingRemoval && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {templateId ? 'Salvar Alterações' : 'Criar Modelo'}
         </Button>
       </div>
+
+      <Dialog
+        open={removalTargets.length > 0}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemovalTargets([]);
+            setPendingOrdered(null);
+            setTargetByRemoved({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Transferir tarefas antes de excluir</DialogTitle>
+            <DialogDescription>
+              Não é possível excluir uma etapa que ainda tem tarefas. Escolha para qual etapa
+              as tarefas devem ser transferidas — a exclusão acontece depois da transferência.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {removalTargets.map((removed) => (
+              <div key={removed.id} className="space-y-2">
+                <Label>
+                  {removed.name}{' '}
+                  <span className="text-muted-foreground font-normal">
+                    ({removed.count} {removed.count === 1 ? 'tarefa' : 'tarefas'})
+                  </span>
+                </Label>
+                <Select
+                  value={targetByRemoved[removed.id] || ''}
+                  onValueChange={(value) =>
+                    setTargetByRemoved((prev) => ({ ...prev, [removed.id]: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a etapa de destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {buildOrderedItems().map((item, index) => (
+                      <SelectItem key={itemKey(item, index)} value={itemKey(item, index)}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          {item.name || 'Sem nome'}
+                          {!item.id && (
+                            <Badge variant="secondary" className="ml-1">nova</Badge>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRemovalTargets([]);
+                setPendingOrdered(null);
+                setTargetByRemoved({});
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmRemoval}
+              disabled={
+                removalTargets.some((r) => !targetByRemoved[r.id]) || updateTemplate.isPending
+              }
+            >
+              Transferir e salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
