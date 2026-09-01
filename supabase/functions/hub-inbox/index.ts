@@ -1391,7 +1391,13 @@ async function handleBriefingPublicar(
         continue;
       }
 
+      // 5b. Marca no registro de criação da subtarefa a origem (briefing).
+      await marcarOrigemIntegracao(admin, subtarefa.id, "Briefing", {
+        external_briefing_ref: item.external_briefing_ref,
+      });
+
       // 6. Atividade subtask.created na tarefa-mãe.
+
       try {
         await admin.from("task_activities").insert({
           task_id: item.parent_id,
