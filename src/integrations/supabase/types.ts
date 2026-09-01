@@ -3449,6 +3449,7 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      norm_status_name: { Args: { _name: string }; Returns: string }
       normalize_client_key: { Args: { _valor: string }; Returns: string }
       restore_space: { Args: { p_space_id: string }; Returns: undefined }
       resync_template_statuses: {
