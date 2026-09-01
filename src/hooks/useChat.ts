@@ -200,7 +200,10 @@ export const useChatMessages = (channelId?: string) => {
 
             queryClient.setQueryData(
               ['chat-messages', channelId],
-              (old: ChatMessageWithSender[] | undefined) => [...(old || []), messageWithSender]
+              (old: ChatMessageWithSender[] | undefined) => {
+                if (old?.some((m) => m.id === messageWithSender.id)) return old;
+                return [...(old || []), messageWithSender];
+              }
             );
           } else if (payload.eventType === 'UPDATE') {
             const updatedMsg = payload.new as any;
