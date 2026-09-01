@@ -13,15 +13,23 @@
 `src/hooks/useStatusTemplates.ts` (`useUpdateStatusTemplate`): atualizar os itens existentes pelo `id` (nome, cor, ordem, categoria, padrão), inserir os novos e excluir apenas os que o usuário realmente removeu — preservando `status_template_items.id` e, com isso, o vínculo com as etapas já sincronizadas.
 
 ### 2. Nova função de ressincronização no banco (não destrutiva)
-Criar `public.resync_template_statuses(p_template_id uuid)` que, para **todo** escopo (lista, pasta, space) com `status_source = 'template'` e `status_template_id = p_template_id`:
-- atualiza as etapas existentes casadas por `template_item_id` (ou, quando faltar o vínculo, por nome normalizado, gravando o `template_item_id`): nome, cor, ordem, categoria e etapa padrão;
+Criar `public.resync_template_statuses(p_template_id uuid, p_reassign jsonb)` que, para **todo** escopo (lista, pasta, space) com `status_source = 'template'` e `status_template_id = p_template_id`:
+- atualiza as etapas existentes casadas por `template_item_id` (ou, quando faltar o vínculo, por nome normalizado, gravando o `template_item_id`): **nome, cor, posição (ordem), categoria e etapa padrão** — renomear e reordenar passa a funcionar livremente, sem tocar nas tarefas;
 - insere as etapas novas do modelo;
-- para etapas do modelo que foram removidas: move as tarefas que as usam para a etapa padrão do modelo e só então exclui;
+- para cada etapa do modelo que foi removida: move as tarefas para a etapa de destino indicada em `p_reassign` (mapa "item removido → item de destino", que pode ser uma etapa existente ou uma recém-criada) e só então exclui;
+- se uma etapa removida ainda tiver tarefas e não houver destino indicado, a função **falha com mensagem clara** em vez de excluir;
 - nunca apaga etapas criadas manualmente fora do modelo (`template_item_id IS NULL`) — elas continuam ao final da sequência.
 
 Assim os IDs das etapas se mantêm e nenhuma tarefa perde o status.
 
-### 3. Chamar a ressincronização e limpar os caches
+### 3. Fluxo de perguntas ao excluir uma etapa do modelo
+No editor do modelo (`src/components/settings/StatusTemplateEditor.tsx`), ao salvar:
+1. Detectar itens removidos e consultar quantas tarefas usam as etapas correspondentes em todos os escopos que usam o modelo (nova função de leitura, ex.: `count_tasks_for_template_items`).
+2. Se houver tarefas, abrir um diálogo explicando que não é possível excluir com tarefas nas etapas, listando etapa removida + quantidade de tarefas, e pedindo para cada uma o destino: qualquer etapa que continua no modelo, inclusive as novas criadas nessa mesma edição.
+3. Confirmado o destino, salvar e ressincronizar com o mapa de transferência: as tarefas vão para a etapa escolhida e depois a etapa removida é excluída.
+4. Se as etapas removidas não têm tarefa nenhuma, salva direto, sem perguntas.
+
+### 4. Chamar a ressincronização e limpar os caches
 Depois de salvar o modelo, chamar `resync_template_statuses` e invalidar `status-templates`, `status-template`, `statuses`, `statuses-for-scope`, `default-status`, `default-status-for-scope`, `tasks` e `task`. A tela da tarefa passa a refletir a alteração imediatamente.
 
 ### 4. Ordem estável das etapas
