@@ -12,11 +12,13 @@ Wendy Uda é administradora (perfil "administrador" e admin do workspace), mas n
 ## Correção proposta
 
 ### 1. Ajustar as regras de acesso (banco)
-Uma migração que substitui as regras de escrita dos templates de Space para permitir:
+Uma migração que substitui as regras de escrita dos templates de Space, ampliando o acesso para **administradores em geral**:
 
-- **Templates globais** (sem workspace): editar/excluir para o criador **ou** administradores do sistema (administrador global / administrador do Hub).
-- **Templates de workspace**: editar/excluir para o criador **ou** administrador daquele workspace (comportamento atual mantido).
-- As mesmas condições aplicadas às tabelas filhas: pastas, listas, tarefas e automações do template — hoje elas exigem ser o criador, o que também bloqueia o salvamento das automações.
+- Pode criar, editar e excluir **qualquer** template de Space (global ou de workspace) quem for:
+  - o criador do template, ou
+  - **administrador** do sistema (papel `admin`/`owner` do app, administrador global do Hub), ou
+  - administrador do workspace do template (quando o template pertence a um workspace).
+- As mesmas condições aplicadas às tabelas filhas: pastas, listas, tarefas e automações do template — hoje elas exigem ser o criador, o que bloqueia o salvamento das automações.
 - Limpeza das regras duplicadas de atualização/exclusão em `space_templates` (existem duas versões sobrepostas hoje).
 
 Leitura continua como está: qualquer membro do workspace, e todos para templates globais.
