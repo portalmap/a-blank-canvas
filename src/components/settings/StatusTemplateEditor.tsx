@@ -20,8 +20,25 @@ import {
   useStatusTemplate, 
   useCreateStatusTemplate, 
   useUpdateStatusTemplate,
+  countTasksForTemplateItems,
   StatusTemplateItem 
 } from '@/hooks/useStatusTemplates';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface StatusTemplateEditorProps {
   workspaceId: string;
