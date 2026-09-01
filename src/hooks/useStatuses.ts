@@ -75,7 +75,8 @@ async function fetchWorkspaceStatuses(workspaceId: string): Promise<StatusItem[]
     .select('*')
     .eq('workspace_id', workspaceId)
     .eq('scope_type', 'workspace')
-    .order('order_index', { ascending: true });
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
 
