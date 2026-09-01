@@ -200,7 +200,10 @@ export const useChatMessages = (channelId?: string) => {
 
             queryClient.setQueryData(
               ['chat-messages', channelId],
-              (old: ChatMessageWithSender[] | undefined) => [...(old || []), messageWithSender]
+              (old: ChatMessageWithSender[] | undefined) => {
+                if (old?.some((m) => m.id === messageWithSender.id)) return old;
+                return [...(old || []), messageWithSender];
+              }
             );
           } else if (payload.eventType === 'UPDATE') {
             const updatedMsg = payload.new as any;
@@ -250,6 +253,7 @@ export const useChatMessages = (channelId?: string) => {
 
 export const useSendMessage = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ channelId, content, assigneeId, attachments, replyTo }: { 
@@ -281,6 +285,46 @@ export const useSendMessage = () => {
 
       if (error) throw error;
       return { ...data, hasAssignee: !!assigneeId };
+    },
+    onSuccess: async (data: any) => {
+      // Não depender apenas do realtime: adiciona a mensagem na lista imediatamente
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('id', data.sender_id)
+        .maybeSingle();
+
+      let assigneeProfile = null;
+      if (data.assignee_id) {
+        const { data: aProfile } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .eq('id', data.assignee_id)
+          .maybeSingle();
+        assigneeProfile = aProfile;
+      }
+
+      const message: ChatMessageWithSender = {
+        ...data,
+        edited_at: data.edited_at || null,
+        edit_count: data.edit_count || 0,
+        assignee_id: data.assignee_id || null,
+        resolved_at: data.resolved_at || null,
+        resolved_by: data.resolved_by || null,
+        reply_to: data.reply_to || null,
+        sender: profile,
+        assignee: assigneeProfile,
+      };
+
+      queryClient.setQueryData(
+        ['chat-messages', data.channel_id],
+        (old: ChatMessageWithSender[] | undefined) => {
+          if (old?.some((m) => m.id === message.id)) return old;
+          return [...(old || []), message];
+        }
+      );
+
+      queryClient.invalidateQueries({ queryKey: ['chat-messages', data.channel_id] });
     },
     onError: (error: any) => {
       if (error?.code === 'PGRST303' || error?.message?.includes('JWT expired')) {
