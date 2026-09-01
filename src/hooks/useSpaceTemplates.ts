@@ -486,8 +486,18 @@ export const useUpdateSpaceTemplate = () => {
       queryClient.invalidateQueries({ queryKey: ['space-template', data.id] });
       toast.success('Template atualizado com sucesso!');
     },
-    onError: (error) => {
-      toast.error('Erro ao atualizar template');
+    onError: (error: any) => {
+      const code = error?.code as string | undefined;
+      const msg = String(error?.message ?? '');
+      const isPermission =
+        code === '42501' ||
+        code === 'PGRST116' ||
+        /row-level security|permission denied|no.*rows/i.test(msg);
+      toast.error(
+        isPermission
+          ? 'Você não tem permissão para editar este template'
+          : 'Erro ao atualizar template',
+      );
       console.error(error);
     },
   });
