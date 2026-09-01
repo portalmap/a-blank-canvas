@@ -117,20 +117,51 @@ export const useCreateStatusTemplate = () => {
   });
 };
 
+export interface StatusTemplateItemInput {
+  id?: string;
+  name: string;
+  color: string;
+  is_default: boolean;
+  order_index: number;
+  category: string;
+  /** id do item removido cujas tarefas devem ir para este item (usado quando o item é novo) */
+  reassignFrom?: string[];
+}
+
+/**
+ * Conta quantas tarefas usam as etapas ligadas a itens do modelo.
+ * Usado para avisar antes de excluir uma etapa.
+ */
+export const countTasksForTemplateItems = async (itemIds: string[]) => {
+  if (itemIds.length === 0) return {} as Record<string, number>;
+
+  const { data, error } = await supabase.rpc('count_tasks_for_template_items', {
+    p_item_ids: itemIds,
+  });
+
+  if (error) throw error;
+
+  const result: Record<string, number> = {};
+  for (const row of (data || []) as { template_item_id: string; task_count: number }[]) {
+    result[row.template_item_id] = (result[row.template_item_id] || 0) + Number(row.task_count || 0);
+  }
+  return result;
+};
+
 export const useUpdateStatusTemplate = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      id, 
-      name, 
+    mutationFn: async ({
+      id,
+      name,
       description,
-      items 
-    }: { 
-      id: string; 
-      name: string; 
+      items,
+    }: {
+      id: string;
+      name: string;
       description?: string;
-      items: { name: string; color: string; is_default: boolean; order_index: number; category: string }[];
+      items: StatusTemplateItemInput[];
     }) => {
       const { error: templateError } = await supabase
         .from('status_templates')
@@ -139,26 +170,82 @@ export const useUpdateStatusTemplate = () => {
 
       if (templateError) throw templateError;
 
-      // Delete existing items
-      await supabase
+      // Itens que já existem no banco
+      const { data: existing, error: existingError } = await supabase
         .from('status_template_items')
-        .delete()
+        .select('id')
         .eq('template_id', id);
 
-      // Insert new items
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase
+      if (existingError) throw existingError;
+
+      const keptIds = new Set(items.map((i) => i.id).filter(Boolean) as string[]);
+      const removedIds = (existing || []).map((e) => e.id).filter((eid) => !keptIds.has(eid));
+
+      // 1. Atualiza os itens existentes no lugar (preserva o vínculo com as etapas)
+      for (const [index, item] of items.entries()) {
+        if (!item.id) continue;
+        const { error } = await supabase
           .from('status_template_items')
-          .insert(items.map((item, index) => ({
+          .update({
+            name: item.name,
+            color: item.color,
+            is_default: item.is_default,
+            order_index: index,
+            category: item.category,
+          })
+          .eq('id', item.id);
+        if (error) throw error;
+      }
+
+      // 2. Insere os itens novos, guardando o mapa "item removido -> item novo"
+      const reassign: Record<string, string> = {};
+      for (const [index, item] of items.entries()) {
+        if (item.id) continue;
+        const { data: inserted, error } = await supabase
+          .from('status_template_items')
+          .insert({
             template_id: id,
             name: item.name,
             color: item.color,
             is_default: item.is_default,
             order_index: index,
             category: item.category,
-          })));
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
 
-        if (itemsError) throw itemsError;
+        for (const from of item.reassignFrom || []) {
+          reassign[from] = inserted.id;
+        }
+      }
+
+      // Destinos que apontam para itens já existentes
+      for (const item of items) {
+        if (!item.id) continue;
+        for (const from of item.reassignFrom || []) {
+          reassign[from] = item.id;
+        }
+      }
+
+      // 3. Propaga para todas as listas/pastas/spaces que usam o modelo.
+      // Se alguma etapa removida ainda tiver tarefas sem destino, a função falha
+      // e os itens removidos NÃO são apagados.
+      const { error: resyncError } = await supabase.rpc('resync_template_statuses', {
+        p_template_id: id,
+        p_reassign: reassign,
+        p_removed_item_ids: removedIds,
+      });
+
+      if (resyncError) throw resyncError;
+
+      // 4. Só agora remove os itens do modelo
+      if (removedIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('status_template_items')
+          .delete()
+          .in('id', removedIds);
+        if (deleteError) throw deleteError;
       }
 
       return { id };
@@ -166,10 +253,17 @@ export const useUpdateStatusTemplate = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['status-templates'] });
       queryClient.invalidateQueries({ queryKey: ['status-template'] });
-      toast.success('Modelo atualizado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['statuses'] });
+      queryClient.invalidateQueries({ queryKey: ['statuses-for-scope'] });
+      queryClient.invalidateQueries({ queryKey: ['default-status'] });
+      queryClient.invalidateQueries({ queryKey: ['default-status-for-scope'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task'] });
+      toast.success('Modelo atualizado e sincronizado com as listas!');
     },
-    onError: (error) => {
-      toast.error('Erro ao atualizar modelo');
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar modelo';
+      toast.error(message);
       console.error(error);
     },
   });

@@ -22,7 +22,8 @@ async function fetchScopedStatuses(
     .select('*')
     .eq('scope_type', scopeType)
     .eq('scope_id', scopeId)
-    .order('order_index', { ascending: true });
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true });
 
   if (error || !data || data.length === 0) return null;
 
@@ -74,7 +75,8 @@ async function fetchWorkspaceStatuses(workspaceId: string): Promise<StatusItem[]
     .select('*')
     .eq('workspace_id', workspaceId)
     .eq('scope_type', 'workspace')
-    .order('order_index', { ascending: true });
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
 

@@ -3255,6 +3255,13 @@ export type Database = {
         Args: { _editor_id: string; _target_user_id: string }
         Returns: boolean
       }
+      count_tasks_for_template_items: {
+        Args: { p_item_ids: string[] }
+        Returns: {
+          task_count: number
+          template_item_id: string
+        }[]
+      }
       create_space_secure: {
         Args: {
           p_color?: string
@@ -3439,6 +3446,14 @@ export type Database = {
       }
       normalize_client_key: { Args: { _valor: string }; Returns: string }
       restore_space: { Args: { p_space_id: string }; Returns: undefined }
+      resync_template_statuses: {
+        Args: {
+          p_reassign?: Json
+          p_removed_item_ids?: string[]
+          p_template_id: string
+        }
+        Returns: undefined
+      }
       sync_hub_role_to_app_roles: {
         Args: { _role_slug: string; _user_id: string }
         Returns: undefined

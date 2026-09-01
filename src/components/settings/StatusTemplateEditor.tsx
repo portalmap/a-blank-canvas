@@ -20,8 +20,25 @@ import {
   useStatusTemplate, 
   useCreateStatusTemplate, 
   useUpdateStatusTemplate,
+  countTasksForTemplateItems,
   StatusTemplateItem 
 } from '@/hooks/useStatusTemplates';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface StatusTemplateEditorProps {
   workspaceId: string;
@@ -58,6 +75,11 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [items, setItems] = useState<StatusItemForm[]>([]);
+  const [checkingRemoval, setCheckingRemoval] = useState(false);
+  const [pendingOrdered, setPendingOrdered] = useState<StatusItemForm[] | null>(null);
+  const [removalTargets, setRemovalTargets] = useState<{ id: string; name: string; count: number }[]>([]);
+  const [targetByRemoved, setTargetByRemoved] = useState<Record<string, string>>({});
+
 
   const { data: template, isLoading } = useStatusTemplate(templateId || undefined);
   const createTemplate = useCreateStatusTemplate();
@@ -116,29 +138,105 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleSave = async () => {
-    if (!name.trim()) return;
+  // Chave estável para identificar o destino escolhido (itens novos ainda não têm id)
+  const itemKey = (item: StatusItemForm, index: number) =>
+    item.id ? `existing:${item.id}` : `new:${index}`;
 
-    // Ordenar items pela sequência visual de categorias antes de salvar
-    const orderedItems = CATEGORY_ORDER.flatMap(category => 
-      items.filter(item => item.category === category)
-    );
 
-    const formattedItems = orderedItems.map((item, index) => ({
+  // Ordena os itens pela sequência visual de categorias
+  const buildOrderedItems = () =>
+    CATEGORY_ORDER.flatMap(category => items.filter(item => item.category === category));
+
+  const formatItems = (
+    ordered: StatusItemForm[],
+    reassignByKey: Record<string, string[]> = {}
+  ) =>
+    ordered.map((item, index) => ({
+      id: item.id,
       name: item.name,
       color: item.color,
       is_default: item.is_default,
       order_index: index,
       category: item.category,
+      reassignFrom: reassignByKey[itemKey(item, index)],
     }));
+
+  const persist = async (
+    ordered: StatusItemForm[],
+    reassignByKey: Record<string, string[]> = {}
+  ) => {
+    const formattedItems = formatItems(ordered, reassignByKey);
 
     if (templateId) {
       await updateTemplate.mutateAsync({ id: templateId, name, description, items: formattedItems });
     } else {
-      await createTemplate.mutateAsync({ workspaceId, name, description, items: formattedItems });
+      await createTemplate.mutateAsync({
+        workspaceId,
+        name,
+        description,
+        items: formattedItems.map(({ id: _id, reassignFrom: _r, ...rest }) => rest),
+      });
     }
-    
+
     onClose();
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+
+    const ordered = buildOrderedItems();
+
+    // Modelo novo: nada a excluir
+    if (!templateId || !template) {
+      await persist(ordered);
+      return;
+    }
+
+    const keptIds = new Set(ordered.map(i => i.id).filter(Boolean) as string[]);
+    const removedItems = (template.status_template_items || []).filter(ti => !keptIds.has(ti.id));
+
+    if (removedItems.length === 0) {
+      await persist(ordered);
+      return;
+    }
+
+    setCheckingRemoval(true);
+    try {
+      const counts = await countTasksForTemplateItems(removedItems.map(i => i.id));
+      const withTasks = removedItems
+        .map(i => ({ id: i.id, name: i.name, count: counts[i.id] || 0 }))
+        .filter(i => i.count > 0);
+
+      if (withTasks.length === 0) {
+        await persist(ordered);
+        return;
+      }
+
+      setPendingOrdered(ordered);
+      setRemovalTargets(withTasks);
+      setTargetByRemoved({});
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível verificar as tarefas das etapas removidas');
+    } finally {
+      setCheckingRemoval(false);
+    }
+  };
+
+  const handleConfirmRemoval = async () => {
+    if (!pendingOrdered) return;
+
+    const reassignByKey: Record<string, string[]> = {};
+    for (const removed of removalTargets) {
+      const key = targetByRemoved[removed.id];
+      if (!key) return;
+      reassignByKey[key] = [...(reassignByKey[key] || []), removed.id];
+    }
+
+    const ordered = pendingOrdered;
+    setPendingOrdered(null);
+    setRemovalTargets([]);
+    await persist(ordered, reassignByKey);
   };
 
   const getItemsByCategory = (category: StatusCategory) => 
@@ -274,11 +372,99 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
         </Button>
         <Button 
           onClick={handleSave}
-          disabled={!name.trim() || items.length === 0}
+          disabled={
+            !name.trim() ||
+            items.length === 0 ||
+            checkingRemoval ||
+            updateTemplate.isPending ||
+            createTemplate.isPending
+          }
         >
+          {checkingRemoval && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {templateId ? 'Salvar Alterações' : 'Criar Modelo'}
         </Button>
       </div>
+
+      <Dialog
+        open={removalTargets.length > 0}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemovalTargets([]);
+            setPendingOrdered(null);
+            setTargetByRemoved({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Transferir tarefas antes de excluir</DialogTitle>
+            <DialogDescription>
+              Não é possível excluir uma etapa que ainda tem tarefas. Escolha para qual etapa
+              as tarefas devem ser transferidas — a exclusão acontece depois da transferência.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {removalTargets.map((removed) => (
+              <div key={removed.id} className="space-y-2">
+                <Label>
+                  {removed.name}{' '}
+                  <span className="text-muted-foreground font-normal">
+                    ({removed.count} {removed.count === 1 ? 'tarefa' : 'tarefas'})
+                  </span>
+                </Label>
+                <Select
+                  value={targetByRemoved[removed.id] || ''}
+                  onValueChange={(value) =>
+                    setTargetByRemoved((prev) => ({ ...prev, [removed.id]: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a etapa de destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {buildOrderedItems().map((item, index) => (
+                      <SelectItem key={itemKey(item, index)} value={itemKey(item, index)}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          {item.name || 'Sem nome'}
+                          {!item.id && (
+                            <Badge variant="secondary" className="ml-1">nova</Badge>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRemovalTargets([]);
+                setPendingOrdered(null);
+                setTargetByRemoved({});
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmRemoval}
+              disabled={
+                removalTargets.some((r) => !targetByRemoved[r.id]) || updateTemplate.isPending
+              }
+            >
+              Transferir e salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
