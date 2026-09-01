@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.log_task_created() FROM PUBLIC, anon, authenticated;

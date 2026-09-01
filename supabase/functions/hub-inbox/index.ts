@@ -601,6 +601,15 @@ async function handleCalendarioPublicar(
         if (!taskId) throw insercao.error;
       }
 
+      // Marca no registro de criação que a tarefa veio da integração.
+      if (criada && taskId) {
+        await marcarOrigemIntegracao(admin, taskId, "Calendário", {
+          external_post_ref: post.external_post_ref,
+        });
+      }
+
+
+
       // Anexos apenas para tarefas criadas agora (evita duplicar).
       if (criada && post.attachments?.length) {
         const linhas = post.attachments.map((a) => ({
@@ -692,6 +701,43 @@ function sanitizeFileName(name: string): string {
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_+/g, "_");
 }
+
+// Complementa a atividade 'task.created' (criada pelo gatilho do banco) com o
+// rótulo da integração que originou a tarefa. Falha aqui não invalida nada.
+async function marcarOrigemIntegracao(
+  admin: any,
+  taskId: string,
+  label: string,
+  extra: Record<string, unknown> = {},
+) {
+  try {
+    const { data: atividade } = await admin
+      .from("task_activities")
+      .select("id, metadata")
+      .eq("task_id", taskId)
+      .eq("activity_type", "task.created")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!atividade) return;
+    await admin
+      .from("task_activities")
+      .update({
+        metadata: {
+          ...(atividade.metadata ?? {}),
+          created_by: "integration",
+          integration_label: label,
+          origem: "hub",
+          ...extra,
+        },
+      })
+      .eq("id", atividade.id);
+  } catch (e) {
+    console.error("marcarOrigemIntegracao falhou", taskId, e);
+  }
+}
+
+
 
 // Baixa cada anexo da URL assinada (Portal), sobe no bucket task-attachments
 // do MAP Flow e registra em task_attachments. Falha de um anexo não afeta os
@@ -1345,7 +1391,13 @@ async function handleBriefingPublicar(
         continue;
       }
 
+      // 5b. Marca no registro de criação da subtarefa a origem (briefing).
+      await marcarOrigemIntegracao(admin, subtarefa.id, "Briefing", {
+        external_briefing_ref: item.external_briefing_ref,
+      });
+
       // 6. Atividade subtask.created na tarefa-mãe.
+
       try {
         await admin.from("task_activities").insert({
           task_id: item.parent_id,

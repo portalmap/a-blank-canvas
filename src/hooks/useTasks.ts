@@ -239,13 +239,9 @@ export const useCreateTask = () => {
 
       if (error) throw error;
 
-      // Registrar atividade de criação com o usuário real
-      await supabase.from('task_activities').insert({
-        task_id: data.id,
-        user_id: user.id,
-        activity_type: 'task.created',
-        metadata: { created_by: 'user', created_at_date: data.created_at },
-      });
+      // A atividade 'task.created' é registrada automaticamente pelo gatilho
+      // do banco (trg_tasks_log_created), válido para qualquer origem.
+
 
       // Aplicar automações (responsáveis e seguidores automáticos)
       try {
