@@ -253,6 +253,7 @@ export const useChatMessages = (channelId?: string) => {
 
 export const useSendMessage = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ channelId, content, assigneeId, attachments, replyTo }: { 
