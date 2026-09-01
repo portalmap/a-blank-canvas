@@ -601,6 +601,15 @@ async function handleCalendarioPublicar(
         if (!taskId) throw insercao.error;
       }
 
+      // Marca no registro de criação que a tarefa veio da integração.
+      if (criada && taskId) {
+        await marcarOrigemIntegracao(admin, taskId, "Calendário", {
+          external_post_ref: post.external_post_ref,
+        });
+      }
+
+
+
       // Anexos apenas para tarefas criadas agora (evita duplicar).
       if (criada && post.attachments?.length) {
         const linhas = post.attachments.map((a) => ({
