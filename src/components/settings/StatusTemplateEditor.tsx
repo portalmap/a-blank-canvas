@@ -116,29 +116,100 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleSave = async () => {
-    if (!name.trim()) return;
+  // Ordena os itens pela sequência visual de categorias
+  const buildOrderedItems = () =>
+    CATEGORY_ORDER.flatMap(category => items.filter(item => item.category === category));
 
-    // Ordenar items pela sequência visual de categorias antes de salvar
-    const orderedItems = CATEGORY_ORDER.flatMap(category => 
-      items.filter(item => item.category === category)
-    );
-
-    const formattedItems = orderedItems.map((item, index) => ({
+  const formatItems = (
+    ordered: StatusItemForm[],
+    reassignByKey: Record<string, string[]> = {}
+  ) =>
+    ordered.map((item, index) => ({
+      id: item.id,
       name: item.name,
       color: item.color,
       is_default: item.is_default,
       order_index: index,
       category: item.category,
+      reassignFrom: reassignByKey[itemKey(item, index)],
     }));
+
+  const persist = async (
+    ordered: StatusItemForm[],
+    reassignByKey: Record<string, string[]> = {}
+  ) => {
+    const formattedItems = formatItems(ordered, reassignByKey);
 
     if (templateId) {
       await updateTemplate.mutateAsync({ id: templateId, name, description, items: formattedItems });
     } else {
-      await createTemplate.mutateAsync({ workspaceId, name, description, items: formattedItems });
+      await createTemplate.mutateAsync({
+        workspaceId,
+        name,
+        description,
+        items: formattedItems.map(({ id: _id, reassignFrom: _r, ...rest }) => rest),
+      });
     }
-    
+
     onClose();
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+
+    const ordered = buildOrderedItems();
+
+    // Modelo novo: nada a excluir
+    if (!templateId || !template) {
+      await persist(ordered);
+      return;
+    }
+
+    const keptIds = new Set(ordered.map(i => i.id).filter(Boolean) as string[]);
+    const removedItems = (template.status_template_items || []).filter(ti => !keptIds.has(ti.id));
+
+    if (removedItems.length === 0) {
+      await persist(ordered);
+      return;
+    }
+
+    setCheckingRemoval(true);
+    try {
+      const counts = await countTasksForTemplateItems(removedItems.map(i => i.id));
+      const withTasks = removedItems
+        .map(i => ({ id: i.id, name: i.name, count: counts[i.id] || 0 }))
+        .filter(i => i.count > 0);
+
+      if (withTasks.length === 0) {
+        await persist(ordered);
+        return;
+      }
+
+      setPendingOrdered(ordered);
+      setRemovalTargets(withTasks);
+      setTargetByRemoved({});
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível verificar as tarefas das etapas removidas');
+    } finally {
+      setCheckingRemoval(false);
+    }
+  };
+
+  const handleConfirmRemoval = async () => {
+    if (!pendingOrdered) return;
+
+    const reassignByKey: Record<string, string[]> = {};
+    for (const removed of removalTargets) {
+      const key = targetByRemoved[removed.id];
+      if (!key) return;
+      reassignByKey[key] = [...(reassignByKey[key] || []), removed.id];
+    }
+
+    const ordered = pendingOrdered;
+    setPendingOrdered(null);
+    setRemovalTargets([]);
+    await persist(ordered, reassignByKey);
   };
 
   const getItemsByCategory = (category: StatusCategory) => 
