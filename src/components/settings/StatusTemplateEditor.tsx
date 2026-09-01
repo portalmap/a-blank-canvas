@@ -138,6 +138,11 @@ export function StatusTemplateEditor({ workspaceId, templateId, onClose }: Statu
     setItems(items.filter((_, i) => i !== index));
   };
 
+  // Chave estável para identificar o destino escolhido (itens novos ainda não têm id)
+  const itemKey = (item: StatusItemForm, index: number) =>
+    item.id ? `existing:${item.id}` : `new:${index}`;
+
+
   // Ordena os itens pela sequência visual de categorias
   const buildOrderedItems = () =>
     CATEGORY_ORDER.flatMap(category => items.filter(item => item.category === category));
