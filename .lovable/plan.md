@@ -41,4 +41,5 @@ O modelo "Tráfego Pago" tem dois itens chamados "A Fazer" (posições 0 e 1). �
 
 ## Verificação
 
-Renomear/reordenar uma etapa em um modelo sincronizado, salvar e abrir uma tarefa de uma lista que usa esse modelo: o seletor de Status deve mostrar o novo nome e a nova ordem, com a tarefa mantendo a etapa em que estava.
+1. Renomear/reordenar uma etapa em um modelo sincronizado, salvar e abrir uma tarefa de uma lista que usa esse modelo: o seletor de Status deve mostrar o novo nome e a nova ordem, com a tarefa mantendo a etapa em que estava.
+2. Remover uma etapa que tem tarefas: deve aparecer o aviso e a escolha de destino; após confirmar, as tarefas aparecem na etapa escolhida e a etapa removida desaparece de todas as listas do modelo.
