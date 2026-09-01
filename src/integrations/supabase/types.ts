@@ -3255,6 +3255,10 @@ export type Database = {
         Args: { _editor_id: string; _target_user_id: string }
         Returns: boolean
       }
+      can_manage_space_template: {
+        Args: { _template_id: string; _user_id: string }
+        Returns: boolean
+      }
       count_tasks_for_template_items: {
         Args: { p_item_ids: string[] }
         Returns: {
@@ -3432,6 +3436,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_app_admin: { Args: { _user_id: string }; Returns: boolean }
       is_document_creator: {
         Args: { _document_id: string; _user_id: string }
         Returns: boolean
