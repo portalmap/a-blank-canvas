@@ -32,7 +32,7 @@ No editor do modelo (`src/components/settings/StatusTemplateEditor.tsx`), ao sal
 ### 4. Chamar a ressincronização e limpar os caches
 Depois de salvar o modelo, chamar `resync_template_statuses` e invalidar `status-templates`, `status-template`, `statuses`, `statuses-for-scope`, `default-status`, `default-status-for-scope`, `tasks` e `task`. A tela da tarefa passa a refletir a alteração imediatamente.
 
-### 4. Ordem estável das etapas
+### 5. Ordem estável das etapas
 `src/hooks/useStatuses.ts`: ordenar por `order_index` e, em empate, por `created_at`, em todas as buscas de etapas. Hoje as etapas padrão do workspace estão todas com `order_index = 0`, o que deixa o seletor de Status da tarefa em ordem indefinida. Com isso, o seletor da tarefa passa a seguir a mesma sequência do Kanban / do modelo.
 
 ## Observação já verificada
