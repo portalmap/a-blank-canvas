@@ -132,39 +132,6 @@ export function useBulkAssignTasks() {
   });
 }
 
-export function useBulkAddTags() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({
-      taskIds,
-      tagIds,
-    }: {
-      taskIds: string[];
-      tagIds: string[];
-    }) => {
-      for (const taskId of taskIds) {
-        for (const tagId of tagIds) {
-          await supabase
-            .from("task_tag_relations")
-            .upsert(
-              { task_id: taskId, tag_id: tagId },
-              { onConflict: "task_id,tag_id" }
-            );
-        }
-      }
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["task-tag-relations"] });
-      toast({ title: `Etiquetas adicionadas a ${variables.taskIds.length} tarefa(s)` });
-    },
-    onError: () => {
-      toast({ title: "Erro ao adicionar etiquetas", variant: "destructive" });
-    },
-  });
-}
-
 export function useBulkMoveTasks() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

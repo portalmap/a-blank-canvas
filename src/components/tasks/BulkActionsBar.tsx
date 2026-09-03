@@ -1,9 +1,9 @@
-import { X, Archive, Trash2, Copy, FolderInput, Tag, Calendar, Users, CircleDot, GripVertical } from "lucide-react";
+import { X, Archive, Trash2, Copy, FolderInput, Calendar, Users, CircleDot, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBulkPopover } from "./bulk-actions/StatusBulkPopover";
 import { AssigneeBulkPopover } from "./bulk-actions/AssigneeBulkPopover";
 import { DatesBulkPopover } from "./bulk-actions/DatesBulkPopover";
-import { TagsBulkPopover } from "./bulk-actions/TagsBulkPopover";
+
 import { ConfirmBulkDeleteDialog } from "./bulk-actions/ConfirmBulkDeleteDialog";
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
@@ -263,16 +263,6 @@ export function BulkActionsBar({
             </Button>
           </DatesBulkPopover>
 
-          <TagsBulkPopover
-            taskIds={selectedTaskIds}
-            workspaceId={workspaceId}
-            onSuccess={onClearSelection}
-          >
-            <Button variant="ghost" size="sm" className="h-9 gap-1 md:h-8">
-              <Tag className="h-4 w-4" />
-              Etiquetas
-            </Button>
-          </TagsBulkPopover>
 
           <div className="h-4 w-px bg-border" />
 
