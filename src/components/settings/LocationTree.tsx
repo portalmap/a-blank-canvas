@@ -220,11 +220,15 @@ export function LocationTree({
                 {spaceLists.map((list) => (
                   <div key={list.id} className={rowClass}>
                     <div className="w-5" />
-                    <Checkbox
-                      id={`${idPrefix}-list-${list.id}`}
-                      checked={selectedLists.includes(list.id)}
-                      onCheckedChange={() => onToggleSelection('list', list.id)}
-                    />
+                    {canSelect('list') ? (
+                      <Checkbox
+                        id={`${idPrefix}-list-${list.id}`}
+                        checked={selectedLists.includes(list.id)}
+                        onCheckedChange={() => onToggleSelection('list', list.id)}
+                      />
+                    ) : (
+                      <div className="w-4" />
+                    )}
                     <Label htmlFor={`${idPrefix}-list-${list.id}`} className={labelClass}>
                       <List className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="truncate">{list.name}</span>
