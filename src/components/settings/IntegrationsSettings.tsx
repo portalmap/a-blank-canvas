@@ -30,8 +30,9 @@ function formatDate(value: string | null) {
 }
 
 export function IntegrationsSettings() {
-  const { isGlobalOwner, isOwner } = useUserRole();
-  const allowed = isGlobalOwner || isOwner;
+  const { data: roleData } = useUserRole();
+  const allowed = !!roleData?.isGlobalOwner || !!roleData?.isOwner;
+
   const [googleOpen, setGoogleOpen] = useState(false);
   const [pendingUser, setPendingUser] = useState<{ id: string; label: string } | null>(null);
 

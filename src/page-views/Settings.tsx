@@ -8,6 +8,8 @@ import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettin
 import { AutomationTemplateSettings } from "@/components/settings/AutomationTemplateSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { ProductivitySettings } from "@/components/settings/ProductivitySettings";
+import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
+
 
 export default function Settings() {
   return (
