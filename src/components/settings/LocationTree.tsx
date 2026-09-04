@@ -51,6 +51,8 @@ export function LocationTree({
   idPrefix,
   density = 'compact',
   search = '',
+  selectableTypes = ['space', 'folder', 'list'],
+  showWorkspaceOption = true,
   spaces,
   folders,
   lists,
