@@ -30,6 +30,11 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
     if (!files || files.length === 0) return;
 
     for (const file of Array.from(files)) {
+      const sizeError = validateAttachmentSize(file);
+      if (sizeError) {
+        toast.error(sizeError);
+        continue;
+      }
       try {
         const uploaded = await uploadAttachment.mutateAsync({ taskId, file });
         // Extrair o storage path (não a signed URL) para salvar no metadata
