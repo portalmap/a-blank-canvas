@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_user_connections: {
+        Row: {
+          connection_key_ciphertext: string
+          connector_id: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connection_key_ciphertext: string
+          connector_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connection_key_ciphertext?: string
+          connector_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       automation_executions: {
         Row: {
           automation_id: string
@@ -144,6 +171,199 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      calendar_event_guests: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          event_id: string
+          id: string
+          invite_error: string | null
+          invite_status: string
+          invited_at: string | null
+          response_status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          event_id: string
+          id?: string
+          invite_error?: string | null
+          invite_status?: string
+          invited_at?: string | null
+          response_status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          event_id?: string
+          id?: string
+          invite_error?: string | null
+          invite_status?: string
+          invited_at?: string | null
+          response_status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_guests_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_event_reminders: {
+        Row: {
+          created_at: string
+          event_id: string
+          fire_at: string
+          id: string
+          notified_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          fire_at: string
+          id?: string
+          notified_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          fire_at?: string
+          id?: string
+          notified_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_reminders_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_events: {
+        Row: {
+          all_day: boolean
+          color: string
+          created_at: string
+          deleted_at: string | null
+          description: string | null
+          ends_at: string
+          google_calendar_id: string | null
+          google_etag: string | null
+          google_event_id: string | null
+          google_html_link: string | null
+          id: string
+          last_synced_at: string | null
+          location: string | null
+          reminder_minutes: number | null
+          source: string
+          starts_at: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          ends_at: string
+          google_calendar_id?: string | null
+          google_etag?: string | null
+          google_event_id?: string | null
+          google_html_link?: string | null
+          id?: string
+          last_synced_at?: string | null
+          location?: string | null
+          reminder_minutes?: number | null
+          source?: string
+          starts_at: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          ends_at?: string
+          google_calendar_id?: string | null
+          google_etag?: string | null
+          google_event_id?: string | null
+          google_html_link?: string | null
+          id?: string
+          last_synced_at?: string | null
+          location?: string | null
+          reminder_minutes?: number | null
+          source?: string
+          starts_at?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      calendar_google_accounts: {
+        Row: {
+          calendar_id: string
+          connected_at: string
+          created_at: string
+          google_email: string | null
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          status: string
+          sync_token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_id?: string
+          connected_at?: string
+          created_at?: string
+          google_email?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          status?: string
+          sync_token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string
+          connected_at?: string
+          created_at?: string
+          google_email?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          status?: string
+          sync_token?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       chat_channel_members: {
         Row: {
@@ -3483,6 +3703,10 @@ export type Database = {
           new_phone?: string
           target_user_id: string
         }
+        Returns: boolean
+      }
+      user_can_access_calendar_event: {
+        Args: { _event_id: string; _user_id: string }
         Returns: boolean
       }
       user_can_access_document: {
