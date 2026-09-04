@@ -71,7 +71,12 @@ export default function Settings() {
         <TabsContent value="notifications" className="mt-6">
           <NotificationSettings />
         </TabsContent>
+
+        <TabsContent value="integrations" className="mt-6">
+          <IntegrationsSettings />
+        </TabsContent>
       </Tabs>
+
     </div>
   );
 }
