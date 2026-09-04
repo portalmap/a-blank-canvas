@@ -75,6 +75,8 @@ export function LocationTree({
     density === 'comfortable' ? 'text-sm' : 'text-sm'
   );
 
+  const canSelect = (t: 'space' | 'folder' | 'list') => selectableTypes.includes(t);
+
   const foldersForSpace = (spaceId: string) => folders.filter((f) => f.space_id === spaceId);
   const listsForFolder = (folderId: string) => lists.filter((l) => l.folder_id === folderId);
   const listsInSpace = (spaceId: string) =>
@@ -94,7 +96,7 @@ export function LocationTree({
 
   return (
     <div className="space-y-1">
-      {(!searching || matches('Todo o Workspace', search)) && (
+      {showWorkspaceOption && (!searching || matches('Todo o Workspace', search)) && (
         <div className={rowClass}>
           <div className="w-5" />
           <Checkbox
@@ -134,11 +136,15 @@ export function LocationTree({
                   <ChevronRight className="h-4 w-4" />
                 )}
               </button>
-              <Checkbox
-                id={`${idPrefix}-space-${space.id}`}
-                checked={selectedSpaces.includes(space.id)}
-                onCheckedChange={() => onToggleSelection('space', space.id)}
-              />
+              {canSelect('space') ? (
+                <Checkbox
+                  id={`${idPrefix}-space-${space.id}`}
+                  checked={selectedSpaces.includes(space.id)}
+                  onCheckedChange={() => onToggleSelection('space', space.id)}
+                />
+              ) : (
+                <div className="w-4" />
+              )}
               <Label htmlFor={`${idPrefix}-space-${space.id}`} className={labelClass}>
                 <div
                   className="w-3 h-3 rounded-sm shrink-0"
@@ -170,11 +176,15 @@ export function LocationTree({
                             <ChevronRight className="h-4 w-4" />
                           )}
                         </button>
-                        <Checkbox
-                          id={`${idPrefix}-folder-${folder.id}`}
-                          checked={selectedFolders.includes(folder.id)}
-                          onCheckedChange={() => onToggleSelection('folder', folder.id)}
-                        />
+                        {canSelect('folder') ? (
+                          <Checkbox
+                            id={`${idPrefix}-folder-${folder.id}`}
+                            checked={selectedFolders.includes(folder.id)}
+                            onCheckedChange={() => onToggleSelection('folder', folder.id)}
+                          />
+                        ) : (
+                          <div className="w-4" />
+                        )}
                         <Label htmlFor={`${idPrefix}-folder-${folder.id}`} className={labelClass}>
                           <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="truncate">{folder.name}</span>
@@ -186,11 +196,15 @@ export function LocationTree({
                           {folderLists.map((list) => (
                             <div key={list.id} className={rowClass}>
                               <div className="w-5" />
-                              <Checkbox
-                                id={`${idPrefix}-list-${list.id}`}
-                                checked={selectedLists.includes(list.id)}
-                                onCheckedChange={() => onToggleSelection('list', list.id)}
-                              />
+                              {canSelect('list') ? (
+                                <Checkbox
+                                  id={`${idPrefix}-list-${list.id}`}
+                                  checked={selectedLists.includes(list.id)}
+                                  onCheckedChange={() => onToggleSelection('list', list.id)}
+                                />
+                              ) : (
+                                <div className="w-4" />
+                              )}
                               <Label htmlFor={`${idPrefix}-list-${list.id}`} className={labelClass}>
                                 <List className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <span className="truncate">{list.name}</span>
