@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Paperclip, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTaskAttachments, useUploadAttachment, useDeleteAttachment, TaskAttachment } from '@/hooks/useTaskAttachments';
+import { useTaskAttachments, useUploadAttachment, useDeleteAttachment, TaskAttachment, validateAttachmentSize } from '@/hooks/useTaskAttachments';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
