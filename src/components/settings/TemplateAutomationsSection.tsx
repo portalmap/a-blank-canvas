@@ -128,10 +128,17 @@ export function TemplateAutomationsSection({
                 Estas automações serão criadas automaticamente quando um Space for criado a partir deste template.
               </CardDescription>
             </div>
-            <Button onClick={handleCreate} size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setImportOpen(true)} size="sm" variant="outline">
+                <Download className="h-4 w-4 mr-1" />
+                Importar
+              </Button>
+              <Button onClick={handleCreate} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar
+              </Button>
+            </div>
+
           </div>
         </CardHeader>
         <CardContent>
