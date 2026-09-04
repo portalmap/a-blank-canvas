@@ -188,10 +188,26 @@ export function useDeleteEvent() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('calendar_events').delete().eq('id', id);
-      if (error) throw error;
+      // Marca como excluído; a sincronização remove no Google e apaga o registro.
+      const { data: event } = await supabase
+        .from('calendar_events')
+        .select('google_event_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (event?.google_event_id) {
+        const { error } = await supabase
+          .from('calendar_events')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+        if (error) throw error;
+      }
       return id;
     },
+
     onSuccess: () => {
       invalidate(queryClient);
       toast.success('Compromisso excluído');
