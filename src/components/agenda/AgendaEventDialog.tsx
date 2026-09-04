@@ -1,0 +1,357 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Trash2, X, Plus, ExternalLink } from 'lucide-react';
+import { useAllProfiles } from '@/hooks/useAllProfiles';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  useCreateEvent,
+  useDeleteEvent,
+  useEventGuests,
+  useUpdateEvent,
+  type CalendarEvent,
+} from '@/hooks/useAgenda';
+import { toast } from 'sonner';
+
+const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#0ea5e9', '#64748b'];
+
+const REMINDERS = [
+  { value: 'none', label: 'Sem lembrete' },
+  { value: '15', label: '15 minutos antes' },
+  { value: '60', label: '1 hora antes' },
+  { value: '1440', label: '1 dia antes' },
+];
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  event?: CalendarEvent | null;
+  defaultDate?: Date;
+}
+
+type GuestDraft = { user_id?: string | null; email?: string | null; display_name?: string | null };
+
+function toLocalInput(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function toDateInput(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Props) {
+  const { user } = useAuth();
+  const { data: profiles } = useAllProfiles();
+  const { data: existingGuests } = useEventGuests(event?.id);
+  const createEvent = useCreateEvent();
+  const updateEvent = useUpdateEvent();
+  const deleteEvent = useDeleteEvent();
+
+  const isOwner = !event || event.user_id === user?.id;
+
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [allDay, setAllDay] = useState(false);
+  const [start, setStart] = useState('');
+  const [end, setEnd] = useState('');
+  const [color, setColor] = useState(COLORS[0]);
+  const [reminder, setReminder] = useState('none');
+  const [guests, setGuests] = useState<GuestDraft[]>([]);
+  const [emailDraft, setEmailDraft] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    if (event) {
+      const s = new Date(event.starts_at);
+      const e = new Date(event.ends_at);
+      setTitle(event.title);
+      setDescription(event.description ?? '');
+      setLocation(event.location ?? '');
+      setAllDay(event.all_day);
+      setStart(event.all_day ? toDateInput(s) : toLocalInput(s));
+      setEnd(event.all_day ? toDateInput(e) : toLocalInput(e));
+      setColor(event.color);
+      setReminder(event.reminder_minutes ? String(event.reminder_minutes) : 'none');
+    } else {
+      const base = defaultDate ? new Date(defaultDate) : new Date();
+      if (!defaultDate) base.setMinutes(0, 0, 0);
+      base.setSeconds(0, 0);
+      const endBase = new Date(base.getTime() + 60 * 60_000);
+      setTitle('');
+      setDescription('');
+      setLocation('');
+      setAllDay(false);
+      setStart(toLocalInput(base));
+      setEnd(toLocalInput(endBase));
+      setColor(COLORS[0]);
+      setReminder('none');
+      setGuests([]);
+    }
+    setEmailDraft('');
+  }, [open, event, defaultDate]);
+
+  useEffect(() => {
+    if (!open || !event) return;
+    setGuests(
+      (existingGuests ?? []).map((g) => ({
+        user_id: g.user_id,
+        email: g.email,
+        display_name: g.display_name,
+      })),
+    );
+  }, [open, event, existingGuests]);
+
+  const profileOptions = useMemo(
+    () => (profiles ?? []).filter((p) => p.id !== user?.id && !guests.some((g) => g.user_id === p.id)),
+    [profiles, guests, user?.id],
+  );
+
+  const guestLabel = (g: GuestDraft) => {
+    if (g.user_id) {
+      const p = (profiles ?? []).find((x) => x.id === g.user_id);
+      return p?.full_name || 'Usuário';
+    }
+    return g.email ?? '';
+  };
+
+  const addEmail = () => {
+    const value = emailDraft.trim().toLowerCase();
+    if (!value) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      toast.error('Informe um e-mail válido');
+      return;
+    }
+    if (guests.some((g) => g.email === value)) {
+      setEmailDraft('');
+      return;
+    }
+    setGuests((prev) => [...prev, { email: value }]);
+    setEmailDraft('');
+  };
+
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      toast.error('Informe um título');
+      return;
+    }
+    const startsAt = allDay ? new Date(`${start}T00:00:00`) : new Date(start);
+    const endsAt = allDay ? new Date(`${end}T23:59:59`) : new Date(end);
+    if (!(startsAt instanceof Date) || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      toast.error('Informe datas válidas');
+      return;
+    }
+    if (endsAt <= startsAt) {
+      toast.error('O fim deve ser depois do início');
+      return;
+    }
+
+    const payload = {
+      title: title.trim(),
+      description: description.trim() || null,
+      location: location.trim() || null,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      all_day: allDay,
+      color,
+      reminder_minutes: reminder === 'none' ? null : Number(reminder),
+      guests,
+    };
+
+    if (event) {
+      await updateEvent.mutateAsync({ id: event.id, ...payload });
+    } else {
+      await createEvent.mutateAsync(payload);
+    }
+    onOpenChange(false);
+  };
+
+  const handleDelete = async () => {
+    if (!event) return;
+    await deleteEvent.mutateAsync(event.id);
+    onOpenChange(false);
+  };
+
+  const saving = createEvent.isPending || updateEvent.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{event ? 'Compromisso' : 'Novo compromisso'}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Título</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={!isOwner} placeholder="Reunião com o cliente" />
+          </div>
+
+          <div className="flex items-center justify-between rounded-md border border-border p-3">
+            <Label className="text-sm">Dia inteiro</Label>
+            <Switch checked={allDay} disabled={!isOwner} onCheckedChange={(v) => {
+              setAllDay(v);
+              const s = start ? new Date(start.length === 10 ? `${start}T09:00` : start) : new Date();
+              const e = end ? new Date(end.length === 10 ? `${end}T10:00` : end) : new Date();
+              setStart(v ? toDateInput(s) : toLocalInput(s));
+              setEnd(v ? toDateInput(e) : toLocalInput(e));
+            }} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Início</Label>
+              <Input
+                type={allDay ? 'date' : 'datetime-local'}
+                value={start}
+                disabled={!isOwner}
+                onChange={(e) => setStart(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Fim</Label>
+              <Input
+                type={allDay ? 'date' : 'datetime-local'}
+                value={end}
+                disabled={!isOwner}
+                onChange={(e) => setEnd(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Local</Label>
+            <Input value={location} disabled={!isOwner} onChange={(e) => setLocation(e.target.value)} placeholder="Sala, endereço ou link" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Descrição</Label>
+            <Textarea value={description} disabled={!isOwner} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Cor</Label>
+              <div className="flex flex-wrap gap-2">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    disabled={!isOwner}
+                    onClick={() => setColor(c)}
+                    className={`h-7 w-7 rounded-full border-2 transition ${color === c ? 'border-foreground' : 'border-transparent'}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Cor ${c}`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Lembrete</Label>
+              <Select value={reminder} onValueChange={setReminder} disabled={!isOwner}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REMINDERS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {isOwner && (
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <Label className="text-sm font-medium">Convidados</Label>
+
+              <Select value="" onValueChange={(id) => setGuests((prev) => [...prev, { user_id: id }])}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Adicionar pessoa do sistema" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profileOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex gap-2">
+                <Input
+                  value={emailDraft}
+                  onChange={(e) => setEmailDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addEmail();
+                    }
+                  }}
+                  placeholder="convidado@empresa.com"
+                />
+                <Button type="button" variant="outline" size="icon" onClick={addEmail}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {guests.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {guests.map((g, i) => (
+                    <Badge key={`${guestLabel(g)}-${i}`} variant="secondary" className="gap-1">
+                      {guestLabel(g)}
+                      <button type="button" onClick={() => setGuests((prev) => prev.filter((_, idx) => idx !== i))}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {event?.google_html_link && (
+            <a
+              href={event.google_html_link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ExternalLink className="h-3 w-3" /> Abrir no Google Agenda
+            </a>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          {event && isOwner ? (
+            <Button variant="ghost" className="text-destructive" onClick={handleDelete} disabled={deleteEvent.isPending}>
+              <Trash2 className="mr-2 h-4 w-4" /> Excluir
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+            {isOwner && (
+              <Button onClick={handleSubmit} disabled={saving}>
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            )}
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
