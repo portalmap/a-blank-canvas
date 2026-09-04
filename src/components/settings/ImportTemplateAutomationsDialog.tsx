@@ -40,7 +40,7 @@ export function ImportTemplateAutomationsDialog({
   const { data: spaces = [] } = useSpaces(workspaceId);
   const { data: folders = [] } = useFoldersForWorkspace(workspaceId);
   const { data: lists = [] } = useListsForWorkspace(workspaceId);
-  const { data: templates = [] } = useSpaceTemplates(workspaceId);
+  const { data: templates = [] } = useSpaceTemplates();
   const importAutomations = useImportTemplateAutomations();
 
   const [search, setSearch] = useState('');
