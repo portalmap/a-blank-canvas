@@ -9,10 +9,12 @@ import {
   Trash2, 
   Edit,
   Copy,
+  Download,
   LayoutGrid,
   Folder,
   List as ListIcon
 } from 'lucide-react';
+
 import { 
   useTemplateAutomations, 
   useDeleteTemplateAutomation, 
