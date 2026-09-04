@@ -26,6 +26,8 @@ import { getTriggerById } from '@/components/automations/advanced/triggerCategor
 import { getActionById } from '@/components/automations/advanced/actionCategories';
 import type { SpaceTemplateFolder, SpaceTemplateList } from '@/hooks/useSpaceTemplates';
 import { TemplateAutomationDialog } from './TemplateAutomationDialog';
+import { ImportTemplateAutomationsDialog } from './ImportTemplateAutomationsDialog';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,8 +58,10 @@ export function TemplateAutomationsSection({
   const duplicateAutomation = useDuplicateTemplateAutomation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingAutomation, setEditingAutomation] = useState<TemplateAutomation | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
 
   const handleEdit = (automation: TemplateAutomation) => {
     setEditingAutomation(automation);
