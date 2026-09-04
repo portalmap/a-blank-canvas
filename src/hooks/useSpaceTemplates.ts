@@ -1332,16 +1332,20 @@ export const useApplyTemplateAutomationsToScopes = () => {
       workspaceId,
       targetType,
       targetIds,
+      createInSpaceIds = [],
     }: {
       templateId: string;
       workspaceId: string;
       targetType: 'folder' | 'list';
       targetIds: string[];
+      /** Spaces onde as pastas/listas do modelo que não existirem devem ser criadas. */
+      createInSpaceIds?: string[];
     }): Promise<ApplyAutomationsToScopesResult> => {
       const result: ApplyAutomationsToScopesResult = {
         targetsProcessed: 0,
         automationsCreated: 0,
         automationsReplaced: 0,
+        structuresCreated: 0,
         errors: [],
       };
 
@@ -1356,8 +1360,98 @@ export const useApplyTemplateAutomationsToScopes = () => {
       const templateAutomations = (templateAutomationsResult.data || []) as unknown as TemplateAutomation[];
 
       if (templateAutomations.length === 0) {
-        throw new Error('Este template não possui automações habilitadas.');
+        throw new Error('Este template não possui automações habilitadas. Use "Importar" na edição do modelo para trazer automações existentes.');
       }
+
+      // 0. Criar estrutura faltante nos spaces escolhidos
+      const allTargetIds = [...targetIds];
+      for (const spaceId of createInSpaceIds) {
+        try {
+          const { data: space } = await supabase
+            .from('spaces')
+            .select('id, name')
+            .eq('id', spaceId)
+            .single();
+          if (!space) throw new Error('Space não encontrado');
+
+          const { data: existingFolders } = await supabase
+            .from('folders')
+            .select('id, name')
+            .eq('space_id', spaceId);
+          const { data: existingLists } = await supabase
+            .from('lists')
+            .select('id, name, folder_id')
+            .eq('space_id', spaceId);
+
+          const realFolders = [...(existingFolders || [])];
+          const realLists = [...(existingLists || [])];
+
+          // Pastas do modelo
+          const folderIdByRef: Record<string, string> = {};
+          for (const tf of templateFolders) {
+            const existing = realFolders.find(f => realMatchesTemplateName(tf.name, f.name));
+            if (existing) {
+              folderIdByRef[tf.id] = existing.id;
+              continue;
+            }
+            const { data: created, error } = await supabase
+              .from('folders')
+              .insert({ space_id: spaceId, name: buildRealName(tf.name, space.name) })
+              .select('id, name')
+              .single();
+            if (error || !created) throw new Error(error?.message || 'Falha ao criar pasta');
+            folderIdByRef[tf.id] = created.id;
+            realFolders.push(created);
+            result.structuresCreated++;
+            if (targetType === 'folder') allTargetIds.push(created.id);
+          }
+          if (targetType === 'folder') {
+            for (const tf of templateFolders) {
+              const id = folderIdByRef[tf.id];
+              if (id && !allTargetIds.includes(id)) allTargetIds.push(id);
+            }
+          }
+
+          // Listas do modelo
+          for (const tl of templateLists) {
+            const existing = realLists.find(l => realMatchesTemplateName(tl.name, l.name));
+            if (existing) {
+              if (targetType === 'list' && !allTargetIds.includes(existing.id)) allTargetIds.push(existing.id);
+              continue;
+            }
+            const folderId = tl.folder_ref_id ? folderIdByRef[tl.folder_ref_id] ?? null : null;
+            const { data: created, error } = await supabase
+              .from('lists')
+              .insert({
+                workspace_id: workspaceId,
+                space_id: spaceId,
+                folder_id: folderId,
+                name: buildRealName(tl.name, space.name),
+                status_template_id: tl.status_template_id ?? null,
+                status_source: tl.status_template_id ? 'template' : 'inherit',
+              })
+              .select('id, name, folder_id')
+              .single();
+            if (error || !created) throw new Error(error?.message || 'Falha ao criar lista');
+            realLists.push(created);
+            result.structuresCreated++;
+            if (tl.status_template_id) {
+              await supabase.rpc('sync_template_statuses_for_list', {
+                p_list_id: created.id,
+                p_template_id: tl.status_template_id,
+                p_workspace_id: workspaceId,
+              });
+            }
+            if (targetType === 'list') allTargetIds.push(created.id);
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Erro desconhecido';
+          result.errors.push(`Criação de estrutura no space ${spaceId}: ${message}`);
+        }
+      }
+
+      const uniqueTargetIds = Array.from(new Set(allTargetIds));
+
 
       // Status template items usados pelas listas do template
       const statusTemplateIds = Array.from(new Set(
