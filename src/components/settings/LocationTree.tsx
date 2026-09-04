@@ -26,6 +26,10 @@ export interface LocationTreeProps {
   idPrefix: string;
   density?: 'compact' | 'comfortable';
   search?: string;
+  /** Which node types can be selected. Defaults to all. */
+  selectableTypes?: Array<'space' | 'folder' | 'list'>;
+  /** Whether to show the "Todo o Workspace" option. Defaults to true. */
+  showWorkspaceOption?: boolean;
   spaces: LocationNodeSpace[];
   folders: LocationNodeFolder[];
   lists: LocationNodeList[];
