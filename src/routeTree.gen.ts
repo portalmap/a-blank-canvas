@@ -24,6 +24,7 @@ import { Route as AuthenticatedDashboardsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAutomationsRouteImport } from './routes/_authenticated/automations'
 import { Route as AuthenticatedArchivedSpacesRouteImport } from './routes/_authenticated/archived-spaces'
+import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedDocumentsIndexRouteImport } from './routes/_authenticated/documents.index'
 import { Route as AuthenticatedDashboardsIndexRouteImport } from './routes/_authenticated/dashboards.index'
 import { Route as AuthenticatedTaskTaskIdRouteImport } from './routes/_authenticated/task.$taskId'
@@ -109,6 +110,11 @@ const AuthenticatedArchivedSpacesRoute =
     path: '/archived-spaces',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDocumentsIndexRoute =
   AuthenticatedDocumentsIndexRouteImport.update({
     id: '/',
@@ -159,6 +165,7 @@ const AuthenticatedDashboardsIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/signed-out': typeof SignedOutRoute
+  '/agenda': typeof AuthenticatedAgendaRoute
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -182,6 +189,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/signed-out': typeof SignedOutRoute
+  '/agenda': typeof AuthenticatedAgendaRoute
   '/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/automations': typeof AuthenticatedAutomationsRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/signed-out': typeof SignedOutRoute
+  '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
   '/_authenticated/archived-spaces': typeof AuthenticatedArchivedSpacesRoute
   '/_authenticated/automations': typeof AuthenticatedAutomationsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/signed-out'
+    | '/agenda'
     | '/archived-spaces'
     | '/automations'
     | '/chat'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/signed-out'
+    | '/agenda'
     | '/archived-spaces'
     | '/automations'
     | '/chat'
@@ -279,6 +290,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/signed-out'
+    | '/_authenticated/agenda'
     | '/_authenticated/archived-spaces'
     | '/_authenticated/automations'
     | '/_authenticated/chat'
@@ -416,6 +428,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedArchivedSpacesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/agenda': {
+      id: '/_authenticated/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AuthenticatedAgendaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/documents/': {
       id: '/_authenticated/documents/'
       path: '/'
@@ -508,6 +527,7 @@ const AuthenticatedDocumentsRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
   AuthenticatedArchivedSpacesRoute: typeof AuthenticatedArchivedSpacesRoute
   AuthenticatedAutomationsRoute: typeof AuthenticatedAutomationsRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
@@ -526,6 +546,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
   AuthenticatedArchivedSpacesRoute: AuthenticatedArchivedSpacesRoute,
   AuthenticatedAutomationsRoute: AuthenticatedAutomationsRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
