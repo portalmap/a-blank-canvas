@@ -152,10 +152,20 @@ export function TemplateAutomationsSection({
               <p className="text-muted-foreground text-sm">
                 Nenhuma automação configurada neste template.
               </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={handleCreate}>
-                <Plus className="h-4 w-4 mr-1" />
-                Adicionar Automação
-              </Button>
+              <p className="text-muted-foreground text-xs mt-1">
+                Sem automações aqui, não é possível aplicar em Spaces, pastas ou listas.
+              </p>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                  <Download className="h-4 w-4 mr-1" />
+                  Importar de existente
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCreate}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar Automação
+                </Button>
+              </div>
+
             </div>
           ) : (
             <div className="space-y-3">
