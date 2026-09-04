@@ -13,7 +13,7 @@ import { CommentAttachmentButton } from './CommentAttachmentButton';
 import { AttachmentPreview } from './AttachmentPreview';
 import { WorkspaceMember } from '@/hooks/useWorkspaceMembers';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useUploadAttachment } from '@/hooks/useTaskAttachments';
+import { useUploadAttachment, validateAttachmentSize } from '@/hooks/useTaskAttachments';
 import { useUploadChatAttachments } from '@/hooks/useChatAttachments';
 import { AudioRecorderButton } from '@/components/audio/AudioRecorderButton';
 import { toast } from 'sonner';
