@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Paperclip, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTaskAttachments, useUploadAttachment, useDeleteAttachment, TaskAttachment } from '@/hooks/useTaskAttachments';
+import { useTaskAttachments, useUploadAttachment, useDeleteAttachment, TaskAttachment, validateAttachmentSize } from '@/hooks/useTaskAttachments';
 import { useCreateTaskActivity } from '@/hooks/useTaskActivities';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +30,11 @@ export const TaskAttachmentsList = ({ taskId }: TaskAttachmentsListProps) => {
     if (!files || files.length === 0) return;
 
     for (const file of Array.from(files)) {
+      const sizeError = validateAttachmentSize(file);
+      if (sizeError) {
+        toast.error(sizeError);
+        continue;
+      }
       try {
         const uploaded = await uploadAttachment.mutateAsync({ taskId, file });
         // Extrair o storage path (não a signed URL) para salvar no metadata
