@@ -9,10 +9,12 @@ import {
   Trash2, 
   Edit,
   Copy,
+  Download,
   LayoutGrid,
   Folder,
   List as ListIcon
 } from 'lucide-react';
+
 import { 
   useTemplateAutomations, 
   useDeleteTemplateAutomation, 
@@ -24,6 +26,8 @@ import { getTriggerById } from '@/components/automations/advanced/triggerCategor
 import { getActionById } from '@/components/automations/advanced/actionCategories';
 import type { SpaceTemplateFolder, SpaceTemplateList } from '@/hooks/useSpaceTemplates';
 import { TemplateAutomationDialog } from './TemplateAutomationDialog';
+import { ImportTemplateAutomationsDialog } from './ImportTemplateAutomationsDialog';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,8 +58,10 @@ export function TemplateAutomationsSection({
   const duplicateAutomation = useDuplicateTemplateAutomation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingAutomation, setEditingAutomation] = useState<TemplateAutomation | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
 
   const handleEdit = (automation: TemplateAutomation) => {
     setEditingAutomation(automation);
@@ -122,10 +128,17 @@ export function TemplateAutomationsSection({
                 Estas automações serão criadas automaticamente quando um Space for criado a partir deste template.
               </CardDescription>
             </div>
-            <Button onClick={handleCreate} size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setImportOpen(true)} size="sm" variant="outline">
+                <Download className="h-4 w-4 mr-1" />
+                Importar
+              </Button>
+              <Button onClick={handleCreate} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar
+              </Button>
+            </div>
+
           </div>
         </CardHeader>
         <CardContent>
@@ -139,10 +152,20 @@ export function TemplateAutomationsSection({
               <p className="text-muted-foreground text-sm">
                 Nenhuma automação configurada neste template.
               </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={handleCreate}>
-                <Plus className="h-4 w-4 mr-1" />
-                Adicionar Automação
-              </Button>
+              <p className="text-muted-foreground text-xs mt-1">
+                Sem automações aqui, não é possível aplicar em Spaces, pastas ou listas.
+              </p>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                  <Download className="h-4 w-4 mr-1" />
+                  Importar de existente
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCreate}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar Automação
+                </Button>
+              </div>
+
             </div>
           ) : (
             <div className="space-y-3">
@@ -243,6 +266,14 @@ export function TemplateAutomationsSection({
         automation={editingAutomation}
         workspaceId={workspaceId}
       />
+
+      <ImportTemplateAutomationsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        templateId={templateId}
+        workspaceId={workspaceId}
+      />
+
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
