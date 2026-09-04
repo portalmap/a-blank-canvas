@@ -117,6 +117,9 @@ export const useUploadAttachment = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      const sizeError = validateAttachmentSize(file);
+      if (sizeError) throw new Error(sizeError);
+
       const safeName = sanitizeFileName(file.name);
       const storagePath = `${user.id}/${taskId}/${Date.now()}_${safeName}`;
 
