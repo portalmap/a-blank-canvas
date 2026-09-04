@@ -1320,6 +1320,7 @@ export interface ApplyAutomationsToScopesResult {
   targetsProcessed: number;
   automationsCreated: number;
   automationsReplaced: number;
+  structuresCreated: number;
   errors: string[];
 }
 
@@ -1474,7 +1475,7 @@ export const useApplyTemplateAutomationsToScopes = () => {
         .in('scope_type', ['space', 'workspace']);
       const fallbackStatusList = fallbackStatuses || [];
 
-      for (const targetId of targetIds) {
+      for (const targetId of uniqueTargetIds) {
         try {
           // 1. Listas reais associadas ao destino
           let realLists: { id: string; name: string; folder_id: string | null }[] = [];
@@ -1600,6 +1601,9 @@ export const useApplyTemplateAutomationsToScopes = () => {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['automations'] });
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
+      queryClient.invalidateQueries({ queryKey: ['lists'] });
+      queryClient.invalidateQueries({ queryKey: ['statuses'] });
       if (result.errors.length === 0) {
         toast.success(`${result.automationsCreated} automações aplicadas em ${result.targetsProcessed} destino(s)!`);
       } else {
