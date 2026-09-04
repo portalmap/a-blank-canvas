@@ -267,6 +267,14 @@ export function TemplateAutomationsSection({
         workspaceId={workspaceId}
       />
 
+      <ImportTemplateAutomationsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        templateId={templateId}
+        workspaceId={workspaceId}
+      />
+
+
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
         <AlertDialogContent>
