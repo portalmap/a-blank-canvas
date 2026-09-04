@@ -27,6 +27,7 @@ import { Route as AuthenticatedArchivedSpacesRouteImport } from './routes/_authe
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedDocumentsIndexRouteImport } from './routes/_authenticated/documents.index'
 import { Route as AuthenticatedDashboardsIndexRouteImport } from './routes/_authenticated/dashboards.index'
+import { Route as OauthGoogleCalendarReturnRouteImport } from './routes/oauth.google-calendar.return'
 import { Route as AuthenticatedTaskTaskIdRouteImport } from './routes/_authenticated/task.$taskId'
 import { Route as AuthenticatedSpaceSpaceIdRouteImport } from './routes/_authenticated/space.$spaceId'
 import { Route as AuthenticatedListListIdRouteImport } from './routes/_authenticated/list.$listId'
@@ -127,6 +128,12 @@ const AuthenticatedDashboardsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedDashboardsRoute,
   } as any)
+const OauthGoogleCalendarReturnRoute =
+  OauthGoogleCalendarReturnRouteImport.update({
+    id: '/oauth/google-calendar/return',
+    path: '/oauth/google-calendar/return',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedTaskTaskIdRoute = AuthenticatedTaskTaskIdRouteImport.update({
   id: '/task/$taskId',
   path: '/task/$taskId',
@@ -184,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/list/$listId': typeof AuthenticatedListListIdRoute
   '/space/$spaceId': typeof AuthenticatedSpaceSpaceIdRoute
   '/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
+  '/oauth/google-calendar/return': typeof OauthGoogleCalendarReturnRoute
   '/dashboards/': typeof AuthenticatedDashboardsIndexRoute
   '/documents/': typeof AuthenticatedDocumentsIndexRoute
 }
@@ -207,6 +215,7 @@ export interface FileRoutesByTo {
   '/list/$listId': typeof AuthenticatedListListIdRoute
   '/space/$spaceId': typeof AuthenticatedSpaceSpaceIdRoute
   '/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
+  '/oauth/google-calendar/return': typeof OauthGoogleCalendarReturnRoute
   '/dashboards': typeof AuthenticatedDashboardsIndexRoute
   '/documents': typeof AuthenticatedDocumentsIndexRoute
 }
@@ -234,6 +243,7 @@ export interface FileRoutesById {
   '/_authenticated/list/$listId': typeof AuthenticatedListListIdRoute
   '/_authenticated/space/$spaceId': typeof AuthenticatedSpaceSpaceIdRoute
   '/_authenticated/task/$taskId': typeof AuthenticatedTaskTaskIdRoute
+  '/oauth/google-calendar/return': typeof OauthGoogleCalendarReturnRoute
   '/_authenticated/dashboards/': typeof AuthenticatedDashboardsIndexRoute
   '/_authenticated/documents/': typeof AuthenticatedDocumentsIndexRoute
 }
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/list/$listId'
     | '/space/$spaceId'
     | '/task/$taskId'
+    | '/oauth/google-calendar/return'
     | '/dashboards/'
     | '/documents/'
   fileRoutesByTo: FileRoutesByTo
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/list/$listId'
     | '/space/$spaceId'
     | '/task/$taskId'
+    | '/oauth/google-calendar/return'
     | '/dashboards'
     | '/documents'
   id:
@@ -310,6 +322,7 @@ export interface FileRouteTypes {
     | '/_authenticated/list/$listId'
     | '/_authenticated/space/$spaceId'
     | '/_authenticated/task/$taskId'
+    | '/oauth/google-calendar/return'
     | '/_authenticated/dashboards/'
     | '/_authenticated/documents/'
   fileRoutesById: FileRoutesById
@@ -319,6 +332,7 @@ export interface RootRouteChildren {
   SignedOutRoute: typeof SignedOutRoute
   SsoCallbackRoute: typeof SsoCallbackRoute
   SsoLoginRoute: typeof SsoLoginRoute
+  OauthGoogleCalendarReturnRoute: typeof OauthGoogleCalendarReturnRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -449,6 +463,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardsIndexRouteImport
       parentRoute: typeof AuthenticatedDashboardsRoute
     }
+    '/oauth/google-calendar/return': {
+      id: '/oauth/google-calendar/return'
+      path: '/oauth/google-calendar/return'
+      fullPath: '/oauth/google-calendar/return'
+      preLoaderRoute: typeof OauthGoogleCalendarReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/task/$taskId': {
       id: '/_authenticated/task/$taskId'
       path: '/task/$taskId'
@@ -572,6 +593,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignedOutRoute: SignedOutRoute,
   SsoCallbackRoute: SsoCallbackRoute,
   SsoLoginRoute: SsoLoginRoute,
+  OauthGoogleCalendarReturnRoute: OauthGoogleCalendarReturnRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

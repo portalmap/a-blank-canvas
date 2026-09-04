@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink, FolderPlus, Archive, LogOut } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink, FolderPlus, Archive, LogOut, CalendarDays } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useTheme } from 'next-themes';
 import { useLocation, useNavigate } from "@/lib/router-compat";
@@ -46,12 +46,14 @@ const homeNavItem = { title: 'Início', url: '/', icon: Home };
 const everythingNavItem = { title: 'Tudo', url: '/everything', icon: Layers };
 
 const modulesNavItems = [
+  { title: 'Agenda', url: '/agenda', icon: CalendarDays },
   { title: 'Chat', url: '/chat', icon: MessageSquare },
   { title: 'Equipes', url: '/teams', icon: Users },
   { title: 'Documentos', url: '/documents', icon: FileText },
   { title: 'Painéis', url: '/dashboards', icon: BarChart3 },
   { title: 'Automações', url: '/automations', icon: Zap },
 ];
+
 
 export function AppSidebar() {
   const { state, sidebarWidth, setSidebarWidth, toggleSidebar } = useSidebar();

@@ -8,6 +8,8 @@ import { SpaceTemplateSettings } from "@/components/settings/SpaceTemplateSettin
 import { AutomationTemplateSettings } from "@/components/settings/AutomationTemplateSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { ProductivitySettings } from "@/components/settings/ProductivitySettings";
+import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
+
 
 export default function Settings() {
   return (
@@ -20,7 +22,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="flex w-full justify-start overflow-x-auto lg:grid lg:w-[1080px] lg:grid-cols-9">
+        <TabsList className="flex w-full justify-start overflow-x-auto lg:grid lg:w-[1200px] lg:grid-cols-10">
           <TabsTrigger className="shrink-0" value="profile">Perfil</TabsTrigger>
           <TabsTrigger className="shrink-0" value="workspace">Workspace</TabsTrigger>
           <TabsTrigger className="shrink-0" value="status">Status</TabsTrigger>
@@ -30,7 +32,9 @@ export default function Settings() {
           <TabsTrigger className="shrink-0" value="productivity">Produtividade</TabsTrigger>
           <TabsTrigger className="shrink-0" value="users">Usuários</TabsTrigger>
           <TabsTrigger className="shrink-0" value="notifications">Notificações</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="integrations">Integrações</TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="profile" className="mt-6">
           <UserProfile />
@@ -67,7 +71,12 @@ export default function Settings() {
         <TabsContent value="notifications" className="mt-6">
           <NotificationSettings />
         </TabsContent>
+
+        <TabsContent value="integrations" className="mt-6">
+          <IntegrationsSettings />
+        </TabsContent>
       </Tabs>
+
     </div>
   );
 }
