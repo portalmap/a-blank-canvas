@@ -25,6 +25,7 @@ import {
 import { Plus, MoreHorizontal, Pencil, Copy, Trash2, FolderTree, Loader2, Zap, Folder, List } from 'lucide-react';
 import { useState } from 'react';
 import { ApplyTemplateAutomationsDialog } from './ApplyTemplateAutomationsDialog';
+import { ApplyTemplateAutomationsToScopeDialog } from './ApplyTemplateAutomationsToScopeDialog';
 
 interface SpaceTemplateListProps {
   onEdit: (templateId: string) => void;
@@ -153,15 +154,17 @@ export const SpaceTemplateList = ({ onEdit, onCreate, type = 'space' }: SpaceTem
                     <Copy className="h-4 w-4 mr-2" />
                     Duplicar
                   </DropdownMenuItem>
-                  {type === 'space' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setApplyAutomationsTemplateId(template.id)}>
-                        <Zap className="h-4 w-4 mr-2" />
-                        Aplicar automações em Spaces
-                      </DropdownMenuItem>
-                    </>
-                  )}
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setApplyAutomationsTemplateId(template.id)}>
+                      <Zap className="h-4 w-4 mr-2" />
+                      {type === 'space'
+                        ? 'Aplicar automações em Spaces'
+                        : type === 'folder'
+                          ? 'Aplicar automações em Pastas'
+                          : 'Aplicar automações em Listas'}
+                    </DropdownMenuItem>
+                  </>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={() => handleDelete(template.id)}
@@ -194,7 +197,18 @@ export const SpaceTemplateList = ({ onEdit, onCreate, type = 'space' }: SpaceTem
         </AlertDialogContent>
       </AlertDialog>
 
-      {applyAutomationsTemplateId && (
+      {applyAutomationsTemplateId && type !== 'space' && (
+        <ApplyTemplateAutomationsToScopeDialog
+          open={!!applyAutomationsTemplateId}
+          onOpenChange={(open) => {
+            if (!open) setApplyAutomationsTemplateId(null);
+          }}
+          templateId={applyAutomationsTemplateId}
+          targetType={type}
+        />
+      )}
+
+      {applyAutomationsTemplateId && type === 'space' && (
         <ApplyTemplateAutomationsDialog
           open={!!applyAutomationsTemplateId}
           onOpenChange={(open) => {

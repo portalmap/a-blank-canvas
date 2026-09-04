@@ -1311,3 +1311,210 @@ export const useApplyTemplateAutomationsToSpaces = () => {
     },
   });
 };
+
+// ---------------------------------------------------------------------------
+// Aplicar automações de templates de Pasta / Lista em pastas ou listas reais
+// ---------------------------------------------------------------------------
+
+export interface ApplyAutomationsToScopesResult {
+  targetsProcessed: number;
+  automationsCreated: number;
+  automationsReplaced: number;
+  errors: string[];
+}
+
+export const useApplyTemplateAutomationsToScopes = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      templateId,
+      workspaceId,
+      targetType,
+      targetIds,
+    }: {
+      templateId: string;
+      workspaceId: string;
+      targetType: 'folder' | 'list';
+      targetIds: string[];
+    }): Promise<ApplyAutomationsToScopesResult> => {
+      const result: ApplyAutomationsToScopesResult = {
+        targetsProcessed: 0,
+        automationsCreated: 0,
+        automationsReplaced: 0,
+        errors: [],
+      };
+
+      const [templateFoldersResult, templateListsResult, templateAutomationsResult] = await Promise.all([
+        supabase.from('space_template_folders').select('id, name').eq('template_id', templateId),
+        supabase.from('space_template_lists').select('id, name, folder_ref_id, status_template_id').eq('template_id', templateId),
+        supabase.from('space_template_automations').select('*').eq('template_id', templateId).eq('enabled', true),
+      ]);
+
+      const templateFolders = templateFoldersResult.data || [];
+      const templateLists = templateListsResult.data || [];
+      const templateAutomations = (templateAutomationsResult.data || []) as unknown as TemplateAutomation[];
+
+      if (templateAutomations.length === 0) {
+        throw new Error('Este template não possui automações habilitadas.');
+      }
+
+      // Status template items usados pelas listas do template
+      const statusTemplateIds = Array.from(new Set(
+        templateLists.map(l => l.status_template_id).filter(Boolean) as string[]
+      ));
+      let allTemplateStatusItems: { id: string; name: string; template_id: string }[] = [];
+      if (statusTemplateIds.length > 0) {
+        const { data } = await supabase
+          .from('status_template_items')
+          .select('id, name, template_id')
+          .in('template_id', statusTemplateIds);
+        allTemplateStatusItems = data || [];
+      }
+
+      // Fallback de status a nível de space/workspace
+      const { data: fallbackStatuses } = await supabase
+        .from('statuses')
+        .select('id, name, scope_id, scope_type')
+        .eq('workspace_id', workspaceId)
+        .in('scope_type', ['space', 'workspace']);
+      const fallbackStatusList = fallbackStatuses || [];
+
+      for (const targetId of targetIds) {
+        try {
+          // 1. Listas reais associadas ao destino
+          let realLists: { id: string; name: string; folder_id: string | null }[] = [];
+          let targetFolderId: string | null = null;
+
+          if (targetType === 'folder') {
+            targetFolderId = targetId;
+            const { data } = await supabase
+              .from('lists')
+              .select('id, name, folder_id')
+              .eq('folder_id', targetId);
+            realLists = data || [];
+          } else {
+            const { data } = await supabase
+              .from('lists')
+              .select('id, name, folder_id')
+              .eq('id', targetId)
+              .single();
+            if (!data) throw new Error('Lista não encontrada');
+            realLists = [data];
+            targetFolderId = data.folder_id;
+          }
+
+          // 2. Mapas de IDs
+          const folderIdMap: Record<string, string> = {};
+          for (const tf of templateFolders) {
+            if (targetFolderId) folderIdMap[tf.id] = targetFolderId;
+          }
+
+          const listIdMap: Record<string, string> = {};
+          if (targetType === 'list') {
+            // Todas as referências de lista do template apontam para a lista destino
+            for (const tl of templateLists) listIdMap[tl.id] = targetId;
+          } else {
+            const byName = createListMap(templateLists, realLists);
+            Object.assign(listIdMap, byName);
+            // Fallback: template com uma única lista e pasta com uma única lista
+            if (Object.keys(listIdMap).length === 0 && templateLists.length === 1 && realLists.length === 1) {
+              listIdMap[templateLists[0].id] = realLists[0].id;
+            }
+          }
+
+          // 3. Mapa de status
+          const realListIds = realLists.map(l => l.id);
+          let allRealStatuses: { id: string; name: string; scope_id: string | null }[] = [];
+          if (realListIds.length > 0) {
+            const { data } = await supabase
+              .from('statuses')
+              .select('id, name, scope_id')
+              .in('scope_id', realListIds);
+            allRealStatuses = data || [];
+          }
+
+          const statusIdMap: Record<string, string> = {};
+          for (const tList of templateLists) {
+            if (!tList.status_template_id) continue;
+            const items = allTemplateStatusItems.filter(i => i.template_id === tList.status_template_id);
+            const realListId = listIdMap[tList.id];
+            const statusesForList = realListId
+              ? allRealStatuses.filter(s => s.scope_id === realListId)
+              : [];
+            for (const item of items) {
+              const match =
+                statusesForList.find(s => s.name.toLowerCase() === item.name.toLowerCase()) ||
+                fallbackStatusList.find(s => s.name.toLowerCase() === item.name.toLowerCase());
+              if (match) statusIdMap[item.id] = match.id;
+            }
+          }
+
+          // 4. Criar / substituir automações
+          for (const automation of templateAutomations) {
+            const remapped = remapAutomation(
+              automation,
+              folderIdMap,
+              listIdMap,
+              statusIdMap,
+              targetId,
+              workspaceId
+            );
+            if (!remapped) continue;
+
+            if (targetType === 'list') {
+              remapped.scope_type = 'list';
+              remapped.scope_id = targetId;
+            } else if (automation.scope_type !== 'list') {
+              remapped.scope_type = 'folder';
+              remapped.scope_id = targetId;
+            }
+
+            if (!remapped.scope_id) continue;
+
+            // Sobrescrever: remove equivalentes já existentes no mesmo escopo
+            let deleteQuery = supabase
+              .from('automations')
+              .delete()
+              .eq('scope_type', remapped.scope_type)
+              .eq('scope_id', remapped.scope_id)
+              .eq('trigger', remapped.trigger)
+              .eq('action_type', remapped.action_type);
+            deleteQuery = remapped.description
+              ? deleteQuery.eq('description', remapped.description)
+              : deleteQuery.is('description', null);
+
+            const { data: deleted } = await deleteQuery.select('id');
+            result.automationsReplaced += deleted?.length || 0;
+
+            const { error } = await supabase.from('automations').insert([remapped]);
+            if (error) {
+              result.errors.push(`${targetType === 'folder' ? 'Pasta' : 'Lista'} ${targetId}: ${error.message}`);
+            } else {
+              result.automationsCreated++;
+            }
+          }
+
+          result.targetsProcessed++;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Erro desconhecido';
+          result.errors.push(`${targetType === 'folder' ? 'Pasta' : 'Lista'} ${targetId}: ${message}`);
+        }
+      }
+
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['automations'] });
+      if (result.errors.length === 0) {
+        toast.success(`${result.automationsCreated} automações aplicadas em ${result.targetsProcessed} destino(s)!`);
+      } else {
+        toast.warning(`${result.automationsCreated} automações aplicadas, mas houve ${result.errors.length} erro(s).`);
+      }
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Erro ao aplicar automações');
+      console.error(error);
+    },
+  });
+};
