@@ -75,6 +75,25 @@ export const useTaskAttachments = (taskId?: string) => {
   });
 };
 
+// Limite por arquivo: 1 GB
+export const MAX_ATTACHMENT_BYTES = 1024 * 1024 * 1024;
+export const MAX_ATTACHMENT_LABEL = '1 GB';
+
+export const formatBytesShort = (bytes: number): string => {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
+};
+
+// Retorna mensagem de erro se o arquivo passar do limite, ou null se estiver ok
+export const validateAttachmentSize = (file: File): string | null => {
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    return `O limite por arquivo é de ${MAX_ATTACHMENT_LABEL}. "${file.name}" tem ${formatBytesShort(file.size)}.`;
+  }
+  return null;
+};
+
 // Sanitiza nome do arquivo removendo acentos e caracteres especiais
 const sanitizeFileName = (name: string): string => {
   return name
