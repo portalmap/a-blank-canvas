@@ -50,7 +50,18 @@ export const TaskActivityPanel = ({ taskId, workspaceId, taskTitle }: TaskActivi
   }, [activities]);
 
   const handleFilesSelected = (files: File[]) => {
-    const newFiles = files.map(file => {
+    const accepted: File[] = [];
+    for (const file of files) {
+      const sizeError = validateAttachmentSize(file);
+      if (sizeError) {
+        toast.error(sizeError);
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length === 0) return;
+
+    const newFiles = accepted.map(file => {
       const isImage = file.type.startsWith('image/');
       return {
         file,
