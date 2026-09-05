@@ -28,6 +28,8 @@ interface GoogleEvent {
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
   attendees?: { email?: string; displayName?: string; responseStatus?: string; self?: boolean }[];
+  creator?: { email?: string; self?: boolean };
+  organizer?: { email?: string; self?: boolean };
   outOfOfficeProperties?: { autoDeclineMode?: string };
   reminders?: { useDefault?: boolean; overrides?: { method: string; minutes: number }[] };
 }
@@ -472,7 +474,31 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
     );
   };
 
-  // Todas as agendas acessíveis (a principal e as compartilhadas/convites).
+  
+  // Agendas relevantes: a principal e as compartilhadas (dessas, só o que é meu).
+  // Feriados/aniversários ficam de fora.
+  const ignoredCalendar = (id: string) =>
+    id.includes('#holiday@') || id.includes('#contacts@') || id.includes('#weeknum@');
+
+  const selfEmail = (googleEmail ?? '').trim().toLowerCase();
+  const primaryIds = new Set(
+    ['primary', calendarId.toLowerCase(), selfEmail].filter(Boolean) as string[],
+  );
+
+  /** Só entra o que é meu: minha agenda, ou eu como criador/organizador/convidado. */
+  const isMine = (calId: string, ev: GoogleEvent) => {
+    if (primaryIds.has(calId.toLowerCase())) return true;
+    if (ev.creator?.self || ev.organizer?.self) return true;
+    const creator = ev.creator?.email?.trim().toLowerCase();
+    const organizer = ev.organizer?.email?.trim().toLowerCase();
+    if (selfEmail && (creator === selfEmail || organizer === selfEmail)) return true;
+    for (const a of ev.attendees ?? []) {
+      if (a.self) return true;
+      if (selfEmail && a.email?.trim().toLowerCase() === selfEmail) return true;
+    }
+    return false;
+  };
+
   let cursor: SyncCursor;
   if (resumeCursor) {
     cursor = resumeCursor;
@@ -481,7 +507,8 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
     const listRes = await google(connectionAPIKey, '/users/me/calendarList?maxResults=250');
     if (listRes.ok) {
       for (const cal of (listRes.body?.items ?? []) as { id?: string }[]) {
-        if (cal.id && !calendarIds.includes(cal.id)) calendarIds.push(cal.id);
+        if (!cal.id || ignoredCalendar(cal.id) || calendarIds.includes(cal.id)) continue;
+        calendarIds.push(cal.id);
       }
     }
     // Janela padrão da listagem completa: 30 dias atrás até 180 dias à frente.
@@ -502,7 +529,8 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
   const applyPage = async (calId: string, items: GoogleEvent[]) => {
     const valid = items.filter((ev) => !!ev.id);
     const cancelledIds = valid.filter((ev) => ev.status === 'cancelled').map((ev) => ev.id);
-    const live = valid.filter((ev) => ev.status !== 'cancelled');
+    const live = valid.filter((ev) => ev.status !== 'cancelled' && isMine(calId, ev));
+
 
     if (cancelledIds.length) {
       const { error, count } = await admin

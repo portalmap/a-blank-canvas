@@ -117,13 +117,35 @@ function layoutDay(dayEvents: CalendarEvent[], day: Date): DayLayout {
     });
 
     if (hidden.length) {
-      const top = Math.min(...hidden.map((i) => i.start));
-      overflows.push({
-        key: `${day.toISOString()}-${top}`,
-        top: ((top - dayStart) / 60_000) * MINUTE,
-        events: hidden.sort((a, b) => a.start - b.start).map((i) => i.event),
-      });
+      // Marcador "+N" por faixa de horário: conta apenas os eventos ocultos que
+      // realmente se cruzam naquele intervalo, e não a cadeia inteira do dia.
+      const sorted = [...hidden].sort((a, b) => a.start - b.start || a.end - b.end);
+      const boundaries = Array.from(new Set(sorted.map((i) => i.start))).sort((a, b) => a - b);
+      const seen = new Set<string>();
+      for (const t of boundaries) {
+        const slice = sorted.filter((i) => i.start <= t && i.end > t);
+        if (!slice.length) continue;
+        const signature = slice.map((i) => i.event.id).join('|');
+        if (seen.has(signature)) continue;
+        // Ignora faixas contidas em outra já registrada (evita marcadores repetidos).
+        let contained = false;
+        for (const prev of seen) {
+          const ids = new Set(prev.split('|'));
+          if (slice.every((i) => ids.has(i.event.id))) {
+            contained = true;
+            break;
+          }
+        }
+        if (contained) continue;
+        seen.add(signature);
+        overflows.push({
+          key: `${day.toISOString()}-${t}`,
+          top: ((t - dayStart) / 60_000) * MINUTE,
+          events: slice.map((i) => i.event),
+        });
+      }
     }
+
   }
 
   return { positioned, overflows };
