@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { CalendarEvent } from '@/hooks/useAgenda';
-import { AgendaItemIcon } from '@/components/agenda/agendaItemVisual';
+
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Props {
