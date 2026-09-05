@@ -319,7 +319,7 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
     pageToken = res.body?.nextPageToken ?? null;
     nextSyncToken = res.body?.nextSyncToken ?? nextSyncToken;
     guard += 1;
-  } while (pageToken && guard < 20);
+  } while (pageToken && guard < 20 && Date.now() - startedAt < MAX_SYNC_MS);
 
   await admin.from('calendar_google_accounts').upsert(
     {
