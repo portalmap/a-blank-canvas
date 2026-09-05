@@ -250,6 +250,8 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
   let pageToken: string | null = null;
   let nextSyncToken: string | null = null;
   let guard = 0;
+  const startedAt = Date.now();
+  const MAX_SYNC_MS = 25_000;
 
   do {
     const params = new URLSearchParams();
@@ -258,11 +260,16 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
     params.set('maxResults', '250');
     if (syncToken) params.set('syncToken', syncToken);
     else {
+      // Janela padrão: 30 dias atrás até 180 dias à frente.
       const from = new Date();
       from.setDate(from.getDate() - 30);
+      const to = new Date();
+      to.setDate(to.getDate() + 180);
       params.set('timeMin', from.toISOString());
+      params.set('timeMax', to.toISOString());
     }
     if (pageToken) params.set('pageToken', pageToken);
+
 
     const res = await google(
       connectionAPIKey,
