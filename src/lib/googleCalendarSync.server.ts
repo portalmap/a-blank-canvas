@@ -474,7 +474,7 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
     );
   };
 
-  // Todas as agendas acessíveis (a principal e as compartilhadas/convites).
+  
   // Agendas relevantes: a principal e as compartilhadas (dessas, só o que é meu).
   // Feriados/aniversários ficam de fora.
   const ignoredCalendar = (id: string) =>
