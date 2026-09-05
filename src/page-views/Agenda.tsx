@@ -42,6 +42,7 @@ export default function Agenda() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined);
+  const [defaultType, setDefaultType] = useState<AgendaItemType>('event');
 
   const { rangeStart, rangeEnd, days } = useMemo(() => {
     if (view === 'month') {
@@ -75,9 +76,10 @@ export default function Agenda() {
     else setReference((d) => addDays(d, 1));
   };
 
-  const openNew = (date?: Date) => {
+  const openNew = (date?: Date, type: AgendaItemType = 'event') => {
     setSelectedEvent(null);
     setDefaultDate(date);
+    setDefaultType(type);
     setDialogOpen(true);
   };
 
@@ -111,10 +113,22 @@ export default function Agenda() {
         </div>
         <div className="flex items-center gap-2">
           <GoogleAgendaButton />
-          <Button size="sm" onClick={() => openNew()}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Novo
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm">
+                <Plus className="mr-1.5 h-4 w-4" />
+                Criar
+                <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {AGENDA_ITEM_TYPES.map((t) => (
+                <DropdownMenuItem key={t.value} onClick={() => openNew(undefined, t.value)}>
+                  {t.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
