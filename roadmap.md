@@ -1,5 +1,6 @@
 # Roadmap
 
 ## Agenda / Google
-- [ ] Sincronização resumível e em lote (cursor por agenda, várias rodadas, marcador salvo) — em andamento
-- [ ] Verificar que "Reunião Desenvolvimento | Aviões e Música" (ter 8/9 15h) aparece após a sincronização
+- [x] Sincronização resumível e em lote (cursor por agenda, várias rodadas, marcador salvo)
+- [x] "Reunião Desenvolvimento | Aviões e Música" aparece após a sincronização
+- [ ] Acompanhar: sincronização completa da conta em andamento em segundo plano (14 agendas); rodadas seguintes usam token incremental
