@@ -31,7 +31,13 @@ interface GoogleEvent {
   creator?: { email?: string; self?: boolean };
   organizer?: { email?: string; self?: boolean };
   outOfOfficeProperties?: { autoDeclineMode?: string };
+  hangoutLink?: string;
+  conferenceData?: {
+    conferenceId?: string;
+    entryPoints?: { entryPointType?: string; uri?: string }[];
+  };
   reminders?: { useDefault?: boolean; overrides?: { method: string; minutes: number }[] };
+
 }
 
 interface GoogleTask {
@@ -182,6 +188,9 @@ function fromGoogleEvent(ev: GoogleEvent, userId: string, calendarId: string) {
     google_calendar_id: calendarId,
     google_etag: ev.etag ?? null,
     google_html_link: ev.htmlLink ?? null,
+    hangout_link: hangoutLinkOf(ev),
+    meet_code: meetCodeOf(ev),
+
     source: 'google',
     last_synced_at: new Date().toISOString(),
     deleted_at: null,
