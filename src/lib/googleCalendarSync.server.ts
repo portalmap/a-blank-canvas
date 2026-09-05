@@ -230,6 +230,33 @@ export interface SyncResult {
   pulled: number;
   removed: number;
   error?: string;
+  /** true quando ainda há páginas/agendas a percorrer: o cliente deve chamar de novo. */
+  more?: boolean;
+  progress?: { calendar: number; calendars: number };
+}
+
+/** Ponto onde a listagem completa parou (persistido em calendar_google_accounts.sync_cursor). */
+interface SyncCursor {
+  calendarIds: string[];
+  index: number;
+  pageToken: string | null;
+  windowFrom: string;
+  windowTo: string;
+}
+
+function readCursor(raw: unknown): SyncCursor | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const c = raw as Partial<SyncCursor>;
+  if (!Array.isArray(c.calendarIds) || !c.calendarIds.length) return null;
+  if (typeof c.index !== 'number' || c.index >= c.calendarIds.length) return null;
+  if (!c.windowFrom || !c.windowTo) return null;
+  return {
+    calendarIds: c.calendarIds,
+    index: c.index,
+    pageToken: typeof c.pageToken === 'string' ? c.pageToken : null,
+    windowFrom: c.windowFrom,
+    windowTo: c.windowTo,
+  };
 }
 
 export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult> {
@@ -259,6 +286,10 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
     return { connected: true, pushed: 0, pulled: 0, removed: 0, error: message };
   }
   const googleEmail: string | null = profileRes.body?.id ?? null;
+
+  // Continuação de uma listagem completa interrompida por tempo?
+  const resumeCursor = readCursor(account?.sync_cursor);
+  const resuming = !!resumeCursor;
 
   // ---------- PUSH ----------
   const { data: localEvents } = await admin
