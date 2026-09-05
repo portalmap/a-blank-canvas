@@ -88,7 +88,8 @@ export function useConnectGoogleCalendar() {
 
       // Dentro da pré-visualização (iframe): abre a autorização em aba independente
       // já com a URL final (evita herdar restrições do contexto incorporado).
-      const tab = window.open(authorizationUrl, '_blank', 'noopener');
+      // Sem "noopener" para que a rota de retorno consiga avisar esta aba.
+      const tab = window.open(authorizationUrl, '_blank');
       if (!tab) {
         sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
         throw new Error('Libere as janelas pop-up do navegador e tente de novo.');
