@@ -23,8 +23,19 @@ export function useMyGoogleStatus() {
   });
 }
 
-function waitForOAuthCompletion(popup: Window) {
-  return new Promise<string | null>((resolve, reject) => {
+export const GOOGLE_CONNECT_RETURN_TO_KEY = 'google-calendar:return-to';
+
+function isInsideIframe() {
+  try {
+    return window.top !== window.self;
+  } catch {
+    return true;
+  }
+}
+
+/** Escuta a conclusão do OAuth feita em aba nova (mesma origem) vinda da rota de retorno. */
+function waitForOAuthTabCompletion(tab: Window) {
+  return new Promise<boolean>((resolve, reject) => {
     let poll: number | undefined;
     const cleanup = () => {
       window.removeEventListener('message', onMessage);
@@ -34,22 +45,21 @@ function waitForOAuthCompletion(popup: Window) {
       const type = event.data?.type;
       if (
         event.origin !== window.location.origin ||
-        event.source !== popup ||
+        event.source !== tab ||
         event.data?.connectorId !== CONNECTOR_ID ||
         (type !== 'appUserConnectorOAuthComplete' && type !== 'appUserConnectorOAuthFailed')
       )
         return;
       cleanup();
       if (type === 'appUserConnectorOAuthComplete') {
-        resolve(typeof event.data?.code === 'string' ? event.data.code : null);
+        resolve(true);
         return;
       }
-      popup.close();
       reject(new Error('Não foi possível concluir a conexão com o Google.'));
     };
     window.addEventListener('message', onMessage);
     poll = window.setInterval(() => {
-      if (!popup.closed) return;
+      if (!tab.closed) return;
       cleanup();
       reject(new Error('A janela do Google foi fechada antes de concluir.'));
     }, 500);
@@ -59,32 +69,49 @@ function waitForOAuthCompletion(popup: Window) {
 export function useConnectGoogleCalendar() {
   const queryClient = useQueryClient();
   const start = useServerFn(startGoogleCalendarConnect);
-  const complete = useServerFn(completeGoogleCalendarConnection);
 
   return useMutation({
     mutationFn: async () => {
-      const popup = window.open('', 'google-calendar-oauth', 'width=600,height=720');
-      if (!popup) throw new Error('Libere as janelas pop-up do navegador e tente de novo.');
-      let code: string | null;
+      const { authorizationUrl } = await start();
+      sessionStorage.setItem(
+        GOOGLE_CONNECT_RETURN_TO_KEY,
+        `${window.location.pathname}${window.location.search}`,
+      );
+
+      // Fora de iframe: a própria página vai ao Google e volta para a rota de retorno,
+      // que conclui a troca do código e redireciona de volta.
+      if (!isInsideIframe()) {
+        window.location.assign(authorizationUrl);
+        // A navegação descarrega a página; o mutation não retorna.
+        return new Promise<boolean>(() => {});
+      }
+
+      // Dentro da pré-visualização (iframe): abre a autorização em aba independente
+      // já com a URL final (evita herdar restrições do contexto incorporado).
+      const tab = window.open(authorizationUrl, '_blank', 'noopener');
+      if (!tab) {
+        sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
+        throw new Error('Libere as janelas pop-up do navegador e tente de novo.');
+      }
       try {
-        const { authorizationUrl } = await start();
-        const completion = waitForOAuthCompletion(popup);
-        popup.location.href = authorizationUrl;
-        code = await completion;
+        await waitForOAuthTabCompletion(tab);
       } catch (error) {
-        popup.close();
+        tab.close();
         throw error;
       }
-      if (code) await complete({ data: { code } });
       return true;
     },
     onSuccess: () => {
+      sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
       queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
       queryClient.invalidateQueries({ queryKey: ['agenda-events'] });
       queryClient.invalidateQueries({ queryKey: ['google-calendar-accounts'] });
       toast.success('Google Agenda conectado');
     },
-    onError: (e: Error) => toast.error(e.message || 'Erro ao conectar o Google'),
+    onError: (e: Error) => {
+      sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
+      toast.error(e.message || 'Erro ao conectar o Google');
+    },
   });
 }
 
