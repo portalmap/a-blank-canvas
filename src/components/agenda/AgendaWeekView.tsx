@@ -248,28 +248,27 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                         key={event.id}
                         type="button"
                         onClick={() => onSelectEvent(event)}
-                        className="absolute overflow-hidden rounded border border-card/60 px-1.5 py-0.5 text-left text-[11px] leading-tight text-primary-foreground shadow-sm transition-shadow hover:z-30 hover:shadow-md focus-visible:z-30"
+                        className="absolute overflow-hidden rounded border border-card/60 px-1 py-0.5 text-left text-[11px] leading-tight text-primary-foreground shadow-sm transition-shadow hover:z-30 hover:shadow-md focus-visible:z-30"
                         style={{
                           top,
                           height,
-                          left: `calc(${left}% + 2px)`,
-                          width: `calc(${width}% - 4px)`,
+                          left: `${left}%`,
+                          width: `calc(${width}% - 1px)`,
                           backgroundColor: event.color,
                           zIndex,
                         }}
                         title={event.title}
                       >
                         <span
-                          className={`flex items-center gap-1 truncate font-semibold ${
+                          className={`block font-semibold ${height >= 34 ? 'line-clamp-2' : 'truncate'} ${
                             event.completed_at || event.response_status === 'declined'
                               ? 'line-through opacity-80'
                               : ''
                           } ${event.response_status === 'tentative' ? 'italic' : ''}`}
                         >
-                          <AgendaItemIcon type={event.item_type} />
-                          <span className="truncate">{event.title}</span>
+                          {event.title}
                         </span>
-                        {height > 32 && (
+                        {height > 44 && (
                           <span className="block truncate opacity-90">
                             {format(new Date(event.starts_at), 'HH:mm')} – {format(new Date(event.ends_at), 'HH:mm')}
                           </span>
