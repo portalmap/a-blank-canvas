@@ -18,7 +18,7 @@ import { ChevronLeft, ChevronRight, Plus, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AgendaMonthView } from '@/components/agenda/AgendaMonthView';
-import { AgendaListView } from '@/components/agenda/AgendaListView';
+import { AgendaWeekView } from '@/components/agenda/AgendaWeekView';
 import { AgendaEventDialog } from '@/components/agenda/AgendaEventDialog';
 import { GoogleAgendaButton } from '@/components/agenda/GoogleAgendaButton';
 import { useAgendaEvents, type CalendarEvent } from '@/hooks/useAgenda';
