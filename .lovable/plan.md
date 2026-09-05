@@ -2,33 +2,74 @@
 
 ## O que está acontecendo
 
-Dessa vez a página do Google abriu normalmente (o bloqueio anterior foi resolvido). O erro agora vem do próprio Google: o endereço de retorno usado na autorização não está cadastrado no aplicativo Google que estamos usando. Enquanto esse endereço não estiver na lista de retornos autorizados, o Google recusa qualquer tentativa de login.
+A página do Google abriu, mas ele recusou a autorização porque o endereço de retorno usado pelo App User Connector não está cadastrado no aplicativo Google. Como você vai criar um novo projeto no Google Cloud, o passo a passo abaixo configura tudo do zero.
 
-Isso não é um problema de código do MAP Flow — é um ajuste de cadastro no painel do Google Cloud do aplicativo Google.
+## Passo a passo para criar o projeto no Google Cloud
 
-## Como resolver
+1. Acesse https://console.cloud.google.com/ com uma conta Google (pode ser a `vibo86@gmail.com` ou outra que você queira usar como administrador).
+2. No topo da tela, clique no seletor de projeto e depois em **Novo projeto**.
+3. Dê um nome ao projeto (ex.: `MAP Flow Integrações`) e confirme.
+4. Aguarde a criação e, se necessário, selecione o projeto novo no seletor.
 
-1. No painel do Google Cloud, abrir as credenciais do aplicativo (OAuth Client ID, tipo "Aplicativo da Web") que está sendo usado na conexão do Google Agenda.
-2. Em "URIs de redirecionamento autorizados", adicionar exatamente:
+## Configurar a tela de consentimento OAuth
 
-```text
-https://connector-gateway.lovable.dev/api/v1/app-users/oauth2/callback
-```
+1. No menu lateral, vá em **APIs e serviços > Tela de consentimento OAuth**.
+2. Escolha **Externo** (para permitir qualquer conta Google, inclusive a de teste) e clique em **Criar**.
+3. Preencha os campos obrigatórios:
+   - **Nome do app**: `MAP Flow`
+   - **E-mail de suporte do usuário**: seu e-mail administrativo
+   - **Logo** (opcional): logo da MAP
+   - **E-mail de contato do desenvolvedor**: seu e-mail
+4. Em **Escopos**, clique em **Adicionar ou remover escopos** e selecione:
+   - `.../auth/calendar`
+   - `.../auth/calendar.events`
+   - `.../auth/userinfo.email`
+   - `openid`
+5. Em **Usuários de teste**, adicione `vibo86@gmail.com` (e quaisquer outros e-mails que você for usar durante os testes).
+6. Revise e clique em **Voltar ao painel**. A tela ficará em modo "Em teste" até você publicá-la, mas já funciona para os usuários de teste.
 
-3. Em "Origens JavaScript autorizadas", adicionar:
+## Criar as credenciais OAuth
+
+1. Vá em **APIs e serviços > Credenciais**.
+2. Clique em **Criar credenciais > ID do cliente OAuth**.
+3. Tipo de aplicativo: **Aplicativo da Web**.
+4. **Nome**: `MAP Flow Web`.
+5. Em **Origens JavaScript autorizadas**, adicione:
 
 ```text
 https://connector-gateway.lovable.dev
 ```
 
-4. Salvar e aguardar alguns minutos (o Google leva um tempo para propagar).
-5. Confirmar que a conta de teste (`vibo86@gmail.com`) está na lista de usuários de teste, caso a tela de consentimento ainda esteja em modo "Em teste".
-6. Confirmar que a API do Google Agenda está ativada no mesmo projeto do Google Cloud.
+6. Em **URIs de redirecionamento autorizados**, adicione exatamente:
+
+```text
+https://connector-gateway.lovable.dev/api/v1/app-users/oauth2/callback
+```
+
+7. Clique em **Criar**.
+8. Anote o **ID do cliente** e a **Chave secreta do cliente** (você vai colar esses valores no Lovable/Supabase).
+
+## Ativar a API do Google Agenda
+
+1. No menu lateral, vá em **APIs e serviços > Biblioteca**.
+2. Pesquise por **Google Calendar API**.
+3. Clique no resultado e depois em **Ativar**.
+
+## Inserir as credenciais no Lovable
+
+1. No Lovable, vá em **Project Settings > Secrets** (ou equivalente).
+2. Adicione/atualize os segredos:
+   - `GOOGLE_CALENDAR_APP_USER_CONNECTOR_CLIENT_API_KEY` = ID do cliente do Google
+   - `GOOGLE_CALENDAR_APP_USER_CONNECTOR_CLIENT_API_SECRET` = Chave secreta do cliente do Google
+3. Se o Supabase for gerenciado separadamente, adicione os mesmos valores nas variáveis de ambiente do Supabase (Edge Functions/server functions precisam ler `process.env`).
 
 ## Verificação depois do ajuste
 
-Abrir a Agenda em uma aba própria, clicar em "Conectar Google", autorizar com a conta desejada e confirmar que ela aparece em Configurações > Integrações como "online", com os compromissos espelhados.
+1. Aguarde alguns minutos para o Google propagar as alterações.
+2. Abra a Agenda em uma aba própria (fora do iframe de preview).
+3. Clique em **Conectar Google**, escolha `vibo86@gmail.com` e autorize.
+4. Confirme que a conta aparece em **Configurações > Integrações** como "online" e que os compromissos começam a espelhar.
 
 ## Se o erro persistir
 
-Se, após o cadastro do endereço acima, o Google continuar recusando, o passo seguinte é verificar no MAP Flow qual endereço de retorno está sendo enviado na autorização e compará-lo, caractere por caractere, com o que está cadastrado no Google — a diferença costuma ser uma barra final ou http/https. Nesse caso eu faço essa checagem e ajusto o que for necessário no lado do app.
+Se, após cadastrar tudo corretamente, o Google continuar recusando, o passo seguinte é comparar caractere por caractere o redirect URI enviado pelo MAP Flow com o cadastrado. A diferença costuma ser uma barra final, http/https ou um parâmetro a mais. Nesse caso eu verifico o lado do app e ajusto o que for necessário.
