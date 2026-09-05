@@ -104,12 +104,15 @@ export function useConnectGoogleCalendar() {
         sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
         throw new Error('Libere as janelas pop-up do navegador e tente de novo.');
       }
+      let code: string | null;
       try {
-        await waitForOAuthTabCompletion(tab);
+        code = await waitForOAuthTabCompletion(tab);
       } catch (error) {
         tab.close();
         throw error;
       }
+      // A troca precisa acontecer aqui: só esta aba tem a sessão do MAP Flow.
+      if (code) await complete({ data: { code } });
       return true;
     },
     onSuccess: () => {
