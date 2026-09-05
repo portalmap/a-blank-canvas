@@ -142,13 +142,14 @@ export default function Agenda() {
           onSelectEvent={openEvent}
         />
       ) : (
-        <AgendaListView
+        <AgendaWeekView
           days={days}
           events={events}
           onSelectEvent={openEvent}
-          onSelectDay={(day) => openNew(new Date(new Date(day).setHours(9, 0, 0, 0)))}
+          onSelectSlot={(date) => openNew(date)}
         />
       )}
+
 
       <AgendaEventDialog
         open={dialogOpen}
