@@ -17,10 +17,12 @@ import { Trash2, X, Plus, ExternalLink } from 'lucide-react';
 import { useAllProfiles } from '@/hooks/useAllProfiles';
 import { useAuth } from '@/contexts/AuthContext';
 import {
+  AGENDA_ITEM_TYPES,
   useCreateEvent,
   useDeleteEvent,
   useEventGuests,
   useUpdateEvent,
+  type AgendaItemType,
   type CalendarEvent,
 } from '@/hooks/useAgenda';
 import { toast } from 'sonner';
@@ -34,11 +36,19 @@ const REMINDERS = [
   { value: '1440', label: '1 dia antes' },
 ];
 
+const TITLE_PLACEHOLDER: Record<AgendaItemType, string> = {
+  event: 'Reunião com o cliente',
+  task: 'Enviar relatório',
+  out_of_office: 'Férias',
+  focus_time: 'Foco no projeto',
+};
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event?: CalendarEvent | null;
   defaultDate?: Date;
+  defaultType?: AgendaItemType;
 }
 
 type GuestDraft = { user_id?: string | null; email?: string | null; display_name?: string | null };
@@ -53,7 +63,7 @@ function toDateInput(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Props) {
+export function AgendaEventDialog({ open, onOpenChange, event, defaultDate, defaultType = 'event' }: Props) {
   const { user } = useAuth();
   const { data: profiles } = useAllProfiles();
   const { data: existingGuests } = useEventGuests(event?.id);
@@ -63,6 +73,7 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
 
   const isOwner = !event || event.user_id === user?.id;
 
+  const [itemType, setItemType] = useState<AgendaItemType>(defaultType);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
@@ -71,6 +82,8 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
   const [end, setEnd] = useState('');
   const [color, setColor] = useState(COLORS[0]);
   const [reminder, setReminder] = useState('none');
+  const [completed, setCompleted] = useState(false);
+  const [autoDecline, setAutoDecline] = useState(false);
   const [guests, setGuests] = useState<GuestDraft[]>([]);
   const [emailDraft, setEmailDraft] = useState('');
 
@@ -79,6 +92,7 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
     if (event) {
       const s = new Date(event.starts_at);
       const e = new Date(event.ends_at);
+      setItemType(event.item_type ?? 'event');
       setTitle(event.title);
       setDescription(event.description ?? '');
       setLocation(event.location ?? '');
@@ -87,11 +101,14 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
       setEnd(event.all_day ? toDateInput(e) : toLocalInput(e));
       setColor(event.color);
       setReminder(event.reminder_minutes ? String(event.reminder_minutes) : 'none');
+      setCompleted(!!event.completed_at);
+      setAutoDecline(!!event.auto_decline);
     } else {
       const base = defaultDate ? new Date(defaultDate) : new Date();
       if (!defaultDate) base.setMinutes(0, 0, 0);
       base.setSeconds(0, 0);
       const endBase = new Date(base.getTime() + 60 * 60_000);
+      setItemType(defaultType);
       setTitle('');
       setDescription('');
       setLocation('');
@@ -100,10 +117,12 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
       setEnd(toLocalInput(endBase));
       setColor(COLORS[0]);
       setReminder('none');
+      setCompleted(false);
+      setAutoDecline(defaultType === 'out_of_office');
       setGuests([]);
     }
     setEmailDraft('');
-  }, [open, event, defaultDate]);
+  }, [open, event, defaultDate, defaultType]);
 
   useEffect(() => {
     if (!open || !event) return;
@@ -163,13 +182,16 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
     const payload = {
       title: title.trim(),
       description: description.trim() || null,
-      location: location.trim() || null,
+      location: itemType === 'event' ? location.trim() || null : null,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
       all_day: allDay,
       color,
       reminder_minutes: reminder === 'none' ? null : Number(reminder),
-      guests,
+      item_type: itemType,
+      completed_at: itemType === 'task' && completed ? new Date().toISOString() : null,
+      auto_decline: itemType === 'out_of_office' ? autoDecline : false,
+      guests: itemType === 'event' ? guests : [],
     };
 
     if (event) {
@@ -187,18 +209,45 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
   };
 
   const saving = createEvent.isPending || updateEvent.isPending;
+  const isEventType = itemType === 'event';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{event ? 'Compromisso' : 'Novo compromisso'}</DialogTitle>
+          <DialogTitle>{event ? 'Compromisso' : 'Novo item da agenda'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
+            <Label>Tipo</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {AGENDA_ITEM_TYPES.map((t) => (
+                <Button
+                  key={t.value}
+                  type="button"
+                  size="sm"
+                  variant={itemType === t.value ? 'default' : 'outline'}
+                  disabled={!isOwner}
+                  onClick={() => {
+                    setItemType(t.value);
+                    if (t.value === 'out_of_office') setAutoDecline(true);
+                  }}
+                >
+                  {t.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <Label>Título</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={!isOwner} placeholder="Reunião com o cliente" />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={!isOwner}
+              placeholder={TITLE_PLACEHOLDER[itemType]}
+            />
           </div>
 
           <div className="flex items-center justify-between rounded-md border border-border p-3">
@@ -233,10 +282,26 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Local</Label>
-            <Input value={location} disabled={!isOwner} onChange={(e) => setLocation(e.target.value)} placeholder="Sala, endereço ou link" />
-          </div>
+          {itemType === 'task' && (
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <Label className="text-sm">Tarefa concluída</Label>
+              <Switch checked={completed} disabled={!isOwner} onCheckedChange={setCompleted} />
+            </div>
+          )}
+
+          {itemType === 'out_of_office' && (
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <Label className="text-sm">Recusar convites automaticamente</Label>
+              <Switch checked={autoDecline} disabled={!isOwner} onCheckedChange={setAutoDecline} />
+            </div>
+          )}
+
+          {isEventType && (
+            <div className="space-y-2">
+              <Label>Local</Label>
+              <Input value={location} disabled={!isOwner} onChange={(e) => setLocation(e.target.value)} placeholder="Sala, endereço ou link" />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Descrição</Label>
@@ -275,9 +340,12 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate }: Pr
             </div>
           </div>
 
-          {isOwner && (
+          {isOwner && isEventType && (
             <div className="space-y-3 rounded-md border border-border p-3">
               <Label className="text-sm font-medium">Convidados</Label>
+              <p className="text-xs text-muted-foreground">
+                Cada convidado recebe o convite por e-mail quando a sua conta do Google estiver conectada.
+              </p>
 
               <Select value="" onValueChange={(id) => setGuests((prev) => [...prev, { user_id: id }])}>
                 <SelectTrigger>
