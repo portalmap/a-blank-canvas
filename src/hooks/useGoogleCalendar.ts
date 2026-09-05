@@ -204,6 +204,10 @@ export function useSyncGoogleCalendar() {
       queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
       if (result?.error) toast.error('O Google recusou a sincronização. Tente reconectar.');
     },
+    onError: () =>
+      toast.error('Não foi possível sincronizar com o Google', {
+        description: 'Tente novamente em "Atualizar" ou reconecte a conta.',
+      }),
   });
 }
 
