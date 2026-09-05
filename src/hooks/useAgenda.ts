@@ -258,23 +258,62 @@ export function useToggleAgendaTask() {
   });
 }
 
+/** Respostas de convite, iguais às do Google. */
+export type InviteResponse = 'accepted' | 'declined' | 'tentative';
+
+export const INVITE_RESPONSES: { value: InviteResponse; label: string }[] = [
+  { value: 'accepted', label: 'Sim' },
+  { value: 'declined', label: 'Não' },
+  { value: 'tentative', label: 'Talvez' },
+];
+
+export const INVITE_RESPONSE_LABEL: Record<string, string> = {
+  accepted: 'Sim',
+  declined: 'Não',
+  tentative: 'Talvez',
+  needsAction: 'Sem resposta',
+};
+
 export function useRespondInvite() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const pushRsvp = useServerFn(respondCalendarInvite);
 
   return useMutation({
-    mutationFn: async ({ eventId, status }: { eventId: string; status: 'accepted' | 'declined' }) => {
+    mutationFn: async ({ eventId, status }: { eventId: string; status: InviteResponse }) => {
       if (!user) throw new Error('Não autenticado');
-      const { error } = await supabase
+
+      // Convidado: grava na própria linha de convidado.
+      const { error: guestError } = await supabase
         .from('calendar_event_guests')
         .update({ response_status: status })
         .eq('event_id', eventId)
         .eq('user_id', user.id);
-      if (error) throw error;
+      if (guestError) throw guestError;
+
+      // Cópia do compromisso do próprio usuário (importada do Google).
+      const { error: eventError } = await supabase
+        .from('calendar_events')
+        .update({ response_status: status })
+        .eq('id', eventId)
+        .eq('user_id', user.id);
+      if (eventError) throw eventError;
+
+      // Envia a resposta ao Google (se houver conexão). Falha não desfaz o registro local.
+      try {
+        await pushRsvp({ data: { eventId, status } });
+      } catch (e) {
+        return { googleError: e instanceof Error ? e.message : String(e) };
+      }
+      return { googleError: null as string | null };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       invalidate(queryClient);
-      toast.success('Resposta registrada');
+      if (result?.googleError) {
+        toast.warning('Resposta registrada aqui, mas não foi possível enviar ao Google.');
+      } else {
+        toast.success('Resposta registrada');
+      }
     },
     onError: (e: Error) => toast.error(e.message || 'Erro ao responder convite'),
   });
