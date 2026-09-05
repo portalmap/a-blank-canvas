@@ -1,30 +1,35 @@
-# Agenda: reuniões que me convidaram, eventos de outras pessoas e tarefas
+# Agenda com os quatro tipos do Google: Evento, Tarefa, Ausente e Hora de se concentrar
 
-Hoje a Agenda mostra só o que eu criei e o que o Google traz da minha agenda principal. Vamos ampliar em três frentes, cada uma isolada, sem mexer nos outros módulos.
+O banco já está preparado (cada compromisso guarda o tipo, se a tarefa foi concluída e o vínculo com a tarefa do Google), mas a tela e a sincronização ainda tratam tudo como "evento". Vamos completar, mantendo a Agenda como módulo isolado.
 
-## 1. Reuniões do Google em que fui convidado
+## 1. Botão "Criar" com os quatro tipos
 
-- Passar a ler **todas as agendas** que a conta conectada tem acesso (a principal e as compartilhadas/convites), e não apenas a principal.
-- Cada reunião importada guarda de qual agenda veio e o seu status de participação (aceito, pendente, recusado), exibido no evento.
-- A criação/edição de eventos feita aqui continua indo apenas para a agenda principal — não alteramos reuniões de terceiros.
-- Ao desconectar, segue a regra atual: futuro importado sai, histórico fica.
+- O botão de criar passa a abrir um menu com: Evento, Tarefa, Ausente, Hora de se concentrar.
+- A janela de criação se adapta ao tipo:
+  - Evento: como hoje (com convidados).
+  - Tarefa: título, data/hora, descrição e caixa "concluída" — sem convidados.
+  - Ausente: período e opção "recusar automaticamente convites".
+  - Hora de se concentrar: período e descrição.
+- Cada tipo ganha um marcador visual próprio (cor/ícone) nas visões Mês, Semana e Lista; tarefas concluídas aparecem riscadas e podem ser marcadas direto na agenda.
 
-## 2. Convites feitos dentro do MAP Flow
+## 2. Tarefas do Google indo e voltando
 
-- Convidado passa a ser sempre gravado com **e-mail + nome simples**, garantindo o casamento com o Google.
-- Convite por e-mail é vinculado automaticamente ao usuário do sistema com aquele e-mail (agora e também quando ele entrar depois).
-- O evento aparece na agenda de quem foi convidado, com botão de aceitar/recusar, e o lembrete também é criado para o convidado.
+- As tarefas do Google (a lista de tarefas ligada à conta conectada) passam a ser lidas e mostradas na Agenda no dia em que vencem.
+- Tarefa criada aqui é criada na conta do Google; editar, concluir ou excluir aqui reflete lá, e o que muda no Google volta para cá.
+- Ausente e Hora de se concentrar são criados no Google com o tipo correspondente, e os que vêm do Google entram com o mesmo tipo.
+- Isso exige uma permissão nova do Google: será necessário clicar uma vez em "Reconectar" na Agenda e autorizar o acesso às tarefas.
 
-## 3. Tarefas na Agenda
+## 3. O que não muda
 
-- Uma camada de leitura mostra na Agenda as tarefas com data, nos casos: sou responsável, eu criei, eu sigo/fui mencionado, ou fui convidado/adicionado nela.
-- Visual diferente dos compromissos (marcador próprio) e clique abre a tarefa. Um botão "Mostrar tarefas" liga/desliga essa camada.
-- Tarefas não são copiadas para a agenda nem enviadas ao Google — é só exibição.
+- Reuniões de terceiros continuam somente leitura; nada é criado em agendas de outras pessoas.
+- Ao desconectar, segue a regra atual: o futuro importado sai, o histórico fica.
+- As tarefas dos projetos do MAP Flow não entram nessa camada agora (fica para depois, se você quiser).
 
 ## Detalhes técnicos
 
-- `googleCalendarSync.server.ts`: percorrer `calendarList`, puxar eventos de cada agenda, gravar `google_calendar_id` e `response_status` do participante; push continua no `primary`.
-- Tokens de sincronização por agenda: nova coluna `sync_tokens jsonb` em `calendar_google_accounts` (mantendo `sync_token` para a principal), com fallback para janela -30/+180 dias.
-- `calendar_event_guests`: normalizar e-mail no insert e resolver `user_id` via `profiles` (função security definer para vincular e-mails a usuários); nova policy de SELECT em `calendar_events` permitindo convidado por e-mail; helper `user_is_calendar_event_guest` estendido.
-- Lembretes: ao inserir convidado com `user_id`, criar linha em `calendar_event_reminders` para ele.
-- Novo hook `useAgendaTasks` (consulta em `tasks` + `task_assignees` + `task_followers`, respeitando RLS) e renderização nas views Mês/Semana/Dia como itens somente leitura.
+- `useAgenda.ts`: tipo `AgendaItemType` ('event' | 'task' | 'out_of_office' | 'focus_time'), campos `item_type`, `completed_at`, `auto_decline`, `response_status` em `CalendarEvent`/`EventInput`; mutação `useToggleAgendaTask`.
+- `AgendaEventDialog.tsx`: seletor de tipo + campos condicionais; convidados só para `event`.
+- `Agenda.tsx`: `DropdownMenu` no botão Criar passando o tipo inicial; legenda por tipo.
+- `AgendaMonthView/AgendaWeekView/AgendaListView`: estilo por `item_type` e checkbox de conclusão para tarefas.
+- `googleCalendarSync.server.ts`: escopo extra `https://www.googleapis.com/auth/tasks`; mapear `eventType` (`default`/`outOfOffice`/`focusTime`) nos dois sentidos; novo bloco push/pull em `/tasks/v1/lists/@default/tasks` gravando `google_task_id`/`google_task_list_id`; `status: 'completed'` ↔ `completed_at`.
+- `GOOGLE_SCOPES` em `googleCalendarSync.server.ts` e no fluxo de consentimento de `useGoogleCalendar.ts` precisam ficar iguais, para o "Reconectar" pedir a permissão nova.
