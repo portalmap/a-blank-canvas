@@ -57,10 +57,14 @@ export const completeGoogleCalendarConnection = createServerFn({ method: 'POST' 
     const { saveConnectionKeyForUser } = await import('@/lib/appUserConnections.server');
     const { syncUserGoogleCalendar } = await import('@/lib/googleCalendarSync.server');
 
-    const { connectionAPIKey, connectorId } = await exchangeAppUserOAuthCode(
-      GATEWAY_BASE_URL,
-      data.code,
-    );
+    let exchanged: { connectionAPIKey: string; connectorId: string };
+    try {
+      exchanged = await exchangeAppUserOAuthCode(GATEWAY_BASE_URL, data.code);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Falha ao concluir a autorização do Google: ${detail}`);
+    }
+    const { connectionAPIKey, connectorId } = exchanged;
     if (connectorId !== CONNECTOR_ID) {
       throw new Error('A autorização retornou um serviço diferente do esperado.');
     }

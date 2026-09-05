@@ -3749,6 +3749,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_is_calendar_event_guest: {
+        Args: { _event_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_is_channel_member: {
         Args: { _channel_id: string; _user_id: string }
         Returns: boolean
@@ -3759,6 +3763,10 @@ export type Database = {
       }
       user_is_workspace_member: {
         Args: { _user_id: string; _workspace_id: string }
+        Returns: boolean
+      }
+      user_owns_calendar_event: {
+        Args: { _event_id: string; _user_id: string }
         Returns: boolean
       }
     }
