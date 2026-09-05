@@ -201,5 +201,31 @@ export const disconnectGoogleCalendarAccount = createServerFn({ method: 'POST' }
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     await supabaseAdmin.from('calendar_google_accounts').delete().eq('user_id', data.userId);
 
-    return { ok: true };
+    // Limpeza local: compromissos vindos do Google a partir de agora somem;
+    // os que já aconteceram ficam como histórico local (sem vínculo com o Google).
+    const cutoff = new Date().toISOString();
+
+    const { data: removed } = await supabaseAdmin
+      .from('calendar_events')
+      .delete()
+      .eq('user_id', data.userId)
+      .eq('source', 'google')
+      .gte('starts_at', cutoff)
+      .select('id');
+
+    const { data: kept } = await supabaseAdmin
+      .from('calendar_events')
+      .update({
+        source: 'local',
+        google_event_id: null,
+        google_calendar_id: null,
+        google_etag: null,
+        google_html_link: null,
+        last_synced_at: null,
+      })
+      .eq('user_id', data.userId)
+      .eq('source', 'google')
+      .select('id');
+
+    return { ok: true, removed: removed?.length ?? 0, kept: kept?.length ?? 0 };
   });
