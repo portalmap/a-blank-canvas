@@ -42,6 +42,11 @@ export function GoogleAgendaButton() {
   }
 
   const offline = status?.status === 'offline';
+  const syncLabel = sync.isPending
+    ? sync.progress && sync.progress.calendars > 1
+      ? `Sincronizando ${sync.progress.calendar}/${sync.progress.calendars}`
+      : 'Sincronizando'
+    : 'Atualizar';
 
   return (
     <div className="flex items-center gap-1">
@@ -55,7 +60,7 @@ export function GoogleAgendaButton() {
             disabled={sync.isPending}
           >
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${sync.isPending ? 'animate-spin' : ''}`} />
-            {sync.isPending ? 'Sincronizando' : 'Atualizar'}
+            {syncLabel}
           </Button>
         </TooltipTrigger>
         <TooltipContent>

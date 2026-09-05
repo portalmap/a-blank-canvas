@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
@@ -193,12 +194,43 @@ export function useConnectGoogleCalendar() {
   });
 }
 
+export type SyncProgress = { calendar: number; calendars: number } | null;
+
+// Evita duas sincronizações simultâneas na mesma aba (botão + auto-sync).
+let syncInFlight: Promise<Awaited<ReturnType<typeof syncMyGoogleCalendar>>> | null = null;
+
+/**
+ * Sincroniza com o Google em rodadas: o servidor devolve `more: true` enquanto
+ * ainda houver páginas/agendas a importar, e a agenda é atualizada entre rodadas.
+ */
 export function useSyncGoogleCalendar() {
   const queryClient = useQueryClient();
   const sync = useServerFn(syncMyGoogleCalendar);
+  const [progress, setProgress] = useState<SyncProgress>(null);
 
-  return useMutation({
-    mutationFn: () => sync(),
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (syncInFlight) return syncInFlight;
+      const run = (async () => {
+        const MAX_ROUNDS = 40;
+        let result = await sync();
+        let rounds = 1;
+        while (result?.more && !result.error && rounds < MAX_ROUNDS) {
+          setProgress(result.progress ?? null);
+          queryClient.invalidateQueries({ queryKey: ['agenda-events'] });
+          result = await sync();
+          rounds += 1;
+        }
+        return result;
+      })();
+      syncInFlight = run;
+      try {
+        return await run;
+      } finally {
+        syncInFlight = null;
+        setProgress(null);
+      }
+    },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['agenda-events'] });
       queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
@@ -209,6 +241,8 @@ export function useSyncGoogleCalendar() {
         description: 'Tente novamente em "Atualizar" ou reconecte a conta.',
       }),
   });
+
+  return { ...mutation, progress };
 }
 
 export function useGoogleCalendarAccounts(enabled: boolean) {
