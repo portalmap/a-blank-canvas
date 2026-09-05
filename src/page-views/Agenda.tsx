@@ -52,6 +52,7 @@ export default function Agenda() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined);
   const [defaultType, setDefaultType] = useState<AgendaItemType>('event');
+  const { ref: fullscreenRef, isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
   const { rangeStart, rangeEnd, days } = useMemo(() => {
     if (view === 'month') {
