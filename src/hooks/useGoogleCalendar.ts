@@ -158,10 +158,17 @@ export function useDisconnectGoogleAccount() {
 
   return useMutation({
     mutationFn: (userId: string) => disconnect({ data: { userId } }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['google-calendar-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
-      toast.success('Conta desconectada');
+      queryClient.invalidateQueries({ queryKey: ['agenda-events'] });
+      const removed = result?.removed ?? 0;
+      toast.success('Conta desconectada', {
+        description:
+          removed > 0
+            ? `${removed} compromisso(s) do Google a partir de hoje foram removidos. O histórico anterior foi mantido.`
+            : 'O histórico anterior foi mantido.',
+      });
     },
     onError: (e: Error) => toast.error(e.message || 'Erro ao desconectar'),
   });
