@@ -1,77 +1,33 @@
-# Corrigir "Erro 400: redirect_uri_mismatch" ao conectar o Google Agenda
+# Onde ficam o ID e a senha do Google (e o que falta fazer)
 
-## O que está acontecendo
+## Esclarecimento
 
-A página do Google abriu, mas ele recusou a autorização porque o endereço de retorno usado pelo App User Connector não está cadastrado no aplicativo Google. Como você vai criar um novo projeto no Google Cloud, o passo a passo abaixo configura tudo do zero.
+Não falta nada no banco de segredos deste projeto. O ID do cliente e a senha do cliente do Google **não** ficam aqui: eles são guardados na conexão do Google do seu espaço de trabalho (a integração chamada "Agenda MAP"). O que fica no projeto é apenas a chave interna que liga o app a essa conexão — e ela já está salva (`GOOGLE_CALENDAR_APP_USER_CONNECTOR_CLIENT_API_KEY`).
 
-## Passo a passo para criar o projeto no Google Cloud
+Hoje a conexão "Agenda MAP" está usando o cliente antigo do Google:
+`426507370750-98tsug2frdmojv26tj689aunfjavlf7m.apps.googleusercontent.com`.
 
-1. Acesse https://console.cloud.google.com/ com uma conta Google (pode ser a `vibo86@gmail.com` ou outra que você queira usar como administrador).
-2. No topo da tela, clique no seletor de projeto e depois em **Novo projeto**.
-3. Dê um nome ao projeto (ex.: `MAP Flow Integrações`) e confirme.
-4. Aguarde a criação e, se necessário, selecione o projeto novo no seletor.
+Como você criou um projeto novo no Google Cloud, é esse valor que precisa ser trocado — por isso o erro de endereço de retorno continuava aparecendo.
 
-## Configurar a tela de consentimento OAuth
+## O que vou fazer
 
-1. No menu lateral, vá em **APIs e serviços > Tela de consentimento OAuth**.
-2. Escolha **Externo** (para permitir qualquer conta Google, inclusive a de teste) e clique em **Criar**.
-3. Preencha os campos obrigatórios:
-   - **Nome do app**: `MAP Flow`
-   - **E-mail de suporte do usuário**: seu e-mail administrativo
-   - **Logo** (opcional): logo da MAP
-   - **E-mail de contato do desenvolvedor**: seu e-mail
-4. Em **Escopos**, clique em **Adicionar ou remover escopos**. Na caixa de pesquisa, procure por "Google Calendar API" e "userinfo.email", depois marque:
-   - `https://www.googleapis.com/auth/calendar`
-   - `https://www.googleapis.com/auth/calendar.events`
-   - `https://www.googleapis.com/auth/userinfo.email`
-   - `openid`
+1. Abrir o cartão de configuração da integração Google do espaço de trabalho.
+2. Você cola ali o **ID do cliente** e a **senha do cliente** do novo projeto do Google Cloud.
+3. Confirmar que a integração segue ligada a este projeto e com acesso contínuo ("offline") habilitado.
 
-   Se não aparecerem na lista, confirme que a **Google Calendar API** já foi ativada (passo "Ativar a API do Google Agenda" abaixo) e tente novamente.
-5. Em **Usuários de teste**, adicione `vibo86@gmail.com` (e quaisquer outros e-mails que você for usar durante os testes).
-6. Revise e clique em **Voltar ao painel**. A tela ficará em modo "Em teste" até você publicá-la, mas já funciona para os usuários de teste.
+## Antes disso, confirme no Google Cloud
 
-## Criar as credenciais OAuth
-
-1. Vá em **APIs e serviços > Credenciais**.
-2. Clique em **Criar credenciais > ID do cliente OAuth**.
-3. Tipo de aplicativo: **Aplicativo da Web**.
-4. **Nome**: `MAP Flow Web`.
-5. Em **Origens JavaScript autorizadas**, adicione:
-
-```text
-https://connector-gateway.lovable.dev
-```
-
-6. Em **URIs de redirecionamento autorizados**, adicione exatamente:
+- Em **URIs de redirecionamento autorizados** do novo cliente existe exatamente:
 
 ```text
 https://connector-gateway.lovable.dev/api/v1/app-users/oauth2/callback
 ```
 
-7. Clique em **Criar**.
-8. Anote o **ID do cliente** e a **Chave secreta do cliente** (você vai colar esses valores no Lovable/Supabase).
+- A **Google Calendar API** está ativada.
+- `vibo86@gmail.com` está na lista de usuários de teste.
 
-## Ativar a API do Google Agenda
+## Depois da troca
 
-1. No menu lateral, vá em **APIs e serviços > Biblioteca**.
-2. Pesquise por **Google Calendar API**.
-3. Clique no resultado e depois em **Ativar**.
-
-## Inserir as credenciais no Lovable
-
-1. No Lovable, vá em **Project Settings > Secrets** (ou equivalente).
-2. Adicione/atualize os segredos:
-   - `GOOGLE_CALENDAR_APP_USER_CONNECTOR_CLIENT_API_KEY` = ID do cliente do Google
-   - `GOOGLE_CALENDAR_APP_USER_CONNECTOR_CLIENT_API_SECRET` = Chave secreta do cliente do Google
-3. Se o Supabase for gerenciado separadamente, adicione os mesmos valores nas variáveis de ambiente do Supabase (Edge Functions/server functions precisam ler `process.env`).
-
-## Verificação depois do ajuste
-
-1. Aguarde alguns minutos para o Google propagar as alterações.
-2. Abra a Agenda em uma aba própria (fora do iframe de preview).
-3. Clique em **Conectar Google**, escolha `vibo86@gmail.com` e autorize.
-4. Confirme que a conta aparece em **Configurações > Integrações** como "online" e que os compromissos começam a espelhar.
-
-## Se o erro persistir
-
-Se, após cadastrar tudo corretamente, o Google continuar recusando, o passo seguinte é comparar caractere por caractere o redirect URI enviado pelo MAP Flow com o cadastrado. A diferença costuma ser uma barra final, http/https ou um parâmetro a mais. Nesse caso eu verifico o lado do app e ajusto o que for necessário.
+1. Abrir a Agenda em uma aba própria.
+2. Clicar em **Conectar Google** e autorizar com a conta desejada.
+3. Verificar em **Configurações > Integrações** se a conta aparece como "online" e se os compromissos começam a espelhar.
