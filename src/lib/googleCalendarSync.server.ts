@@ -28,6 +28,8 @@ interface GoogleEvent {
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
   attendees?: { email?: string; displayName?: string; responseStatus?: string; self?: boolean }[];
+  creator?: { email?: string; self?: boolean };
+  organizer?: { email?: string; self?: boolean };
   outOfOfficeProperties?: { autoDeclineMode?: string };
   reminders?: { useDefault?: boolean; overrides?: { method: string; minutes: number }[] };
 }
