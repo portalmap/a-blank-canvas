@@ -17,8 +17,8 @@ const MINUTE = HOUR_HEIGHT / 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 /** Colunas visíveis em um grupo de sobreposição; o excedente vira um marcador "+N". */
 const MAX_COLUMNS = 3;
-/** Quanto cada bloco avança sobre o vizinho (0 = fatias iguais, 1 = totalmente empilhado). */
-const OVERLAP = 0.32;
+/** Faixa (em %) do bloco de trás que fica visível à esquerda quando há sobreposição. */
+const STRIP = 18;
 
 interface Positioned {
   event: CalendarEvent;
