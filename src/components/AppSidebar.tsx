@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink, FolderPlus, Archive, LogOut, CalendarDays } from 'lucide-react';
+import { Home, MessageSquare, Users, FileText, BarChart3, Settings, Zap, MoreHorizontal, PanelLeft, PanelLeftClose, Layers, Sun, Moon, ChevronRight, ArrowLeftRight, Plus, Pencil, Star, StarOff, ExternalLink, FolderPlus, Archive, LogOut, CalendarDays, ShieldCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useTheme } from 'next-themes';
 import { useLocation, useNavigate } from "@/lib/router-compat";
@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSpaces } from '@/hooks/useSpaces';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useManagementAccess } from '@/hooks/useManagement';
 import { SpaceTreeItem } from '@/components/workspace/SpaceTreeItem';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -52,6 +53,7 @@ const modulesNavItems = [
   { title: 'Documentos', url: '/documents', icon: FileText },
   { title: 'Painéis', url: '/dashboards', icon: BarChart3 },
   { title: 'Automações', url: '/automations', icon: Zap },
+  { title: 'Gestão', url: '/gestao', icon: ShieldCheck },
 ];
 
 
@@ -65,6 +67,7 @@ export function AppSidebar() {
   const { activeWorkspace, clearActiveWorkspace } = useWorkspace();
   const { data: spaces } = useSpaces(activeWorkspace?.id);
   const { data: userRole } = useUserRole();
+  const { data: managementAccess } = useManagementAccess();
   const { data: unreadChannels } = useUnreadChannels();
   const { data: canCreate } = useCanCreateWorkspace();
   const { data: defaultWorkspaceId } = useDefaultWorkspace();
@@ -101,6 +104,7 @@ export function AppSidebar() {
     ? []
     : modulesNavItems.filter(item => {
         if (item.url === '/automations') return isAdmin;
+        if (item.url === '/gestao') return managementAccess?.canAccess ?? false;
         return true;
       });
 

@@ -12,6 +12,8 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/meetings.space.readonly',
+
 ];
 
 type ItemType = 'event' | 'task' | 'out_of_office' | 'focus_time';
@@ -31,7 +33,13 @@ interface GoogleEvent {
   creator?: { email?: string; self?: boolean };
   organizer?: { email?: string; self?: boolean };
   outOfOfficeProperties?: { autoDeclineMode?: string };
+  hangoutLink?: string;
+  conferenceData?: {
+    conferenceId?: string;
+    entryPoints?: { entryPointType?: string; uri?: string }[];
+  };
   reminders?: { useDefault?: boolean; overrides?: { method: string; minutes: number }[] };
+
 }
 
 interface GoogleTask {
@@ -153,6 +161,23 @@ function toGooglePayload(event: any, attendees: { email: string; displayName?: s
   return payload;
 }
 
+/** Link do Google Meet do evento, quando existir. */
+function hangoutLinkOf(ev: GoogleEvent): string | null {
+  if (ev.hangoutLink) return ev.hangoutLink;
+  const entry = (ev.conferenceData?.entryPoints ?? []).find(
+    (e) => e.entryPointType === 'video' && e.uri,
+  );
+  return entry?.uri ?? null;
+}
+
+/** Código da reunião do Meet (ex.: abc-defg-hij). */
+function meetCodeOf(ev: GoogleEvent): string | null {
+  const link = hangoutLinkOf(ev);
+  const fromLink = link?.match(/meet\.google\.com\/([a-z0-9-]+)/i)?.[1];
+  return fromLink ?? ev.conferenceData?.conferenceId ?? null;
+}
+
+
 function fromGoogleEvent(ev: GoogleEvent, userId: string, calendarId: string) {
   const allDay = !!ev.start?.date;
   const startsAt = allDay
@@ -182,6 +207,9 @@ function fromGoogleEvent(ev: GoogleEvent, userId: string, calendarId: string) {
     google_calendar_id: calendarId,
     google_etag: ev.etag ?? null,
     google_html_link: ev.htmlLink ?? null,
+    hangout_link: hangoutLinkOf(ev),
+    meet_code: meetCodeOf(ev),
+
     source: 'google',
     last_synced_at: new Date().toISOString(),
     deleted_at: null,

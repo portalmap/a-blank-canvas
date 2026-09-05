@@ -273,10 +273,12 @@ export type Database = {
           google_html_link: string | null
           google_task_id: string | null
           google_task_list_id: string | null
+          hangout_link: string | null
           id: string
           item_type: string
           last_synced_at: string | null
           location: string | null
+          meet_code: string | null
           reminder_minutes: number | null
           response_status: string | null
           source: string
@@ -300,10 +302,12 @@ export type Database = {
           google_html_link?: string | null
           google_task_id?: string | null
           google_task_list_id?: string | null
+          hangout_link?: string | null
           id?: string
           item_type?: string
           last_synced_at?: string | null
           location?: string | null
+          meet_code?: string | null
           reminder_minutes?: number | null
           response_status?: string | null
           source?: string
@@ -327,10 +331,12 @@ export type Database = {
           google_html_link?: string | null
           google_task_id?: string | null
           google_task_list_id?: string | null
+          hangout_link?: string | null
           id?: string
           item_type?: string
           last_synced_at?: string | null
           location?: string | null
+          meet_code?: string | null
           reminder_minutes?: number | null
           response_status?: string | null
           source?: string
@@ -1618,6 +1624,133 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_members: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      meeting_attendance_conferences: {
+        Row: {
+          collected_at: string
+          created_at: string
+          end_time: string | null
+          event_id: string | null
+          google_conference_record: string
+          id: string
+          meet_code: string | null
+          organizer_user_id: string | null
+          start_time: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          collected_at?: string
+          created_at?: string
+          end_time?: string | null
+          event_id?: string | null
+          google_conference_record: string
+          id?: string
+          meet_code?: string | null
+          organizer_user_id?: string | null
+          start_time?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          collected_at?: string
+          created_at?: string
+          end_time?: string | null
+          event_id?: string | null
+          google_conference_record?: string
+          id?: string
+          meet_code?: string | null
+          organizer_user_id?: string | null
+          start_time?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_attendance_conferences_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_attendance_sessions: {
+        Row: {
+          conference_id: string
+          created_at: string
+          display_name: string | null
+          duration_seconds: number | null
+          email: string | null
+          google_session_id: string
+          id: string
+          join_time: string | null
+          leave_time: string | null
+          participant_key: string
+          participant_type: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          conference_id: string
+          created_at?: string
+          display_name?: string | null
+          duration_seconds?: number | null
+          email?: string | null
+          google_session_id: string
+          id?: string
+          join_time?: string | null
+          leave_time?: string | null
+          participant_key: string
+          participant_type?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          conference_id?: string
+          created_at?: string
+          display_name?: string | null
+          duration_seconds?: number | null
+          email?: string | null
+          google_session_id?: string
+          id?: string
+          join_time?: string | null
+          leave_time?: string | null
+          participant_key?: string
+          participant_type?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_attendance_sessions_conference_id_fkey"
+            columns: ["conference_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_attendance_conferences"
             referencedColumns: ["id"]
           },
         ]
@@ -3494,6 +3627,7 @@ export type Database = {
         Args: { p_delivery_pct: number }
         Returns: number
       }
+      can_access_management: { Args: { _user_id: string }; Returns: boolean }
       can_create_workspace: { Args: { _user_id: string }; Returns: boolean }
       can_edit_user: {
         Args: { _editor_id: string; _target_user_id: string }
