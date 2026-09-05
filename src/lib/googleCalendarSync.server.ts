@@ -12,6 +12,8 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/meetings.space.readonly',
+
 ];
 
 type ItemType = 'event' | 'task' | 'out_of_office' | 'focus_time';
