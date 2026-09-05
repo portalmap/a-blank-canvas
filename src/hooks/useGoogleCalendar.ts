@@ -174,14 +174,9 @@ export function useConnectGoogleCalendar() {
         sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
         throw new Error('Libere as janelas pop-up do navegador e tente de novo.');
       }
-      let code: string | null;
-      try {
-        code = await waitForOAuthTabCompletion(tab);
-      } catch (error) {
-        tab.close();
-        throw error;
-      }
-      // A troca precisa acontecer aqui: só esta aba tem a sessão do MAP Flow.
+      const code = await waitForOAuthTabCompletion(tab);
+      // Quando o código chega aqui, a troca acontece nesta aba (que tem a sessão).
+      // Sem código, a própria aba de retorno já concluiu: só revalidamos o status.
       if (code) await complete({ data: { code } });
       return true;
     },
@@ -190,7 +185,6 @@ export function useConnectGoogleCalendar() {
       queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
       queryClient.invalidateQueries({ queryKey: ['agenda-events'] });
       queryClient.invalidateQueries({ queryKey: ['google-calendar-accounts'] });
-      toast.success('Google Agenda conectado');
     },
     onError: (e: Error) => {
       sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
