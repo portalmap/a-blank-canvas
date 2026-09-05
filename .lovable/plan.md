@@ -1,33 +1,36 @@
-# Onde ficam o ID e a senha do Google (e o que falta fazer)
+# Trocar o cliente do Google usado pela Agenda
 
-## Esclarecimento
+## O que eu verifiquei agora
 
-Não falta nada no banco de segredos deste projeto. O ID do cliente e a senha do cliente do Google **não** ficam aqui: eles são guardados na conexão do Google do seu espaço de trabalho (a integração chamada "Agenda MAP"). O que fica no projeto é apenas a chave interna que liga o app a essa conexão — e ela já está salva (`GOOGLE_CALENDAR_APP_USER_CONNECTOR_CLIENT_API_KEY`).
+A integração do Google deste espaço de trabalho ("Agenda MAP", já ligada a este projeto, com acesso contínuo habilitado) continua guardando o cliente antigo:
 
-Hoje a conexão "Agenda MAP" está usando o cliente antigo do Google:
-`426507370750-98tsug2frdmojv26tj689aunfjavlf7m.apps.googleusercontent.com`.
+```text
+426507370750-98tsug2frdmojv26tj689aunfjavlf7m.apps.googleusercontent.com
+```
 
-Como você criou um projeto novo no Google Cloud, é esse valor que precisa ser trocado — por isso o erro de endereço de retorno continuava aparecendo.
+A última alteração dela foi em 04/09 — ou seja, as mudanças que você fez no Google Cloud (novo projeto, endereço de retorno, API ativada) não chegaram até aqui. Enquanto esse valor não for atualizado, o Google continuará recusando com "solicitação inválida / redirect_uri_mismatch".
+
+Isso não tem relação com publicar o app: essa configuração é externa ao código.
 
 ## O que vou fazer
 
 1. Abrir o cartão de configuração da integração Google do espaço de trabalho.
-2. Você cola ali o **ID do cliente** e a **senha do cliente** do novo projeto do Google Cloud.
-3. Confirmar que a integração segue ligada a este projeto e com acesso contínuo ("offline") habilitado.
+2. Você cola nele o **ID do cliente** e a **senha do cliente** do novo projeto do Google Cloud (ou confirma o cliente correto, se preferir manter um já existente).
+3. Confirmar que a integração segue ligada a este projeto e com acesso contínuo ("offline") ativo.
 
-## Antes disso, confirme no Google Cloud
+## Confirme antes, no Google Cloud
 
-- Em **URIs de redirecionamento autorizados** do novo cliente existe exatamente:
+- Nos **URIs de redirecionamento autorizados** do cliente novo existe exatamente:
 
 ```text
 https://connector-gateway.lovable.dev/api/v1/app-users/oauth2/callback
 ```
 
-- A **Google Calendar API** está ativada.
+- A **Google Calendar API** está ativada nesse mesmo projeto do Google Cloud.
 - `vibo86@gmail.com` está na lista de usuários de teste.
 
 ## Depois da troca
 
 1. Abrir a Agenda em uma aba própria.
-2. Clicar em **Conectar Google** e autorizar com a conta desejada.
-3. Verificar em **Configurações > Integrações** se a conta aparece como "online" e se os compromissos começam a espelhar.
+2. Clicar em **Conectar Google** e autorizar.
+3. Conferir em **Configurações > Integrações** se a conta aparece como "online" e se os compromissos começam a espelhar.
