@@ -23,8 +23,8 @@ O **segredo do cliente (client secret)** salvo no conector não corresponde ao c
    - Confirmar URI de redirecionamento exatamente: `https://connector-gateway.lovable.dev/api/v1/app-users/oauth2/callback`
 2. Na Lovable: **Workspace > Conectores > Google Calendar > Agenda MAP > Editar**
    - Colar novamente o **ID do cliente** e o **segredo novo**, sem espaços extras, e salvar.
-3. Abrir a Agenda em uma aba própria (fora do editor), clicar em **Conectar Google** e escolher `vibo86@gmail.com`.
-4. Se ainda falhar, verificar em **Tela de consentimento OAuth > Público-alvo** se `vibo86@gmail.com` está como usuário de teste (app em modo "Teste").
+3. Abrir a Agenda em uma aba própria (fora do editor), clicar em **Conectar Google** e escolher a conta de teste que você está usando.
+4. Se ainda falhar, verificar em **Tela de consentimento OAuth > Público-alvo** se o e-mail da conta de teste está listado como usuário de teste (app em modo "Teste").
 
 ## Se o erro persistir após os passos acima
 
