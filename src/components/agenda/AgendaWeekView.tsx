@@ -219,7 +219,14 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                         }}
                         title={event.title}
                       >
-                        <span className="block truncate font-semibold">{event.title}</span>
+                        <span
+                          className={`flex items-center gap-1 truncate font-semibold ${
+                            event.completed_at ? 'line-through opacity-80' : ''
+                          }`}
+                        >
+                          <AgendaItemIcon type={event.item_type} />
+                          <span className="truncate">{event.title}</span>
+                        </span>
                         {height > 32 && (
                           <span className="block truncate opacity-90">
                             {format(new Date(event.starts_at), 'HH:mm')} – {format(new Date(event.ends_at), 'HH:mm')}
