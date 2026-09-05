@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useServerFn } from '@tanstack/react-start';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { completeGoogleCalendarConnection } from '@/lib/google-calendar.functions';
 import { GOOGLE_CONNECT_RETURN_TO_KEY } from '@/hooks/useGoogleCalendar';
@@ -11,8 +11,11 @@ function OAuthReturn() {
   const navigate = useNavigate();
   const complete = useServerFn(completeGoogleCalendarConnection);
   const [message, setMessage] = useState('Concluindo a conexão com o Google...');
+  const handled = useRef(false);
 
   useEffect(() => {
+    if (handled.current) return;
+    handled.current = true;
     const params = new URLSearchParams(window.location.search);
     const success = params.get('success') === 'true';
     const code = params.get('code');
