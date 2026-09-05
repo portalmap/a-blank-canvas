@@ -1,6 +1,7 @@
 import { addDays, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { CalendarEvent } from '@/hooks/useAgenda';
+import { AgendaItemIcon } from '@/components/agenda/agendaItemVisual';
 
 interface Props {
   reference: Date;
@@ -67,8 +68,12 @@ export function AgendaMonthView({ reference, events, onSelectDay, onSelectEvent 
                     }}
                     className="flex items-center gap-1 truncate rounded px-1 py-0.5 text-[11px] text-foreground hover:bg-accent"
                   >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
-                    <span className="truncate">
+                    <span style={{ color: e.color }} className="flex shrink-0">
+                      <AgendaItemIcon type={e.item_type} />
+                    </span>
+                    <span
+                      className={`truncate ${e.completed_at ? 'text-muted-foreground line-through' : ''}`}
+                    >
                       {!e.all_day && `${format(new Date(e.starts_at), 'HH:mm')} `}
                       {e.title}
                     </span>
