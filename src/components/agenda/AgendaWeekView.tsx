@@ -281,7 +281,7 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                         <PopoverTrigger asChild>
                           <button
                             type="button"
-                            className="absolute z-40 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-foreground shadow-sm hover:bg-accent"
+                            className="absolute z-40 rounded bg-card/90 px-1 py-px text-[10px] font-semibold text-foreground/80 shadow-sm hover:bg-accent"
                             style={{ top: top + 2, right: 2 }}
                           >
                             +{hidden.length}
