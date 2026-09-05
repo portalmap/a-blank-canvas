@@ -14,7 +14,15 @@ import {
   subWeeks,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, ChevronDown } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  CalendarDays,
+  ChevronDown,
+  Maximize2,
+  Minimize2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -33,6 +41,7 @@ import {
   type AgendaItemType,
   type CalendarEvent,
 } from '@/hooks/useAgenda';
+import { useFullscreen } from '@/hooks/useFullscreen';
 
 type ViewMode = 'month' | 'week' | 'day';
 
