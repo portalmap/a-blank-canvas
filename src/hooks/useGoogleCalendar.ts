@@ -32,9 +32,12 @@ function isInsideIframe() {
   }
 }
 
-/** Escuta a conclusão do OAuth feita em aba nova (mesma origem) vinda da rota de retorno. */
+/**
+ * Escuta a conclusão do OAuth feita em aba nova (mesma origem) e devolve o código
+ * de uso único para que a troca aconteça nesta aba, que tem a sessão do MAP Flow.
+ */
 function waitForOAuthTabCompletion(tab: Window) {
-  return new Promise<boolean>((resolve, reject) => {
+  return new Promise<string | null>((resolve, reject) => {
     let poll: number | undefined;
     const cleanup = () => {
       window.removeEventListener('message', onMessage);
@@ -51,10 +54,16 @@ function waitForOAuthTabCompletion(tab: Window) {
         return;
       cleanup();
       if (type === 'appUserConnectorOAuthComplete') {
-        resolve(true);
+        resolve(typeof event.data?.code === 'string' ? event.data.code : null);
         return;
       }
-      reject(new Error('Não foi possível concluir a conexão com o Google.'));
+      reject(
+        new Error(
+          typeof event.data?.error === 'string' && event.data.error
+            ? event.data.error
+            : 'Não foi possível concluir a conexão com o Google.',
+        ),
+      );
     };
     window.addEventListener('message', onMessage);
     poll = window.setInterval(() => {
@@ -68,6 +77,7 @@ function waitForOAuthTabCompletion(tab: Window) {
 export function useConnectGoogleCalendar() {
   const queryClient = useQueryClient();
   const start = useServerFn(startGoogleCalendarConnect);
+  const complete = useServerFn(completeGoogleCalendarConnection);
 
   return useMutation({
     mutationFn: async () => {
