@@ -3,6 +3,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+/** Tipos de item da agenda, espelhando o Google Agenda. */
+export type AgendaItemType = 'event' | 'task' | 'out_of_office' | 'focus_time';
+
+export const AGENDA_ITEM_TYPES: { value: AgendaItemType; label: string }[] = [
+  { value: 'event', label: 'Evento' },
+  { value: 'task', label: 'Tarefa' },
+  { value: 'out_of_office', label: 'Ausente' },
+  { value: 'focus_time', label: 'Hora de se concentrar' },
+];
+
+export const AGENDA_ITEM_LABEL: Record<AgendaItemType, string> = {
+  event: 'Evento',
+  task: 'Tarefa',
+  out_of_office: 'Ausente',
+  focus_time: 'Hora de se concentrar',
+};
+
 export interface CalendarEvent {
   id: string;
   user_id: string;
@@ -16,7 +33,12 @@ export interface CalendarEvent {
   reminder_minutes: number | null;
   google_event_id: string | null;
   google_html_link: string | null;
+  google_task_id: string | null;
   source: string;
+  item_type: AgendaItemType;
+  completed_at: string | null;
+  auto_decline: boolean;
+  response_status: string | null;
 }
 
 export interface CalendarGuest {
@@ -39,6 +61,9 @@ export interface EventInput {
   all_day: boolean;
   color: string;
   reminder_minutes: number | null;
+  item_type: AgendaItemType;
+  completed_at?: string | null;
+  auto_decline?: boolean;
   guests: { user_id?: string | null; email?: string | null; display_name?: string | null }[];
 }
 
@@ -61,7 +86,7 @@ export function useAgendaEvents(rangeStart: Date, rangeEnd: Date) {
         .gt('ends_at', startIso)
         .order('starts_at');
       if (error) throw error;
-      return (data ?? []) as CalendarEvent[];
+      return (data ?? []) as unknown as CalendarEvent[];
     },
   });
 }
@@ -142,14 +167,14 @@ export function useCreateEvent() {
         .select('*')
         .single();
       if (error) throw error;
-      const event = data as CalendarEvent;
+      const event = data as unknown as CalendarEvent;
       await syncGuests(event.id, guests);
       await scheduleReminder(event);
       return event;
     },
-    onSuccess: () => {
+    onSuccess: (event) => {
       invalidate(queryClient);
-      toast.success('Compromisso criado');
+      toast.success(`${AGENDA_ITEM_LABEL[event.item_type] ?? 'Compromisso'} criado`);
     },
     onError: (e: Error) => toast.error(e.message || 'Erro ao criar compromisso'),
   });
@@ -170,7 +195,7 @@ export function useUpdateEvent() {
         .select('*')
         .single();
       if (error) throw error;
-      const event = data as CalendarEvent;
+      const event = data as unknown as CalendarEvent;
       await syncGuests(id, guests);
       await scheduleReminder(event);
       return event;
@@ -191,11 +216,11 @@ export function useDeleteEvent() {
       // Marca como excluído; a sincronização remove no Google e apaga o registro.
       const { data: event } = await supabase
         .from('calendar_events')
-        .select('google_event_id')
+        .select('google_event_id, google_task_id')
         .eq('id', id)
         .maybeSingle();
 
-      if (event?.google_event_id) {
+      if (event?.google_event_id || event?.google_task_id) {
         const { error } = await supabase
           .from('calendar_events')
           .update({ deleted_at: new Date().toISOString() })
@@ -213,6 +238,23 @@ export function useDeleteEvent() {
       toast.success('Compromisso excluído');
     },
     onError: (e: Error) => toast.error(e.message || 'Erro ao excluir compromisso'),
+  });
+}
+
+/** Marca/desmarca uma tarefa da agenda como concluída. */
+export function useToggleAgendaTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, completed }: { id: string; completed: boolean }) => {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({ completed_at: completed ? new Date().toISOString() : null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidate(queryClient),
+    onError: (e: Error) => toast.error(e.message || 'Erro ao atualizar a tarefa'),
   });
 }
 
