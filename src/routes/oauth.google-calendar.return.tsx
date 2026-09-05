@@ -8,7 +8,6 @@ import {
 } from '@/lib/google-calendar.functions';
 import {
   GOOGLE_CONNECT_RETURN_TO_KEY,
-  GOOGLE_OAUTH_CHANNEL,
   publishGoogleOAuthOutcome,
 } from '@/hooks/useGoogleCalendar';
 
@@ -143,5 +142,3 @@ export const Route = createFileRoute('/oauth/google-calendar/return')({
     ],
   }),
 });
-
-export { GOOGLE_OAUTH_CHANNEL };
