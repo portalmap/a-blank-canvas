@@ -159,6 +159,23 @@ function toGooglePayload(event: any, attendees: { email: string; displayName?: s
   return payload;
 }
 
+/** Link do Google Meet do evento, quando existir. */
+function hangoutLinkOf(ev: GoogleEvent): string | null {
+  if (ev.hangoutLink) return ev.hangoutLink;
+  const entry = (ev.conferenceData?.entryPoints ?? []).find(
+    (e) => e.entryPointType === 'video' && e.uri,
+  );
+  return entry?.uri ?? null;
+}
+
+/** Código da reunião do Meet (ex.: abc-defg-hij). */
+function meetCodeOf(ev: GoogleEvent): string | null {
+  const link = hangoutLinkOf(ev);
+  const fromLink = link?.match(/meet\.google\.com\/([a-z0-9-]+)/i)?.[1];
+  return fromLink ?? ev.conferenceData?.conferenceId ?? null;
+}
+
+
 function fromGoogleEvent(ev: GoogleEvent, userId: string, calendarId: string) {
   const allDay = !!ev.start?.date;
   const startsAt = allDay
