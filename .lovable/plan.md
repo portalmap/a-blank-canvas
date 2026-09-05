@@ -20,11 +20,13 @@ A página do Google abriu, mas ele recusou a autorização porque o endereço de
    - **E-mail de suporte do usuário**: seu e-mail administrativo
    - **Logo** (opcional): logo da MAP
    - **E-mail de contato do desenvolvedor**: seu e-mail
-4. Em **Escopos**, clique em **Adicionar ou remover escopos** e selecione:
-   - `.../auth/calendar`
-   - `.../auth/calendar.events`
-   - `.../auth/userinfo.email`
+4. Em **Escopos**, clique em **Adicionar ou remover escopos**. Na caixa de pesquisa, procure por "Google Calendar API" e "userinfo.email", depois marque:
+   - `https://www.googleapis.com/auth/calendar`
+   - `https://www.googleapis.com/auth/calendar.events`
+   - `https://www.googleapis.com/auth/userinfo.email`
    - `openid`
+
+   Se não aparecerem na lista, confirme que a **Google Calendar API** já foi ativada (passo "Ativar a API do Google Agenda" abaixo) e tente novamente.
 5. Em **Usuários de teste**, adicione `vibo86@gmail.com` (e quaisquer outros e-mails que você for usar durante os testes).
 6. Revise e clique em **Voltar ao painel**. A tela ficará em modo "Em teste" até você publicá-la, mas já funciona para os usuários de teste.
 
