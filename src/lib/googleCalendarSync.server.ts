@@ -292,10 +292,10 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
   const resuming = !!resumeCursor;
 
   // ---------- PUSH ----------
-  const { data: localEvents } = await admin
-    .from('calendar_events')
-    .select('*')
-    .eq('user_id', userId);
+  // Só na primeira rodada; as rodadas de continuação apenas terminam a importação.
+  const { data: localEvents } = resuming
+    ? { data: [] as any[] }
+    : await admin.from('calendar_events').select('*').eq('user_id', userId);
 
   for (const event of localEvents ?? []) {
     try {
