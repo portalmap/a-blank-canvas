@@ -54,13 +54,18 @@ export const completeGoogleCalendarConnection = createServerFn({ method: 'POST' 
     const { exchangeAppUserOAuthCode, GATEWAY_BASE_URL } = await import(
       '@/integrations/lovable/appUserConnector.server'
     );
-    const { saveConnectionKeyForUser } = await import('@/lib/appUserConnections.server');
-    const { syncUserGoogleCalendar } = await import('@/lib/googleCalendarSync.server');
+    const { getConnectionKeyForUser, saveConnectionKeyForUser } = await import(
+      '@/lib/appUserConnections.server'
+    );
 
     let exchanged: { connectionAPIKey: string; connectorId: string };
     try {
       exchanged = await exchangeAppUserOAuthCode(GATEWAY_BASE_URL, data.code);
     } catch (error) {
+      // Código de uso único já consumido (ex.: F5 na tela de retorno): se a conexão
+      // já está salva, tratamos como sucesso em vez de erro.
+      const already = await getConnectionKeyForUser(context.userId, CONNECTOR_ID);
+      if (already) return { ok: true, alreadyConnected: true };
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(`Falha ao concluir a autorização do Google: ${detail}`);
     }
@@ -82,8 +87,8 @@ export const completeGoogleCalendarConnection = createServerFn({ method: 'POST' 
       { onConflict: 'user_id' },
     );
 
-    const result = await syncUserGoogleCalendar(context.userId);
-    return { ok: true, ...result };
+    // A sincronização acontece depois, na Agenda, para não travar esta etapa.
+    return { ok: true, alreadyConnected: false };
   });
 
 /** Current user's Google connection status. */

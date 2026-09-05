@@ -24,6 +24,29 @@ export function useMyGoogleStatus() {
 }
 
 export const GOOGLE_CONNECT_RETURN_TO_KEY = 'google-calendar:return-to';
+export const GOOGLE_OAUTH_CHANNEL = 'google-calendar:oauth';
+
+export type GoogleOAuthOutcome = {
+  type: 'appUserConnectorOAuthComplete' | 'appUserConnectorOAuthFailed';
+  connectorId: string;
+  code: string | null;
+  error: string | null;
+};
+
+/** Publica o resultado do OAuth para outras abas da mesma origem. */
+export function publishGoogleOAuthOutcome(outcome: GoogleOAuthOutcome) {
+  const payload = JSON.stringify({ ...outcome, at: Date.now() });
+  try {
+    new BroadcastChannel(GOOGLE_OAUTH_CHANNEL).postMessage(payload);
+  } catch {
+    /* navegador sem BroadcastChannel: usa localStorage */
+  }
+  try {
+    localStorage.setItem(GOOGLE_OAUTH_CHANNEL, payload);
+  } catch {
+    /* sem armazenamento disponível */
+  }
+}
 
 function isInsideIframe() {
   try {
@@ -36,42 +59,83 @@ function isInsideIframe() {
 /**
  * Escuta a conclusão do OAuth feita em aba nova (mesma origem) e devolve o código
  * de uso único para que a troca aconteça nesta aba, que tem a sessão do MAP Flow.
+ * O Google corta o vínculo `window.opener` (COOP), por isso também ouvimos o
+ * canal compartilhado do navegador.
  */
 function waitForOAuthTabCompletion(tab: Window) {
   return new Promise<string | null>((resolve, reject) => {
     let poll: number | undefined;
+    let timeout: number | undefined;
+    let channel: BroadcastChannel | null = null;
+
     const cleanup = () => {
       window.removeEventListener('message', onMessage);
+      window.removeEventListener('storage', onStorage);
       if (poll !== undefined) window.clearInterval(poll);
+      if (timeout !== undefined) window.clearTimeout(timeout);
+      channel?.close();
     };
-    const onMessage = (event: MessageEvent) => {
-      const type = event.data?.type;
-      if (
-        event.origin !== window.location.origin ||
-        event.source !== tab ||
-        event.data?.connectorId !== CONNECTOR_ID ||
-        (type !== 'appUserConnectorOAuthComplete' && type !== 'appUserConnectorOAuthFailed')
-      )
-        return;
+
+    const settle = (outcome: GoogleOAuthOutcome) => {
+      if (outcome.connectorId !== CONNECTOR_ID) return;
       cleanup();
-      if (type === 'appUserConnectorOAuthComplete') {
-        resolve(typeof event.data?.code === 'string' ? event.data.code : null);
+      if (outcome.type === 'appUserConnectorOAuthComplete') {
+        resolve(typeof outcome.code === 'string' ? outcome.code : null);
         return;
       }
-      reject(
-        new Error(
-          typeof event.data?.error === 'string' && event.data.error
-            ? event.data.error
-            : 'Não foi possível concluir a conexão com o Google.',
-        ),
-      );
+      reject(new Error(outcome.error || 'Não foi possível concluir a conexão com o Google.'));
     };
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (
+        data?.type !== 'appUserConnectorOAuthComplete' &&
+        data?.type !== 'appUserConnectorOAuthFailed'
+      )
+        return;
+      settle(data as GoogleOAuthOutcome);
+    };
+
+    const parse = (raw: unknown): GoogleOAuthOutcome | null => {
+      if (typeof raw !== 'string') return null;
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed?.type ? (parsed as GoogleOAuthOutcome) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== GOOGLE_OAUTH_CHANNEL) return;
+      const outcome = parse(event.newValue);
+      if (outcome) settle(outcome);
+    };
+
     window.addEventListener('message', onMessage);
+    window.addEventListener('storage', onStorage);
+    try {
+      channel = new BroadcastChannel(GOOGLE_OAUTH_CHANNEL);
+      channel.onmessage = (event) => {
+        const outcome = parse(event.data);
+        if (outcome) settle(outcome);
+      };
+    } catch {
+      /* sem BroadcastChannel */
+    }
+
     poll = window.setInterval(() => {
       if (!tab.closed) return;
       cleanup();
-      reject(new Error('A janela do Google foi fechada antes de concluir.'));
+      // A aba pode ter concluído sozinha; a Agenda revalida o status.
+      resolve(null);
     }, 500);
+
+    timeout = window.setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 180_000);
   });
 }
 
@@ -87,6 +151,12 @@ export function useConnectGoogleCalendar() {
         GOOGLE_CONNECT_RETURN_TO_KEY,
         `${window.location.pathname}${window.location.search}`,
       );
+      try {
+        localStorage.removeItem(GOOGLE_OAUTH_CHANNEL);
+      } catch {
+        /* sem armazenamento */
+      }
+
 
       // Fora de iframe: a própria página vai ao Google e volta para a rota de retorno,
       // que conclui a troca do código e redireciona de volta.
@@ -104,14 +174,9 @@ export function useConnectGoogleCalendar() {
         sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
         throw new Error('Libere as janelas pop-up do navegador e tente de novo.');
       }
-      let code: string | null;
-      try {
-        code = await waitForOAuthTabCompletion(tab);
-      } catch (error) {
-        tab.close();
-        throw error;
-      }
-      // A troca precisa acontecer aqui: só esta aba tem a sessão do MAP Flow.
+      const code = await waitForOAuthTabCompletion(tab);
+      // Quando o código chega aqui, a troca acontece nesta aba (que tem a sessão).
+      // Sem código, a própria aba de retorno já concluiu: só revalidamos o status.
       if (code) await complete({ data: { code } });
       return true;
     },
@@ -120,7 +185,6 @@ export function useConnectGoogleCalendar() {
       queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
       queryClient.invalidateQueries({ queryKey: ['agenda-events'] });
       queryClient.invalidateQueries({ queryKey: ['google-calendar-accounts'] });
-      toast.success('Google Agenda conectado');
     },
     onError: (e: Error) => {
       sessionStorage.removeItem(GOOGLE_CONNECT_RETURN_TO_KEY);
@@ -140,6 +204,10 @@ export function useSyncGoogleCalendar() {
       queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
       if (result?.error) toast.error('O Google recusou a sincronização. Tente reconectar.');
     },
+    onError: () =>
+      toast.error('Não foi possível sincronizar com o Google', {
+        description: 'Tente novamente em "Atualizar" ou reconecte a conta.',
+      }),
   });
 }
 

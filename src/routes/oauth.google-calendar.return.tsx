@@ -2,14 +2,21 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useServerFn } from '@tanstack/react-start';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { completeGoogleCalendarConnection } from '@/lib/google-calendar.functions';
-import { GOOGLE_CONNECT_RETURN_TO_KEY } from '@/hooks/useGoogleCalendar';
+import {
+  completeGoogleCalendarConnection,
+  getMyGoogleCalendarStatus,
+} from '@/lib/google-calendar.functions';
+import {
+  GOOGLE_CONNECT_RETURN_TO_KEY,
+  publishGoogleOAuthOutcome,
+} from '@/hooks/useGoogleCalendar';
 
 const CONNECTOR_ID = 'google_calendar';
 
 function OAuthReturn() {
   const navigate = useNavigate();
   const complete = useServerFn(completeGoogleCalendarConnection);
+  const status = useServerFn(getMyGoogleCalendarStatus);
   const [message, setMessage] = useState('Concluindo a conexão com o Google...');
   const handled = useRef(false);
 
@@ -31,64 +38,92 @@ function OAuthReturn() {
       }
     })();
 
-    // Fluxo em aba separada (pré-visualização): a Agenda original espera um aviso.
-    // Nunca concluímos a troca aqui — esta aba não tem a sessão do MAP Flow.
-    const notifyOpener = (
+    // O Google corta o vínculo com a aba que abriu (COOP), então avisamos por
+    // canal compartilhado da mesma origem, além do postMessage quando existir.
+    const announce = (
       type: 'appUserConnectorOAuthComplete' | 'appUserConnectorOAuthFailed',
       exchangeCode: string | null = null,
       readableError: string | null = null,
-    ): boolean => {
-      if (!window.opener) return false;
-      window.opener.postMessage(
-        { type, connectorId: CONNECTOR_ID, code: exchangeCode, error: readableError },
-        window.location.origin,
-      );
-      window.close();
-      return true;
+    ) => {
+      const payload = { type, connectorId: CONNECTOR_ID, code: exchangeCode, error: readableError };
+      try {
+        window.opener?.postMessage(payload, window.location.origin);
+      } catch {
+        /* aba sem vínculo: seguimos pelo canal compartilhado */
+      }
+      publishGoogleOAuthOutcome(payload);
+    };
+
+    const finishLocally = async () => {
+      // Sem vínculo com a Agenda: concluímos aqui e voltamos.
+      try {
+        if (code) {
+          await complete({ data: { code } });
+        } else {
+          const current = await status();
+          if (!current?.connected) throw new Error('A autorização não foi concluída.');
+        }
+        announce('appUserConnectorOAuthComplete', null);
+        toast.success('Google Agenda conectado');
+      } catch (err) {
+        // Pode ser um F5 com código já usado: confirmamos o estado real.
+        let connected = false;
+        try {
+          connected = !!(await status())?.connected;
+        } catch {
+          /* mantém connected = false */
+        }
+        if (connected) {
+          announce('appUserConnectorOAuthComplete', null);
+          toast.success('Google Agenda conectado');
+        } else {
+          const readable = err instanceof Error ? err.message : 'Não foi possível conectar.';
+          announce('appUserConnectorOAuthFailed', null, readable);
+          toast.error('Erro ao conectar o Google', { description: readable });
+        }
+      }
+      navigate({ to: returnTo, replace: true });
     };
 
     if (!success || (params.get('offline_access_allowed') !== 'false' && !code)) {
       const readable = errorParam ?? 'A autorização não foi concluída.';
-      if (notifyOpener('appUserConnectorOAuthFailed', null, readable)) {
-        setMessage(readable);
+      setMessage(readable);
+      announce('appUserConnectorOAuthFailed', null, readable);
+      if (window.opener) {
+        window.close();
         return;
       }
-      setMessage(readable);
       toast.error('Erro ao conectar o Google', { description: readable });
       navigate({ to: returnTo, replace: true });
       return;
     }
 
-    // Aba separada: devolve o código para a Agenda concluir com a sessão dela.
+    // Aba aberta pela Agenda e ainda vinculada: devolve o código para ela concluir.
     if (window.opener) {
       setMessage('Conexão autorizada! Esta janela será fechada.');
-      notifyOpener('appUserConnectorOAuthComplete', code ?? null);
+      announce('appUserConnectorOAuthComplete', code ?? null);
+      window.close();
+      // Se o navegador não permitir fechar, concluímos aqui mesmo.
+      window.setTimeout(() => {
+        void finishLocally();
+      }, 1200);
       return;
     }
 
-    // Fluxo de redirecionamento da própria página: concluir aqui e voltar à Agenda.
-    if (!code) {
-      setMessage('A autorização terminou sem código de troca.');
-      toast.error('Erro ao conectar o Google');
-      navigate({ to: returnTo, replace: true });
-      return;
-    }
-    complete({ data: { code } })
-      .then(() => {
-        toast.success('Google Agenda conectado');
-        navigate({ to: returnTo, replace: true });
-      })
-      .catch((err: Error) => {
-        setMessage(err.message || 'Não foi possível concluir a conexão.');
-        toast.error('Erro ao conectar o Google', { description: err.message });
-        navigate({ to: returnTo, replace: true });
-      });
+    void finishLocally();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6 text-center text-sm text-muted-foreground">
-      {message}
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+      <p>{message}</p>
+      <button
+        type="button"
+        className="text-xs underline hover:text-foreground"
+        onClick={() => navigate({ to: '/agenda', replace: true })}
+      >
+        Voltar para a Agenda
+      </button>
     </div>
   );
 }
