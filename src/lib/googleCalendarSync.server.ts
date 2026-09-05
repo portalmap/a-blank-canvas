@@ -451,40 +451,177 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
   if (account?.sync_token && !syncTokens[calendarId]) syncTokens[calendarId] = account.sync_token;
 
   const startedAt = Date.now();
-  const MAX_SYNC_MS = 25_000;
+  const MAX_SYNC_MS = 20_000;
+  const outOfTime = () => Date.now() - startedAt > MAX_SYNC_MS;
+
+  // Estado persistido da conta (tokens por agenda + cursor de continuação).
+  const persistAccount = async (cursor: SyncCursor | null) => {
+    await admin.from('calendar_google_accounts').upsert(
+      {
+        user_id: userId,
+        google_email: googleEmail,
+        calendar_id: calendarId,
+        status: 'online',
+        sync_token: syncTokens[calendarId] ?? null,
+        sync_tokens: syncTokens,
+        sync_cursor: cursor ?? {},
+        last_synced_at: new Date().toISOString(),
+        last_error: null,
+      },
+      { onConflict: 'user_id' },
+    );
+  };
 
   // Todas as agendas acessíveis (a principal e as compartilhadas/convites).
-  const calendarIds: string[] = [calendarId];
-  const listRes = await google(connectionAPIKey, '/users/me/calendarList?maxResults=250');
-  if (listRes.ok) {
-    for (const cal of (listRes.body?.items ?? []) as { id?: string }[]) {
-      if (cal.id && !calendarIds.includes(cal.id)) calendarIds.push(cal.id);
+  let cursor: SyncCursor;
+  if (resumeCursor) {
+    cursor = resumeCursor;
+  } else {
+    const calendarIds: string[] = [calendarId];
+    const listRes = await google(connectionAPIKey, '/users/me/calendarList?maxResults=250');
+    if (listRes.ok) {
+      for (const cal of (listRes.body?.items ?? []) as { id?: string }[]) {
+        if (cal.id && !calendarIds.includes(cal.id)) calendarIds.push(cal.id);
+      }
     }
+    // Janela padrão da listagem completa: 30 dias atrás até 180 dias à frente.
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    const to = new Date();
+    to.setDate(to.getDate() + 180);
+    cursor = {
+      calendarIds,
+      index: 0,
+      pageToken: null,
+      windowFrom: from.toISOString(),
+      windowTo: to.toISOString(),
+    };
   }
 
-  for (const calId of calendarIds) {
-    if (Date.now() - startedAt > MAX_SYNC_MS) break;
-    let syncToken: string | null = syncTokens[calId] ?? null;
-    let pageToken: string | null = null;
+  /** Aplica uma página de eventos do Google em lote (poucas idas ao banco por página). */
+  const applyPage = async (calId: string, items: GoogleEvent[]) => {
+    const valid = items.filter((ev) => !!ev.id);
+    const cancelledIds = valid.filter((ev) => ev.status === 'cancelled').map((ev) => ev.id);
+    const live = valid.filter((ev) => ev.status !== 'cancelled');
+
+    if (cancelledIds.length) {
+      const { error, count } = await admin
+        .from('calendar_events')
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+        .in('google_event_id', cancelledIds);
+      if (!error) removed += count ?? cancelledIds.length;
+    }
+    if (!live.length) return;
+
+    const { data: existingRows } = await admin
+      .from('calendar_events')
+      .select('id, google_event_id, google_etag')
+      .eq('user_id', userId)
+      .in(
+        'google_event_id',
+        live.map((ev) => ev.id),
+      );
+    const existingByGoogleId = new Map<string, { id: string; google_etag: string | null }>();
+    for (const r of existingRows ?? []) {
+      if (r.google_event_id) existingByGoogleId.set(r.google_event_id, r);
+    }
+
+    const localIdByGoogleId = new Map<string, string>();
+    const toInsert: any[] = [];
+
+    for (const ev of live) {
+      const row = fromGoogleEvent(ev, userId, calId);
+      const existing = existingByGoogleId.get(ev.id);
+      if (existing) {
+        localIdByGoogleId.set(ev.id, existing.id);
+        if (existing.google_etag === row.google_etag) continue;
+        await admin.from('calendar_events').update(row).eq('id', existing.id);
+        pulled += 1;
+      } else {
+        toInsert.push({ ...row, color: '#0ea5e9' });
+      }
+    }
+
+    if (toInsert.length) {
+      const { data: inserted, error } = await admin
+        .from('calendar_events')
+        .insert(toInsert)
+        .select('id, google_event_id');
+      if (error) {
+        // Concorrência/duplicidade: insere um a um para não perder a página inteira.
+        for (const row of toInsert) {
+          const { data: one } = await admin
+            .from('calendar_events')
+            .upsert(row, { onConflict: 'user_id,google_event_id' })
+            .select('id, google_event_id')
+            .maybeSingle();
+          if (one?.google_event_id) {
+            localIdByGoogleId.set(one.google_event_id, one.id);
+            pulled += 1;
+          }
+        }
+      } else {
+        for (const r of inserted ?? []) {
+          if (r.google_event_id) localIdByGoogleId.set(r.google_event_id, r.id);
+        }
+        pulled += inserted?.length ?? 0;
+      }
+    }
+
+    // Espelha a resposta de cada convidado (Sim/Não/Talvez) vinda do Google.
+    const desired = new Map<string, string>(); // `${localId}|${email}` -> status
+    const withGuests: string[] = [];
+    for (const ev of live) {
+      const localId = localIdByGoogleId.get(ev.id);
+      if (!localId || !(ev.attendees ?? []).length) continue;
+      withGuests.push(localId);
+      for (const attendee of ev.attendees ?? []) {
+        const email = attendee.email?.trim().toLowerCase();
+        if (!email) continue;
+        desired.set(`${localId}|${email}`, attendee.responseStatus ?? 'needsAction');
+      }
+    }
+    if (withGuests.length) {
+      const { data: guests } = await admin
+        .from('calendar_event_guests')
+        .select('id, event_id, email, response_status')
+        .in('event_id', withGuests)
+        .not('email', 'is', null);
+      for (const g of guests ?? []) {
+        const want = desired.get(`${g.event_id}|${(g.email ?? '').trim().toLowerCase()}`);
+        if (want && want !== g.response_status) {
+          await admin.from('calendar_event_guests').update({ response_status: want }).eq('id', g.id);
+        }
+      }
+    }
+  };
+
+  let stoppedForTime = false;
+
+  calendarsLoop: for (; cursor.index < cursor.calendarIds.length; cursor.index++, cursor.pageToken = null) {
+    const calId = cursor.calendarIds[cursor.index]!;
+    // Com pageToken em andamento estamos numa listagem completa; sem ele, tenta o token incremental.
+    let syncToken: string | null = cursor.pageToken ? null : (syncTokens[calId] ?? null);
     let nextSyncToken: string | null = null;
     let guard = 0;
 
-    do {
+    while (true) {
+      if (outOfTime()) {
+        stoppedForTime = true;
+        break calendarsLoop;
+      }
+
       const params = new URLSearchParams();
       params.set('singleEvents', 'true');
       params.set('showDeleted', 'true');
       params.set('maxResults', '250');
       if (syncToken) params.set('syncToken', syncToken);
       else {
-        // Janela padrão: 30 dias atrás até 180 dias à frente.
-        const from = new Date();
-        from.setDate(from.getDate() - 30);
-        const to = new Date();
-        to.setDate(to.getDate() + 180);
-        params.set('timeMin', from.toISOString());
-        params.set('timeMax', to.toISOString());
+        params.set('timeMin', cursor.windowFrom);
+        params.set('timeMax', cursor.windowTo);
       }
-      if (pageToken) params.set('pageToken', pageToken);
+      if (cursor.pageToken) params.set('pageToken', cursor.pageToken);
 
       const res = await google(
         connectionAPIKey,
@@ -493,9 +630,10 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
 
       if (!res.ok) {
         if (res.status === 410 && syncToken) {
-          // Sync token expired: restart a full sync.
+          // Token incremental expirou: recomeça a listagem completa desta agenda.
           syncToken = null;
-          pageToken = null;
+          delete syncTokens[calId];
+          cursor.pageToken = null;
           continue;
         }
         if (calId === calendarId) {
@@ -503,62 +641,34 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
           await markOffline(admin, userId, `(${res.status}) ${message}`);
           return { connected: true, pushed, pulled, removed, error: message };
         }
-        break;
+        break; // agenda secundária indisponível: segue para a próxima
       }
 
-      for (const ev of (res.body?.items ?? []) as GoogleEvent[]) {
-        if (!ev.id) continue;
-        if (ev.status === 'cancelled') {
-          const { error } = await admin
-            .from('calendar_events')
-            .delete()
-            .eq('user_id', userId)
-            .eq('google_event_id', ev.id);
-          if (!error) removed += 1;
-          continue;
-        }
-        const row = fromGoogleEvent(ev, userId, calId);
-        const { data: existing } = await admin
-          .from('calendar_events')
-          .select('id, google_etag')
-          .eq('user_id', userId)
-          .eq('google_event_id', ev.id)
-          .maybeSingle();
+      await applyPage(calId, (res.body?.items ?? []) as GoogleEvent[]);
 
-        let localId = existing?.id ?? null;
-        if (existing) {
-          if (existing.google_etag === row.google_etag) continue;
-          await admin.from('calendar_events').update(row).eq('id', existing.id);
-        } else {
-          const { data: inserted } = await admin
-            .from('calendar_events')
-            .insert({ ...row, color: '#0ea5e9' })
-            .select('id')
-            .maybeSingle();
-          localId = inserted?.id ?? null;
-        }
-
-        // Espelha a resposta de cada convidado (Sim/Não/Talvez) vinda do Google.
-        if (localId && (ev.attendees ?? []).length) {
-          for (const attendee of ev.attendees ?? []) {
-            const email = attendee.email?.trim().toLowerCase();
-            if (!email) continue;
-            await admin
-              .from('calendar_event_guests')
-              .update({ response_status: attendee.responseStatus ?? 'needsAction' })
-              .eq('event_id', localId)
-              .eq('email', email);
-          }
-        }
-        pulled += 1;
-      }
-
-      pageToken = res.body?.nextPageToken ?? null;
+      const nextPage: string | null = res.body?.nextPageToken ?? null;
       nextSyncToken = res.body?.nextSyncToken ?? nextSyncToken;
       guard += 1;
-    } while (pageToken && guard < 20 && Date.now() - startedAt < MAX_SYNC_MS);
+
+      if (!nextPage || guard >= 40) break;
+      cursor.pageToken = nextPage;
+      // Salva o ponto entre páginas: se o tempo acabar, a próxima rodada continua daqui.
+      await persistAccount(cursor);
+    }
 
     if (nextSyncToken) syncTokens[calId] = nextSyncToken;
+  }
+
+  if (stoppedForTime) {
+    await persistAccount(cursor);
+    return {
+      connected: true,
+      pushed,
+      pulled,
+      removed,
+      more: true,
+      progress: { calendar: cursor.index + 1, calendars: cursor.calendarIds.length },
+    };
   }
 
   // ---------- PULL: tarefas do Google ----------
@@ -567,7 +677,7 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
     const lists = (listsRes.ok ? listsRes.body?.items ?? [] : []) as { id?: string }[];
     for (const list of lists) {
       if (!list.id) continue;
-      if (Date.now() - startedAt > MAX_SYNC_MS + 10_000) break;
+      if (Date.now() - startedAt > MAX_SYNC_MS + 5_000) break;
       const params = new URLSearchParams({
         showCompleted: 'true',
         showHidden: 'true',
@@ -580,15 +690,25 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
       );
       if (!res.ok) continue;
 
-      for (const task of (res.body?.items ?? []) as GoogleTask[]) {
-        if (!task.id) continue;
-        const { data: existing } = await admin
-          .from('calendar_events')
-          .select('id, google_etag')
-          .eq('user_id', userId)
-          .eq('google_task_id', task.id)
-          .maybeSingle();
+      const tasks = ((res.body?.items ?? []) as GoogleTask[]).filter((t) => !!t.id);
+      if (!tasks.length) continue;
 
+      const { data: existingTasks } = await admin
+        .from('calendar_events')
+        .select('id, google_task_id, google_etag')
+        .eq('user_id', userId)
+        .in(
+          'google_task_id',
+          tasks.map((t) => t.id),
+        );
+      const existingByTaskId = new Map<string, { id: string; google_etag: string | null }>();
+      for (const r of existingTasks ?? []) {
+        if (r.google_task_id) existingByTaskId.set(r.google_task_id, r);
+      }
+
+      const toInsert: any[] = [];
+      for (const task of tasks) {
+        const existing = existingByTaskId.get(task.id);
         if (task.deleted) {
           if (existing) {
             await admin.from('calendar_events').delete().eq('id', existing.id);
@@ -603,31 +723,30 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
         if (existing) {
           if (existing.google_etag && existing.google_etag === row.google_etag) continue;
           await admin.from('calendar_events').update(row).eq('id', existing.id);
+          pulled += 1;
         } else {
-          await admin.from('calendar_events').insert({ ...row, color: '#22c55e' });
+          toInsert.push({ ...row, color: '#22c55e' });
         }
-        pulled += 1;
+      }
+      if (toInsert.length) {
+        const { error } = await admin.from('calendar_events').insert(toInsert);
+        if (!error) pulled += toInsert.length;
       }
     }
   } catch {
     /* tarefas do Google indisponíveis: a agenda continua funcionando */
   }
 
-  await admin.from('calendar_google_accounts').upsert(
-    {
-      user_id: userId,
-      google_email: googleEmail,
-      calendar_id: calendarId,
-      status: 'online',
-      sync_token: syncTokens[calendarId] ?? null,
-      sync_tokens: syncTokens,
-      last_synced_at: new Date().toISOString(),
-      last_error: null,
-    },
-    { onConflict: 'user_id' },
-  );
+  await persistAccount(null);
 
-  return { connected: true, pushed, pulled, removed };
+  return {
+    connected: true,
+    pushed,
+    pulled,
+    removed,
+    more: false,
+    progress: { calendar: cursor.calendarIds.length, calendars: cursor.calendarIds.length },
+  };
 }
 
 /**
