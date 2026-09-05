@@ -18,6 +18,7 @@ import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedTeamsRouteImport } from './routes/_authenticated/teams'
 import { Route as AuthenticatedSpacesRouteImport } from './routes/_authenticated/spaces'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedGestaoRouteImport } from './routes/_authenticated/gestao'
 import { Route as AuthenticatedEverythingRouteImport } from './routes/_authenticated/everything'
 import { Route as AuthenticatedDocumentsRouteImport } from './routes/_authenticated/documents'
 import { Route as AuthenticatedDashboardsRouteImport } from './routes/_authenticated/dashboards'
@@ -77,6 +78,11 @@ const AuthenticatedSpacesRoute = AuthenticatedSpacesRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedGestaoRoute = AuthenticatedGestaoRouteImport.update({
+  id: '/gestao',
+  path: '/gestao',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedEverythingRoute = AuthenticatedEverythingRouteImport.update({
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/dashboards': typeof AuthenticatedDashboardsRouteWithChildren
   '/documents': typeof AuthenticatedDocumentsRouteWithChildren
   '/everything': typeof AuthenticatedEverythingRoute
+  '/gestao': typeof AuthenticatedGestaoRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/spaces': typeof AuthenticatedSpacesRoute
   '/teams': typeof AuthenticatedTeamsRoute
@@ -202,6 +209,7 @@ export interface FileRoutesByTo {
   '/automations': typeof AuthenticatedAutomationsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/everything': typeof AuthenticatedEverythingRoute
+  '/gestao': typeof AuthenticatedGestaoRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/spaces': typeof AuthenticatedSpacesRoute
   '/teams': typeof AuthenticatedTeamsRoute
@@ -230,6 +238,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboards': typeof AuthenticatedDashboardsRouteWithChildren
   '/_authenticated/documents': typeof AuthenticatedDocumentsRouteWithChildren
   '/_authenticated/everything': typeof AuthenticatedEverythingRoute
+  '/_authenticated/gestao': typeof AuthenticatedGestaoRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/spaces': typeof AuthenticatedSpacesRoute
   '/_authenticated/teams': typeof AuthenticatedTeamsRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/dashboards'
     | '/documents'
     | '/everything'
+    | '/gestao'
     | '/settings'
     | '/spaces'
     | '/teams'
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
     | '/automations'
     | '/chat'
     | '/everything'
+    | '/gestao'
     | '/settings'
     | '/spaces'
     | '/teams'
@@ -309,6 +320,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboards'
     | '/_authenticated/documents'
     | '/_authenticated/everything'
+    | '/_authenticated/gestao'
     | '/_authenticated/settings'
     | '/_authenticated/spaces'
     | '/_authenticated/teams'
@@ -398,6 +410,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/gestao': {
+      id: '/_authenticated/gestao'
+      path: '/gestao'
+      fullPath: '/gestao'
+      preLoaderRoute: typeof AuthenticatedGestaoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/everything': {
@@ -555,6 +574,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardsRoute: typeof AuthenticatedDashboardsRouteWithChildren
   AuthenticatedDocumentsRoute: typeof AuthenticatedDocumentsRouteWithChildren
   AuthenticatedEverythingRoute: typeof AuthenticatedEverythingRoute
+  AuthenticatedGestaoRoute: typeof AuthenticatedGestaoRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSpacesRoute: typeof AuthenticatedSpacesRoute
   AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
@@ -574,6 +594,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardsRoute: AuthenticatedDashboardsRouteWithChildren,
   AuthenticatedDocumentsRoute: AuthenticatedDocumentsRouteWithChildren,
   AuthenticatedEverythingRoute: AuthenticatedEverythingRoute,
+  AuthenticatedGestaoRoute: AuthenticatedGestaoRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSpacesRoute: AuthenticatedSpacesRoute,
   AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
