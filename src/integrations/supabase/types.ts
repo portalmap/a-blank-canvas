@@ -260,7 +260,9 @@ export type Database = {
       calendar_events: {
         Row: {
           all_day: boolean
+          auto_decline: boolean
           color: string
+          completed_at: string | null
           created_at: string
           deleted_at: string | null
           description: string | null
@@ -269,10 +271,14 @@ export type Database = {
           google_etag: string | null
           google_event_id: string | null
           google_html_link: string | null
+          google_task_id: string | null
+          google_task_list_id: string | null
           id: string
+          item_type: string
           last_synced_at: string | null
           location: string | null
           reminder_minutes: number | null
+          response_status: string | null
           source: string
           starts_at: string
           title: string
@@ -281,7 +287,9 @@ export type Database = {
         }
         Insert: {
           all_day?: boolean
+          auto_decline?: boolean
           color?: string
+          completed_at?: string | null
           created_at?: string
           deleted_at?: string | null
           description?: string | null
@@ -290,10 +298,14 @@ export type Database = {
           google_etag?: string | null
           google_event_id?: string | null
           google_html_link?: string | null
+          google_task_id?: string | null
+          google_task_list_id?: string | null
           id?: string
+          item_type?: string
           last_synced_at?: string | null
           location?: string | null
           reminder_minutes?: number | null
+          response_status?: string | null
           source?: string
           starts_at: string
           title: string
@@ -302,7 +314,9 @@ export type Database = {
         }
         Update: {
           all_day?: boolean
+          auto_decline?: boolean
           color?: string
+          completed_at?: string | null
           created_at?: string
           deleted_at?: string | null
           description?: string | null
@@ -311,10 +325,14 @@ export type Database = {
           google_etag?: string | null
           google_event_id?: string | null
           google_html_link?: string | null
+          google_task_id?: string | null
+          google_task_list_id?: string | null
           id?: string
+          item_type?: string
           last_synced_at?: string | null
           location?: string | null
           reminder_minutes?: number | null
+          response_status?: string | null
           source?: string
           starts_at?: string
           title?: string
@@ -334,6 +352,7 @@ export type Database = {
           last_synced_at: string | null
           status: string
           sync_token: string | null
+          sync_tokens: Json
           updated_at: string
           user_id: string
         }
@@ -347,6 +366,7 @@ export type Database = {
           last_synced_at?: string | null
           status?: string
           sync_token?: string | null
+          sync_tokens?: Json
           updated_at?: string
           user_id: string
         }
@@ -360,6 +380,7 @@ export type Database = {
           last_synced_at?: string | null
           status?: string
           sync_token?: string | null
+          sync_tokens?: Json
           updated_at?: string
           user_id?: string
         }
