@@ -110,7 +110,15 @@ export default function Agenda() {
   }, [view, reference]);
 
   return (
-    <div className="container mx-auto space-y-5 p-3 md:p-6">
+    <div
+      ref={fullscreenRef}
+      className={cn(
+        'flex flex-col bg-background',
+        isFullscreen
+          ? 'h-screen w-screen overflow-hidden p-4'
+          : 'container mx-auto space-y-5 p-3 md:p-6'
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground md:text-3xl">
@@ -154,6 +162,16 @@ export default function Agenda() {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <span className="ml-2 text-sm font-medium capitalize text-foreground">{periodLabel}</span>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? 'Sair da tela cheia' : 'Expandir tela cheia'}
+            title={isFullscreen ? 'Sair da tela cheia' : 'Expandir tela cheia'}
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
         </div>
 
         <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
@@ -184,7 +202,6 @@ export default function Agenda() {
           onSelectSlot={(date) => openNew(date)}
         />
       )}
-
 
       <AgendaEventDialog
         open={dialogOpen}
