@@ -181,6 +181,7 @@ export default function Agenda() {
         onOpenChange={setDialogOpen}
         event={selectedEvent}
         defaultDate={defaultDate}
+        defaultType={defaultType}
       />
     </div>
   );
