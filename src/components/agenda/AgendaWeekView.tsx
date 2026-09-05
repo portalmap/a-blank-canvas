@@ -19,6 +19,10 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MAX_COLUMNS = 3;
 /** Faixa (em %) do bloco de trás que fica visível à esquerda quando há sobreposição. */
 const STRIP = 18;
+/** Largura (em %) do bloco do fundo e redução por camada à frente. */
+const BASE_WIDTH = 80;
+const WIDTH_STEP = 10;
+const MIN_WIDTH = 40;
 
 interface Positioned {
   event: CalendarEvent;
@@ -89,12 +93,15 @@ function layoutDay(dayEvents: CalendarEvent[], day: Date): DayLayout {
     const hidden = columns.slice(MAX_COLUMNS).flat();
     const total = visible.length;
 
+    // Larguras decrescentes estilo Google: o bloco do fundo é o mais largo
+    // e cada bloco à frente reduz a espessura, deslocado para a direita.
+    const widthAt = (i: number) => Math.max(MIN_WIDTH, BASE_WIDTH - i * WIDTH_STEP);
+    const lastWidth = widthAt(total - 1);
+    const step = total > 1 ? Math.min(STRIP, (100 - lastWidth) / (total - 1)) : 0;
+
     visible.forEach((col, index) => {
-      // Escalonamento estilo Google: cada bloco vai até a borda direita,
-      // deixando só uma faixa fina do bloco anterior visível à esquerda.
-      const step = total > 1 ? Math.min(STRIP, 70 / (total - 1)) : 0;
-      const left = index * step;
-      const width = 100 - left;
+      const width = widthAt(index);
+      const left = Math.min(index * step, 100 - width);
       for (const item of col) {
         const startMin = (item.start - dayStart) / 60_000;
         const endMin = (item.end - dayStart) / 60_000;
