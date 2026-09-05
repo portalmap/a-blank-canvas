@@ -151,6 +151,12 @@ export function useConnectGoogleCalendar() {
         GOOGLE_CONNECT_RETURN_TO_KEY,
         `${window.location.pathname}${window.location.search}`,
       );
+      try {
+        localStorage.removeItem(GOOGLE_OAUTH_CHANNEL);
+      } catch {
+        /* sem armazenamento */
+      }
+
 
       // Fora de iframe: a própria página vai ao Google e volta para a rota de retorno,
       // que conclui a troca do código e redireciona de volta.
