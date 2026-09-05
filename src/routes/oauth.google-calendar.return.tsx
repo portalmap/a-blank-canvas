@@ -32,18 +32,24 @@ function OAuthReturn() {
     })();
 
     // Fluxo em aba separada (pré-visualização): a Agenda original espera um aviso.
+    // Nunca concluímos a troca aqui — esta aba não tem a sessão do MAP Flow.
     const notifyOpener = (
       type: 'appUserConnectorOAuthComplete' | 'appUserConnectorOAuthFailed',
+      exchangeCode: string | null = null,
+      readableError: string | null = null,
     ): boolean => {
       if (!window.opener) return false;
-      window.opener.postMessage({ type, connectorId: CONNECTOR_ID }, window.location.origin);
+      window.opener.postMessage(
+        { type, connectorId: CONNECTOR_ID, code: exchangeCode, error: readableError },
+        window.location.origin,
+      );
       window.close();
       return true;
     };
 
     if (!success || (params.get('offline_access_allowed') !== 'false' && !code)) {
       const readable = errorParam ?? 'A autorização não foi concluída.';
-      if (notifyOpener('appUserConnectorOAuthFailed')) {
+      if (notifyOpener('appUserConnectorOAuthFailed', null, readable)) {
         setMessage(readable);
         return;
       }
@@ -53,22 +59,10 @@ function OAuthReturn() {
       return;
     }
 
-    // Quem abriu em aba separada (dentro da pré-visualização) já conclui a troca lá.
+    // Aba separada: devolve o código para a Agenda concluir com a sessão dela.
     if (window.opener) {
-      setMessage('Conexão concluída! Esta janela será fechada.');
-      if (!code) {
-        // Sem código para trocar aqui: quem abriu conclui a conexão.
-        window.opener.postMessage(
-          { type: 'appUserConnectorOAuthComplete', connectorId: CONNECTOR_ID, code: null },
-          window.location.origin,
-        );
-        window.close();
-        return;
-      }
-      // Com código: concluímos aqui e avisamos a aba original.
-      complete({ data: { code } })
-        .then(() => notifyOpener('appUserConnectorOAuthComplete'))
-        .catch(() => notifyOpener('appUserConnectorOAuthFailed'));
+      setMessage('Conexão autorizada! Esta janela será fechada.');
+      notifyOpener('appUserConnectorOAuthComplete', code ?? null);
       return;
     }
 
