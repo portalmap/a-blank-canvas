@@ -16,9 +16,9 @@ export function GoogleAgendaButton() {
 
   const connected = !!status?.connected;
 
-  // Sincroniza ao abrir a agenda (uma vez por carregamento).
+  // Sincroniza ao abrir a agenda (uma vez por carregamento) e após conectar.
   useEffect(() => {
-    if (!connected || autoSynced.current) return;
+    if (!connected || autoSynced.current || sync.isPending) return;
     autoSynced.current = true;
     sync.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
