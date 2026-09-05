@@ -494,11 +494,30 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
           .eq('google_event_id', ev.id)
           .maybeSingle();
 
+        let localId = existing?.id ?? null;
         if (existing) {
           if (existing.google_etag === row.google_etag) continue;
           await admin.from('calendar_events').update(row).eq('id', existing.id);
         } else {
-          await admin.from('calendar_events').insert({ ...row, color: '#0ea5e9' });
+          const { data: inserted } = await admin
+            .from('calendar_events')
+            .insert({ ...row, color: '#0ea5e9' })
+            .select('id')
+            .maybeSingle();
+          localId = inserted?.id ?? null;
+        }
+
+        // Espelha a resposta de cada convidado (Sim/Não/Talvez) vinda do Google.
+        if (localId && (ev.attendees ?? []).length) {
+          for (const attendee of ev.attendees ?? []) {
+            const email = attendee.email?.trim().toLowerCase();
+            if (!email) continue;
+            await admin
+              .from('calendar_event_guests')
+              .update({ response_status: attendee.responseStatus ?? 'needsAction' })
+              .eq('event_id', localId)
+              .eq('email', email);
+          }
         }
         pulled += 1;
       }
