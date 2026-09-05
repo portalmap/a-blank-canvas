@@ -1,35 +1,37 @@
-# Agenda com os quatro tipos do Google: Evento, Tarefa, Ausente e Hora de se concentrar
+# Confirmação de presença (Sim / Não / Talvez) na Agenda
 
-O banco já está preparado (cada compromisso guarda o tipo, se a tarefa foi concluída e o vínculo com a tarefa do Google), mas a tela e a sincronização ainda tratam tudo como "evento". Vamos completar, mantendo a Agenda como módulo isolado.
+Objetivo: poder responder aos convites do Google direto daqui, com as três opções do Google — Sim (aceito), Não (recusado) e Talvez (provisório) — e a resposta chegar no Google e nos organizadores.
 
-## 1. Botão "Criar" com os quatro tipos
+## O que muda para você
 
-- O botão de criar passa a abrir um menu com: Evento, Tarefa, Ausente, Hora de se concentrar.
-- A janela de criação se adapta ao tipo:
-  - Evento: como hoje (com convidados).
-  - Tarefa: título, data/hora, descrição e caixa "concluída" — sem convidados.
-  - Ausente: período e opção "recusar automaticamente convites".
-  - Hora de se concentrar: período e descrição.
-- Cada tipo ganha um marcador visual próprio (cor/ícone) nas visões Mês, Semana e Lista; tarefas concluídas aparecem riscadas e podem ser marcadas direto na agenda.
-
-## 2. Tarefas do Google indo e voltando
-
-- As tarefas do Google (a lista de tarefas ligada à conta conectada) passam a ser lidas e mostradas na Agenda no dia em que vencem.
-- Tarefa criada aqui é criada na conta do Google; editar, concluir ou excluir aqui reflete lá, e o que muda no Google volta para cá.
-- Ausente e Hora de se concentrar são criados no Google com o tipo correspondente, e os que vêm do Google entram com o mesmo tipo.
-- Isso exige uma permissão nova do Google: será necessário clicar uma vez em "Reconectar" na Agenda e autorizar o acesso às tarefas.
-
-## 3. O que não muda
-
-- Reuniões de terceiros continuam somente leitura; nada é criado em agendas de outras pessoas.
-- Ao desconectar, segue a regra atual: o futuro importado sai, o histórico fica.
-- As tarefas dos projetos do MAP Flow não entram nessa camada agora (fica para depois, se você quiser).
+- Ao abrir um compromisso em que você foi convidado (evento vindo do Google ou criado aqui), aparecem três botões: **Sim**, **Não** e **Talvez**, com destaque na opção já escolhida.
+- Nas visões de mês e semana, o compromisso mostra um sinal da sua resposta: aceito (cheio), talvez (contorno pontilhado) e recusado (título riscado, mais apagado).
+- Se você recusar, o compromisso continua na agenda, apenas marcado como recusado (mesmo comportamento do Google).
+- Quando você é o organizador, o dialogo lista os convidados com a resposta de cada um (Sim / Não / Talvez / Sem resposta), atualizada a cada sincronização.
+- A resposta é enviada ao Google e aos organizadores; se a conta do Google não estiver conectada, a resposta é registrada apenas aqui.
+- Tarefas do Google não têm confirmação de presença (o Google também não oferece); nelas continua apenas concluir/reabrir.
 
 ## Detalhes técnicos
 
-- `useAgenda.ts`: tipo `AgendaItemType` ('event' | 'task' | 'out_of_office' | 'focus_time'), campos `item_type`, `completed_at`, `auto_decline`, `response_status` em `CalendarEvent`/`EventInput`; mutação `useToggleAgendaTask`.
-- `AgendaEventDialog.tsx`: seletor de tipo + campos condicionais; convidados só para `event`.
-- `Agenda.tsx`: `DropdownMenu` no botão Criar passando o tipo inicial; legenda por tipo.
-- `AgendaMonthView/AgendaWeekView/AgendaListView`: estilo por `item_type` e checkbox de conclusão para tarefas.
-- `googleCalendarSync.server.ts`: escopo extra `https://www.googleapis.com/auth/tasks`; mapear `eventType` (`default`/`outOfOffice`/`focusTime`) nos dois sentidos; novo bloco push/pull em `/tasks/v1/lists/@default/tasks` gravando `google_task_id`/`google_task_list_id`; `status: 'completed'` ↔ `completed_at`.
-- `GOOGLE_SCOPES` em `googleCalendarSync.server.ts` e no fluxo de consentimento de `useGoogleCalendar.ts` precisam ficar iguais, para o "Reconectar" pedir a permissão nova.
+1. Banco (migration)
+   - `calendar_event_guests.response_status`: passar a aceitar `needsAction | accepted | declined | tentative` (checagem por trigger de validação, não CHECK imutável), padrão `needsAction`.
+   - `calendar_events.response_status`: mesma normalização, usado para a resposta do próprio dono da linha importada do Google.
+   - Sem novas tabelas; grants/RLS existentes permanecem.
+
+2. `src/hooks/useAgenda.ts`
+   - Ampliar `useRespondInvite` para aceitar `'accepted' | 'declined' | 'tentative'`.
+   - Atualizar as duas pontas: `calendar_event_guests` (quando o usuário é convidado) e `calendar_events.response_status` (quando é a cópia importada do Google do próprio usuário).
+   - Após gravar, chamar a função de servidor de RSVP e invalidar as queries da agenda.
+
+3. `src/lib/googleCalendarSync.server.ts`
+   - Nova rotina `pushRsvp(userId, eventId, status)`: `PATCH /calendar/v3/calendars/{calendarId}/events/{eventId}?sendUpdates=all`, enviando o array `attendees` com a entrada `self` atualizada para o `responseStatus` escolhido.
+   - No pull, além de `response_status` do próprio usuário, gravar a resposta de cada convidado (`attendees[].responseStatus`) em `calendar_event_guests`, casando por e-mail.
+   - Manter a janela de sincronização e os tokens por agenda como estão.
+
+4. `src/lib/google-calendar.functions.ts`
+   - Nova server function autenticada `respondCalendarInvite` (`{ eventId, status }`), que valida se o usuário é dono/convidado do evento e chama `pushRsvp`; erro do Google é devolvido sem quebrar a resposta local.
+
+5. UI
+   - `src/components/agenda/AgendaEventDialog.tsx`: bloco “Sua resposta” com os três botões para convites; lista de convidados com o status de resposta para o organizador.
+   - `src/components/agenda/AgendaMonthView.tsx`, `AgendaWeekView.tsx`, `AgendaListView.tsx`: estilo conforme a resposta (aceito / talvez / recusado) reaproveitando o helper de ícones já existente.
+   - Nenhuma mudança fora do módulo Agenda.
