@@ -3,6 +3,7 @@ import { format, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { CalendarEvent } from '@/hooks/useAgenda';
 import { AgendaItemIcon } from '@/components/agenda/agendaItemVisual';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Props {
   days: Date[];
@@ -14,6 +15,10 @@ interface Props {
 const HOUR_HEIGHT = 48;
 const MINUTE = HOUR_HEIGHT / 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+/** Colunas visíveis em um grupo de sobreposição; o excedente vira um marcador "+N". */
+const MAX_COLUMNS = 3;
+/** Quanto cada bloco avança sobre o vizinho (0 = fatias iguais, 1 = totalmente empilhado). */
+const OVERLAP = 0.32;
 
 interface Positioned {
   event: CalendarEvent;
@@ -21,9 +26,21 @@ interface Positioned {
   height: number;
   left: number;
   width: number;
+  zIndex: number;
 }
 
-function layoutDay(dayEvents: CalendarEvent[], day: Date): Positioned[] {
+interface Overflow {
+  key: string;
+  top: number;
+  events: CalendarEvent[];
+}
+
+interface DayLayout {
+  positioned: Positioned[];
+  overflows: Overflow[];
+}
+
+function layoutDay(dayEvents: CalendarEvent[], day: Date): DayLayout {
   const dayStart = startOfDay(day).getTime();
   const dayEnd = dayStart + 24 * 3600_000;
 
@@ -35,7 +52,7 @@ function layoutDay(dayEvents: CalendarEvent[], day: Date): Positioned[] {
     })
     .sort((a, b) => a.start - b.start || b.end - a.end);
 
-  // Agrupa eventos que se cruzam no tempo para dividir a largura da coluna.
+  // Agrupa eventos que se cruzam no tempo para distribuir a largura da coluna.
   const groups: (typeof items)[] = [];
   let current: typeof items = [];
   let groupEnd = 0;
@@ -50,7 +67,9 @@ function layoutDay(dayEvents: CalendarEvent[], day: Date): Positioned[] {
   }
   if (current.length) groups.push(current);
 
-  const out: Positioned[] = [];
+  const positioned: Positioned[] = [];
+  const overflows: Overflow[] = [];
+
   for (const group of groups) {
     const columns: (typeof items)[] = [];
     for (const item of group) {
@@ -65,22 +84,41 @@ function layoutDay(dayEvents: CalendarEvent[], day: Date): Positioned[] {
       }
       if (!placed) columns.push([item]);
     }
-    const total = columns.length;
-    columns.forEach((col, index) => {
+
+    const visible = columns.slice(0, MAX_COLUMNS);
+    const hidden = columns.slice(MAX_COLUMNS).flat();
+    const total = visible.length;
+
+    visible.forEach((col, index) => {
+      // Escalonamento estilo Google: avança sobre o vizinho e fica mais largo que a fatia exata.
+      const slot = 100 / total;
+      const left = index * slot * (1 - OVERLAP / Math.max(total - 1, 1));
+      const width = Math.min(slot * (1 + OVERLAP), 100 - left);
       for (const item of col) {
         const startMin = (item.start - dayStart) / 60_000;
         const endMin = (item.end - dayStart) / 60_000;
-        out.push({
+        positioned.push({
           event: item.event,
           top: startMin * MINUTE,
           height: Math.max((endMin - startMin) * MINUTE, 22),
-          left: (index / total) * 100,
-          width: 100 / total,
+          left,
+          width,
+          zIndex: 10 + index,
         });
       }
     });
+
+    if (hidden.length) {
+      const top = Math.min(...hidden.map((i) => i.start));
+      overflows.push({
+        key: `${day.toISOString()}-${top}`,
+        top: ((top - dayStart) / 60_000) * MINUTE,
+        events: hidden.sort((a, b) => a.start - b.start).map((i) => i.event),
+      });
+    }
   }
-  return out;
+
+  return { positioned, overflows };
 }
 
 export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Props) {
@@ -107,7 +145,7 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
         return {
           day,
           allDay: all.filter((e) => e.all_day),
-          timed: layoutDay(
+          layout: layoutDay(
             all.filter((e) => !e.all_day),
             day,
           ),
@@ -184,7 +222,7 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                 ))}
               </div>
 
-              {perDay.map(({ day, timed }) => {
+              {perDay.map(({ day, layout }) => {
                 const today = isSameDay(day, now);
                 const nowTop = (now.getHours() * 60 + now.getMinutes()) * MINUTE;
                 return (
@@ -204,18 +242,19 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                       />
                     ))}
 
-                    {timed.map(({ event, top, height, left, width }) => (
+                    {layout.positioned.map(({ event, top, height, left, width, zIndex }) => (
                       <button
                         key={event.id}
                         type="button"
                         onClick={() => onSelectEvent(event)}
-                        className="absolute overflow-hidden rounded border border-card/40 px-1.5 py-0.5 text-left text-[11px] leading-tight text-primary-foreground shadow-sm"
+                        className="absolute overflow-hidden rounded border border-card/60 px-1.5 py-0.5 text-left text-[11px] leading-tight text-primary-foreground shadow-sm transition-shadow hover:z-30 hover:shadow-md focus-visible:z-30"
                         style={{
                           top,
                           height,
                           left: `calc(${left}% + 2px)`,
                           width: `calc(${width}% - 4px)`,
                           backgroundColor: event.color,
+                          zIndex,
                         }}
                         title={event.title}
                       >
@@ -237,9 +276,47 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                       </button>
                     ))}
 
+                    {layout.overflows.map(({ key, top, events: hidden }) => (
+                      <Popover key={key}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="absolute z-40 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-foreground shadow-sm hover:bg-accent"
+                            style={{ top: top + 2, right: 2 }}
+                          >
+                            +{hidden.length}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64 p-2">
+                          <p className="mb-1 px-1 text-[11px] font-medium text-muted-foreground">
+                            Mais compromissos neste horário
+                          </p>
+                          <div className="space-y-1">
+                            {hidden.map((e) => (
+                              <button
+                                key={e.id}
+                                type="button"
+                                onClick={() => onSelectEvent(e)}
+                                className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-xs hover:bg-accent"
+                              >
+                                <span
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                  style={{ backgroundColor: e.color }}
+                                />
+                                <span className="shrink-0 text-muted-foreground">
+                                  {format(new Date(e.starts_at), 'HH:mm')}
+                                </span>
+                                <span className="truncate text-foreground">{e.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ))}
+
                     {today && (
                       <div
-                        className="pointer-events-none absolute left-0 right-0 z-10 border-t-2 border-destructive"
+                        className="pointer-events-none absolute left-0 right-0 z-50 border-t-2 border-destructive"
                         style={{ top: nowTop }}
                       >
                         <span className="absolute -left-1 -top-[5px] h-2 w-2 rounded-full bg-destructive" />
