@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { CalendarEvent } from '@/hooks/useAgenda';
-import { AgendaItemIcon } from '@/components/agenda/agendaItemVisual';
+
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Props {
@@ -17,8 +17,8 @@ const MINUTE = HOUR_HEIGHT / 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 /** Colunas visíveis em um grupo de sobreposição; o excedente vira um marcador "+N". */
 const MAX_COLUMNS = 3;
-/** Quanto cada bloco avança sobre o vizinho (0 = fatias iguais, 1 = totalmente empilhado). */
-const OVERLAP = 0.32;
+/** Faixa (em %) do bloco de trás que fica visível à esquerda quando há sobreposição. */
+const STRIP = 18;
 
 interface Positioned {
   event: CalendarEvent;
@@ -90,10 +90,11 @@ function layoutDay(dayEvents: CalendarEvent[], day: Date): DayLayout {
     const total = visible.length;
 
     visible.forEach((col, index) => {
-      // Escalonamento estilo Google: avança sobre o vizinho e fica mais largo que a fatia exata.
-      const slot = 100 / total;
-      const left = index * slot * (1 - OVERLAP / Math.max(total - 1, 1));
-      const width = Math.min(slot * (1 + OVERLAP), 100 - left);
+      // Escalonamento estilo Google: cada bloco vai até a borda direita,
+      // deixando só uma faixa fina do bloco anterior visível à esquerda.
+      const step = total > 1 ? Math.min(STRIP, 70 / (total - 1)) : 0;
+      const left = index * step;
+      const width = 100 - left;
       for (const item of col) {
         const startMin = (item.start - dayStart) / 60_000;
         const endMin = (item.end - dayStart) / 60_000;
@@ -247,28 +248,27 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                         key={event.id}
                         type="button"
                         onClick={() => onSelectEvent(event)}
-                        className="absolute overflow-hidden rounded border border-card/60 px-1.5 py-0.5 text-left text-[11px] leading-tight text-primary-foreground shadow-sm transition-shadow hover:z-30 hover:shadow-md focus-visible:z-30"
+                        className="absolute overflow-hidden rounded border border-card/60 px-1 py-0.5 text-left text-[11px] leading-tight text-primary-foreground shadow-sm transition-shadow hover:z-30 hover:shadow-md focus-visible:z-30"
                         style={{
                           top,
                           height,
-                          left: `calc(${left}% + 2px)`,
-                          width: `calc(${width}% - 4px)`,
+                          left: `${left}%`,
+                          width: `calc(${width}% - 1px)`,
                           backgroundColor: event.color,
                           zIndex,
                         }}
                         title={event.title}
                       >
                         <span
-                          className={`flex items-center gap-1 truncate font-semibold ${
+                          className={`block font-semibold ${height >= 34 ? 'line-clamp-2' : 'truncate'} ${
                             event.completed_at || event.response_status === 'declined'
                               ? 'line-through opacity-80'
                               : ''
                           } ${event.response_status === 'tentative' ? 'italic' : ''}`}
                         >
-                          <AgendaItemIcon type={event.item_type} />
-                          <span className="truncate">{event.title}</span>
+                          {event.title}
                         </span>
-                        {height > 32 && (
+                        {height > 44 && (
                           <span className="block truncate opacity-90">
                             {format(new Date(event.starts_at), 'HH:mm')} – {format(new Date(event.ends_at), 'HH:mm')}
                           </span>
@@ -281,7 +281,7 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                         <PopoverTrigger asChild>
                           <button
                             type="button"
-                            className="absolute z-40 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-foreground shadow-sm hover:bg-accent"
+                            className="absolute z-40 rounded bg-card/90 px-1 py-px text-[10px] font-semibold text-foreground/80 shadow-sm hover:bg-accent"
                             style={{ top: top + 2, right: 2 }}
                           >
                             +{hidden.length}
