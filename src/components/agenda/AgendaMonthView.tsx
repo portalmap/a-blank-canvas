@@ -72,7 +72,11 @@ export function AgendaMonthView({ reference, events, onSelectDay, onSelectEvent 
                       <AgendaItemIcon type={e.item_type} />
                     </span>
                     <span
-                      className={`truncate ${e.completed_at ? 'text-muted-foreground line-through' : ''}`}
+                      className={`truncate ${
+                        e.completed_at || e.response_status === 'declined'
+                          ? 'text-muted-foreground line-through'
+                          : ''
+                      } ${e.response_status === 'tentative' ? 'italic text-muted-foreground' : ''}`}
                     >
                       {!e.all_day && `${format(new Date(e.starts_at), 'HH:mm')} `}
                       {e.title}
