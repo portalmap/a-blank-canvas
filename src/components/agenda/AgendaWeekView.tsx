@@ -90,10 +90,11 @@ function layoutDay(dayEvents: CalendarEvent[], day: Date): DayLayout {
     const total = visible.length;
 
     visible.forEach((col, index) => {
-      // Escalonamento estilo Google: avança sobre o vizinho e fica mais largo que a fatia exata.
-      const slot = 100 / total;
-      const left = index * slot * (1 - OVERLAP / Math.max(total - 1, 1));
-      const width = Math.min(slot * (1 + OVERLAP), 100 - left);
+      // Escalonamento estilo Google: cada bloco vai até a borda direita,
+      // deixando só uma faixa fina do bloco anterior visível à esquerda.
+      const step = total > 1 ? Math.min(STRIP, 70 / (total - 1)) : 0;
+      const left = index * step;
+      const width = 100 - left;
       for (const item of col) {
         const startMin = (item.start - dayStart) / 60_000;
         const endMin = (item.end - dayStart) / 60_000;
