@@ -74,7 +74,17 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate, defa
   const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
 
+  const respondInvite = useRespondInvite();
+
   const isOwner = !event || event.user_id === user?.id;
+
+  // Convite próprio: linha de convidado do usuário ou cópia importada do Google.
+  const myGuest = useMemo(
+    () => (existingGuests ?? []).find((g) => g.user_id === user?.id),
+    [existingGuests, user?.id],
+  );
+  const canRespond = !!myGuest || !!event?.response_status;
+  const myResponse = myGuest?.response_status ?? event?.response_status ?? 'needsAction';
 
   const [itemType, setItemType] = useState<AgendaItemType>(defaultType);
   const [title, setTitle] = useState('');
