@@ -631,7 +631,7 @@ export async function pushRsvpToGoogle(
     return { pushed: false, reason: message };
   }
 
-  const attendees = ((current.body?.attendees ?? []) as GoogleEvent['attendees']) ?? [];
+  const attendees = (current.body?.attendees ?? []) as NonNullable<GoogleEvent['attendees']>;
   const updated = attendees.map((a) => (a.self ? { ...a, responseStatus: status } : a));
   if (!updated.some((a) => a.self)) return { pushed: false, reason: 'sem-convite-para-o-usuario' };
 
