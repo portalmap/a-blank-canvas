@@ -221,8 +221,10 @@ export function AgendaWeekView({ days, events, onSelectEvent, onSelectSlot }: Pr
                       >
                         <span
                           className={`flex items-center gap-1 truncate font-semibold ${
-                            event.completed_at ? 'line-through opacity-80' : ''
-                          }`}
+                            event.completed_at || event.response_status === 'declined'
+                              ? 'line-through opacity-80'
+                              : ''
+                          } ${event.response_status === 'tentative' ? 'italic' : ''}`}
                         >
                           <AgendaItemIcon type={event.item_type} />
                           <span className="truncate">{event.title}</span>

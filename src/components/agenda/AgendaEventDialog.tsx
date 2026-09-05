@@ -18,9 +18,12 @@ import { useAllProfiles } from '@/hooks/useAllProfiles';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   AGENDA_ITEM_TYPES,
+  INVITE_RESPONSES,
+  INVITE_RESPONSE_LABEL,
   useCreateEvent,
   useDeleteEvent,
   useEventGuests,
+  useRespondInvite,
   useUpdateEvent,
   type AgendaItemType,
   type CalendarEvent,
@@ -71,7 +74,17 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate, defa
   const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
 
+  const respondInvite = useRespondInvite();
+
   const isOwner = !event || event.user_id === user?.id;
+
+  // Convite próprio: linha de convidado do usuário ou cópia importada do Google.
+  const myGuest = useMemo(
+    () => (existingGuests ?? []).find((g) => g.user_id === user?.id),
+    [existingGuests, user?.id],
+  );
+  const canRespond = !!myGuest || !!event?.response_status;
+  const myResponse = myGuest?.response_status ?? event?.response_status ?? 'needsAction';
 
   const [itemType, setItemType] = useState<AgendaItemType>(defaultType);
   const [title, setTitle] = useState('');
@@ -339,6 +352,47 @@ export function AgendaEventDialog({ open, onOpenChange, event, defaultDate, defa
               </Select>
             </div>
           </div>
+
+          {event && isEventType && canRespond && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <Label className="text-sm font-medium">Você vai participar?</Label>
+              <div className="flex flex-wrap gap-2">
+                {INVITE_RESPONSES.map((r) => (
+                  <Button
+                    key={r.value}
+                    type="button"
+                    size="sm"
+                    variant={myResponse === r.value ? 'default' : 'outline'}
+                    disabled={respondInvite.isPending}
+                    onClick={() => respondInvite.mutate({ eventId: event.id, status: r.value })}
+                  >
+                    {r.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                A sua resposta é enviada ao Google e aos organizadores.
+              </p>
+            </div>
+          )}
+
+          {event && isEventType && (existingGuests?.length ?? 0) > 0 && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <Label className="text-sm font-medium">Respostas dos convidados</Label>
+              <ul className="space-y-1 text-xs">
+                {(existingGuests ?? []).map((g) => (
+                  <li key={g.id} className="flex items-center justify-between gap-2">
+                    <span className="truncate text-muted-foreground">
+                      {g.display_name || g.email || 'Convidado'}
+                    </span>
+                    <Badge variant="secondary">
+                      {INVITE_RESPONSE_LABEL[g.response_status] ?? 'Sem resposta'}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {isOwner && isEventType && (
             <div className="space-y-3 rounded-md border border-border p-3">

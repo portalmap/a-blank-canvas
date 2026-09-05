@@ -50,7 +50,15 @@ export function AgendaListView({ days, events, onSelectEvent, onSelectDay }: Pro
                   >
                     <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-foreground">{e.title}</span>
+                      <span
+                        className={`block truncate text-sm font-medium text-foreground ${
+                          e.completed_at || e.response_status === 'declined'
+                            ? 'text-muted-foreground line-through'
+                            : ''
+                        } ${e.response_status === 'tentative' ? 'italic' : ''}`}
+                      >
+                        {e.title}
+                      </span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <Clock className="h-3 w-3" />

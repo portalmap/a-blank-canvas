@@ -234,3 +234,27 @@ export const disconnectGoogleCalendarAccount = createServerFn({ method: 'POST' }
 
     return { ok: true, removed: removed?.length ?? 0, kept: kept?.length ?? 0 };
   });
+
+/** Envia ao Google a resposta (Sim/Não/Talvez) do usuário para um compromisso. */
+export const respondCalendarInvite = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { eventId: string; status: 'accepted' | 'declined' | 'tentative' }) => {
+    if (!input?.eventId) throw new Error('Compromisso inválido');
+    if (!['accepted', 'declined', 'tentative'].includes(input.status)) {
+      throw new Error('Resposta inválida');
+    }
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    // A leitura passa pelo cliente do usuário: as regras de acesso já garantem
+    // que ele só responde a compromissos que pode ver.
+    const { data: event, error } = await context.supabase
+      .from('calendar_events')
+      .select('id')
+      .eq('id', data.eventId)
+      .maybeSingle();
+    if (error || !event) throw new Error('Compromisso não encontrado');
+
+    const { pushRsvpToGoogle } = await import('@/lib/googleCalendarSync.server');
+    return pushRsvpToGoogle(context.userId, data.eventId, data.status);
+  });
