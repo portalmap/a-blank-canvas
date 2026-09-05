@@ -579,3 +579,56 @@ export async function syncUserGoogleCalendar(userId: string): Promise<SyncResult
 
   return { connected: true, pushed, pulled, removed };
 }
+
+/**
+ * Envia ao Google a resposta do usuário (accepted/declined/tentative) para um
+ * compromisso já sincronizado. Retorna { pushed: false } quando não há Google.
+ */
+export async function pushRsvpToGoogle(
+  userId: string,
+  eventId: string,
+  status: 'accepted' | 'declined' | 'tentative',
+): Promise<{ pushed: boolean; reason?: string }> {
+  const { supabaseAdmin: admin } = await import('@/integrations/supabase/client.server');
+
+  const connectionAPIKey = await getConnectionKeyForUser(userId, GOOGLE_CONNECTOR_ID);
+  if (!connectionAPIKey) return { pushed: false, reason: 'sem-conexao' };
+
+  const { data: event } = await admin
+    .from('calendar_events')
+    .select('google_event_id, google_calendar_id, item_type')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (!event?.google_event_id) return { pushed: false, reason: 'sem-evento-google' };
+  if (event.item_type === 'task') return { pushed: false, reason: 'tarefa-sem-rsvp' };
+
+  const calendarId = event.google_calendar_id || 'primary';
+  const path = `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(event.google_event_id)}`;
+
+  const current = await google(connectionAPIKey, path);
+  if (!current.ok) {
+    const message = typeof current.body === 'string' ? current.body : JSON.stringify(current.body);
+    return { pushed: false, reason: message };
+  }
+
+  const attendees = ((current.body?.attendees ?? []) as GoogleEvent['attendees']) ?? [];
+  const updated = attendees.map((a) => (a.self ? { ...a, responseStatus: status } : a));
+  if (!updated.some((a) => a.self)) return { pushed: false, reason: 'sem-convite-para-o-usuario' };
+
+  const res = await google(connectionAPIKey, `${path}?sendUpdates=all`, {
+    method: 'PATCH',
+    body: JSON.stringify({ attendees: updated }),
+  });
+  if (!res.ok) {
+    const message = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+    return { pushed: false, reason: message };
+  }
+
+  await admin
+    .from('calendar_events')
+    .update({ response_status: status, last_synced_at: new Date().toISOString() })
+    .eq('id', eventId);
+
+  return { pushed: true };
+}
